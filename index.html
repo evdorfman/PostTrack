@@ -10032,6 +10032,49 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     ingest_dates: p.ingestDates || [],
     closed_at: p.closedAt || null
   });
+  const BOOKING_KNOWN_FIELDS = ["id", "title", "projectId", "parentBookingId", "bookingStatus", "productionType", "location", "startTime", "endTime", "crewCallTime", "notes", "equipmentIds", "confirmations", "crewInternal", "crewExternal"];
+  const rowToBooking = (row) => ({
+    id: row.id,
+    title: row.title,
+    projectId: row.project_id,
+    parentBookingId: row.parent_booking_id,
+    bookingStatus: row.booking_status,
+    productionType: row.production_type,
+    location: row.location,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    crewCallTime: row.crew_call_time,
+    notes: row.notes || "",
+    equipmentIds: row.equipment_ids || [],
+    confirmations: row.confirmations || [],
+    crewInternal: row.crew_internal || [],
+    crewExternal: row.crew_external || [],
+    ...row.extra || {}
+  });
+  const bookingToRow = (b) => {
+    const extra = {};
+    Object.keys(b).forEach((k) => {
+      if (!BOOKING_KNOWN_FIELDS.includes(k)) extra[k] = b[k];
+    });
+    return {
+      id: b.id,
+      title: b.title,
+      project_id: b.projectId || null,
+      parent_booking_id: b.parentBookingId || null,
+      booking_status: b.bookingStatus || null,
+      production_type: b.productionType || null,
+      location: b.location || null,
+      start_time: b.startTime || null,
+      end_time: b.endTime || null,
+      crew_call_time: b.crewCallTime || null,
+      notes: b.notes || null,
+      equipment_ids: b.equipmentIds || [],
+      confirmations: b.confirmations || [],
+      crew_internal: b.crewInternal || [],
+      crew_external: b.crewExternal || [],
+      extra
+    };
+  };
   const INTAKE_STATUSES = ["New", "In Review", "Assigned", "Archived"];
   const INTAKE_STATUS_COLOR = { "New": "#6366f1", "In Review": "#f59e0b", "Assigned": "#10b981", "Archived": "#6b7280" };
   const INTAKE_FIELD_DEFS = [
@@ -15102,17 +15145,14 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       setMsgs(newMsgs);
       setLoading(true);
       try {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-6",
-            max_tokens: 1500,
+        if (!sb) throw new Error("Backend not configured");
+        const { data, error } = await sb.functions.invoke("agent", {
+          body: {
             system: AGENT_SYSTEM_PROMPT(projects, team),
             messages: newMsgs.map((m) => ({ role: m.role, content: m.content }))
-          })
+          }
         });
-        const data = await res.json();
+        if (error) throw error;
         const reply = ((_a = data.content) == null ? void 0 : _a.map((c) => c.text || "").join("")) || "Sorry, I couldn't get a response.";
         const updates = parseUpdates(reply, projects);
         const msgId = uid();
@@ -15143,10 +15183,10 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       setMsgs((prev) => [...prev, { role: "assistant", content: "No problem, I won't make those changes.", msgId: uid() }]);
       setPendingId(null);
     };
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, !open && /* @__PURE__ */ React.createElement(
       "button",
       {
-        onClick: () => setOpen((o) => !o),
+        onClick: () => setOpen(true),
         style: {
           position: "fixed",
           bottom: 28,
@@ -15162,12 +15202,10 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: open ? 20 : 22,
-          transition: "transform 0.2s,font-size 0.1s",
-          transform: open ? "rotate(0deg)" : "none"
+          fontSize: 22
         }
       },
-      open ? "\xD7" : "\u2726"
+      "\u2726"
     ), open && /* @__PURE__ */ React.createElement("div", { style: {
       position: "fixed",
       right: 0,
@@ -15191,6 +15229,14 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         title: "Clear chat"
       },
       "CLR"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setOpen(false),
+        style: { background: "#1f2937", border: "none", borderRadius: 6, color: "#9ca3af", width: 24, height: 24, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+        title: "Close"
+      },
+      "\xD7"
     )), /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 auto", minHeight: 0, overflowY: "scroll", WebkitOverflowScrolling: "touch", padding: "16px 14px 28px" } }, msgs.map((m, i) => /* @__PURE__ */ React.createElement(
       AgentMsgBubble,
       {
@@ -17656,6 +17702,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       });
     };
     const projectsLoadedRef = useRef(false);
+    const bookingsLoadedRef = useRef(false);
     useEffect(() => {
       const safeGet = (key, shared) => {
         var _a;
@@ -17793,6 +17840,10 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         if (!error && data) setProjects(data.map(rowToProject));
         projectsLoadedRef.current = true;
       });
+      sb.from("studio_bookings").select("*").then(({ data, error }) => {
+        if (!error && data) setStudioBookings(data.map(rowToBooking));
+        bookingsLoadedRef.current = true;
+      });
     }, [authed]);
     useEffect(() => {
       if (!projectsLoadedRef.current || !sb) return;
@@ -17801,6 +17852,12 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       sb.from("projects").upsert(real.map(projectToRow)).then(() => {
       });
     }, [projects]);
+    useEffect(() => {
+      if (!bookingsLoadedRef.current || !sb) return;
+      if (!studioBookings.length) return;
+      sb.from("studio_bookings").upsert(studioBookings.map(bookingToRow)).then(() => {
+      });
+    }, [studioBookings]);
     const [appPresets, setAppPresets] = useState([BEC_EVENT_PRESET]);
     const saveAppPresets = useCallback((ps) => {
       var _a;
