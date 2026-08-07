@@ -14709,6 +14709,30 @@ const projectToRow = p => ({
   closed_at: p.closedAt||null,
 });
 
+// Explicit fields get their own columns; anything else on a booking object
+// (e.g. rejectionNote, set only when a Broadcast Manager denies a booking)
+// round-trips through the `extra` JSONB catch-all instead of being dropped.
+const BOOKING_KNOWN_FIELDS = ["id","title","projectId","parentBookingId","bookingStatus","productionType","location","startTime","endTime","crewCallTime","notes","equipmentIds","confirmations","crewInternal","crewExternal"];
+const rowToBooking = row => ({
+  id: row.id, title: row.title, projectId: row.project_id, parentBookingId: row.parent_booking_id,
+  bookingStatus: row.booking_status, productionType: row.production_type, location: row.location,
+  startTime: row.start_time, endTime: row.end_time, crewCallTime: row.crew_call_time, notes: row.notes||"",
+  equipmentIds: row.equipment_ids||[], confirmations: row.confirmations||[],
+  crewInternal: row.crew_internal||[], crewExternal: row.crew_external||[],
+  ...(row.extra||{}),
+});
+const bookingToRow = b => {
+  const extra = {};
+  Object.keys(b).forEach(k=>{ if(!BOOKING_KNOWN_FIELDS.includes(k)) extra[k]=b[k]; });
+  return {
+    id: b.id, title: b.title, project_id: b.projectId||null, parent_booking_id: b.parentBookingId||null,
+    booking_status: b.bookingStatus||null, production_type: b.productionType||null, location: b.location||null,
+    start_time: b.startTime||null, end_time: b.endTime||null, crew_call_time: b.crewCallTime||null,
+    notes: b.notes||null, equipment_ids: b.equipmentIds||[], confirmations: b.confirmations||[],
+    crew_internal: b.crewInternal||[], crew_external: b.crewExternal||[], extra,
+  };
+};
+
 const INTAKE_STATUSES = ["New","In Review","Assigned","Archived"];
 const INTAKE_STATUS_COLOR = {"New":"#6366f1","In Review":"#f59e0b","Assigned":"#10b981","Archived":"#6b7280"};
 
@@ -21846,17 +21870,19 @@ const StudioAgent = ({projects, team, onApplyUpdate, onOpenProject}) => {
     setMsgs(newMsgs);
     setLoading(true);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model:"claude-sonnet-4-6",
-          max_tokens:1500,
+      // Calls the "agent" Supabase Edge Function rather than Anthropic
+      // directly — the real API key lives server-side as an Edge Function
+      // secret, never in this browser-visible bundle. Requires being signed
+      // in (sb.functions.invoke sends the current session's JWT, which the
+      // function's default JWT verification checks).
+      if(!sb) throw new Error("Backend not configured");
+      const { data, error } = await sb.functions.invoke("agent", {
+        body: {
           system: AGENT_SYSTEM_PROMPT(projects, team),
           messages: newMsgs.map(m=>({role:m.role, content:m.content})),
-        })
+        },
       });
-      const data = await res.json();
+      if(error) throw error;
       const reply = data.content?.map(c=>c.text||"").join("") || "Sorry, I couldn't get a response.";
       const updates = parseUpdates(reply, projects);
       const msgId = uid();
@@ -21891,14 +21917,18 @@ const StudioAgent = ({projects, team, onApplyUpdate, onOpenProject}) => {
 
   return (
     <>
-      {/* FAB */}
-      <button onClick={()=>setOpen(o=>!o)}
-        style={{position:"fixed",bottom:28,right:28,zIndex:900,width:52,height:52,borderRadius:"50%",
-          background:"linear-gradient(135deg,#6366f1,#8b5cf6)",border:"none",cursor:"pointer",
-          boxShadow:"0 4px 20px #6366f160",display:"flex",alignItems:"center",justifyContent:"center",
-          fontSize:open?20:22,transition:"transform 0.2s,font-size 0.1s",transform:open?"rotate(0deg)":"none"}}>
-        {open?"×":"✦"}
-      </button>
+      {/* FAB — launcher only; once the panel is open it has its own close
+          button in the header below, since this fixed bottom-right position
+          otherwise sits on top of the panel's own send button. */}
+      {!open&&(
+        <button onClick={()=>setOpen(true)}
+          style={{position:"fixed",bottom:28,right:28,zIndex:900,width:52,height:52,borderRadius:"50%",
+            background:"linear-gradient(135deg,#6366f1,#8b5cf6)",border:"none",cursor:"pointer",
+            boxShadow:"0 4px 20px #6366f160",display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:22}}>
+          ✦
+        </button>
+      )}
 
       {/* Panel */}
       {open&&(
@@ -21916,6 +21946,9 @@ const StudioAgent = ({projects, team, onApplyUpdate, onOpenProject}) => {
             <button onClick={()=>{ setMsgs([{role:"assistant",content:"Conversation cleared. How can I help?",msgId:uid()}]); setPendingId(null); }}
               style={{marginLeft:"auto",background:"none",border:"none",color: "#838ba0",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}
               title="Clear chat">CLR</button>
+            <button onClick={()=>setOpen(false)}
+              style={{background:"#1f2937",border:"none",borderRadius:6,color:"#9ca3af",width:24,height:24,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}
+              title="Close">×</button>
           </div>
 
           {/* Messages */}
@@ -25364,6 +25397,10 @@ export default function App() {
   // fire with the initial SEED_PROJECTS default and clobber real saved data
   // before the async load in the mount effect below has had a chance to apply it.
   const projectsLoadedRef = useRef(false);
+  // Same guard, for studio bookings (which start at [] rather than a seed
+  // constant, so there's no clobbering risk from the default — this still
+  // exists so the very first authed load doesn't race the persist effect).
+  const bookingsLoadedRef = useRef(false);
 
   // Load persisted admin data on mount.
   // Each lookup gets its own .catch(()=>null) so a single missing key (e.g. a
@@ -25426,6 +25463,10 @@ export default function App() {
       if(!error && data) setProjects(data.map(rowToProject));
       projectsLoadedRef.current = true;
     });
+    sb.from("studio_bookings").select("*").then(({data,error})=>{
+      if(!error && data) setStudioBookings(data.map(rowToBooking));
+      bookingsLoadedRef.current = true;
+    });
   },[authed]);
 
   // Projects (the user's actual campaigns/deliverables) are the one collection
@@ -25448,6 +25489,16 @@ export default function App() {
     if(!real.length) return;
     sb.from("projects").upsert(real.map(projectToRow)).then(()=>{});
   },[projects]);
+
+  // Studio bookings previously had zero persistence of any kind (not even
+  // window.storage) — they reset to empty on every refresh, for everyone.
+  // Same watcher pattern as projects, same one-directional caveat (no
+  // realtime yet).
+  useEffect(()=>{
+    if(!bookingsLoadedRef.current || !sb) return;
+    if(!studioBookings.length) return;
+    sb.from("studio_bookings").upsert(studioBookings.map(bookingToRow)).then(()=>{});
+  },[studioBookings]);
 
   // App-level preset state — shared between AdminView (manage) and ProductionSection (use)
   const [appPresets, setAppPresets] = useState([BEC_EVENT_PRESET]);
