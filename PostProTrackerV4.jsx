@@ -25332,13 +25332,24 @@ export default function App() {
     ingestRemainingPct:   {...DEFAULT_INGEST_REMAINING_PCT},
     assignablePercent:    DEFAULT_ASSIGNABLE_PERCENT,
   });
+  // Supabase writes below all route through this instead of a bare
+  // .then(()=>{}) — a failed write (missing table, RLS denial, schema
+  // mismatch) used to fail completely silently, which is exactly how the
+  // studio_bookings gap went unnoticed. Now it logs to console AND toasts,
+  // so "it doesn't look like it's saving" comes with an actual reason.
+  const reportSbError = (label, error) => {
+    if(!error) return;
+    console.error(`[Supabase] ${label} failed:`, error);
+    showToast({msg:`${label} failed to save — check console for details`, color:"#ef4444"});
+  };
+
   const saveTeam   = t => {
     const removedIds = teamRoster.filter(m=>!t.some(n=>n.id===m.id)).map(m=>m.id);
     setTeamRoster(t);
     window.storage?.set("posttrack-admin-team",   JSON.stringify(t)).catch(()=>{});
     if(sb){
-      if(removedIds.length) sb.from("team_members").delete().in("id", removedIds).then(()=>{});
-      sb.from("team_members").upsert(t.map(teamMemberToRow)).then(()=>{});
+      if(removedIds.length) sb.from("team_members").delete().in("id", removedIds).then(({error})=>reportSbError("Team member removal", error));
+      sb.from("team_members").upsert(t.map(teamMemberToRow)).then(({error})=>reportSbError("Team roster", error));
     }
   };
   const saveGear   = g => { setGearList(g);      window.storage?.set("posttrack-admin-gear",   JSON.stringify(g)).catch(()=>{}); };
@@ -25487,7 +25498,7 @@ export default function App() {
     // allProjects, so persisting them here would just bloat the table.
     const real = projects.filter(p=>!p._isSeedData);
     if(!real.length) return;
-    sb.from("projects").upsert(real.map(projectToRow)).then(()=>{});
+    sb.from("projects").upsert(real.map(projectToRow)).then(({error})=>reportSbError("Project", error));
   },[projects]);
 
   // Studio bookings previously had zero persistence of any kind (not even
@@ -25497,7 +25508,7 @@ export default function App() {
   useEffect(()=>{
     if(!bookingsLoadedRef.current || !sb) return;
     if(!studioBookings.length) return;
-    sb.from("studio_bookings").upsert(studioBookings.map(bookingToRow)).then(()=>{});
+    sb.from("studio_bookings").upsert(studioBookings.map(bookingToRow)).then(({error})=>reportSbError("Studio booking", error));
   },[studioBookings]);
 
   // App-level preset state — shared between AdminView (manage) and ProductionSection (use)
