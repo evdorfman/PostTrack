@@ -767,6 +767,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     "Replay Operator",
     "Graphics Operator"
   ];
+  const ONBOARDING_ROLE_OPTIONS = [.../* @__PURE__ */ new Set([...ALL_ROLES, ...SETUP_CREW_ROLES])];
+  const ONBOARDING_DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const EXT_CREW_STATUSES = ["Not Booked", "Requested", "Tentative", "Holding", "Booked"];
   const EXT_CREW_STATUS_COLOR = {
     "Not Booked": "#4b5563",
@@ -10000,7 +10002,8 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     rate: row.rate || { type: "salary", amount: null },
     skills: row.skills || [],
     workHours: row.work_hours || { days: [1, 2, 3, 4, 5], start: 9, end: 17, timezone: "EST" },
-    assignablePercent: row.assignable_percent
+    assignablePercent: row.assignable_percent,
+    authUserId: row.auth_user_id || null
   });
   const teamMemberToRow = (m) => {
     var _a;
@@ -10016,7 +10019,8 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
       rate: m.rate || {},
       skills: m.skills || [],
       work_hours: m.workHours || {},
-      assignable_percent: (_a = m.assignablePercent) != null ? _a : null
+      assignable_percent: (_a = m.assignablePercent) != null ? _a : null,
+      auth_user_id: m.authUserId || null
     };
   };
   const rowToProject = (row) => ({
@@ -17521,6 +17525,64 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       busy ? "Signing in\u2026" : "Sign In \u2192"
     ), err && /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 13, marginTop: 10, textAlign: "center" } }, err), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#838ba0", marginTop: 18, textAlign: "center" } }, "Contact your studio coordinator for access")));
   };
+  const OnboardingModal = ({ email, onSubmit, onSkip }) => {
+    const [name, setName] = useState("");
+    const [department, setDepartment] = useState(DEPT_OPTIONS[0]);
+    const [employeeType, setEmployeeType] = useState(EMP_TYPE_OPTIONS[0]);
+    const [roles, setRoles] = useState([]);
+    const [days, setDays] = useState([1, 2, 3, 4, 5]);
+    const [start, setStart] = useState(9);
+    const [end, setEnd] = useState(17);
+    const [timezone, setTimezone] = useState("EST");
+    const [skills, setSkills] = useState([]);
+    const toggleDay = (d) => setDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort());
+    const submit = () => {
+      if (!name.trim()) return;
+      onSubmit({ name: name.trim(), department, employeeType, roles, workHours: { days, start: +start, end: +end, timezone }, skills });
+    };
+    const lbl = { fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 6, display: "block" };
+    const inp = { width: "100%", background: "#0a0f1a", border: "1px solid #374151", borderRadius: 8, color: "#f1f5f9", padding: "9px 12px", fontSize: 14, outline: "none", fontFamily: "'DM Sans',sans-serif", colorScheme: "dark" };
+    return /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 5e3, background: "#000c", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 16, padding: 32, width: "100%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 80px #000c" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 24, fontWeight: 900, color: "#f1f5f9", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 } }, "Welcome to PostTrack"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af", marginBottom: 22, lineHeight: 1.5 } }, "Signed in as ", /* @__PURE__ */ React.createElement("span", { style: { color: "#818cf8" } }, email), " \u2014 set up your profile so the rest of the team can see and assign you."), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Name *"), /* @__PURE__ */ React.createElement("input", { style: inp, value: name, onChange: (e) => setName(e.target.value), placeholder: "Your full name", autoFocus: true })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Department"), /* @__PURE__ */ React.createElement("select", { style: inp, value: department, onChange: (e) => setDepartment(e.target.value) }, DEPT_OPTIONS.map((d) => /* @__PURE__ */ React.createElement("option", { key: d }, d)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Employee Type"), /* @__PURE__ */ React.createElement("select", { style: inp, value: employeeType, onChange: (e) => setEmployeeType(e.target.value) }, EMP_TYPE_OPTIONS.map((t) => /* @__PURE__ */ React.createElement("option", { key: t }, t))))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Roles"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, ONBOARDING_ROLE_OPTIONS.map((r) => {
+      const on = roles.includes(r);
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: r,
+          type: "button",
+          onClick: () => setRoles((prev) => on ? prev.filter((x) => x !== r) : [...prev, r]),
+          style: { background: on ? "#6366f1" : "#111827", border: `1px solid ${on ? "#6366f1" : "#1f2937"}`, borderRadius: 20, color: on ? "#fff" : "#9ca3af", padding: "4px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans',sans-serif" }
+        },
+        r
+      );
+    }))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Hours of Availability"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5, marginBottom: 8 } }, ONBOARDING_DAY_LABELS.map((d, i) => {
+      const on = days.includes(i);
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: i,
+          type: "button",
+          onClick: () => toggleDay(i),
+          style: { flex: 1, background: on ? "#6366f1" : "#111827", border: `1px solid ${on ? "#6366f1" : "#1f2937"}`, borderRadius: 6, color: on ? "#fff" : "#6b7280", padding: "6px 0", fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" }
+        },
+        d
+      );
+    })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } }, /* @__PURE__ */ React.createElement("select", { style: inp, value: start, onChange: (e) => setStart(e.target.value) }, Array.from({ length: 24 }, (_, h) => /* @__PURE__ */ React.createElement("option", { key: h, value: h }, h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`))), /* @__PURE__ */ React.createElement("select", { style: inp, value: end, onChange: (e) => setEnd(e.target.value) }, Array.from({ length: 24 }, (_, h) => /* @__PURE__ */ React.createElement("option", { key: h, value: h }, h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`))), /* @__PURE__ */ React.createElement("select", { style: inp, value: timezone, onChange: (e) => setTimezone(e.target.value) }, ["EST", "CST", "MST", "PST"].map((tz) => /* @__PURE__ */ React.createElement("option", { key: tz }, tz))))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Skills ", /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 400, textTransform: "none", letterSpacing: 0 } }, "(optional)")), /* @__PURE__ */ React.createElement(KeywordsEditor, { value: skills, onChange: setSkills })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: onSkip,
+        style: { flex: "0 0 auto", background: "transparent", border: "1px solid #1f2937", borderRadius: 10, color: "#6b7280", padding: "12px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" }
+      },
+      "Skip for now"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: submit,
+        disabled: !name.trim(),
+        style: { flex: 1, background: name.trim() ? "#6366f1" : "#1f2937", border: "none", borderRadius: 10, color: name.trim() ? "#fff" : "#4b5563", padding: "12px 0", fontSize: 13, fontWeight: 800, cursor: name.trim() ? "pointer" : "not-allowed", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }
+      },
+      "Create My Profile \u2192"
+    ))));
+  };
   function App() {
     const [authed, setAuthed] = useState(false);
     const [authChecked, setAuthChecked] = useState(false);
@@ -17555,7 +17617,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [toast, setToast] = useState(null);
     const pushOffset = usePushOffset();
     const { transformX: pushTransformX, transitionOn: pushTransitionOn } = useAnimatedPushOffset(pushOffset);
-    const [teamRoster, setTeamRoster] = useState(TEAM);
+    const [teamRoster, setTeamRoster] = useState([]);
     const [gearList, setGearList] = useState([
       // Seed a basic gear inventory
       { id: uid(), name: "Sony FX9", category: "Camera", quantity: 2, notes: "" },
@@ -17875,6 +17937,46 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         bookingsLoadedRef.current = true;
       });
     }, [authed]);
+    const [authUser, setAuthUser] = useState(null);
+    useEffect(() => {
+      if (!authed || !sb) {
+        setAuthUser(null);
+        return;
+      }
+      sb.auth.getUser().then(({ data }) => setAuthUser((data == null ? void 0 : data.user) || null));
+    }, [authed]);
+    useEffect(() => {
+      if (!authUser || !sb || !teamRoster.length) return;
+      const email = authUser.email;
+      if (!email) return;
+      const match = teamRoster.find((m) => (m.email || "").toLowerCase() === email.toLowerCase());
+      if (match && match.authUserId !== authUser.id) {
+        setTeamRoster((prev) => prev.map((m) => m.id === match.id ? { ...m, authUserId: authUser.id } : m));
+        sb.from("team_members").update({ auth_user_id: authUser.id }).eq("id", match.id).then(({ error }) => reportSbError("Account link", error));
+      }
+    }, [authUser, teamRoster]);
+    const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+    const needsOnboarding = !!(authed && authUser && !teamRoster.some((m) => m.authUserId === authUser.id) && !onboardingDismissed);
+    const completeOnboarding = (profile) => {
+      if (!authUser) return;
+      const newMember = {
+        id: uid(),
+        name: profile.name,
+        roles: profile.roles,
+        employeeType: profile.employeeType,
+        available: true,
+        email: authUser.email || "",
+        phone: "",
+        department: profile.department,
+        rate: { type: "salary", amount: null },
+        skills: profile.skills,
+        workHours: profile.workHours,
+        assignablePercent: null,
+        authUserId: authUser.id
+      };
+      setTeamRoster((prev) => [...prev, newMember]);
+      if (sb) sb.from("team_members").insert(teamMemberToRow(newMember)).then(({ error }) => reportSbError("Profile creation", error));
+    };
     useEffect(() => {
       if (!projectsLoadedRef.current || !sb) return;
       const real = projects.filter((p) => !p._isSeedData);
@@ -17949,6 +18051,22 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const realProjects = projects.filter((p) => !p._isSeedData);
     const allProjects = showSeedData ? [...realProjects, ...SEED_PROJECTS.map((p) => seedOverrides[p.id] ? { ...p, ...seedOverrides[p.id] } : p)] : realProjects;
     const allStudioBookings = showSeedData ? [...studioBookings, ...STUDIO_BOOKINGS_SEED] : studioBookings;
+    const [showDummyTeam, setShowDummyTeam] = useState(() => {
+      try {
+        return localStorage.getItem("posttrack-dummy-team") !== "false";
+      } catch (e) {
+        return true;
+      }
+    });
+    const toggleDummyTeam = () => setShowDummyTeam((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem("posttrack-dummy-team", next ? "true" : "false");
+      } catch (e) {
+      }
+      return next;
+    });
+    const allTeam = showDummyTeam ? [...teamRoster, ...TEAM] : teamRoster;
     const showToast = useCallback(({ msg, color = "#10b981" }) => {
       setToast({ msg, color });
       setTimeout(() => setToast(null), 3e3);
@@ -18220,6 +18338,13 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         style: { background: showSeedData ? "#10b98118" : "#ef444412", border: `1px solid ${showSeedData ? "#10b98140" : "#ef444440"}`, borderRadius: 5, color: showSeedData ? "#10b981" : "#ef4444", padding: "3px 10px", fontSize: 10, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }
       },
       showSeedData ? "\u25CF On" : "\u25CB Off"
+    )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, borderLeft: "1px solid #1f2937", paddingLeft: 10 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: "#4b5563", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" } }, "Dummy Team"), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: toggleDummyTeam,
+        style: { background: showDummyTeam ? "#10b98118" : "#ef444412", border: `1px solid ${showDummyTeam ? "#10b98140" : "#ef444440"}`, borderRadius: 5, color: showDummyTeam ? "#10b981" : "#ef4444", padding: "3px 10px", fontSize: 10, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }
+      },
+      showDummyTeam ? "\u25CF On" : "\u25CB Off"
     )), /* @__PURE__ */ React.createElement(Btn, { onClick: () => setAddingProject(true) }, "+ New Project"), sb && /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -18228,10 +18353,10 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         style: { background: "transparent", border: "1px solid #1f2937", borderRadius: 5, color: "#6b7280", padding: "3px 10px", fontSize: 10, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }
       },
       "Sign Out"
-    )))), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1600, margin: "0 auto", padding: "20px 24px" } }, /* @__PURE__ */ React.createElement(StatsBar, { projects: allProjects, team: teamRoster, setView: (v) => {
+    )))), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1600, margin: "0 auto", padding: "20px 24px" } }, /* @__PURE__ */ React.createElement(StatsBar, { projects: allProjects, team: allTeam, setView: (v) => {
       setView(v);
       if (v !== "projects") setStatsFilter(null);
-    }, onOpenProject: openProject, onSetStatsFilter: setStatsFilter }), view === "workReview" && /* @__PURE__ */ React.createElement(WorkReviewView, { projects: allProjects, team: teamRoster, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster }), view === "pipeline" && /* @__PURE__ */ React.createElement(PipelineView, { projects: allProjects, team: teamRoster, onOpenProject: openProject, onUpdateProject: updateProject }), view === "animations" && /* @__PURE__ */ React.createElement(AnimationView, { allProjects, team: teamRoster }), view === "intake" && /* @__PURE__ */ React.createElement(
+    }, onOpenProject: openProject, onSetStatsFilter: setStatsFilter }), view === "workReview" && /* @__PURE__ */ React.createElement(WorkReviewView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster }), view === "pipeline" && /* @__PURE__ */ React.createElement(PipelineView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject }), view === "animations" && /* @__PURE__ */ React.createElement(AnimationView, { allProjects, team: allTeam }), view === "intake" && /* @__PURE__ */ React.createElement(
       IntakeView,
       {
         intakes,
@@ -18257,7 +18382,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           });
         }
       }
-    ), view === "projects" && /* @__PURE__ */ React.createElement(ProjectsView, { projects: allProjects, team: teamRoster, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, statsFilter, onClearStatsFilter: () => setStatsFilter(null) }), view === "studio" && /* @__PURE__ */ React.createElement(StudioTab, { projects: allProjects, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, team: teamRoster, onOpenProject: openProject, talentRoster, onUpdateProject: updateProject, mediaCards }), view === "kanban" && kanbanMode === "status" && /* @__PURE__ */ React.createElement(KanbanStatus, { projects: filtered, team: teamRoster, onUpdateDel: updateDel }), view === "kanban" && kanbanMode === "editor" && /* @__PURE__ */ React.createElement(KanbanEditor, { projects: filtered, team: teamRoster, onUpdateDel: updateDel }), view === "calendar" && /* @__PURE__ */ React.createElement(CalendarView, { projects: allProjects, team: teamRoster, onOpenProject: openProject, onCalEventClick: (item) => setCalDrawerItem(item) }), view === "deliverables" && /* @__PURE__ */ React.createElement(DeliverablesTab, { projects: allProjects, team: teamRoster, onOpenProject: openProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, talentRoster }), view === "ingest" && /* @__PURE__ */ React.createElement(IngestView, { projects: allProjects, team: teamRoster, onUpdateProject: updateProject, onAddDel: addDel, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster }), view === "resources" && /* @__PURE__ */ React.createElement(ResourceView, { projects: allProjects, team: teamRoster, studioBookings: allStudioBookings, resourceConfig, onUpdateProject: updateProject, unavailability, onUpdateDel: updateDel }), view === "myview" && /* @__PURE__ */ React.createElement(MyView, { projects: allProjects, team: teamRoster, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, showToast, nudges, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, unavailability, onAddUnavailability: addUnavailability, onDeleteUnavailability: deleteUnavailability }), view === "admin" && /* @__PURE__ */ React.createElement(
+    ), view === "projects" && /* @__PURE__ */ React.createElement(ProjectsView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, statsFilter, onClearStatsFilter: () => setStatsFilter(null) }), view === "studio" && /* @__PURE__ */ React.createElement(StudioTab, { projects: allProjects, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, team: allTeam, onOpenProject: openProject, talentRoster, onUpdateProject: updateProject, mediaCards }), view === "kanban" && kanbanMode === "status" && /* @__PURE__ */ React.createElement(KanbanStatus, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "kanban" && kanbanMode === "editor" && /* @__PURE__ */ React.createElement(KanbanEditor, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "calendar" && /* @__PURE__ */ React.createElement(CalendarView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onCalEventClick: (item) => setCalDrawerItem(item) }), view === "deliverables" && /* @__PURE__ */ React.createElement(DeliverablesTab, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, talentRoster }), view === "ingest" && /* @__PURE__ */ React.createElement(IngestView, { projects: allProjects, team: allTeam, onUpdateProject: updateProject, onAddDel: addDel, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster }), view === "resources" && /* @__PURE__ */ React.createElement(ResourceView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, resourceConfig, onUpdateProject: updateProject, unavailability, onUpdateDel: updateDel }), view === "myview" && /* @__PURE__ */ React.createElement(MyView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, showToast, nudges, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, unavailability, onAddUnavailability: addUnavailability, onDeleteUnavailability: deleteUnavailability }), view === "admin" && /* @__PURE__ */ React.createElement(
       AdminView,
       {
         team: teamRoster,
@@ -18294,10 +18419,10 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         presets: appPresets,
         onUpdatePresets: saveAppPresets
       }
-    )), calDrawerItem && view === "calendar" && /* @__PURE__ */ React.createElement(CalEventDrawer, { item: calDrawerItem, projects, team: teamRoster, onClose: () => setCalDrawerItem(null), onUpdateProject: updateProject, onOpenProject: openProject }), liveSelected && /* @__PURE__ */ React.createElement(ProjectOverview, { project: liveSelected, team: teamRoster, allProjects, onClose: () => setSelected(null), onUpdateDel: updateDel, onAddDel: addDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, initialTab: initialTab == null ? void 0 : initialTab.tab, initialShootId: initialTab == null ? void 0 : initialTab.itemId, initialItemId: initialTab == null ? void 0 : initialTab.itemId, studioBookings: allStudioBookings, mediaCards, setupTypes, onAddSetupType: addSetupType, talentRoster, onUpdateTalentRoster: saveTalentRoster, nudges, onAddNudge: addNudge, furnitureList, propsList, screenContentOptions, gearList, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, appPresets, onSaveAppPresets: saveAppPresets, vendorCompanies, addVendorCompany, intakes, becRequests }), addingProject && /* @__PURE__ */ React.createElement(AddProjectModal, { team: teamRoster, existingProjects: allProjects, onClose: () => setAddingProject(false), onAdd: addProject }), createFromIntake && /* @__PURE__ */ React.createElement(
+    )), calDrawerItem && view === "calendar" && /* @__PURE__ */ React.createElement(CalEventDrawer, { item: calDrawerItem, projects, team: allTeam, onClose: () => setCalDrawerItem(null), onUpdateProject: updateProject, onOpenProject: openProject }), liveSelected && /* @__PURE__ */ React.createElement(ProjectOverview, { project: liveSelected, team: allTeam, allProjects, onClose: () => setSelected(null), onUpdateDel: updateDel, onAddDel: addDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, initialTab: initialTab == null ? void 0 : initialTab.tab, initialShootId: initialTab == null ? void 0 : initialTab.itemId, initialItemId: initialTab == null ? void 0 : initialTab.itemId, studioBookings: allStudioBookings, mediaCards, setupTypes, onAddSetupType: addSetupType, talentRoster, onUpdateTalentRoster: saveTalentRoster, nudges, onAddNudge: addNudge, furnitureList, propsList, screenContentOptions, gearList, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, appPresets, onSaveAppPresets: saveAppPresets, vendorCompanies, addVendorCompany, intakes, becRequests }), addingProject && /* @__PURE__ */ React.createElement(AddProjectModal, { team: allTeam, existingProjects: allProjects, onClose: () => setAddingProject(false), onAdd: addProject }), createFromIntake && /* @__PURE__ */ React.createElement(
       AddProjectModal,
       {
-        team: teamRoster,
+        team: allTeam,
         existingProjects: allProjects,
         initialData: createFromIntake,
         onClose: () => setCreateFromIntake(null),
@@ -18334,7 +18459,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       StudioAgent,
       {
         projects,
-        team: teamRoster,
+        team: allTeam,
         onOpenProject: openProject,
         onApplyUpdate: (update) => {
           if (!update) return;
@@ -18418,7 +18543,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           });
         }
       }
-    ), toast && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 600, background: toast.color, borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 700, color: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,0.4)", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", pointerEvents: "none", animation: "fadeInUp 0.2s ease" } }, toast.msg)));
+    ), toast && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 600, background: toast.color, borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 700, color: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,0.4)", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", pointerEvents: "none", animation: "fadeInUp 0.2s ease" } }, toast.msg), needsOnboarding && /* @__PURE__ */ React.createElement(OnboardingModal, { email: authUser.email, onSubmit: completeOnboarding, onSkip: () => setOnboardingDismissed(true) })));
   }
   window.App = App;
 })();

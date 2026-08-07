@@ -411,6 +411,11 @@ const SETUP_TYPES_STORAGE_KEY = "posttrack-setup-types-v1";
 const SETUP_PHOTO_PREFIX = "setup-photo:";
 const SETUP_CREW_ROLES = ["DP","Gaffer","Assistant Camera","Sound Mixer","Hair and Makeup","Producer","Director","Production Assistant",
   "Live Director","Technical Director","Broadcast Coordinator","Camera Op","Audio Tech","Lighting Director","EVS Operator","Replay Operator","Graphics Operator"];
+// Full role vocabulary for the onboarding form's role picker — post-production
+// roles (ALL_ROLES) plus production/broadcast crew roles (SETUP_CREW_ROLES),
+// deduplicated, since a new person could be either kind.
+const ONBOARDING_ROLE_OPTIONS = [...new Set([...ALL_ROLES, ...SETUP_CREW_ROLES])];
+const ONBOARDING_DAY_LABELS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
 // External crew booking lifecycle statuses
 const EXT_CREW_STATUSES = ["Not Booked","Requested","Tentative","Holding","Booked"];
@@ -14688,12 +14693,13 @@ const rowToTeamMember = row => ({
   available: row.available, email: row.email||"", phone: row.phone||"", department: row.department,
   rate: row.rate||{type:"salary",amount:null}, skills: row.skills||[],
   workHours: row.work_hours||{days:[1,2,3,4,5],start:9,end:17,timezone:"EST"},
-  assignablePercent: row.assignable_percent,
+  assignablePercent: row.assignable_percent, authUserId: row.auth_user_id||null,
 });
 const teamMemberToRow = m => ({
   id: m.id, name: m.name, roles: m.roles||[], employee_type: m.employeeType,
   available: m.available, email: m.email||null, phone: m.phone||null, department: m.department,
   rate: m.rate||{}, skills: m.skills||[], work_hours: m.workHours||{}, assignable_percent: m.assignablePercent ?? null,
+  auth_user_id: m.authUserId||null,
 });
 
 const rowToProject = row => ({
@@ -25268,6 +25274,113 @@ const SupabaseAuthGate = () => {
   );
 };
 
+// Shown once per session to a signed-in person with no linked team_members
+// row — creates their real profile directly, rather than requiring an admin
+// to pre-seed a row with a matching email first.
+const OnboardingModal = ({email, onSubmit, onSkip}) => {
+  const [name,setName] = useState("");
+  const [department,setDepartment] = useState(DEPT_OPTIONS[0]);
+  const [employeeType,setEmployeeType] = useState(EMP_TYPE_OPTIONS[0]);
+  const [roles,setRoles] = useState([]);
+  const [days,setDays] = useState([1,2,3,4,5]);
+  const [start,setStart] = useState(9);
+  const [end,setEnd] = useState(17);
+  const [timezone,setTimezone] = useState("EST");
+  const [skills,setSkills] = useState([]);
+  const toggleDay = d => setDays(prev=>prev.includes(d)?prev.filter(x=>x!==d):[...prev,d].sort());
+  const submit = () => {
+    if(!name.trim()) return;
+    onSubmit({name:name.trim(),department,employeeType,roles,workHours:{days,start:+start,end:+end,timezone},skills});
+  };
+  const lbl={fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.08em",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:6,display:"block"};
+  const inp={width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:8,color:"#f1f5f9",padding:"9px 12px",fontSize:14,outline:"none",fontFamily:"'DM Sans',sans-serif",colorScheme:"dark"};
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:5000,background:"#000c",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:16,padding:32,width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 24px 80px #000c"}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:900,color:"#f1f5f9",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Welcome to PostTrack</div>
+        <div style={{fontSize:13,color:"#9ca3af",marginBottom:22,lineHeight:1.5}}>Signed in as <span style={{color:"#818cf8"}}>{email}</span> — set up your profile so the rest of the team can see and assign you.</div>
+
+        <div style={{marginBottom:14}}>
+          <label style={lbl}>Name *</label>
+          <input style={inp} value={name} onChange={e=>setName(e.target.value)} placeholder="Your full name" autoFocus/>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+          <div>
+            <label style={lbl}>Department</label>
+            <select style={inp} value={department} onChange={e=>setDepartment(e.target.value)}>
+              {DEPT_OPTIONS.map(d=><option key={d}>{d}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Employee Type</label>
+            <select style={inp} value={employeeType} onChange={e=>setEmployeeType(e.target.value)}>
+              {EMP_TYPE_OPTIONS.map(t=><option key={t}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{marginBottom:14}}>
+          <label style={lbl}>Roles</label>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {ONBOARDING_ROLE_OPTIONS.map(r=>{
+              const on = roles.includes(r);
+              return (
+                <button key={r} type="button" onClick={()=>setRoles(prev=>on?prev.filter(x=>x!==r):[...prev,r])}
+                  style={{background:on?"#6366f1":"#111827",border:`1px solid ${on?"#6366f1":"#1f2937"}`,borderRadius:20,color:on?"#fff":"#9ca3af",padding:"4px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+                  {r}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{marginBottom:14}}>
+          <label style={lbl}>Hours of Availability</label>
+          <div style={{display:"flex",gap:5,marginBottom:8}}>
+            {ONBOARDING_DAY_LABELS.map((d,i)=>{
+              const on = days.includes(i);
+              return (
+                <button key={i} type="button" onClick={()=>toggleDay(i)}
+                  style={{flex:1,background:on?"#6366f1":"#111827",border:`1px solid ${on?"#6366f1":"#1f2937"}`,borderRadius:6,color:on?"#fff":"#6b7280",padding:"6px 0",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            <select style={inp} value={start} onChange={e=>setStart(e.target.value)}>
+              {Array.from({length:24},(_,h)=><option key={h} value={h}>{h===0?"12 AM":h<12?`${h} AM`:h===12?"12 PM":`${h-12} PM`}</option>)}
+            </select>
+            <select style={inp} value={end} onChange={e=>setEnd(e.target.value)}>
+              {Array.from({length:24},(_,h)=><option key={h} value={h}>{h===0?"12 AM":h<12?`${h} AM`:h===12?"12 PM":`${h-12} PM`}</option>)}
+            </select>
+            <select style={inp} value={timezone} onChange={e=>setTimezone(e.target.value)}>
+              {["EST","CST","MST","PST"].map(tz=><option key={tz}>{tz}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{marginBottom:22}}>
+          <label style={lbl}>Skills <span style={{fontWeight:400,textTransform:"none",letterSpacing:0}}>(optional)</span></label>
+          <KeywordsEditor value={skills} onChange={setSkills}/>
+        </div>
+
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={onSkip}
+            style={{flex:"0 0 auto",background:"transparent",border:"1px solid #1f2937",borderRadius:10,color:"#6b7280",padding:"12px 18px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
+            Skip for now
+          </button>
+          <button onClick={submit} disabled={!name.trim()}
+            style={{flex:1,background:name.trim()?"#6366f1":"#1f2937",border:"none",borderRadius:10,color:name.trim()?"#fff":"#4b5563",padding:"12px 0",fontSize:13,fontWeight:800,cursor:name.trim()?"pointer":"not-allowed",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>
+            Create My Profile →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   // Real per-person auth via Supabase, replacing the old shared-password gate.
   // authChecked stays false only for the brief moment while we ask Supabase
@@ -25296,7 +25409,11 @@ export default function App() {
   const pushOffset = usePushOffset();
   const {transformX:pushTransformX, transitionOn:pushTransitionOn} = useAnimatedPushOffset(pushOffset);
   // ── Admin repositories — stateful so they can be edited ──
-  const [teamRoster, setTeamRoster] = useState(TEAM);
+  // Real roster starts empty — TEAM is now purely placeholder "dummy" data,
+  // shown only while showDummyTeam is on (see below), the same way
+  // SEED_PROJECTS works for projects. Real people join via the onboarding
+  // form on first login instead of an admin pre-seeding rows for them.
+  const [teamRoster, setTeamRoster] = useState([]);
   const [gearList,   setGearList]   = useState([
     // Seed a basic gear inventory
     {id:uid(),name:"Sony FX9",           category:"Camera",  quantity:2, notes:""},
@@ -25484,6 +25601,51 @@ export default function App() {
     });
   },[authed]);
 
+  // The signed-in Supabase Auth user, looked up once per sign-in and shared
+  // by both the email-match auto-linker below and the onboarding gate
+  // further down — avoids every consumer calling sb.auth.getUser() itself.
+  const [authUser, setAuthUser] = useState(null);
+  useEffect(()=>{
+    if(!authed || !sb){ setAuthUser(null); return; }
+    sb.auth.getUser().then(({data})=>setAuthUser(data?.user||null));
+  },[authed]);
+
+  // Opportunistic fallback: if a real team_members row already has this
+  // person's email filled in (e.g. an admin pre-created it), link it
+  // automatically. The primary path for new people is the onboarding form
+  // below, which sets authUserId directly on creation — this just covers
+  // the case where a real row predates their first login. Naturally
+  // idempotent: once authUserId is set locally, the comparison below skips
+  // re-writing it on later runs.
+  useEffect(()=>{
+    if(!authUser || !sb || !teamRoster.length) return;
+    const email = authUser.email;
+    if(!email) return;
+    const match = teamRoster.find(m=>(m.email||"").toLowerCase()===email.toLowerCase());
+    if(match && match.authUserId!==authUser.id){
+      setTeamRoster(prev=>prev.map(m=>m.id===match.id?{...m,authUserId:authUser.id}:m));
+      sb.from("team_members").update({auth_user_id:authUser.id}).eq("id",match.id).then(({error})=>reportSbError("Account link",error));
+    }
+  },[authUser, teamRoster]);
+
+  // Onboarding: a signed-in person with no linked team_members row yet gets
+  // prompted to create their own profile, rather than an admin needing to
+  // pre-seed a row with a matching email. Dismissal isn't persisted, so it
+  // asks again next session if skipped — a light nudge, not a hard gate.
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+  const needsOnboarding = !!(authed && authUser && !teamRoster.some(m=>m.authUserId===authUser.id) && !onboardingDismissed);
+  const completeOnboarding = profile => {
+    if(!authUser) return;
+    const newMember = {
+      id: uid(), name: profile.name, roles: profile.roles, employeeType: profile.employeeType,
+      available: true, email: authUser.email||"", phone: "", department: profile.department,
+      rate: {type:"salary",amount:null}, skills: profile.skills, workHours: profile.workHours,
+      assignablePercent: null, authUserId: authUser.id,
+    };
+    setTeamRoster(prev=>[...prev, newMember]);
+    if(sb) sb.from("team_members").insert(teamMemberToRow(newMember)).then(({error})=>reportSbError("Profile creation",error));
+  };
+
   // Projects (the user's actual campaigns/deliverables) are the one collection
   // that previously had no persistence at all — every other collection here
   // (team, gear, presets, intakes, etc.) auto-saves via window.storage, but
@@ -25575,6 +25737,21 @@ export default function App() {
     : realProjects;
   // Seed studio bookings governed by the same toggle as seed projects
   const allStudioBookings = showSeedData ? [...studioBookings, ...STUDIO_BOOKINGS_SEED] : studioBookings;
+
+  // Dummy team toggle — same pattern as showSeedData. teamRoster itself is
+  // always the real, Supabase-backed roster; TEAM (the old 40-person
+  // placeholder list) is merged in only for display, only while this is on,
+  // and is never saved. Turning it off removes the dummy people from every
+  // view without touching real data.
+  const [showDummyTeam, setShowDummyTeam] = useState(()=>{
+    try { return localStorage.getItem('posttrack-dummy-team') !== 'false'; } catch(e) { return true; }
+  });
+  const toggleDummyTeam = () => setShowDummyTeam(v=>{
+    const next = !v;
+    try { localStorage.setItem('posttrack-dummy-team', next?'true':'false'); } catch(e){}
+    return next;
+  });
+  const allTeam = showDummyTeam ? [...teamRoster, ...TEAM] : teamRoster;
 
   // Show a toast for 3 seconds
   const showToast = useCallback(({msg, color="#10b981"}) => {
@@ -25880,6 +26057,13 @@ export default function App() {
                   {showSeedData?"● On":"○ Off"}
                 </button>
               </div>
+              <div style={{display:"flex",alignItems:"center",gap:5,borderLeft:"1px solid #1f2937",paddingLeft:10}}>
+                <span style={{fontSize:10,fontWeight:700,color:"#4b5563",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em",whiteSpace:"nowrap"}}>Dummy Team</span>
+                <button onClick={toggleDummyTeam}
+                  style={{background:showDummyTeam?"#10b98118":"#ef444412",border:`1px solid ${showDummyTeam?"#10b98140":"#ef444440"}`,borderRadius:5,color:showDummyTeam?"#10b981":"#ef4444",padding:"3px 10px",fontSize:10,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",whiteSpace:"nowrap"}}>
+                  {showDummyTeam?"● On":"○ Off"}
+                </button>
+              </div>
               <Btn onClick={()=>setAddingProject(true)}>+ New Project</Btn>
               {sb&&<button onClick={()=>sb.auth.signOut()} title="Sign out"
                 style={{background:"transparent",border:"1px solid #1f2937",borderRadius:5,color:"#6b7280",padding:"3px 10px",fontSize:10,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",whiteSpace:"nowrap"}}>
@@ -25890,10 +26074,10 @@ export default function App() {
         </div>
 
         <div style={{maxWidth:1600,margin:"0 auto",padding:"20px 24px"}}>
-          <StatsBar projects={allProjects} team={teamRoster} setView={v=>{setView(v);if(v!=="projects")setStatsFilter(null);}} onOpenProject={openProject} onSetStatsFilter={setStatsFilter}/>
-          {view==="workReview"&&<WorkReviewView projects={allProjects} team={teamRoster} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster}/>}
-          {view==="pipeline"&&<PipelineView projects={allProjects} team={teamRoster} onOpenProject={openProject} onUpdateProject={updateProject}/>}
-          {view==="animations"&&<AnimationView allProjects={allProjects} team={teamRoster}/>}
+          <StatsBar projects={allProjects} team={allTeam} setView={v=>{setView(v);if(v!=="projects")setStatsFilter(null);}} onOpenProject={openProject} onSetStatsFilter={setStatsFilter}/>
+          {view==="workReview"&&<WorkReviewView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster}/>}
+          {view==="pipeline"&&<PipelineView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject}/>}
+          {view==="animations"&&<AnimationView allProjects={allProjects} team={allTeam}/>}
           {view==="intake"&&<IntakeView
             intakes={intakes}
             onSaveIntakes={saveIntakes}
@@ -25918,15 +26102,15 @@ export default function App() {
               });
             }}
           />}
-          {view==="projects"&&<ProjectsView projects={allProjects} team={teamRoster} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} statsFilter={statsFilter} onClearStatsFilter={()=>setStatsFilter(null)}/>}
-          {view==="studio"&&<StudioTab projects={allProjects} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} team={teamRoster} onOpenProject={openProject} talentRoster={talentRoster} onUpdateProject={updateProject} mediaCards={mediaCards}/>}
-          {view==="kanban"&&kanbanMode==="status"&&<KanbanStatus projects={filtered} team={teamRoster} onUpdateDel={updateDel}/>}
-          {view==="kanban"&&kanbanMode==="editor"&&<KanbanEditor projects={filtered} team={teamRoster} onUpdateDel={updateDel}/>}
-          {view==="calendar"&&<CalendarView projects={allProjects} team={teamRoster} onOpenProject={openProject} onCalEventClick={item=>setCalDrawerItem(item)}/>}
-          {view==="deliverables"&&<DeliverablesTab projects={allProjects} team={teamRoster} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster}/>}
-          {view==="ingest"&&<IngestView projects={allProjects} team={teamRoster} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster}/>}
-          {view==="resources"&&<ResourceView projects={allProjects} team={teamRoster} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
-          {view==="myview"&&<MyView projects={allProjects} team={teamRoster} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability}/>}
+          {view==="projects"&&<ProjectsView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} statsFilter={statsFilter} onClearStatsFilter={()=>setStatsFilter(null)}/>}
+          {view==="studio"&&<StudioTab projects={allProjects} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} team={allTeam} onOpenProject={openProject} talentRoster={talentRoster} onUpdateProject={updateProject} mediaCards={mediaCards}/>}
+          {view==="kanban"&&kanbanMode==="status"&&<KanbanStatus projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
+          {view==="kanban"&&kanbanMode==="editor"&&<KanbanEditor projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
+          {view==="calendar"&&<CalendarView projects={allProjects} team={allTeam} onOpenProject={openProject} onCalEventClick={item=>setCalDrawerItem(item)}/>}
+          {view==="deliverables"&&<DeliverablesTab projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster}/>}
+          {view==="ingest"&&<IngestView projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster}/>}
+          {view==="resources"&&<ResourceView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
+          {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability}/>}
           {view==="admin"&&<AdminView
             team={teamRoster} onUpdateTeam={saveTeam}
             projects={allProjects} nudges={nudges} onOpenProject={openProject}
@@ -25946,10 +26130,10 @@ export default function App() {
           />}
         </div>
 
-        {calDrawerItem&&view==="calendar"&&<CalEventDrawer item={calDrawerItem} projects={projects} team={teamRoster} onClose={()=>setCalDrawerItem(null)} onUpdateProject={updateProject} onOpenProject={openProject}/>}
-        {liveSelected&&<ProjectOverview project={liveSelected} team={teamRoster} allProjects={allProjects} onClose={()=>setSelected(null)} onUpdateDel={updateDel} onAddDel={addDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} initialTab={initialTab?.tab} initialShootId={initialTab?.itemId} initialItemId={initialTab?.itemId} studioBookings={allStudioBookings} mediaCards={mediaCards} setupTypes={setupTypes} onAddSetupType={addSetupType} talentRoster={talentRoster} onUpdateTalentRoster={saveTalentRoster} nudges={nudges} onAddNudge={addNudge} furnitureList={furnitureList} propsList={propsList} screenContentOptions={screenContentOptions} gearList={gearList} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} appPresets={appPresets} onSaveAppPresets={saveAppPresets} vendorCompanies={vendorCompanies} addVendorCompany={addVendorCompany} intakes={intakes} becRequests={becRequests}/>}
-        {addingProject&&<AddProjectModal team={teamRoster} existingProjects={allProjects} onClose={()=>setAddingProject(false)} onAdd={addProject}/>}
-        {createFromIntake&&<AddProjectModal team={teamRoster} existingProjects={allProjects} initialData={createFromIntake}
+        {calDrawerItem&&view==="calendar"&&<CalEventDrawer item={calDrawerItem} projects={projects} team={allTeam} onClose={()=>setCalDrawerItem(null)} onUpdateProject={updateProject} onOpenProject={openProject}/>}
+        {liveSelected&&<ProjectOverview project={liveSelected} team={allTeam} allProjects={allProjects} onClose={()=>setSelected(null)} onUpdateDel={updateDel} onAddDel={addDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} initialTab={initialTab?.tab} initialShootId={initialTab?.itemId} initialItemId={initialTab?.itemId} studioBookings={allStudioBookings} mediaCards={mediaCards} setupTypes={setupTypes} onAddSetupType={addSetupType} talentRoster={talentRoster} onUpdateTalentRoster={saveTalentRoster} nudges={nudges} onAddNudge={addNudge} furnitureList={furnitureList} propsList={propsList} screenContentOptions={screenContentOptions} gearList={gearList} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} appPresets={appPresets} onSaveAppPresets={saveAppPresets} vendorCompanies={vendorCompanies} addVendorCompany={addVendorCompany} intakes={intakes} becRequests={becRequests}/>}
+        {addingProject&&<AddProjectModal team={allTeam} existingProjects={allProjects} onClose={()=>setAddingProject(false)} onAdd={addProject}/>}
+        {createFromIntake&&<AddProjectModal team={allTeam} existingProjects={allProjects} initialData={createFromIntake}
           onClose={()=>setCreateFromIntake(null)}
           onAdd={proj=>{
             addProject(proj);
@@ -25980,7 +26164,7 @@ export default function App() {
         {/* Studio Agent */}
         <StudioAgent
           projects={projects}
-          team={teamRoster}
+          team={allTeam}
           onOpenProject={openProject}
           onApplyUpdate={update=>{
             if(!update) return;
@@ -26045,6 +26229,7 @@ export default function App() {
             {toast.msg}
           </div>
         )}
+        {needsOnboarding&&<OnboardingModal email={authUser.email} onSubmit={completeOnboarding} onSkip={()=>setOnboardingDismissed(true)}/>}
       </div>
     </>
   );
