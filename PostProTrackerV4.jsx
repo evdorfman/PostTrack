@@ -22023,7 +22023,7 @@ const AdminTeamTab = ({team, onUpdateTeam}) => {
   const [showAdd, setShowAdd]   = useState(false);
   const [importMsg, setImportMsg] = useState(null); // {type:"success"|"error", text}
   const fileInputRef = useRef();
-  const [newMember, setNewMember] = useState({name:"",roles:[],department:"Production",employeeType:"Internal",available:true,email:"",phone:"",skills:[]});
+  const [newMember, setNewMember] = useState({name:"",roles:[],department:"Production",employeeType:"Internal",available:true,email:"",phone:"",skills:[],workHours:{days:[1,2,3,4,5],start:9,end:17,timezone:"EST"}});
 
   const filtered = team.filter(m=>
     !search || m.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -22125,6 +22125,41 @@ const AdminTeamTab = ({team, onUpdateTeam}) => {
     </div>
   );
 
+  const WorkHoursPicker = ({workHours, onChange}) => {
+    const wh = workHours || {days:[1,2,3,4,5],start:9,end:17,timezone:"EST"};
+    const toggleDay = d => onChange({...wh, days:(wh.days||[]).includes(d)?(wh.days||[]).filter(x=>x!==d):[...(wh.days||[]),d].sort()});
+    const hourOpts = Array.from({length:24},(_,h)=><option key={h} value={h}>{h===0?"12 AM":h<12?`${h} AM`:h===12?"12 PM":`${h-12} PM`}</option>);
+    return (
+      <div>
+        <div style={{display:"flex",gap:4,marginBottom:6}}>
+          {ONBOARDING_DAY_LABELS.map((d,i)=>{
+            const on = (wh.days||[]).includes(i);
+            return (
+              <button key={i} type="button" onClick={()=>toggleDay(i)}
+                style={{flex:1,background:on?"#6366f1":"#0a0f1a",border:`1px solid ${on?"#6366f1":"#374151"}`,borderRadius:4,color:on?"#fff":"#6b7280",padding:"4px 0",fontSize:10,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
+                {d}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+          <select value={wh.start??9} onChange={e=>onChange({...wh,start:+e.target.value})}
+            style={{width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:12,outline:"none"}}>
+            {hourOpts}
+          </select>
+          <select value={wh.end??17} onChange={e=>onChange({...wh,end:+e.target.value})}
+            style={{width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:12,outline:"none"}}>
+            {hourOpts}
+          </select>
+          <select value={wh.timezone||"EST"} onChange={e=>onChange({...wh,timezone:e.target.value})}
+            style={{width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:12,outline:"none"}}>
+            {["EST","CST","MST","PST"].map(tz=><option key={tz}>{tz}</option>)}
+          </select>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div>
       {/* Hidden file input for CSV import */}
@@ -22192,6 +22227,14 @@ const AdminTeamTab = ({team, onUpdateTeam}) => {
             <div style={{fontSize:11,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Roles</div>
             <RoleToggle roles={newMember.roles} onChange={r=>setNewMember(p=>({...p,roles:r}))}/>
           </div>
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:11,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Hours of Availability</div>
+            <WorkHoursPicker workHours={newMember.workHours} onChange={wh=>setNewMember(p=>({...p,workHours:wh}))}/>
+          </div>
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:11,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Skills</div>
+            <KeywordsEditor value={newMember.skills||[]} onChange={v=>setNewMember(p=>({...p,skills:v}))}/>
+          </div>
           <button onClick={addMember} disabled={!newMember.name.trim()}
             style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"7px 18px",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",opacity:newMember.name.trim()?1:0.4}}>
             Add Member
@@ -22234,6 +22277,14 @@ const AdminTeamTab = ({team, onUpdateTeam}) => {
                 <div style={{marginBottom:10}}>
                   <div style={{fontSize:11,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Roles</div>
                   <RoleToggle roles={draft.roles||[]} onChange={r=>setDraft(p=>({...p,roles:r}))}/>
+                </div>
+                <div style={{marginBottom:10}}>
+                  <div style={{fontSize:11,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Hours of Availability</div>
+                  <WorkHoursPicker workHours={draft.workHours} onChange={wh=>setDraft(p=>({...p,workHours:wh}))}/>
+                </div>
+                <div style={{marginBottom:10}}>
+                  <div style={{fontSize:11,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Skills</div>
+                  <KeywordsEditor value={draft.skills||[]} onChange={v=>setDraft(p=>({...p,skills:v}))}/>
                 </div>
                 <div style={{display:"flex",gap:6}}>
                   <button onClick={saveEdit} style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"6px 16px",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>Save</button>
