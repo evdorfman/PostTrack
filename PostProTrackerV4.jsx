@@ -742,7 +742,14 @@ const usePushOffset = () => useSyncExternalStore(_subscribePush, _getPushSnapsho
 const usePushPanel = width => {
   const idRef = useRef();
   if(!idRef.current) idRef.current = Symbol("pushPanel");
-  useEffect(()=>{
+  // useLayoutEffect, not useEffect — registration needs to land before the
+  // browser paints, in the same synchronous pass as the width change that
+  // triggered it. With a regular useEffect (deferred to after paint), a
+  // panel's own slide-in and the resulting content push could land in two
+  // separate paints: the browser would briefly paint the unmasked jump,
+  // then a correction on the next paint — a visible flash/lag rather than
+  // one smooth motion.
+  useLayoutEffect(()=>{
     _registerPushPanel(idRef.current, width);
     return ()=>_unregisterPushPanel(idRef.current);
   },[width]);
@@ -768,7 +775,14 @@ const useAnimatedPushOffset = pushOffset => {
   const [transitionOn, setTransitionOn] = useState(false);
   const prevRef = useRef(pushOffset);
   const rafRef = useRef([]);
-  useEffect(()=>{
+  // useLayoutEffect, not useEffect — the masking transform has to be applied
+  // in the same synchronous pass as the marginLeft/width change it's
+  // compensating for. A regular useEffect runs after the browser has already
+  // painted the raw (unmasked) jump, so the corrected position would only
+  // show up on the NEXT paint — a one-frame flash of the full jump before it
+  // snaps back into the masked starting point, which reads as "overshoots
+  // then snaps."
+  useLayoutEffect(()=>{
     const prev = prevRef.current;
     prevRef.current = pushOffset;
     if(prev === pushOffset) return;
@@ -6078,12 +6092,9 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
   const setHistoryOpen = v => { setHistoryOpenRaw(v); if(v) setChecklistOpenRaw(false); };
   // Reads the same live offset ChecklistPanel/HistoryFeedSidebar register via
   // usePushPanel, so the project content shifts in lockstep with whichever
-  // one's open. Fed through useAnimatedPushOffset (the same compositor-only
-  // transform trick the app root uses) instead of animating marginLeft/width
-  // directly — this modal's own tab content reflows (grids, wrapping rows)
-  // the same way ProjectsView's does, so a raw CSS transition on those
-  // properties mid-resize reads as jitter for the same reason documented on
-  // useAnimatedPushOffset itself.
+  // one's open. Fed through useAnimatedPushOffset (now backed by
+  // useLayoutEffect — see its definition) for the same compositor-only
+  // transform-masking trick the app root uses.
   const checklistPushOffset = usePushOffset();
   const {transformX:sidebarTransformX, transitionOn:sidebarTransitionOn} = useAnimatedPushOffset(checklistPushOffset);
   const lp=allProjects.find(p=>p.id===project.id)||project;
@@ -6137,11 +6148,9 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
       {/* The push/transform lives on this inner div, not on Modal's own box
           (via contentStyle) — Modal's outer backdrop is `display:flex;
           justifyContent:center`, and an explicit marginLeft on a centered
-          flex child fights that auto-centering as width changes, which is
-          what was causing the double-motion/overshoot. This div is a normal
-          child inside Modal's own column-flex box (default align-items:
-          stretch, no competing justify-content on this axis), so it pushes
-          the same simple, predictable way the app-level root wrapper does. */}
+          flex child fights that auto-centering as width changes. This div is
+          a normal child inside Modal's own column-flex box (default
+          align-items:stretch, no competing justify-content on this axis). */}
       <div style={{
         height:"100vh",display:"flex",flexDirection:"column",overflow:"hidden",
         marginLeft:checklistPushOffset,

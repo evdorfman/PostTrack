@@ -1060,7 +1060,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   var usePushPanel = (width) => {
     const idRef = useRef();
     if (!idRef.current) idRef.current = /* @__PURE__ */ Symbol("pushPanel");
-    useEffect(() => {
+    useLayoutEffect(() => {
       _registerPushPanel(idRef.current, width);
       return () => _unregisterPushPanel(idRef.current);
     }, [width]);
@@ -1070,7 +1070,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const [transitionOn, setTransitionOn] = useState(false);
     const prevRef = useRef(pushOffset);
     const rafRef = useRef([]);
-    useEffect(() => {
+    useLayoutEffect(() => {
       const prev = prevRef.current;
       prevRef.current = pushOffset;
       if (prev === pushOffset) return;
