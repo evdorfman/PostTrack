@@ -6070,6 +6070,7 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
   const [expandedShoot,setExpandedShoot]=useState(initialShootId||null);
   const [validationErrors,setValidationErrors]=useState(null);
   const [checklistOpen,setChecklistOpen]=useState(false);
+  const [historyOpen,setHistoryOpen]=useState(false);
   // Reads the same live offset ChecklistPanel registers via usePushPanel, so the
   // project content shifts in lockstep with the checklist's own slide animation.
   const checklistPushOffset = usePushOffset();
@@ -6150,6 +6151,10 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
               <button onClick={()=>setChecklistOpen(o=>!o)}
                 style={{background:checklistOpen?"#10b981":"#1f2937",border:`1px solid ${checklistOpen?"#10b981":"#374151"}`,borderRadius:8,color:checklistOpen?"#fff":"#9ca3af",padding:"5px 13px",fontSize:11,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",gap:6,flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>
                 <span>✓</span> Checklist
+              </button>
+              <button onClick={()=>setHistoryOpen(o=>!o)}
+                style={{background:historyOpen?"#6366f1":"#1f2937",border:`1px solid ${historyOpen?"#6366f1":"#374151"}`,borderRadius:8,color:historyOpen?"#fff":"#9ca3af",padding:"5px 13px",fontSize:11,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",gap:6,flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>
+                <span>🕓</span> History
               </button>
             </div>
           </div>
@@ -6963,6 +6968,7 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
       </div>
     </Modal>
     {checklistOpen&&<ChecklistPanel project={lp} team={team} activeTab={activeTab} onClose={()=>setChecklistOpen(false)} nudges={nudges} onAddNudge={onAddNudge}/>}
+    {historyOpen&&<HistoryFeedSidebar title={`${lp.name} — History`} buildQuery={q=>q.eq("project_id",lp.id)} onClose={()=>setHistoryOpen(false)}/>}
     </>
   );
 };
@@ -14694,13 +14700,27 @@ const rowToTeamMember = row => ({
   rate: row.rate||{type:"salary",amount:null}, skills: row.skills||[],
   workHours: row.work_hours||{days:[1,2,3,4,5],start:9,end:17,timezone:"EST"},
   assignablePercent: row.assignable_percent, authUserId: row.auth_user_id||null,
+  isAdmin: row.is_admin||false, color: row.color||null,
 });
 const teamMemberToRow = m => ({
   id: m.id, name: m.name, roles: m.roles||[], employee_type: m.employeeType,
   available: m.available, email: m.email||null, phone: m.phone||null, department: m.department,
   rate: m.rate||{}, skills: m.skills||[], work_hours: m.workHours||{}, assignable_percent: m.assignablePercent ?? null,
-  auth_user_id: m.authUserId||null,
+  auth_user_id: m.authUserId||null, is_admin: m.isAdmin||false, color: m.color||null,
 });
+
+// A curated palette (matches the app's existing accent colors) rather than a
+// free-form color input, so every profile color stays visually consistent
+// with the rest of the UI.
+const PROFILE_COLOR_PALETTE = ["#6366f1","#22c55e","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899","#10b981","#3b82f6","#f97316","#84cc16","#14b8a6"];
+const ColorSwatchPicker = ({value, onChange}) => (
+  <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+    {PROFILE_COLOR_PALETTE.map(c=>(
+      <button key={c} type="button" onClick={()=>onChange(c)} title={c}
+        style={{width:24,height:24,borderRadius:"50%",background:c,border:value===c?"2px solid #fff":"2px solid transparent",boxShadow:value===c?`0 0 0 2px ${c}`:"none",cursor:"pointer",padding:0}}/>
+    ))}
+  </div>
+);
 
 const rowToProject = row => ({
   id: row.id, projectCode: row.project_code, name: row.name, requester: row.requester,
@@ -20678,6 +20698,7 @@ const ResourceView = ({projects, team, studioBookings=[], resourceConfig, onUpda
 
 const StudioTab = ({projects, studioBookings, onUpdateStudioBookings, team, onOpenProject, talentRoster=[], onUpdateProject, mediaCards=[]}) => {
   const [subView, setSubView] = useState("bookings");
+  const [statusHistoryOpen, setStatusHistoryOpen] = useState(false);
   const allBookings = useMemo(()=>{
     const fromProjects=projects.flatMap(p=>(p.shoots||[]).map(s=>({...s,bookingStatus:s.bookingStatus||(s.booked?"Confirmed":"Tentative"),productionType:s.productionType||"Content Filming",equipmentIds:s.equipmentIds||[],confirmations:s.confirmations||[],crewCallTime:s.crewCallTime||calcCrewCall(s.startTime),parentBookingId:null,projectId:p.id,projectName:p.name,_source:"project"})));
     // Productions are the real, current data model (shoots above is legacy and
@@ -20722,15 +20743,20 @@ const StudioTab = ({projects, studioBookings, onUpdateStudioBookings, team, onOp
   const subS=a=>({padding:"6px 18px",borderRadius:7,fontWeight:800,fontSize:13,cursor:"pointer",border:"none",background:a?"#6366f1":"transparent",color:a?"#fff":"#6b7280",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.07em",textTransform:"uppercase"});
   return (
     <div>
-      <div style={{display:"flex",gap:2,marginBottom:20,borderBottom:"1px solid #1f2937",paddingBottom:12}}>
+      <div style={{display:"flex",gap:2,marginBottom:20,borderBottom:"1px solid #1f2937",paddingBottom:12,alignItems:"center"}}>
         {[["bookings","📋 Bookings"],["calendar","📅 Calendar"],["equipment","🎒 Equipment"],["display","📺 Display Board"]].map(([id,label])=>(
           <button key={id} style={subS(subView===id)} onClick={()=>setSubView(id)}>{label}</button>
         ))}
+        <button onClick={()=>setStatusHistoryOpen(true)}
+          style={{marginLeft:"auto",background:"transparent",border:"1px solid #1f2937",borderRadius:7,color:"#6b7280",padding:"6px 14px",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>
+          🕓 Status History
+        </button>
       </div>
       {subView==="bookings"  && <StudioBookingsList allBookings={allBookings} projects={projects} team={team} studioBookings={studioBookings} onUpdateStudioBookings={onUpdateStudioBookings} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject}/>}
       {subView==="calendar"  && <StudioCalendar allBookings={allBookings} team={team} projects={projects} onOpenProject={onOpenProject} talentRoster={talentRoster}/>}
       {subView==="equipment" && <StudioEquipmentTab mediaCards={mediaCards}/>}
       {subView==="display"   && <StudioDisplayBoard allBookings={allBookings} team={team}/>}
+      {statusHistoryOpen&&<HistoryFeedSidebar title="Production Status History" buildQuery={q=>q.eq("entity_type","production").eq("action","status_changed")} onClose={()=>setStatusHistoryOpen(false)}/>}
     </div>
   );
 };
@@ -22023,7 +22049,7 @@ const AdminTeamTab = ({team, onUpdateTeam}) => {
   const [showAdd, setShowAdd]   = useState(false);
   const [importMsg, setImportMsg] = useState(null); // {type:"success"|"error", text}
   const fileInputRef = useRef();
-  const [newMember, setNewMember] = useState({name:"",roles:[],department:"Production",employeeType:"Internal",available:true,email:"",phone:"",skills:[],workHours:{days:[1,2,3,4,5],start:9,end:17,timezone:"EST"}});
+  const [newMember, setNewMember] = useState({name:"",roles:[],department:"Production",employeeType:"Internal",available:true,email:"",phone:"",skills:[],workHours:{days:[1,2,3,4,5],start:9,end:17,timezone:"EST"},color:null,isAdmin:false});
 
   const filtered = team.filter(m=>
     !search || m.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -22227,6 +22253,19 @@ const AdminTeamTab = ({team, onUpdateTeam}) => {
             <div style={{fontSize:11,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Roles</div>
             <RoleToggle roles={newMember.roles} onChange={r=>setNewMember(p=>({...p,roles:r}))}/>
           </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div>
+              <div style={{fontSize:11,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Profile Color</div>
+              <ColorSwatchPicker value={newMember.color} onChange={c=>setNewMember(p=>({...p,color:c}))}/>
+            </div>
+            <div>
+              <div style={{fontSize:11,color: "#8e97a6",marginBottom:3,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Admin Access</div>
+              <button onClick={()=>setNewMember(p=>({...p,isAdmin:!p.isAdmin}))}
+                style={{background:newMember.isAdmin?"#f59e0b20":"#0a0f1a",border:`1px solid ${newMember.isAdmin?"#f59e0b":"#374151"}`,borderRadius:6,color:newMember.isAdmin?"#f59e0b":"#4b5563",padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                {newMember.isAdmin?"Admin":"Member"}
+              </button>
+            </div>
+          </div>
           <div style={{marginBottom:10}}>
             <div style={{fontSize:11,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Hours of Availability</div>
             <WorkHoursPicker workHours={newMember.workHours} onChange={wh=>setNewMember(p=>({...p,workHours:wh}))}/>
@@ -22278,6 +22317,19 @@ const AdminTeamTab = ({team, onUpdateTeam}) => {
                   <div style={{fontSize:11,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Roles</div>
                   <RoleToggle roles={draft.roles||[]} onChange={r=>setDraft(p=>({...p,roles:r}))}/>
                 </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                  <div>
+                    <div style={{fontSize:11,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Profile Color</div>
+                    <ColorSwatchPicker value={draft.color} onChange={c=>setDraft(p=>({...p,color:c}))}/>
+                  </div>
+                  <div>
+                    <div style={{fontSize:11,color: "#8e97a6",marginBottom:3,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Admin Access</div>
+                    <button onClick={()=>setDraft(p=>({...p,isAdmin:!p.isAdmin}))}
+                      style={{background:draft.isAdmin?"#f59e0b20":"#0a0f1a",border:`1px solid ${draft.isAdmin?"#f59e0b":"#374151"}`,borderRadius:6,color:draft.isAdmin?"#f59e0b":"#4b5563",padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                      {draft.isAdmin?"Admin":"Member"}
+                    </button>
+                  </div>
+                </div>
                 <div style={{marginBottom:10}}>
                   <div style={{fontSize:11,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Hours of Availability</div>
                   <WorkHoursPicker workHours={draft.workHours} onChange={wh=>setDraft(p=>({...p,workHours:wh}))}/>
@@ -22295,13 +22347,14 @@ const AdminTeamTab = ({team, onUpdateTeam}) => {
               </div>
             ):(
               <div style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",cursor:"pointer"}} onClick={()=>startEdit(m)}>
-                <div style={{width:36,height:36,borderRadius:"50%",background:"#111827",border:"1px solid #1f2937",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#6366f1",flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif"}}>
+                <div style={{width:36,height:36,borderRadius:"50%",background:m.color?m.color+"22":"#111827",border:`1px solid ${m.color||"#1f2937"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:m.color||"#6366f1",flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif"}}>
                   {m.name.split(" ").map(n=>n[0]).join("").slice(0,2)}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:2}}>
                     <span style={{fontWeight:700,fontSize:14,color:"#f1f5f9"}}>{m.name}</span>
                     <span style={{fontSize:11,padding:"1px 6px",borderRadius:3,background:m.available?"#22c55e15":"#374151",color:m.available?"#22c55e":"#4b5563",fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>{m.available?"Available":"Unavailable"}</span>
+                    {m.isAdmin&&<span style={{fontSize:11,padding:"1px 6px",borderRadius:3,background:"#f59e0b15",color:"#f59e0b",fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>Admin</span>}
                     <span style={{fontSize:11,color: "#838ba0",fontFamily:"'Barlow Condensed',sans-serif"}}>{m.employeeType}</span>
                   </div>
                   <div style={{fontSize:11,color: "#8e97a6"}}>{m.roles.join(", ")}</div>
@@ -25432,6 +25485,187 @@ const OnboardingModal = ({email, onSubmit, onSkip}) => {
   );
 };
 
+// Self-service editor for a signed-in person's own team_members row — the
+// RLS "update self or admin" policy lets any authenticated user update the
+// row where auth_user_id matches their own id, so this needs no admin
+// involvement, unlike the rest of the Admin panel.
+const MyProfileModal = ({member, onSubmit, onClose}) => {
+  const [name,setName] = useState(member.name||"");
+  const [department,setDepartment] = useState(member.department||DEPT_OPTIONS[0]);
+  const [employeeType,setEmployeeType] = useState(member.employeeType||EMP_TYPE_OPTIONS[0]);
+  const [roles,setRoles] = useState(member.roles||[]);
+  const [days,setDays] = useState(member.workHours?.days||[1,2,3,4,5]);
+  const [start,setStart] = useState(member.workHours?.start??9);
+  const [end,setEnd] = useState(member.workHours?.end??17);
+  const [timezone,setTimezone] = useState(member.workHours?.timezone||"EST");
+  const [skills,setSkills] = useState(member.skills||[]);
+  const [color,setColor] = useState(member.color||PROFILE_COLOR_PALETTE[0]);
+  const toggleDay = d => setDays(prev=>prev.includes(d)?prev.filter(x=>x!==d):[...prev,d].sort());
+  const submit = () => {
+    if(!name.trim()) return;
+    onSubmit({name:name.trim(),department,employeeType,roles,workHours:{days,start:+start,end:+end,timezone},skills,color});
+  };
+  const lbl={fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.08em",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:6,display:"block"};
+  const inp={width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:8,color:"#f1f5f9",padding:"9px 12px",fontSize:14,outline:"none",fontFamily:"'DM Sans',sans-serif",colorScheme:"dark"};
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:5000,background:"#000c",display:"flex",alignItems:"center",justifyContent:"center",padding:24}} onClick={onClose}>
+      <div style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:16,padding:32,width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 24px 80px #000c"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:900,color:"#f1f5f9",textTransform:"uppercase",letterSpacing:"0.08em"}}>My Profile</div>
+          <button onClick={onClose} style={{background:"#1f2937",border:"none",borderRadius:6,color:"#9ca3af",width:26,height:26,cursor:"pointer",fontSize:14}}>×</button>
+        </div>
+        <div style={{fontSize:13,color:"#9ca3af",marginBottom:22,lineHeight:1.5}}>Update the details the rest of the team sees about you.</div>
+
+        <div style={{marginBottom:14}}>
+          <label style={lbl}>Name *</label>
+          <input style={inp} value={name} onChange={e=>setName(e.target.value)} placeholder="Your full name"/>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+          <div>
+            <label style={lbl}>Department</label>
+            <select style={inp} value={department} onChange={e=>setDepartment(e.target.value)}>
+              {DEPT_OPTIONS.map(d=><option key={d}>{d}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Employee Type</label>
+            <select style={inp} value={employeeType} onChange={e=>setEmployeeType(e.target.value)}>
+              {EMP_TYPE_OPTIONS.map(t=><option key={t}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{marginBottom:14}}>
+          <label style={lbl}>Roles</label>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {ONBOARDING_ROLE_OPTIONS.map(r=>{
+              const on = roles.includes(r);
+              return (
+                <button key={r} type="button" onClick={()=>setRoles(prev=>on?prev.filter(x=>x!==r):[...prev,r])}
+                  style={{background:on?"#6366f1":"#111827",border:`1px solid ${on?"#6366f1":"#1f2937"}`,borderRadius:20,color:on?"#fff":"#9ca3af",padding:"4px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+                  {r}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{marginBottom:14}}>
+          <label style={lbl}>Profile Color</label>
+          <ColorSwatchPicker value={color} onChange={setColor}/>
+        </div>
+
+        <div style={{marginBottom:14}}>
+          <label style={lbl}>Hours of Availability</label>
+          <div style={{display:"flex",gap:5,marginBottom:8}}>
+            {ONBOARDING_DAY_LABELS.map((d,i)=>{
+              const on = days.includes(i);
+              return (
+                <button key={i} type="button" onClick={()=>toggleDay(i)}
+                  style={{flex:1,background:on?"#6366f1":"#111827",border:`1px solid ${on?"#6366f1":"#1f2937"}`,borderRadius:6,color:on?"#fff":"#6b7280",padding:"6px 0",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            <select style={inp} value={start} onChange={e=>setStart(e.target.value)}>
+              {Array.from({length:24},(_,h)=><option key={h} value={h}>{h===0?"12 AM":h<12?`${h} AM`:h===12?"12 PM":`${h-12} PM`}</option>)}
+            </select>
+            <select style={inp} value={end} onChange={e=>setEnd(e.target.value)}>
+              {Array.from({length:24},(_,h)=><option key={h} value={h}>{h===0?"12 AM":h<12?`${h} AM`:h===12?"12 PM":`${h-12} PM`}</option>)}
+            </select>
+            <select style={inp} value={timezone} onChange={e=>setTimezone(e.target.value)}>
+              {["EST","CST","MST","PST"].map(tz=><option key={tz}>{tz}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{marginBottom:22}}>
+          <label style={lbl}>Skills</label>
+          <KeywordsEditor value={skills} onChange={setSkills}/>
+        </div>
+
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={onClose}
+            style={{flex:"0 0 auto",background:"transparent",border:"1px solid #1f2937",borderRadius:10,color:"#6b7280",padding:"12px 18px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
+            Cancel
+          </button>
+          <button onClick={submit} disabled={!name.trim()}
+            style={{flex:1,background:name.trim()?"#6366f1":"#1f2937",border:"none",borderRadius:10,color:name.trim()?"#fff":"#4b5563",padding:"12px 0",fontSize:13,fontWeight:800,cursor:name.trim()?"pointer":"not-allowed",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Read-only feed of activity_log rows, scoped by whatever Supabase query the
+// caller passes in — used both as the per-project History sidebar and the
+// Studio tab's production-status feed. Follows the exact same push-panel +
+// portal + slide-transform shell as ChecklistPanel/StudioBookingDrawer/etc
+// (usePushPanel, left-anchored, translateX) rather than the old fixed-overlay
+// style, so it behaves consistently with every other sidebar in this app.
+const HistoryFeedSidebar = ({title, buildQuery, onClose}) => {
+  const [vis, setVis] = useState(false);
+  useEffect(()=>{ requestAnimationFrame(()=>setVis(true)); },[]);
+  const close = () => { setVis(false); setTimeout(onClose, 200); };
+  usePushPanel(vis?400:0);
+  useEffect(()=>{
+    const h=e=>{if(e.key==="Escape")close();};
+    document.addEventListener("keydown",h);
+    return()=>document.removeEventListener("keydown",h);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(()=>{
+    if(!sb){ setLoading(false); return; }
+    buildQuery(sb.from("activity_log").select("*")).order("created_at",{ascending:false}).limit(200)
+      .then(({data,error})=>{ if(!error&&data) setEntries(data); setLoading(false); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
+  const actionColor = a => a==="created" ? "#10b981" : a==="deleted" ? "#ef4444" : a==="status_changed" ? "#f59e0b" : "#6366f1";
+
+  return ReactDOM.createPortal(
+    <div onClick={e=>e.stopPropagation()} style={{
+      position:"fixed",top:0,left:0,bottom:0,width:400,zIndex:1100,
+      background:"#0d1117",borderRight:"1px solid #1f2937",
+      boxShadow:"16px 0 48px rgba(0,0,0,0.6)",
+      transform:vis?"translateX(0)":"translateX(-100%)",
+      transition:"transform 0.22s cubic-bezier(0.4,0,0.2,1)",
+      display:"grid",gridTemplateRows:"auto 1fr",overflow:"hidden",
+    }}>
+      <div style={{padding:"16px 20px",borderBottom:"1px solid #1f2937",background:"#111827",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:900,color:"#f1f5f9",textTransform:"uppercase",letterSpacing:"0.06em"}}>🕓 {title}</div>
+        <button onClick={close} style={{background:"#1f2937",border:"none",borderRadius:6,color:"#9ca3af",width:28,height:28,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+      </div>
+      <div style={{overflowY:"scroll",WebkitOverflowScrolling:"touch",padding:14}}>
+        {loading&&<div style={{color:"#4b5563",fontSize:13,padding:20,textAlign:"center"}}>Loading…</div>}
+        {!loading&&!entries.length&&<div style={{color:"#4b5563",fontSize:13,padding:20,textAlign:"center"}}>No activity yet.</div>}
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {entries.map(e=>(
+            <div key={e.id} style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:8,padding:"10px 12px",borderLeft:`3px solid ${actionColor(e.action)}`}}>
+              <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:3}}>
+                <span style={{background:actionColor(e.action)+"22",color:actionColor(e.action),borderRadius:99,padding:"1px 8px",fontSize:10,fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>{e.action.replace(/_/g," ")}</span>
+                <span style={{fontSize:10,color:"#374151"}}>{new Date(e.created_at).toLocaleString()}</span>
+              </div>
+              <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9"}}>{e.entity_label}</div>
+              <div style={{fontSize:11,color:"#9ca3af",marginTop:2}}>
+                {e.actor_name||e.actor_email||"Someone"}{e.detail?` — ${e.detail}`:""}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  , document.body);
+};
+
 export default function App() {
   // Real per-person auth via Supabase, replacing the old shared-password gate.
   // authChecked stays false only for the brief moment while we ask Supabase
@@ -25516,14 +25750,63 @@ export default function App() {
     showToast({msg:`${label} failed: ${detail}`, color:"#ef4444"});
   };
 
+  // Best-effort activity log — a write here failing shouldn't block or toast
+  // over the actual save it's describing, so errors just go to console. Reads
+  // authUser/teamRoster via refs (declared further below, but that's fine —
+  // this function's body isn't evaluated until it's actually called, by
+  // which point those refs are populated) so it stays correct even when
+  // called from a useCallback([]) handler whose own closure is frozen stale.
+  const logActivity = ({entityType, entityLabel, action, detail, projectId}) => {
+    const au = authUserRef.current;
+    if(!sb || !au) return;
+    const actorName = teamRosterRef.current.find(m=>m.authUserId===au.id)?.name || au.email || "Someone";
+    sb.from("activity_log").insert({
+      actor_email: au.email||null, actor_name: actorName, project_id: projectId||null,
+      entity_type: entityType, entity_label: entityLabel, action, detail: detail||null,
+    }).then(({error})=>{ if(error) console.error("[Supabase] Activity log failed:", error); });
+  };
+
+  // Batches noisy multi-field edits (Setup, Deliverable, Budget line items)
+  // into a single activity_log entry instead of one per field per keystroke.
+  // Each call adds a field label to that entity's pending set and restarts a
+  // 5-minute inactivity timer; when it fires, one entry lists every field
+  // that changed since the last flush. Keyed by a plain useRef Map (not
+  // state) so it survives being called from useCallback([]) handlers whose
+  // own closures are frozen at mount.
+  const batchTimersRef = useRef(new Map());
+  const BATCH_WINDOW_MS = 5*60*1000;
+  const logFieldChangeBatched = ({entityType, entityId, entityLabel, projectId, fieldLabel}) => {
+    const key = `${entityType}:${entityId}`;
+    const existing = batchTimersRef.current.get(key);
+    if(existing) clearTimeout(existing.timer);
+    const fields = existing?.fields || new Set();
+    fields.add(fieldLabel);
+    const timer = setTimeout(()=>{
+      batchTimersRef.current.delete(key);
+      logActivity({
+        entityType, entityLabel, projectId, action:"updated",
+        detail:`${[...fields].join(", ")} changed`,
+      });
+    }, BATCH_WINDOW_MS);
+    batchTimersRef.current.set(key, {fields, timer, entityLabel, projectId});
+  };
+
   const saveTeam   = t => {
-    const removedIds = teamRoster.filter(m=>!t.some(n=>n.id===m.id)).map(m=>m.id);
+    const removed = teamRoster.filter(m=>!t.some(n=>n.id===m.id));
+    const added = t.filter(n=>!teamRoster.some(m=>m.id===n.id));
+    const edited = t.filter(n=>{
+      const prev = teamRoster.find(m=>m.id===n.id);
+      return prev && JSON.stringify(prev)!==JSON.stringify(n);
+    });
     setTeamRoster(t);
     window.storage?.set("posttrack-admin-team",   JSON.stringify(t)).catch(()=>{});
     if(sb){
-      if(removedIds.length) sb.from("team_members").delete().in("id", removedIds).then(({error})=>reportSbError("Team member removal", error));
+      if(removed.length) sb.from("team_members").delete().in("id", removed.map(m=>m.id)).then(({error})=>reportSbError("Team member removal", error));
       sb.from("team_members").upsert(t.map(teamMemberToRow)).then(({error})=>reportSbError("Team roster", error));
     }
+    added.forEach(m=>logActivity({entityType:"team_member", entityLabel:m.name, action:"created"}));
+    removed.forEach(m=>logActivity({entityType:"team_member", entityLabel:m.name, action:"deleted"}));
+    edited.forEach(m=>logActivity({entityType:"team_member", entityLabel:m.name, action:"updated"}));
   };
   const saveGear   = g => { setGearList(g);      window.storage?.set("posttrack-admin-gear",   JSON.stringify(g)).catch(()=>{}); };
   const saveSpaces = s => { setStudioSpaces(s);  window.storage?.set("posttrack-admin-spaces", JSON.stringify(s)).catch(()=>{}); };
@@ -25539,7 +25822,10 @@ export default function App() {
   const saveScreenContentOptions = s => { setScreenContentOptions(s); window.storage?.set(SCREEN_CONTENT_STORAGE_KEY, JSON.stringify(s)).catch(()=>{}); };
   const [customTasks, setCustomTasks] = useState([]);
   const saveCustomTasks = t => { setCustomTasks(t); window.storage?.set(CUSTOM_TASKS_STORAGE_KEY, JSON.stringify(t)).catch(()=>{}); };
-  const addCustomTask    = task   => saveCustomTasks([...customTasks, task]);
+  const addCustomTask    = task   => {
+    saveCustomTasks([...customTasks, task]);
+    logActivity({entityType:"task", entityLabel:task.title||"Task", projectId:task.projectId||null, action:"created"});
+  };
   const updateCustomTask = task   => saveCustomTasks(customTasks.map(t=>t.id===task.id?task:t));
   const deleteCustomTask = taskId => saveCustomTasks(customTasks.filter(t=>t.id!==taskId));
   const [unavailability, setUnavailability] = useState([]);
@@ -25585,6 +25871,11 @@ export default function App() {
   // constant, so there's no clobbering risk from the default — this still
   // exists so the very first authed load doesn't race the persist effect).
   const bookingsLoadedRef = useRef(false);
+  // Always-fresh mirror of `projects`, read by deleteDel (a useCallback with
+  // empty deps, so it can't safely close over `projects` directly) to look
+  // up a deliverable's name for the activity log before it's removed.
+  const projectsRef = useRef(projects);
+  useEffect(()=>{ projectsRef.current = projects; },[projects]);
 
   // Load persisted admin data on mount.
   // Each lookup gets its own .catch(()=>null) so a single missing key (e.g. a
@@ -25661,6 +25952,16 @@ export default function App() {
     if(!authed || !sb){ setAuthUser(null); return; }
     sb.auth.getUser().then(({data})=>setAuthUser(data?.user||null));
   },[authed]);
+  // logActivity is called from a few useCallback([]) handlers (addDel,
+  // deleteDel, updateProject) that are frozen at mount and never see fresh
+  // `authUser`/`teamRoster` state — these refs give it a live read regardless
+  // of which render's closure ends up calling it.
+  const authUserRef = useRef(authUser);
+  useEffect(()=>{ authUserRef.current = authUser; },[authUser]);
+  const teamRosterRef = useRef(teamRoster);
+  useEffect(()=>{ teamRosterRef.current = teamRoster; },[teamRoster]);
+  const talentRosterRef = useRef(talentRoster);
+  useEffect(()=>{ talentRosterRef.current = talentRoster; },[talentRoster]);
 
   // Opportunistic fallback: if a real team_members row already has this
   // person's email filled in (e.g. an admin pre-created it), link it
@@ -25696,7 +25997,29 @@ export default function App() {
     };
     setTeamRoster(prev=>[...prev, newMember]);
     if(sb) sb.from("team_members").insert(teamMemberToRow(newMember)).then(({error})=>reportSbError("Profile creation",error));
+    logActivity({entityType:"team_member", entityLabel:newMember.name, action:"created", detail:"joined via onboarding"});
   };
+
+  // The signed-in person's own roster row (once linked) and whether they
+  // have admin access — drives both the "My Profile" self-service editor
+  // and which nav tabs/actions are visible. Bootstrapped by hand in
+  // Supabase (see the is_admin SQL); from there, admins can promote others
+  // via the Admin > Team panel.
+  const currentMember = teamRoster.find(m=>m.authUserId===authUser?.id) || null;
+  const isAdmin = !!currentMember?.isAdmin;
+  const [showMyProfile, setShowMyProfile] = useState(false);
+  const updateMyProfile = profile => {
+    if(!currentMember) return;
+    const updated = {...currentMember, ...profile};
+    setTeamRoster(prev=>prev.map(m=>m.id===currentMember.id?updated:m));
+    if(sb) sb.from("team_members").update(teamMemberToRow(updated)).eq("id",currentMember.id).then(({error})=>reportSbError("Profile update",error));
+    setShowMyProfile(false);
+    logActivity({entityType:"team_member", entityLabel:updated.name, action:"updated", detail:"updated their own profile"});
+  };
+  // Admin-only nav tabs disappear entirely for non-admins (see VIEWS below);
+  // this catches the case where an admin gets demoted mid-session while
+  // still sitting on that tab.
+  useEffect(()=>{ if(view==="admin" && !isAdmin) setView("projects"); },[isAdmin, view]);
 
   // Projects (the user's actual campaigns/deliverables) are the one collection
   // that previously had no persistence at all — every other collection here
@@ -25818,6 +26141,8 @@ export default function App() {
   const [statsFilter,setStatsFilter]=useState(null); // {label, ids:Set<id>} — set by StatsBar tiles
 
   const updateDel=useCallback((projectId,delId,field,value)=>{
+    const prevProj = projectsRef.current.find(p=>p.id===projectId);
+    const prevDel = prevProj?.deliverables.find(d=>d.id===delId);
     setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:p.deliverables.map(d=>d.id!==delId?d:{...d,[field]:value})}));
     // Seed project override
     if(SEED_PROJECTS.some(p=>p.id===projectId)){
@@ -25828,6 +26153,30 @@ export default function App() {
         return {...prev,[projectId]:{...existing,deliverables:baseDels.map(d=>d.id!==delId?d:{...d,[field]:value})}};
       });
     }
+    const label = prevDel?.title || "Deliverable";
+    if(field==="status"){
+      logActivity({entityType:"deliverable", entityLabel:label, projectId, action:"status_changed", detail:`status → ${value}`});
+    } else if(field==="deadline"){
+      logActivity({entityType:"deliverable", entityLabel:label, projectId, action:"updated", detail:`final deadline → ${value}`});
+    } else if(field==="frameLink"||field==="framePW"){
+      logActivity({entityType:"deliverable", entityLabel:label, projectId, action:"updated", detail:"frame link/password updated"});
+    } else if(field==="editorId"){
+      const editorName = teamRosterRef.current.find(m=>m.id===value)?.name || "Unassigned";
+      logActivity({entityType:"deliverable", entityLabel:label, projectId, action:"updated", detail:`editor assigned → ${editorName}`});
+    } else if(field==="rounds"){
+      // Only call out an actual status change on an existing round — adding/
+      // removing/reordering rounds isn't itself a status update.
+      const prevRounds = prevDel?.rounds||[];
+      (value||[]).forEach(r=>{
+        const prevRound = prevRounds.find(pr=>pr.id===r.id);
+        if(prevRound && prevRound.status!==r.status){
+          logActivity({entityType:"deliverable", entityLabel:label, projectId, action:"updated", detail:`${r.label||"Review round"} → ${r.status}`});
+        }
+      });
+    } else {
+      logFieldChangeBatched({entityType:"deliverable", entityId:delId, entityLabel:label, projectId, fieldLabel:field});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
   const addDel=useCallback((projectId,newDel)=>{
@@ -25840,9 +26189,13 @@ export default function App() {
         return {...prev,[projectId]:{...existing,deliverables:[...baseDels,newDel]}};
       });
     }
+    logActivity({entityType:"deliverable", entityLabel:newDel.title||"Deliverable", projectId, action:"created"});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
   const deleteDel=useCallback((projectId,delId)=>{
+    const proj = projectsRef.current.find(p=>p.id===projectId);
+    const del = proj?.deliverables.find(d=>d.id===delId);
     setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:p.deliverables.filter(d=>d.id!==delId)}));
     if(SEED_PROJECTS.some(p=>p.id===projectId)){
       setSeedOverrides(prev=>{
@@ -25852,9 +26205,12 @@ export default function App() {
         return {...prev,[projectId]:{...existing,deliverables:baseDels.filter(d=>d.id!==delId)}};
       });
     }
+    if(del) logActivity({entityType:"deliverable", entityLabel:del.title||"Deliverable", projectId, action:"deleted"});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
   const updateProject=useCallback((projectId,field,value)=>{
+    const prevProj = projectsRef.current.find(p=>p.id===projectId);
     // Try real projects first
     setProjects(prev=>{
       if(!prev.some(p=>p.id===projectId)) return prev;
@@ -25864,6 +26220,85 @@ export default function App() {
     if(SEED_PROJECTS.some(p=>p.id===projectId)){
       setSeedOverrides(prev=>({...prev,[projectId]:{...(prev[projectId]||{}),[field]:value}}));
     }
+    const label = prevProj?.name || `Project #${projectId}`;
+    if(field==="status"){
+      logActivity({entityType:"project", entityLabel:label, projectId, action:"status_changed", detail:`status → ${value}`});
+    } else if(field==="deadline"){
+      logActivity({entityType:"project", entityLabel:label, projectId, action:"updated", detail:`deadline → ${value}`});
+    } else if(field==="briefNotes"){
+      // "Adding" a brief is the milestone, not every subsequent edit.
+      if(!prevProj?.briefNotes && value) logActivity({entityType:"project", entityLabel:label, projectId, action:"updated", detail:"project brief added"});
+    } else if(field==="budgetStatus"){
+      logActivity({entityType:"project", entityLabel:label, projectId, action:"updated", detail:`budget status → ${value}`});
+    } else if(field==="postStartDate"){
+      logActivity({entityType:"project", entityLabel:label, projectId, action:"updated", detail:`post start date → ${value}`});
+    } else if(field==="closedAt"){
+      logActivity({entityType:"project", entityLabel:label, projectId, action:"updated", detail: value?"project closed out":"project reopened"});
+    } else if(field==="addedToCompletes"){
+      logActivity({entityType:"project", entityLabel:label, projectId, action:"updated", detail: value?"added to completes tracker":"removed from completes tracker"});
+    } else if(field==="budget"){
+      // Budget line items — grouped, same debounce pattern as Setup fields.
+      logFieldChangeBatched({entityType:"budget", entityId:projectId, entityLabel:label, projectId, fieldLabel:"budget line items"});
+    } else if(field==="productions"){
+      // Every production field edit anywhere in the app (status, notes, crew,
+      // setups, ingest, everything) funnels through this single
+      // onUpdateProject(id,"productions",wholeArray) call, so diffing old vs
+      // new here is the one place that can catch all of it without touching
+      // every call site individually.
+      const prevProds = prevProj?.productions || [];
+      const newProds = value || [];
+      newProds.forEach(p=>{
+        const pp = prevProds.find(x=>x.id===p.id);
+        const prodLabel = p.title||p.type||"Production";
+        if(!pp){
+          logActivity({entityType:"production", entityLabel:prodLabel, projectId, action:"created"});
+          return;
+        }
+        if(pp.status!==p.status){
+          logActivity({entityType:"production", entityLabel:prodLabel, projectId, action:"status_changed", detail:`status → ${p.status}`});
+        }
+        const prevTalentIds = pp.talent||[], newTalentIds = p.talent||[];
+        const addedTalent = newTalentIds.filter(id=>!prevTalentIds.includes(id));
+        const removedTalent = prevTalentIds.filter(id=>!newTalentIds.includes(id));
+        if(addedTalent.length||removedTalent.length){
+          const nameOf = id => talentRosterRef.current.find(t=>t.id===id)?.name || `#${id}`;
+          const parts = [];
+          if(addedTalent.length) parts.push(`added ${addedTalent.map(nameOf).join(", ")}`);
+          if(removedTalent.length) parts.push(`removed ${removedTalent.map(nameOf).join(", ")}`);
+          logActivity({entityType:"production", entityLabel:prodLabel, projectId, action:"updated", detail:`talent: ${parts.join("; ")}`});
+        }
+        if(pp.startTime!==p.startTime || pp.endTime!==p.endTime || pp.location!==p.location){
+          logActivity({entityType:"production", entityLabel:prodLabel, projectId, action:"updated", detail:`shoot time/location → ${p.startTime||"?"}–${p.endTime||"?"} @ ${p.location||"TBD"}`});
+        }
+        const prevExt = pp.crewExternal||[], newExt = p.crewExternal||[];
+        newExt.filter(c=>!prevExt.some(pc=>pc.id===c.id)).forEach(c=>{
+          logActivity({entityType:"production", entityLabel:prodLabel, projectId, action:"updated", detail:`external crew added: ${c.name||c.role||"crew"}`});
+        });
+        newExt.forEach(c=>{
+          const pc = prevExt.find(x=>x.id===c.id);
+          if(pc && pc.status!==c.status){
+            logActivity({entityType:"production", entityLabel:prodLabel, projectId, action:"updated", detail:`${c.name||c.role||"External crew"} status → ${c.status}`});
+          }
+        });
+        if(JSON.stringify(pp.schedule||[])!==JSON.stringify(p.schedule||[])){
+          logActivity({entityType:"production", entityLabel:prodLabel, projectId, action:"updated", detail:"schedule updated"});
+        }
+        if(JSON.stringify(pp.setups||[])!==JSON.stringify(p.setups||[])){
+          logFieldChangeBatched({entityType:"production_setup", entityId:p.id, entityLabel:prodLabel, projectId, fieldLabel:"setup"});
+        }
+      });
+      prevProds.forEach(pp=>{
+        if(!newProds.some(p=>p.id===pp.id)){
+          logActivity({entityType:"production", entityLabel:pp.title||pp.type||"Production", projectId, action:"deleted"});
+        }
+      });
+    } else if(field==="ingestDates"){
+      const prevIngests = prevProj?.ingestDates || [];
+      (value||[]).filter(ig=>!prevIngests.some(pi=>pi.id===ig.id)).forEach(()=>{
+        logActivity({entityType:"ingest", entityLabel:label, projectId, action:"created", detail:`media ingest created ${new Date().toLocaleString()}`});
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
   // Assign an intake to a project — copies relevant fields if it's the first intake on the project.
@@ -25901,6 +26336,8 @@ export default function App() {
       const projectCode = generateNextProjectCode(prev);
       return [{...proj, projectCode}, ...prev];
     });
+    logActivity({entityType:"project", entityLabel:proj.name||"Untitled Project", projectId:proj.id, action:"created"});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
   // GCS BEC booking → create-or-update. Reservation ID is the join key: if it
@@ -26062,7 +26499,7 @@ export default function App() {
 
   const liveSelected=selected?allProjects.find(p=>p.id===selected.id)||null:null;
 
-  const VIEWS=[{id:"projects",l:"Projects"},{id:"studio",l:"Studio"},{id:"calendar",l:"Calendar"},{id:"deliverables",l:"Deliverables"},{id:"animations",l:"Animation"},{id:"ingest",l:"Ingest"},{id:"resources",l:"Resources"},{id:"myview",l:"My View"},{id:"admin",l:"⚙ Admin"},{id:"pipeline",l:"Pipeline"},{id:"intake",l:"Intake"}];
+  const VIEWS=[{id:"projects",l:"Projects"},{id:"studio",l:"Studio"},{id:"calendar",l:"Calendar"},{id:"deliverables",l:"Deliverables"},{id:"animations",l:"Animation"},{id:"ingest",l:"Ingest"},{id:"resources",l:"Resources"},{id:"myview",l:"My View"},{id:"admin",l:"⚙ Admin"},{id:"pipeline",l:"Pipeline"},{id:"intake",l:"Intake"}].filter(v=>v.id!=="admin"||isAdmin);
   // workReview is a nav-less view accessible only via the stats bar
   const NAV_VIEWS = VIEWS; // all visible in nav
   const inp={background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"6px 10px",fontSize:13,outline:"none",fontFamily:"'DM Sans',sans-serif"};
@@ -26117,6 +26554,12 @@ export default function App() {
                 </button>
               </div>
               <Btn onClick={()=>setAddingProject(true)}>+ New Project</Btn>
+              {currentMember&&(
+                <button onClick={()=>setShowMyProfile(true)} title="My Profile"
+                  style={{width:26,height:26,borderRadius:"50%",background:currentMember.color?currentMember.color+"33":"#111827",border:`1px solid ${currentMember.color||"#1f2937"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:currentMember.color||"#6366f1",cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",flexShrink:0}}>
+                  {currentMember.name.split(" ").map(n=>n[0]).join("").slice(0,2)}
+                </button>
+              )}
               {sb&&<button onClick={()=>sb.auth.signOut()} title="Sign out"
                 style={{background:"transparent",border:"1px solid #1f2937",borderRadius:5,color:"#6b7280",padding:"3px 10px",fontSize:10,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",whiteSpace:"nowrap"}}>
                 Sign Out
@@ -26282,6 +26725,7 @@ export default function App() {
           </div>
         )}
         {needsOnboarding&&<OnboardingModal email={authUser.email} onSubmit={completeOnboarding} onSkip={()=>setOnboardingDismissed(true)}/>}
+        {showMyProfile&&currentMember&&<MyProfileModal member={currentMember} onSubmit={updateMyProfile} onClose={()=>setShowMyProfile(false)}/>}
       </div>
     </>
   );
