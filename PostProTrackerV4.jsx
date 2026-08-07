@@ -5831,15 +5831,18 @@ const getOutstandingTasksForMember = (memberId, projects, team, nudges=[]) => {
   return results.sort((a,b)=>(b.nudgedAt?1:0)-(a.nudgedAt?1:0));
 };
 
+// Plain content block — no position:fixed, no portal, no self-driven slide
+// animation. It's meant to live inside a parent that animates a real layout
+// width (see ProjectOverview's sidebarSlot), the same way sidebars in most
+// desktop apps (VS Code, Slack, Linear) work: a real flex sibling with a
+// CSS-transitioned width, not a fixed overlay masked into position with a
+// compensating transform. That JS-timed approach is what kept desyncing here.
 const ChecklistPanel = ({project, team, activeTab, onClose, nudges=[], onAddNudge}) => {
-  const [vis, setVis] = useState(false);
-  useEffect(()=>{ requestAnimationFrame(()=>setVis(true)); },[]);
-  const close = () => { setVis(false); setTimeout(onClose, 200); };
-  usePushPanel(vis?380:0);
   useEffect(()=>{
-    const h=e=>{if(e.key==="Escape")close();};
+    const h=e=>{if(e.key==="Escape")onClose();};
     document.addEventListener("keydown",h);
     return()=>document.removeEventListener("keydown",h);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
   const deliverables   = project.deliverables || [];
@@ -5868,13 +5871,10 @@ const ChecklistPanel = ({project, team, activeTab, onClose, nudges=[], onAddNudg
     return req.length>0 && req.every(c=>c.done);
   }).length;
 
-  return ReactDOM.createPortal(
-    <div onClick={e=>e.stopPropagation()} style={{
-      position:"fixed",top:0,left:0,bottom:0,width:380,zIndex:1100,
-      background:"#0d1117",borderRight:"1px solid #1f2937",
-      boxShadow:"16px 0 48px rgba(0,0,0,0.6)",
-      transform:vis?"translateX(0)":"translateX(-100%)",
-      transition:"transform 0.2s cubic-bezier(0.4,0,0.2,1)",
+  return (
+    <div style={{
+      width:380,height:"100%",
+      background:"#0d1117",
       display:"grid",gridTemplateRows:"auto 1fr auto",overflow:"hidden",
     }}>
         {/* Header */}
@@ -5884,7 +5884,7 @@ const ChecklistPanel = ({project, team, activeTab, onClose, nudges=[], onAddNudg
               <div style={{fontSize:11,fontWeight:800,color:"#10b981",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.1em",marginBottom:3}}>✓ Campaign Checklist</div>
               <div style={{fontSize:16,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>{project.name}</div>
             </div>
-            <button onClick={close} style={{background:"#1f2937",border:"none",borderRadius:6,color:"#9ca3af",width:28,height:28,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+            <button onClick={onClose} style={{background:"#1f2937",border:"none",borderRadius:6,color:"#9ca3af",width:28,height:28,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
           </div>
           {/* Overall progress */}
           <div style={{background:"#0f172a",borderRadius:8,padding:"8px 12px",display:"flex",gap:10,alignItems:"center"}}>
@@ -5961,7 +5961,7 @@ const ChecklistPanel = ({project, team, activeTab, onClose, nudges=[], onAddNudg
           <div style={{fontSize:11,color: "#8e97a6",textAlign:"center",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.08em"}}>Press Esc or click ✓ Checklist to close</div>
         </div>
       </div>
-  , document.body);
+  );
 };
 
 
@@ -6083,20 +6083,18 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
   const [activeTab,setActiveTab]=useState(initialTab||"overview");
   const [expandedShoot,setExpandedShoot]=useState(initialShootId||null);
   const [validationErrors,setValidationErrors]=useState(null);
-  // Mutually exclusive — usePushPanel's registry only tracks one active width
-  // at a time (see _getPushSnapshot), so two panels open together would both
-  // render pinned to the same left:0 edge and stack on top of each other.
+  // Mutually exclusive — only one sidebar slot, so opening one closes the
+  // other. Both are plain content blocks rendered inside a real flex sibling
+  // whose width is CSS-transitioned directly off these two booleans (see the
+  // sidebarWidth/sidebarSlot below) — no portal, no push-panel registry, no
+  // JS-computed masking transform. A real layout width transition is what
+  // every mainstream app (VS Code, Slack, Linear) uses for this exact kind
+  // of panel, and the browser already animates it correctly on its own.
   const [checklistOpen,setChecklistOpenRaw]=useState(false);
   const [historyOpen,setHistoryOpenRaw]=useState(false);
   const setChecklistOpen = v => { setChecklistOpenRaw(v); if(v) setHistoryOpenRaw(false); };
   const setHistoryOpen = v => { setHistoryOpenRaw(v); if(v) setChecklistOpenRaw(false); };
-  // Reads the same live offset ChecklistPanel/HistoryFeedSidebar register via
-  // usePushPanel, so the project content shifts in lockstep with whichever
-  // one's open. Fed through useAnimatedPushOffset (now backed by
-  // useLayoutEffect — see its definition) for the same compositor-only
-  // transform-masking trick the app root uses.
-  const checklistPushOffset = usePushOffset();
-  const {transformX:sidebarTransformX, transitionOn:sidebarTransitionOn} = useAnimatedPushOffset(checklistPushOffset);
+  const sidebarWidth = checklistOpen ? 380 : historyOpen ? 400 : 0;
   const lp=allProjects.find(p=>p.id===project.id)||project;
 
   const done=lp.deliverables.filter(d=>d.status==="Delivered").length;
@@ -6145,19 +6143,17 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
   return (
     <>
     <Modal onClose={onClose} fullscreen>
-      {/* The push/transform lives on this inner div, not on Modal's own box
-          (via contentStyle) — Modal's outer backdrop is `display:flex;
-          justifyContent:center`, and an explicit marginLeft on a centered
-          flex child fights that auto-centering as width changes. This div is
-          a normal child inside Modal's own column-flex box (default
-          align-items:stretch, no competing justify-content on this axis). */}
-      <div style={{
-        height:"100vh",display:"flex",flexDirection:"column",overflow:"hidden",
-        marginLeft:checklistPushOffset,
-        width:checklistPushOffset?`calc(100% - ${checklistPushOffset}px)`:"100%",
-        transform:sidebarTransformX?`translateX(${sidebarTransformX}px)`:undefined,
-        transition:sidebarTransitionOn?"transform 0.22s cubic-bezier(0.4,0,0.2,1)":"none",
-      }}>
+      <div style={{height:"100vh",display:"flex",flexDirection:"row",overflow:"hidden"}}>
+        {/* Real flex sibling with a CSS-transitioned width — no portal, no
+            push-panel registry, no JS-computed masking transform. The
+            browser animates this width change natively and the flex:1
+            content next to it just reflows in lockstep, the same way a
+            sidebar works in VS Code/Slack/Linear. */}
+        <div style={{width:sidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:sidebarWidth?"1px solid #1f2937":"none"}}>
+          {checklistOpen&&<ChecklistPanel project={lp} team={team} activeTab={activeTab} onClose={()=>setChecklistOpen(false)} nudges={nudges} onAddNudge={onAddNudge}/>}
+          {historyOpen&&<HistoryFeedContent title={`${lp.name} — History`} buildQuery={q=>q.eq("project_id",lp.id)} onClose={()=>setHistoryOpen(false)}/>}
+        </div>
+      <div style={{flex:1,minWidth:0,height:"100vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
 
         {/* ── Sticky header ── */}
         <div style={{background:"#0d1117",borderBottom:"1px solid #1f2937",padding:"18px 28px 0",flexShrink:0}}>
@@ -6997,9 +6993,8 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
           <button onClick={onClose} style={{background:"#1f2937",border:"1px solid #374151",borderRadius:9,color:"#e2e8f0",padding:"10px 32px",cursor:"pointer",fontSize:17,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em"}}>✕ Close Project</button>
         </div>
       </div>
+      </div>
     </Modal>
-    {checklistOpen&&<ChecklistPanel project={lp} team={team} activeTab={activeTab} onClose={()=>setChecklistOpen(false)} nudges={nudges} onAddNudge={onAddNudge}/>}
-    {historyOpen&&<HistoryFeedSidebar title={`${lp.name} — History`} buildQuery={q=>q.eq("project_id",lp.id)} onClose={()=>setHistoryOpen(false)}/>}
     </>
   );
 };
@@ -25635,19 +25630,13 @@ const MyProfileModal = ({member, onSubmit, onClose}) => {
   );
 };
 
-// Read-only feed of activity_log rows, scoped by whatever Supabase query the
-// caller passes in — used both as the per-project History sidebar and the
-// Studio tab's production-status feed. Follows the exact same push-panel +
-// portal + slide-transform shell as ChecklistPanel/StudioBookingDrawer/etc
-// (usePushPanel, left-anchored, translateX) rather than the old fixed-overlay
-// style, so it behaves consistently with every other sidebar in this app.
-const HistoryFeedSidebar = ({title, buildQuery, onClose}) => {
-  const [vis, setVis] = useState(false);
-  useEffect(()=>{ requestAnimationFrame(()=>setVis(true)); },[]);
-  const close = () => { setVis(false); setTimeout(onClose, 200); };
-  usePushPanel(vis?400:0);
+// Pure content — data fetch + header + list, no positioning/portal/animation
+// of its own. Used directly (as a real flex sibling with an animated width)
+// inside ProjectOverview's sidebar slot, and wrapped in the portal+push
+// shell below for the Studio tab's usage.
+const HistoryFeedContent = ({title, buildQuery, onClose}) => {
   useEffect(()=>{
-    const h=e=>{if(e.key==="Escape")close();};
+    const h=e=>{if(e.key==="Escape")onClose();};
     document.addEventListener("keydown",h);
     return()=>document.removeEventListener("keydown",h);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -25664,18 +25653,11 @@ const HistoryFeedSidebar = ({title, buildQuery, onClose}) => {
 
   const actionColor = a => a==="created" ? "#10b981" : a==="deleted" ? "#ef4444" : a==="status_changed" ? "#f59e0b" : "#6366f1";
 
-  return ReactDOM.createPortal(
-    <div onClick={e=>e.stopPropagation()} style={{
-      position:"fixed",top:0,left:0,bottom:0,width:400,zIndex:1100,
-      background:"#0d1117",borderRight:"1px solid #1f2937",
-      boxShadow:"16px 0 48px rgba(0,0,0,0.6)",
-      transform:vis?"translateX(0)":"translateX(-100%)",
-      transition:"transform 0.22s cubic-bezier(0.4,0,0.2,1)",
-      display:"grid",gridTemplateRows:"auto 1fr",overflow:"hidden",
-    }}>
+  return (
+    <div style={{width:400,height:"100%",background:"#0d1117",display:"grid",gridTemplateRows:"auto 1fr",overflow:"hidden"}}>
       <div style={{padding:"16px 20px",borderBottom:"1px solid #1f2937",background:"#111827",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:900,color:"#f1f5f9",textTransform:"uppercase",letterSpacing:"0.06em"}}>🕓 {title}</div>
-        <button onClick={close} style={{background:"#1f2937",border:"none",borderRadius:6,color:"#9ca3af",width:28,height:28,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        <button onClick={onClose} style={{background:"#1f2937",border:"none",borderRadius:6,color:"#9ca3af",width:28,height:28,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
       </div>
       <div style={{overflowY:"scroll",WebkitOverflowScrolling:"touch",padding:14}}>
         {loading&&<div style={{color:"#4b5563",fontSize:13,padding:20,textAlign:"center"}}>Loading…</div>}
@@ -25695,6 +25677,28 @@ const HistoryFeedSidebar = ({title, buildQuery, onClose}) => {
           ))}
         </div>
       </div>
+    </div>
+  );
+};
+
+// Portal + push-panel shell — used only by the Studio tab, which was never
+// reported as jittery, so it keeps the mechanism that's already working
+// there. ProjectOverview embeds HistoryFeedContent directly instead (see its
+// sidebar slot) rather than through this shell.
+const HistoryFeedSidebar = ({title, buildQuery, onClose}) => {
+  const [vis, setVis] = useState(false);
+  useEffect(()=>{ requestAnimationFrame(()=>setVis(true)); },[]);
+  const close = () => { setVis(false); setTimeout(onClose, 200); };
+  usePushPanel(vis?400:0);
+  return ReactDOM.createPortal(
+    <div onClick={e=>e.stopPropagation()} style={{
+      position:"fixed",top:0,left:0,bottom:0,width:400,zIndex:1100,
+      borderRight:"1px solid #1f2937",
+      boxShadow:"16px 0 48px rgba(0,0,0,0.6)",
+      transform:vis?"translateX(0)":"translateX(-100%)",
+      transition:"transform 0.22s cubic-bezier(0.4,0,0.2,1)",
+    }}>
+      <HistoryFeedContent title={title} buildQuery={buildQuery} onClose={close}/>
     </div>
   , document.body);
 };
