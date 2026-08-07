@@ -8461,13 +8461,12 @@ const AnimationTab = ({project, onUpdateProject, team=[]}) => {
 // ── ANIMATION TRACKER (main nav view) ────────────────────────────────────────
 
 // Sidebar for a clicked animation group (left side, matches del sidebar style)
-const AnimationGroupSidebar = ({row, onClose, vis}) => {
+const AnimationGroupSidebar = ({row, onClose}) => {
   if(!row) return null;
   const {design={}, batches=[], groupName, projectName, animator, designer, producer, aeProjectName, aeProjectLocation} = row;
-  const slideStyle = {position:"fixed",top:0,left:0,bottom:0,width:420,background:"#0d1117",borderRight:"1px solid #1f2937",zIndex:300,display:"flex",flexDirection:"column",boxShadow:"12px 0 48px #000a",transform:vis?"translateX(0)":"translateX(-100%)",transition:"transform 0.25s ease"};
 
-  return ReactDOM.createPortal(
-    <div style={slideStyle}>
+  return (
+    <div style={{width:420,height:"100%",background:"#0d1117",display:"flex",flexDirection:"column"}}>
       <div style={{padding:"16px 20px",borderBottom:"1px solid #1f2937",display:"flex",alignItems:"flex-start",gap:12}}>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:11,color:"#6366f1",fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>{projectName}</div>
@@ -8540,7 +8539,7 @@ const AnimationGroupSidebar = ({row, onClose, vis}) => {
         </div>
       </div>
     </div>
-  , document.body);
+  );
 };
 
 // Main AnimationView — structure matches DeliverablesTab
@@ -8548,9 +8547,7 @@ const AnimationView = ({allProjects, team}) => {
   const [subTab, setSubTab] = useState("active");
   const [groupBy, setGroupBy] = useState("animator");
   const [selected, setSelected] = useState(null);
-  const [sidebarVis, setSidebarVis] = useState(false);
-  useEffect(()=>{ if(selected) requestAnimationFrame(()=>setSidebarVis(true)); else setSidebarVis(false); },[selected]);
-  usePushPanel(sidebarVis?420:0);
+  const sidebarWidth = selected ? 420 : 0;
 
   // Flatten groups with project-level tags
   const allRows = useMemo(()=>{
@@ -8677,15 +8674,15 @@ const AnimationView = ({allProjects, team}) => {
   );
 
   return (
-    <div>
-      {/* Sidebar */}
-      {selected&&<>
-        <div onClick={()=>setSelected(null)} style={{position:"fixed",inset:0,background:"#00000030",zIndex:299}}/>
-        <AnimationGroupSidebar row={selectedRow} onClose={()=>setSelected(null)} vis={sidebarVis}/>
-      </>}
+    <div style={{display:"flex",flexDirection:"row",alignItems:"flex-start"}}>
+      {/* Sidebar slot — real flex sibling with an animated width, not a
+          fixed-position overlay with a separate backdrop. */}
+      <div style={{width:sidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:sidebarWidth?"1px solid #1f2937":"none"}}>
+        {selected&&<AnimationGroupSidebar row={selectedRow} onClose={()=>setSelected(null)}/>}
+      </div>
 
       {/* Main content */}
-      <div style={{padding:"20px 28px",display:"flex",flexDirection:"column",gap:20}}>
+      <div style={{flex:1,minWidth:0,padding:"20px 28px",display:"flex",flexDirection:"column",gap:20}}>
         <div style={{display:"flex",alignItems:"center",gap:2,flexWrap:"wrap",justifyContent:"space-between"}}>
           <div style={{display:"flex",gap:2}}>
             {[["active","In Progress"],["completed","Completed"],["metrics","Metrics"]].map(([id,l])=>(
@@ -10550,7 +10547,9 @@ const KanbanEditor = ({projects,team,onUpdateDel}) => {
 };
 
 // ─── Calendar ─────────────────────────────────────────────────────────────────
-const CalendarView = ({projects,team,onOpenProject,onCalEventClick}) => {
+const CalendarView = ({projects,team,onOpenProject,onUpdateProject}) => {
+  const [calDrawerItem,setCalDrawerItem]=useState(null);
+  const sidebarWidth = calDrawerItem ? 400 : 0;
   const [year,setYear]=useState(now.getFullYear());
   const [month,setMonth]=useState(now.getMonth());
   const [calView,setCalView]=useState("month"); // month | week | day
@@ -10664,13 +10663,7 @@ const CalendarView = ({projects,team,onOpenProject,onCalEventClick}) => {
         onMouseLeave={e=>{const rt=e.relatedTarget;if(rt&&rt.closest&&rt.closest('[data-tooltip]'))return;setTooltip(null);}}
         onClick={e=>{e.stopPropagation();
           setTooltip(null);
-          if(onCalEventClick) { onCalEventClick({...item, projectId: item.projectId}); return; }
-          const p=projects.find(proj=>proj.id===item.projectId);
-          if(!p) return;
-          if(item.isShoot)       onOpenProject(p,"production",item.id);
-          else if(item.isIngest) onOpenProject(p,"ingest",item.id);
-          else if(item.isRound)  onOpenProject(p,"deliverables",item.delId||item.id);
-          else                   onOpenProject(p,"deliverables",item.id);
+          setCalDrawerItem({...item, projectId: item.projectId});
         }}
         style={{background:color+"28",borderLeft:`2px solid ${color}`,borderRadius:"0 4px 4px 0",
           padding:compact?"3px 5px":"4px 7px",cursor:"pointer",
@@ -10695,7 +10688,8 @@ const CalendarView = ({projects,team,onOpenProject,onCalEventClick}) => {
   };
 
   return (
-    <div onClick={()=>onCalEventClick&&onCalEventClick(null)}>
+    <div style={{display:"flex",flexDirection:"row-reverse",alignItems:"flex-start"}}>
+    <div onClick={()=>setCalDrawerItem(null)} style={{flex:1,minWidth:0}}>
       {/* Controls */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,flexWrap:"wrap"}}>
         <button onClick={pm} style={{background:"#1f2937",border:"none",borderRadius:7,color:"#e2e8f0",width:30,height:30,cursor:"pointer",fontSize:19,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
@@ -10960,6 +10954,12 @@ const CalendarView = ({projects,team,onOpenProject,onCalEventClick}) => {
           })()}
         </div>
       )}
+    </div>
+    {/* Sidebar slot — real flex sibling with an animated width (see the
+        outer row-reverse wrapper), not a fixed-position portal. */}
+    <div style={{width:sidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:sidebarWidth?"1px solid #1f2937":"none"}}>
+      {calDrawerItem&&<CalEventDrawer item={calDrawerItem} projects={projects} team={team} onClose={()=>setCalDrawerItem(null)} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>}
+    </div>
     </div>
   );
 };
@@ -11323,12 +11323,7 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
   const [groupBy, setGroupBy] = useState("editor"); // editor | producer
   const [popupDel, setPopupDel] = useState(null);       // read-only popup (production-sourced deliverables only)
   const [sidebarSel, setSidebarSel] = useState(null);    // {delId, projectId} for the editable left sidebar
-  const [sidebarVis, setSidebarVis] = useState(false);
-  useEffect(()=>{
-    if(sidebarSel) requestAnimationFrame(()=>setSidebarVis(true));
-    else setSidebarVis(false);
-  },[sidebarSel]);
-  usePushPanel(sidebarVis?420:0);
+  const sidebarWidth = sidebarSel ? 420 : 0;
   const [unlocked, setUnlocked] = useState(false);       // archive items start locked; toggled per-session
 
   const getQuarter = d => { if(!d) return "Unknown"; const m=new Date(d).getMonth(); return `Q${Math.floor(m/3)+1}`; };
@@ -11421,7 +11416,8 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
   };
 
   return (
-    <div onClick={()=>{ if(sidebarSel){ setSidebarSel(null); setUnlocked(false); } }}>
+    <div style={{display:"flex",flexDirection:"row-reverse",alignItems:"flex-start"}}>
+    <div onClick={()=>{ if(sidebarSel){ setSidebarSel(null); setUnlocked(false); } }} style={{flex:1,minWidth:0}}>
       <div style={{display:"flex",gap:2,marginBottom:20,flexWrap:"wrap"}}>
         {[["active","In Progress"],["completed","Completed Archive"],["metrics","Metrics"]].map(([id,l])=>(
           <button key={id} style={tabS(subTab===id)} onClick={()=>setSubTab(id)}>{l}</button>
@@ -11660,7 +11656,10 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
       })()}
       {popupDel&&<DelInfoPopup del={{...popupDel,projectName:allDels.find(d=>d.id===popupDel.id)?.projectName||""}} team={team} onClose={()=>setPopupDel(null)}/>}
 
-      {/* ── Editable deliverable sidebar (left) — used by both In Progress and Completed Archive ── */}
+    </div>
+    {/* Sidebar slot — real flex sibling with an animated width (see the
+        outer row-reverse wrapper), not a fixed-position portal. */}
+    <div style={{width:sidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:sidebarWidth?"1px solid #1f2937":"none"}}>
       {sidebarSel&&(()=>{
         const proj = projects.find(p=>p.id===sidebarSel.projectId);
         const liveDel = proj?.deliverables.find(d=>d.id===sidebarSel.delId);
@@ -11668,13 +11667,10 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
         const isArchived = liveDel.status==="Delivered";
         const locked = isArchived && !unlocked;
         const close = ()=>{ setSidebarSel(null); setUnlocked(false); };
-        return ReactDOM.createPortal(
-          <div onClick={e=>e.stopPropagation()} style={{
-            position:"fixed",top:0,left:0,bottom:0,width:420,zIndex:490,
-            background:"#0d1117",borderRight:"1px solid #1f2937",
-            boxShadow:"16px 0 48px rgba(0,0,0,0.6)",
-            transform:sidebarVis?"translateX(0)":"translateX(-100%)",
-            transition:"transform 0.22s cubic-bezier(0.4,0,0.2,1)",
+        return (
+          <div style={{
+            width:420,height:"100%",
+            background:"#0d1117",
             display:"grid",gridTemplateRows:"auto 1fr",overflow:"hidden",
           }}>
               {/* Header */}
@@ -11706,8 +11702,9 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
                 />
               </div>
             </div>
-        , document.body);
+        );
       })()}
+    </div>
     </div>
   );
 };
@@ -14038,22 +14035,20 @@ const MEDIA_CARDS_SEED = [
 ];
 
 // ─── Calendar Event Drawer ────────────────────────────────────────────────────
-// Slide-in from right, overlays the calendar without pushing it.
+// Plain content block — a real flex sibling of CalendarView's own grid
+// (animated via a CSS width transition there), not a fixed-position portal.
 const CalEventDrawer = ({item, projects, team, onClose, onUpdateProject, onOpenProject}) => {
-  const [vis, setVis] = useState(false);
   const [aiSummary, setAiSummary] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
-  useEffect(()=>{ requestAnimationFrame(()=>setVis(true)); },[]);
-  usePushPanel(vis?400:0);
-
-  const close = () => { setVis(false); setTimeout(onClose, 220); };
+  const close = onClose;
 
   // Close on Escape
   useEffect(()=>{
     const h = e=>{ if(e.key==="Escape") close(); };
     document.addEventListener("keydown",h);
     return ()=>document.removeEventListener("keydown",h);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
   if(!item) return null;
@@ -14186,13 +14181,10 @@ const CalEventDrawer = ({item, projects, team, onClose, onUpdateProject, onOpenP
     );
   };
 
-  return ReactDOM.createPortal(
-    <div onClick={e=>e.stopPropagation()} style={{
-      position:"fixed",top:0,left:0,bottom:0,width:400,zIndex:490,
-      background:"#0d1117",borderRight:"1px solid #1f2937",
-      boxShadow:"16px 0 48px rgba(0,0,0,0.6)",
-      transform:vis?"translateX(0)":"translateX(-100%)",
-      transition:"transform 0.22s cubic-bezier(0.4,0,0.2,1)",
+  return (
+    <div style={{
+      width:400,height:"100%",
+      background:"#0d1117",
       display:"grid",gridTemplateRows:"auto 1fr auto",overflow:"hidden",
     }}>
       {/* Header */}
@@ -14453,7 +14445,7 @@ const CalEventDrawer = ({item, projects, team, onClose, onUpdateProject, onOpenP
           </button>
         </div>
       </div>
-  , document.body);
+  );
 };
 
 
@@ -19126,13 +19118,12 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
   const now = new Date();
   const [locFilter, setLocFilter] = useState("All");
   const [drawerBooking, setDrawerBooking] = useState(null);
-  const [drawerVis, setDrawerVis] = useState(false);
+  const sidebarWidth = drawerBooking ? 400 : 0;
   // Persistent approval history — survives the session
   const [approvalHistory, setApprovalHistory] = useState([]);
 
-  const openDrawer = b => { setDrawerBooking(b); requestAnimationFrame(()=>setDrawerVis(true)); };
-  const closeDrawer = () => { setDrawerVis(false); setTimeout(()=>setDrawerBooking(null),220); };
-  usePushPanel(drawerVis?400:0);
+  const openDrawer = b => setDrawerBooking(b);
+  const closeDrawer = () => setDrawerBooking(null);
 
   // Approve / Deny a booking — records to history so it's never lost
   const handleApproval = (bookingId, approved, denyReason="") => {
@@ -19203,7 +19194,8 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
   const selS = {background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"5px 9px",fontSize:12,outline:"none"};
 
   return (
-    <div>
+    <div style={{display:"flex",flexDirection:"row-reverse",alignItems:"flex-start"}}>
+    <div style={{flex:1,minWidth:0}}>
       <div style={{marginBottom:20}}>
         <div style={{fontWeight:900,fontSize:22,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:2}}>👋 {member.name}</div>
         <div style={{fontSize:14,color: "#9ca3af"}}>{member.roles.join(" · ")} · {upcoming.filter(b=>b.bookingStatus!=="Cancelled").length} upcoming broadcast{upcoming.length!==1?"s":""}</div>
@@ -19386,8 +19378,10 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
           ))}
         </div>
       </RVSec>
-
-      {/* ── Booking Detail Drawer ── */}
+    </div>
+    {/* Sidebar slot — real flex sibling with an animated width (see the
+        outer row-reverse wrapper), not a fixed-position portal. */}
+    <div style={{width:sidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:sidebarWidth?"1px solid #1f2937":"none"}}>
       {drawerBooking&&(()=>{
         const b = drawerBooking;
         const linkedProj = b.projectId ? projects.find(p=>p.id===b.projectId) : null;
@@ -19397,8 +19391,8 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
         ];
         const eqList=(b.equipmentIds||[]).map(id=>EQUIPMENT.find(e=>e.id===id)?.name||id).filter(Boolean);
         const color=PRODUCTION_COLOR[b.productionType]||"#ef4444";
-        return ReactDOM.createPortal(
-          <div onClick={e=>e.stopPropagation()} style={{position:"fixed",top:0,left:0,bottom:0,width:400,zIndex:490,background:"#0d1117",borderRight:"1px solid #1f2937",boxShadow:"16px 0 48px rgba(0,0,0,0.6)",transform:drawerVis?"translateX(0)":"translateX(-100%)",transition:"transform 0.22s cubic-bezier(0.4,0,0.2,1)",display:"grid",gridTemplateRows:"auto 1fr auto",overflow:"hidden"}}>
+        return (
+          <div style={{width:400,height:"100%",background:"#0d1117",display:"grid",gridTemplateRows:"auto 1fr auto",overflow:"hidden"}}>
               {/* Drawer header */}
               <div style={{padding:"16px 20px",borderBottom:"1px solid #1f2937",background:"#111827"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
@@ -19489,8 +19483,9 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
                 <button onClick={closeDrawer} style={{background:"#1f2937",border:"1px solid #374151",borderRadius:8,color: "#9ca3af",padding:"8px 14px",fontSize:12,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",flexShrink:0}}>Close</button>
               </div>
             </div>
-        , document.body);
+        );
       })()}
+    </div>
     </div>
   );
 };
@@ -20767,8 +20762,10 @@ const StudioTab = ({projects, studioBookings, onUpdateStudioBookings, team, onOp
     return [...standalone,...fromProjects,...fromProductions].filter(b=>b.startTime).sort((a,b)=>new Date(a.startTime)-new Date(b.startTime));
   },[studioBookings,projects]);
   const subS=a=>({padding:"6px 18px",borderRadius:7,fontWeight:800,fontSize:13,cursor:"pointer",border:"none",background:a?"#6366f1":"transparent",color:a?"#fff":"#6b7280",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.07em",textTransform:"uppercase"});
+  const sidebarWidth = statusHistoryOpen ? 400 : 0;
   return (
-    <div>
+    <div style={{display:"flex",flexDirection:"row-reverse",alignItems:"flex-start"}}>
+    <div style={{flex:1,minWidth:0}}>
       <div style={{display:"flex",gap:2,marginBottom:20,borderBottom:"1px solid #1f2937",paddingBottom:12,alignItems:"center"}}>
         {[["bookings","📋 Bookings"],["calendar","📅 Calendar"],["equipment","🎒 Equipment"],["display","📺 Display Board"]].map(([id,label])=>(
           <button key={id} style={subS(subView===id)} onClick={()=>setSubView(id)}>{label}</button>
@@ -20782,7 +20779,11 @@ const StudioTab = ({projects, studioBookings, onUpdateStudioBookings, team, onOp
       {subView==="calendar"  && <StudioCalendar allBookings={allBookings} team={team} projects={projects} onOpenProject={onOpenProject} talentRoster={talentRoster}/>}
       {subView==="equipment" && <StudioEquipmentTab mediaCards={mediaCards}/>}
       {subView==="display"   && <StudioDisplayBoard allBookings={allBookings} team={team}/>}
-      {statusHistoryOpen&&<HistoryFeedSidebar title="Production Status History" buildQuery={q=>q.eq("entity_type","production").eq("action","status_changed")} onClose={()=>setStatusHistoryOpen(false)}/>}
+    </div>
+    {/* Sidebar slot — real flex sibling with an animated width. */}
+    <div style={{width:sidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:sidebarWidth?"1px solid #1f2937":"none"}}>
+      {statusHistoryOpen&&<HistoryFeedContent title="Production Status History" buildQuery={q=>q.eq("entity_type","production").eq("action","status_changed")} onClose={()=>setStatusHistoryOpen(false)}/>}
+    </div>
     </div>
   );
 };
@@ -21239,11 +21240,11 @@ const StudioBookingsList = ({allBookings, projects, team, studioBookings, onUpda
 // Opened by clicking a block in the Studio calendar. Follows the same push-
 // layout pattern as the other sidebars (Checklist, Project sidebar, etc.) —
 // slides in and pushes the main content over rather than overlaying it.
+// Plain content block — a real flex sibling of StudioCalendar's own grid
+// (animated via a CSS width transition there), not a fixed-position portal
+// pushed into place with a JS-computed transform.
 const StudioBookingDrawer = ({booking, team, projects, talentRoster=[], onClose, onOpenProject}) => {
-  const [vis, setVis] = useState(false);
-  useEffect(()=>{ requestAnimationFrame(()=>setVis(true)); },[]);
-  usePushPanel(vis?400:0);
-  const close = () => { setVis(false); setTimeout(onClose, 200); };
+  const close = onClose;
 
   const Row = ({label,value}) => !value ? null : (
     <div style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:13}}>
@@ -21265,13 +21266,10 @@ const StudioBookingDrawer = ({booking, team, projects, talentRoster=[], onClose,
   const gearList = [...internalGear, ...externalGear];
   const ingestDt = booking.ingest?.datetime || booking.endTime;
 
-  return ReactDOM.createPortal(
-    <div onClick={e=>e.stopPropagation()} style={{
-      position:"fixed",top:0,left:0,bottom:0,width:400,zIndex:490,
-      background:"#0d1117",borderRight:"1px solid #1f2937",
-      boxShadow:"16px 0 48px rgba(0,0,0,0.6)",
-      transform:vis?"translateX(0)":"translateX(-100%)",
-      transition:"transform 0.22s cubic-bezier(0.4,0,0.2,1)",
+  return (
+    <div style={{
+      width:400,height:"100%",
+      background:"#0d1117",
       display:"grid",gridTemplateRows:"auto 1fr",overflow:"hidden",
     }}>
       {/* Header */}
@@ -21350,12 +21348,13 @@ const StudioBookingDrawer = ({booking, team, projects, talentRoster=[], onClose,
         )}
       </div>
     </div>
-  , document.body);
+  );
 };
 
 const StudioCalendar = ({allBookings, team=[], projects=[], onOpenProject, talentRoster=[]}) => {
   const now=new Date(); const [dateOffset,setDateOffset]=useState(0);
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const sidebarWidth = selectedBooking ? 400 : 0;
   const viewDate=new Date(now); viewDate.setDate(now.getDate()+dateOffset);
   const viewDateStr=viewDate.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"});
   const isToday=dateOffset===0;
@@ -21366,7 +21365,11 @@ const StudioCalendar = ({allBookings, team=[], projects=[], onOpenProject, talen
   const fH=h=>{const ap=h<12?"am":"pm",h12=h===0?12:h>12?h-12:h;return `${h12}${ap}`;};
   const sB={background:"#1f2937",border:"none",borderRadius:7,color:"#e2e8f0",width:30,height:30,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"};
   return (
-    <>
+    <div style={{display:"flex",flexDirection:"row",alignItems:"flex-start"}}>
+      <div style={{width:sidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRadius:sidebarWidth?12:0,border:sidebarWidth?"1px solid #1f2937":"none",marginRight:sidebarWidth?16:0}}>
+        {selectedBooking&&<StudioBookingDrawer booking={selectedBooking} team={team} projects={projects} talentRoster={talentRoster} onClose={()=>setSelectedBooking(null)} onOpenProject={onOpenProject}/>}
+      </div>
+      <div style={{flex:1,minWidth:0}}>
     <div onClick={()=>setSelectedBooking(null)} style={{background:"#0f172a",border:"1px solid #1f2937",borderRadius:12,overflow:"hidden"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",borderBottom:"1px solid #1f2937",background:"#111827"}}>
         <button onClick={()=>setDateOffset(o=>o-1)} style={sB}>‹</button>
@@ -21396,17 +21399,8 @@ const StudioCalendar = ({allBookings, team=[], projects=[], onOpenProject, talen
         </div>
       </div>
     </div>
-    {selectedBooking&&(
-      <StudioBookingDrawer
-        booking={selectedBooking}
-        team={team}
-        projects={projects}
-        talentRoster={talentRoster}
-        onOpenProject={onOpenProject}
-        onClose={()=>setSelectedBooking(null)}
-      />
-    )}
-    </>
+      </div>
+    </div>
   );
 };
 
@@ -25681,28 +25675,6 @@ const HistoryFeedContent = ({title, buildQuery, onClose}) => {
   );
 };
 
-// Portal + push-panel shell — used only by the Studio tab, which was never
-// reported as jittery, so it keeps the mechanism that's already working
-// there. ProjectOverview embeds HistoryFeedContent directly instead (see its
-// sidebar slot) rather than through this shell.
-const HistoryFeedSidebar = ({title, buildQuery, onClose}) => {
-  const [vis, setVis] = useState(false);
-  useEffect(()=>{ requestAnimationFrame(()=>setVis(true)); },[]);
-  const close = () => { setVis(false); setTimeout(onClose, 200); };
-  usePushPanel(vis?400:0);
-  return ReactDOM.createPortal(
-    <div onClick={e=>e.stopPropagation()} style={{
-      position:"fixed",top:0,left:0,bottom:0,width:400,zIndex:1100,
-      borderRight:"1px solid #1f2937",
-      boxShadow:"16px 0 48px rgba(0,0,0,0.6)",
-      transform:vis?"translateX(0)":"translateX(-100%)",
-      transition:"transform 0.22s cubic-bezier(0.4,0,0.2,1)",
-    }}>
-      <HistoryFeedContent title={title} buildQuery={buildQuery} onClose={close}/>
-    </div>
-  , document.body);
-};
-
 export default function App() {
   // Real per-person auth via Supabase, replacing the old shared-password gate.
   // authChecked stays false only for the brief moment while we ask Supabase
@@ -25724,7 +25696,6 @@ export default function App() {
     window.storage?.set(MEDIA_CARDS_STORAGE_KEY, JSON.stringify(list)).catch(()=>{});
   },[]);
   const [view,setView]=useState("projects");
-  const [calDrawerItem, setCalDrawerItem] = useState(null);
   const [toast, setToast] = useState(null);
   // How far the main app content should shift right to make room for whichever
   // side panel (Checklist, sidebars, drawers) is currently open.
@@ -26638,7 +26609,7 @@ export default function App() {
           {view==="studio"&&<StudioTab projects={allProjects} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} team={allTeam} onOpenProject={openProject} talentRoster={talentRoster} onUpdateProject={updateProject} mediaCards={mediaCards}/>}
           {view==="kanban"&&kanbanMode==="status"&&<KanbanStatus projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="kanban"&&kanbanMode==="editor"&&<KanbanEditor projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
-          {view==="calendar"&&<CalendarView projects={allProjects} team={allTeam} onOpenProject={openProject} onCalEventClick={item=>setCalDrawerItem(item)}/>}
+          {view==="calendar"&&<CalendarView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject}/>}
           {view==="deliverables"&&<DeliverablesTab projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster}/>}
           {view==="ingest"&&<IngestView projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster}/>}
           {view==="resources"&&<ResourceView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
@@ -26662,7 +26633,6 @@ export default function App() {
           />}
         </div>
 
-        {calDrawerItem&&view==="calendar"&&<CalEventDrawer item={calDrawerItem} projects={projects} team={allTeam} onClose={()=>setCalDrawerItem(null)} onUpdateProject={updateProject} onOpenProject={openProject}/>}
         {liveSelected&&<ProjectOverview project={liveSelected} team={allTeam} allProjects={allProjects} onClose={()=>setSelected(null)} onUpdateDel={updateDel} onAddDel={addDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} initialTab={initialTab?.tab} initialShootId={initialTab?.itemId} initialItemId={initialTab?.itemId} studioBookings={allStudioBookings} mediaCards={mediaCards} setupTypes={setupTypes} onAddSetupType={addSetupType} talentRoster={talentRoster} onUpdateTalentRoster={saveTalentRoster} nudges={nudges} onAddNudge={addNudge} furnitureList={furnitureList} propsList={propsList} screenContentOptions={screenContentOptions} gearList={gearList} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} appPresets={appPresets} onSaveAppPresets={saveAppPresets} vendorCompanies={vendorCompanies} addVendorCompany={addVendorCompany} intakes={intakes} becRequests={becRequests}/>}
         {addingProject&&<AddProjectModal team={allTeam} existingProjects={allProjects} onClose={()=>setAddingProject(false)} onAdd={addProject}/>}
         {createFromIntake&&<AddProjectModal team={allTeam} existingProjects={allProjects} initialData={createFromIntake}
