@@ -6133,13 +6133,22 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
 
   return (
     <>
-    <Modal onClose={onClose} fullscreen contentStyle={{
-      marginLeft:checklistPushOffset,
-      width:checklistPushOffset?`calc(100% - ${checklistPushOffset}px)`:"100%",
-      transform:sidebarTransformX?`translateX(${sidebarTransformX}px)`:undefined,
-      transition:sidebarTransitionOn?"transform 0.22s cubic-bezier(0.4,0,0.2,1)":"none",
-    }}>
-      <div style={{height:"100vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+    <Modal onClose={onClose} fullscreen>
+      {/* The push/transform lives on this inner div, not on Modal's own box
+          (via contentStyle) — Modal's outer backdrop is `display:flex;
+          justifyContent:center`, and an explicit marginLeft on a centered
+          flex child fights that auto-centering as width changes, which is
+          what was causing the double-motion/overshoot. This div is a normal
+          child inside Modal's own column-flex box (default align-items:
+          stretch, no competing justify-content on this axis), so it pushes
+          the same simple, predictable way the app-level root wrapper does. */}
+      <div style={{
+        height:"100vh",display:"flex",flexDirection:"column",overflow:"hidden",
+        marginLeft:checklistPushOffset,
+        width:checklistPushOffset?`calc(100% - ${checklistPushOffset}px)`:"100%",
+        transform:sidebarTransformX?`translateX(${sidebarTransformX}px)`:undefined,
+        transition:sidebarTransitionOn?"transform 0.22s cubic-bezier(0.4,0,0.2,1)":"none",
+      }}>
 
         {/* ── Sticky header ── */}
         <div style={{background:"#0d1117",borderBottom:"1px solid #1f2937",padding:"18px 28px 0",flexShrink:0}}>
