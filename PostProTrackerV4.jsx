@@ -6069,11 +6069,23 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
   const [activeTab,setActiveTab]=useState(initialTab||"overview");
   const [expandedShoot,setExpandedShoot]=useState(initialShootId||null);
   const [validationErrors,setValidationErrors]=useState(null);
-  const [checklistOpen,setChecklistOpen]=useState(false);
-  const [historyOpen,setHistoryOpen]=useState(false);
-  // Reads the same live offset ChecklistPanel registers via usePushPanel, so the
-  // project content shifts in lockstep with the checklist's own slide animation.
+  // Mutually exclusive — usePushPanel's registry only tracks one active width
+  // at a time (see _getPushSnapshot), so two panels open together would both
+  // render pinned to the same left:0 edge and stack on top of each other.
+  const [checklistOpen,setChecklistOpenRaw]=useState(false);
+  const [historyOpen,setHistoryOpenRaw]=useState(false);
+  const setChecklistOpen = v => { setChecklistOpenRaw(v); if(v) setHistoryOpenRaw(false); };
+  const setHistoryOpen = v => { setHistoryOpenRaw(v); if(v) setChecklistOpenRaw(false); };
+  // Reads the same live offset ChecklistPanel/HistoryFeedSidebar register via
+  // usePushPanel, so the project content shifts in lockstep with whichever
+  // one's open. Fed through useAnimatedPushOffset (the same compositor-only
+  // transform trick the app root uses) instead of animating marginLeft/width
+  // directly — this modal's own tab content reflows (grids, wrapping rows)
+  // the same way ProjectsView's does, so a raw CSS transition on those
+  // properties mid-resize reads as jitter for the same reason documented on
+  // useAnimatedPushOffset itself.
   const checklistPushOffset = usePushOffset();
+  const {transformX:sidebarTransformX, transitionOn:sidebarTransitionOn} = useAnimatedPushOffset(checklistPushOffset);
   const lp=allProjects.find(p=>p.id===project.id)||project;
 
   const done=lp.deliverables.filter(d=>d.status==="Delivered").length;
@@ -6124,7 +6136,8 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
     <Modal onClose={onClose} fullscreen contentStyle={{
       marginLeft:checklistPushOffset,
       width:checklistPushOffset?`calc(100% - ${checklistPushOffset}px)`:"100%",
-      transition:"margin-left 0.2s cubic-bezier(0.4,0,0.2,1), width 0.2s cubic-bezier(0.4,0,0.2,1)",
+      transform:sidebarTransformX?`translateX(${sidebarTransformX}px)`:undefined,
+      transition:sidebarTransitionOn?"transform 0.22s cubic-bezier(0.4,0,0.2,1)":"none",
     }}>
       <div style={{height:"100vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
 
@@ -6148,11 +6161,11 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                 {lp.year&&<span style={{color: "#8e97a6"}}>{" · "}{lp.year}</span>}
               </div>
               {/* Checklist button — sits beside the project meta line, away from the modal's own ✕ */}
-              <button onClick={()=>setChecklistOpen(o=>!o)}
+              <button onClick={()=>setChecklistOpen(!checklistOpen)}
                 style={{background:checklistOpen?"#10b981":"#1f2937",border:`1px solid ${checklistOpen?"#10b981":"#374151"}`,borderRadius:8,color:checklistOpen?"#fff":"#9ca3af",padding:"5px 13px",fontSize:11,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",gap:6,flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>
                 <span>✓</span> Checklist
               </button>
-              <button onClick={()=>setHistoryOpen(o=>!o)}
+              <button onClick={()=>setHistoryOpen(!historyOpen)}
                 style={{background:historyOpen?"#6366f1":"#1f2937",border:`1px solid ${historyOpen?"#6366f1":"#374151"}`,borderRadius:8,color:historyOpen?"#fff":"#9ca3af",padding:"5px 13px",fontSize:11,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",gap:6,flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>
                 <span>🕓</span> History
               </button>
@@ -21983,7 +21996,9 @@ const StudioAgent = ({projects, team, onApplyUpdate, onOpenProject}) => {
               style={{marginLeft:"auto",background:"none",border:"none",color: "#838ba0",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}
               title="Clear chat">CLR</button>
             <button onClick={()=>setOpen(false)}
-              style={{background:"#1f2937",border:"none",borderRadius:6,color:"#9ca3af",width:24,height:24,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}
+              onMouseEnter={e=>{e.currentTarget.style.background="#ef4444";e.currentTarget.style.borderColor="#ef4444";e.currentTarget.style.color="#fff";}}
+              onMouseLeave={e=>{e.currentTarget.style.background="#374151";e.currentTarget.style.borderColor="#4b5563";e.currentTarget.style.color="#f1f5f9";}}
+              style={{background:"#374151",border:"1px solid #4b5563",borderRadius:8,color:"#f1f5f9",width:30,height:30,cursor:"pointer",fontSize:18,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"background 0.15s,border-color 0.15s,color 0.15s"}}
               title="Close">×</button>
           </div>
 
