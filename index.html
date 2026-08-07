@@ -8,10 +8,36 @@
 <div id="loading"><div class="spinner"></div><div class="ltxt">Loading preview&hellip;</div></div>
 <div id="app"></div>
 <script>
+// window.storage: every gear/preset/intake/media-card/etc. save*() function
+// in the app already funnels through this same get/set interface, so
+// upgrading it here to read/write Supabase's app_kv table (via window.sb,
+// set once the app bundle below has run) gives all of them real shared
+// persistence with no changes needed at any of those call sites.
+// localStorage is still written on every set() as a fast local cache, and
+// get() falls back to it (and migrates the value up to Supabase) for keys
+// that predate this change, so nobody's existing local data disappears.
 window.storage={
-  get:(k,s)=>Promise.resolve().then(()=>{var v=localStorage.getItem('pt_'+k);if(v===null)throw new Error('nf');return{key:k,value:v};}),
-  set:(k,v,s)=>Promise.resolve().then(()=>{localStorage.setItem('pt_'+k,v);return{key:k,value:v};}),
-  delete:(k,s)=>Promise.resolve().then(()=>{localStorage.removeItem('pt_'+k);return{key:k,deleted:true};}),
+  get:(k,s)=>{
+    var fromLocal=()=>Promise.resolve().then(()=>{var v=localStorage.getItem('pt_'+k);if(v===null)throw new Error('nf');return{key:k,value:v};});
+    if(!window.sb) return fromLocal();
+    return window.sb.from('app_kv').select('value').eq('key',k).maybeSingle().then(({data,error})=>{
+      if(!error&&data) return {key:k,value:data.value};
+      return fromLocal().then(r=>{ window.sb.from('app_kv').upsert({key:k,value:r.value}).then(()=>{}); return r; });
+    });
+  },
+  set:(k,v,s)=>{
+    localStorage.setItem('pt_'+k,v);
+    if(!window.sb) return Promise.resolve({key:k,value:v});
+    return window.sb.from('app_kv').upsert({key:k,value:v}).then(({error})=>{
+      if(error){ console.error('[Supabase] app_kv save failed for "'+k+'":', error); }
+      return {key:k,value:v};
+    });
+  },
+  delete:(k,s)=>{
+    localStorage.removeItem('pt_'+k);
+    if(!window.sb) return Promise.resolve({key:k,deleted:true});
+    return window.sb.from('app_kv').delete().eq('key',k).then(()=>({key:k,deleted:true}));
+  },
   list:(p,s)=>Promise.resolve().then(()=>{var ks=[];for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.startsWith('pt_')){var b=k.slice(3);if(!p||b.startsWith(p))ks.push(b);}}return{keys:ks};})
 };
 </script>
@@ -9961,6 +9987,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
   const SUPABASE_URL = "https://mwugopgmuwkvxviinhtn.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dWdvcGdtdXdrdnh2aWluaHRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMzkwODIsImV4cCI6MjEwMTYxNTA4Mn0.rp2jYMBjIcWRQKlBUtaUq396kJfPz4ZgPM6QIPpNhKM";
   const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+  window.sb = sb;
   const rowToTeamMember = (row) => ({
     id: row.id,
     name: row.name,

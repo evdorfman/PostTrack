@@ -14678,6 +14678,10 @@ const MEDIA_CARDS_STORAGE_KEY = "posttrack-media-cards-v1";
 const SUPABASE_URL = "https://mwugopgmuwkvxviinhtn.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dWdvcGdtdXdrdnh2aWluaHRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMzkwODIsImV4cCI6MjEwMTYxNTA4Mn0.rp2jYMBjIcWRQKlBUtaUq396kJfPz4ZgPM6QIPpNhKM";
 const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+// Exposed globally so the page's window.storage shim (defined in the HTML
+// header, loaded before this bundle) can route its get/set calls through
+// Supabase's app_kv table instead of localStorage-only.
+window.sb = sb;
 
 const rowToTeamMember = row => ({
   id: row.id, name: row.name, roles: row.roles||[], employeeType: row.employee_type,
