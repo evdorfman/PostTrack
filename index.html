@@ -17238,7 +17238,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const reportSbError = (label, error) => {
       if (!error) return;
       console.error(`[Supabase] ${label} failed:`, error);
-      showToast({ msg: `${label} failed to save \u2014 check console for details`, color: "#ef4444" });
+      const detail = error.message || error.details || error.hint || error.code || "unknown error";
+      showToast({ msg: `${label} failed: ${detail}`, color: "#ef4444" });
     };
     const saveTeam = (t) => {
       const removedIds = teamRoster.filter((m) => !t.some((n) => n.id === m.id)).map((m) => m.id);
@@ -17614,7 +17615,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const allTeam = showDummyTeam ? [...teamRoster, ...TEAM] : teamRoster;
     const showToast = useCallback(({ msg, color = "#10b981" }) => {
       setToast({ msg, color });
-      setTimeout(() => setToast(null), 3e3);
+      setTimeout(() => setToast(null), color === "#ef4444" ? 8e3 : 3e3);
     }, []);
     const [kanbanMode, setKanbanMode] = useState("status");
     const [filterStatus, setFilterStatus] = useState("All");
@@ -18087,7 +18088,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           });
         }
       }
-    ), toast && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 600, background: toast.color, borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 700, color: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,0.4)", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", pointerEvents: "none", animation: "fadeInUp 0.2s ease" } }, toast.msg), needsOnboarding && /* @__PURE__ */ React.createElement(OnboardingModal, { email: authUser.email, onSubmit: completeOnboarding, onSkip: () => setOnboardingDismissed(true) })));
+    ), toast && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 600, background: toast.color, borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 700, color: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,0.4)", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", pointerEvents: "none", animation: "fadeInUp 0.2s ease", maxWidth: "min(90vw,560px)", wordBreak: "break-word", textAlign: "center" } }, toast.msg), needsOnboarding && /* @__PURE__ */ React.createElement(OnboardingModal, { email: authUser.email, onSubmit: completeOnboarding, onSkip: () => setOnboardingDismissed(true) })));
   }
   window.App = App;
 })();

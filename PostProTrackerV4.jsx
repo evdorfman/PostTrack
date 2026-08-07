@@ -25512,7 +25512,8 @@ export default function App() {
   const reportSbError = (label, error) => {
     if(!error) return;
     console.error(`[Supabase] ${label} failed:`, error);
-    showToast({msg:`${label} failed to save — check console for details`, color:"#ef4444"});
+    const detail = error.message || error.details || error.hint || error.code || "unknown error";
+    showToast({msg:`${label} failed: ${detail}`, color:"#ef4444"});
   };
 
   const saveTeam   = t => {
@@ -25804,10 +25805,10 @@ export default function App() {
   });
   const allTeam = showDummyTeam ? [...teamRoster, ...TEAM] : teamRoster;
 
-  // Show a toast for 3 seconds
+  // Show a toast — errors linger longer since they can be longer to read
   const showToast = useCallback(({msg, color="#10b981"}) => {
     setToast({msg, color});
-    setTimeout(()=>setToast(null), 3000);
+    setTimeout(()=>setToast(null), color==="#ef4444"?8000:3000);
   },[]);
   const [kanbanMode,setKanbanMode]=useState("status");
   const [filterStatus,setFilterStatus]=useState("All");
@@ -26276,7 +26277,7 @@ export default function App() {
         />
         {/* Toast notification */}
         {toast&&(
-          <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",zIndex:600,background:toast.color,borderRadius:10,padding:"12px 24px",fontSize:14,fontWeight:700,color:"#fff",boxShadow:"0 8px 32px rgba(0,0,0,0.4)",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em",pointerEvents:"none",animation:"fadeInUp 0.2s ease"}}>
+          <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",zIndex:600,background:toast.color,borderRadius:10,padding:"12px 24px",fontSize:14,fontWeight:700,color:"#fff",boxShadow:"0 8px 32px rgba(0,0,0,0.4)",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em",pointerEvents:"none",animation:"fadeInUp 0.2s ease",maxWidth:"min(90vw,560px)",wordBreak:"break-word",textAlign:"center"}}>
             {toast.msg}
           </div>
         )}
