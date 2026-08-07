@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect, useSyncExternalStore } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -6068,7 +6068,7 @@ const ProjectTeamPanel = ({project, lp, team, onUpdateProject}) => {
   );
 };
 
-const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,onDeleteDel,onUpdateProject,initialDelId,initialTab,initialShootId,initialItemId,studioBookings=[],mediaCards=[],setupTypes=[],onAddSetupType,talentRoster=[],onUpdateTalentRoster,nudges=[],onAddNudge,furnitureList=[],propsList=[],screenContentOptions={},gearList=[],customTasks=[],onAddCustomTask,onUpdateCustomTask,onDeleteCustomTask,appPresets=[],onSaveAppPresets,vendorCompanies=[],addVendorCompany,intakes=[],becRequests=[]}) => {
+const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,onDeleteDel,onUpdateProject,initialDelId,initialTab,initialShootId,initialItemId,studioBookings=[],mediaCards=[],setupTypes=[],onAddSetupType,talentRoster=[],onUpdateTalentRoster,nudges=[],onAddNudge,furnitureList=[],propsList=[],screenContentOptions={},gearList=[],customTasks=[],onAddCustomTask,onUpdateCustomTask,onDeleteCustomTask,appPresets=[],onSaveAppPresets,vendorCompanies=[],addVendorCompany,intakes=[],becRequests=[],canAccessBudget=true}) => {
   const [activeDelModal,setActiveDelModal]=useState(initialDelId||((initialTab==="deliverables"||initialTab==="ingest")?initialItemId:null)||null);
   const [handoffDelId,  setHandoffDelId]  = useState(null); // for editor assignment modal in deliverables tab
   const editors = team.filter(m=>m.roles?.some(r=>["Editor","Animator","Designer"].includes(r)));
@@ -6080,7 +6080,8 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
   const [delSort, setDelSort] = useState("default");
   const [bulkDelCount, setBulkDelCount] = useState(1);
   const [confirmDelDelete, setConfirmDelDelete] = useState(null); // deliverable id pending delete confirm
-  const [activeTab,setActiveTab]=useState(initialTab||"overview");
+  const [activeTab,setActiveTab]=useState(initialTab==="budget"&&!canAccessBudget?"overview":(initialTab||"overview"));
+  useEffect(()=>{ if(activeTab==="budget" && !canAccessBudget) setActiveTab("overview"); },[activeTab,canAccessBudget]);
   const [expandedShoot,setExpandedShoot]=useState(initialShootId||null);
   const [validationErrors,setValidationErrors]=useState(null);
   // Mutually exclusive — only one sidebar slot, so opening one closes the
@@ -6238,7 +6239,9 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
           </div>
           {/* Tab bar */}
           <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
-            {[["overview","Overview"],["calendar","📅 Project Cal"],["production","Production"],["ingest","Media Ingest"],["animation","✨ Animation"],["deliverables","Deliverables"],["budget","Budget"],["closeout","Close Out"]].map(([id,label])=>(
+            {[["overview","Overview"],["calendar","📅 Project Cal"],["production","Production"],["ingest","Media Ingest"],["animation","✨ Animation"],["deliverables","Deliverables"],["budget","Budget"],["closeout","Close Out"]]
+              .filter(([id])=>id!=="budget"||canAccessBudget)
+              .map(([id,label])=>(
               <button key={id} style={tabS(activeTab===id)} onClick={()=>{setActiveTab(id);setActiveDelModal(null);}}>{label}</button>
             ))}
           </div>
@@ -13475,8 +13478,9 @@ const MyOutstandingTasks = ({member, projects, team, onOpenProject, nudges=[], c
   );
 };
 
-const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOpenProject, onUpdateProject, onUpdateDel, showToast, nudges=[], customTasks=[], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, unavailability=[], onAddUnavailability, onDeleteUnavailability}) => {
-  const [selectedMember,setSelectedMember] = useState(null);
+const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOpenProject, onUpdateProject, onUpdateDel, showToast, nudges=[], customTasks=[], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, unavailability=[], onAddUnavailability, onDeleteUnavailability, currentMember=null, isAdmin=false}) => {
+  const [selectedMember,setSelectedMember] = useState(()=> (!isAdmin && currentMember) ? currentMember.id : null);
+  useEffect(()=>{ if(!isAdmin && currentMember) setSelectedMember(currentMember.id); },[isAdmin, currentMember?.id]);
   const [customizeMode,  setCustomizeMode] = useState(false);
   const DEFAULT_ORDER = ["cal","chat","tasks"];
   const [sectionOrder, setSectionOrder] = useState(()=>{
@@ -13497,6 +13501,14 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
     {label:"Production Crew",      roles:["DP","Camera Op","Gaffer","Media Manager"]},
     {label:"Broadcast",            dept:"Broadcast"},
   ];
+
+  if(!member && !isAdmin) return (
+    <div style={{maxWidth:700,margin:"0 auto",paddingTop:40,textAlign:"center"}}>
+      <div style={{fontSize:32,marginBottom:8}}>👤</div>
+      <div style={{fontWeight:900,fontSize:26,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:6}}>My View</div>
+      <div style={{fontSize:15,color: "#9ca3af"}}>Your account isn't linked to a team member profile yet. Ask an admin to link it in Team settings.</div>
+    </div>
+  );
 
   if(!member) return (
     <div style={{maxWidth:700,margin:"0 auto",paddingTop:40}}>
@@ -13539,7 +13551,7 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
     <div>
       {/* Back + member header */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24,paddingBottom:16,borderBottom:"1px solid #1f2937"}}>
-        <button onClick={()=>setSelectedMember(null)} style={{background:"#1f2937",border:"none",borderRadius:7,color:"#9ca3af",padding:"6px 12px",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>← Back</button>
+        {isAdmin&&<button onClick={()=>setSelectedMember(null)} style={{background:"#1f2937",border:"none",borderRadius:7,color:"#9ca3af",padding:"6px 12px",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>← Back</button>}
         <Av name={member.name} size={40}/>
         <div>
           <div style={{fontWeight:900,fontSize:20,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>{member.name}</div>
@@ -13547,10 +13559,10 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
         </div>
         {/* Switch to another person + Customize */}
         <div style={{marginLeft:"auto",display:"flex",gap:6,alignItems:"center"}}>
-          <select value={selectedMember} onChange={e=>setSelectedMember(Number(e.target.value))}
+          {isAdmin&&<select value={selectedMember} onChange={e=>setSelectedMember(Number(e.target.value))}
             style={{background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"6px 10px",fontSize:13,outline:"none"}}>
             {team.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
+          </select>}
           <button onClick={()=>setCustomizeMode(o=>!o)}
             style={{background:customizeMode?"#6366f1":"#1f2937",border:"none",borderRadius:7,color:customizeMode?"#fff":"#9ca3af",padding:"6px 12px",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em",whiteSpace:"nowrap"}}>
             {customizeMode?"✓ Done":"⇅ Layout"}
@@ -24463,6 +24475,55 @@ const AdminListsTab = ({lists, onUpdateLists}) => {
   );
 };
 
+// ── Admin: Tab Access Control ────────────────────────────────────────────────
+// Lets an admin restrict Resourcing (a nav tab) and Budget (a per-project tab)
+// to specific job roles. Empty role list for a tab = open to everyone. Admins
+// themselves always bypass these locks regardless of this config — see
+// canAccessTab in App.
+const LOCKABLE_TABS = [
+  {key:"resourcing", label:"Resourcing", hint:"The Resources tab in the main nav."},
+  {key:"budget", label:"Budget", hint:"The Budget tab inside each project. The project's overall budget status still shows in the project summary even when this is locked."},
+];
+const AdminAccessTab = ({tabLocks={}, onUpdateTabLocks}) => {
+  const toggleRole = (tabKey, role) => {
+    const current = tabLocks[tabKey] || [];
+    const next = current.includes(role) ? current.filter(r=>r!==role) : [...current, role];
+    onUpdateTabLocks({...tabLocks, [tabKey]: next});
+  };
+  return (
+    <div>
+      <div style={{fontSize:13,color:"#9ca3af",marginBottom:16,lineHeight:1.5}}>
+        Pick which job roles can see each tab below. Leave a tab with no roles selected to keep it open to everyone. Admins can always see everything, regardless of these settings.
+      </div>
+      {LOCKABLE_TABS.map(({key,label,hint})=>{
+        const selected = tabLocks[key]||[];
+        return (
+          <div key={key} style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:10,padding:16,marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+              <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>{label}</div>
+              <span style={{fontSize:11,fontWeight:700,color:selected.length?"#f59e0b":"#10b981",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
+                {selected.length ? `Locked — ${selected.length} role${selected.length!==1?"s":""}` : "Open to everyone"}
+              </span>
+            </div>
+            <div style={{fontSize:12,color:"#6b7280",marginBottom:10}}>{hint}</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {ROLE_OPTIONS.map(r=>{
+                const on = selected.includes(r);
+                return (
+                  <button key={r} onClick={()=>toggleRole(key,r)}
+                    style={{background:on?"#6366f120":"#0a0f1a",border:`1px solid ${on?"#6366f1":"#1f2937"}`,borderRadius:20,color:on?"#818cf8":"#6b7280",padding:"4px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+                    {r}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 // ── Production Presets Admin ─────────────────────────────────────────────────
 
 const BLANK_PRESET = () => ({
@@ -24830,11 +24891,11 @@ const ProductionPresetsAdmin = ({presets=[], onUpdatePresets, setupTypes=[], tea
   );
 };
 
-const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, gear, onUpdateGear, mediaCards=[], onUpdateMediaCards, furniture=[], onUpdateFurniture, props_=[], onUpdateProps, screenContent={}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes=[], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations=[], onUpdateWorkstations, talentRoster=[], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists={}, onUpdateLists, presets=[], onUpdatePresets}) => {
+const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, gear, onUpdateGear, mediaCards=[], onUpdateMediaCards, furniture=[], onUpdateFurniture, props_=[], onUpdateProps, screenContent={}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes=[], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations=[], onUpdateWorkstations, talentRoster=[], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists={}, onUpdateLists, presets=[], onUpdatePresets, tabLocks={}, onUpdateTabLocks}) => {
   const [gearSubTab, setGearSubTab] = useState("equipment"); // "equipment" | "media"
   const [tab, setTab] = useState("team");
   const [csvModal, setCsvModal] = useState(null); // {filename, content}
-  const tabs = [{id:"team",l:"👥 Team"},{id:"gear",l:"🎒 Gear"},{id:"props",l:"🪑 Props & Furniture"},{id:"screen",l:"📺 Screen Content"},{id:"spaces",l:"📍 Spaces"},{id:"setups",l:"🎬 Setups"},{id:"workstations",l:"💻 Workstations"},{id:"talent",l:"🎤 Talent"},{id:"resources",l:"📊 Resources"},{id:"lists",l:"🗂 Metadata"},{id:"presets",l:"⭐ Production Presets"}];
+  const tabs = [{id:"team",l:"👥 Team"},{id:"gear",l:"🎒 Gear"},{id:"props",l:"🪑 Props & Furniture"},{id:"screen",l:"📺 Screen Content"},{id:"spaces",l:"📍 Spaces"},{id:"setups",l:"🎬 Setups"},{id:"workstations",l:"💻 Workstations"},{id:"talent",l:"🎤 Talent"},{id:"resources",l:"📊 Resources"},{id:"lists",l:"🗂 Metadata"},{id:"presets",l:"⭐ Production Presets"},{id:"access",l:"🔒 Access"}];
 
   const buildAndDownload = (filename, rows) => {
     const escape = v => {
@@ -24966,6 +25027,9 @@ const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, g
           setupTypes={setupTypes} team={team} spaces={spaces||[]} gear={gear||[]}
           lists={lists}/>
       )}
+
+      {/* ── ACCESS TAB ── */}
+      {tab==="access"&&<AdminAccessTab tabLocks={tabLocks} onUpdateTabLocks={onUpdateTabLocks}/>}
     </div>
   );
 };
@@ -25852,6 +25916,13 @@ export default function App() {
     setLists(l);
     window.storage?.set(LISTS_STORAGE_KEY, JSON.stringify(l)).catch(()=>{});
   };
+  // Which job roles can see the Resourcing nav tab / a project's Budget tab.
+  // {resourcing:[...roles], budget:[...roles]} — an empty/missing list for a
+  // key means that tab is open to everyone. Admins always bypass this
+  // regardless (see canAccessTab below), same as they bypass everything else.
+  const TAB_LOCKS_STORAGE_KEY = "posttrack-tab-locks";
+  const [tabLocks, setTabLocks] = useState({});
+  const saveTabLocks = t => { setTabLocks(t); window.storage?.set(TAB_LOCKS_STORAGE_KEY, JSON.stringify(t), true).catch(()=>{}); };
   // Sends (or re-sends) a nudge for one task to one or more recipients. Any
   // prior nudge for this exact task+recipient is replaced rather than stacked,
   // so re-nudging just refreshes the timestamp instead of piling up duplicates.
@@ -25928,6 +25999,7 @@ export default function App() {
       safeGet(INTAKE_STORAGE_KEY).then(iv=>{ try{if(iv?.value){ const list=JSON.parse(iv.value); if(Array.isArray(list)) setIntakes(list); }}catch(e){} }).catch(()=>{});
       safeGet(BEC_REQUEST_STORAGE_KEY).then(bv=>{ try{if(bv?.value){ const list=JSON.parse(bv.value); if(Array.isArray(list)) setBecRequests(list); }}catch(e){} }).catch(()=>{});
       safeGet(MEDIA_CARDS_STORAGE_KEY).then(mv=>{ try{if(mv?.value){ const list=JSON.parse(mv.value); if(Array.isArray(list)) setMediaCards(list); }}catch(e){} }).catch(()=>{});
+      safeGet(TAB_LOCKS_STORAGE_KEY, true).then(tl=>{ try{if(tl?.value) setTabLocks(JSON.parse(tl.value)); }catch(e){} }).catch(()=>{});
     });
   },[]);
 
@@ -26015,6 +26087,16 @@ export default function App() {
   // via the Admin > Team panel.
   const currentMember = teamRoster.find(m=>m.authUserId===authUser?.id) || null;
   const isAdmin = !!currentMember?.isAdmin;
+  // Job-role-based tab locks (Resourcing, Budget) — configured in Admin >
+  // Access. Admins bypass every lock; everyone else needs at least one of
+  // their own job roles in the tab's allow-list (or the list is empty,
+  // meaning the tab isn't locked at all).
+  const canAccessTab = tabKey => {
+    if(isAdmin) return true;
+    const allowed = tabLocks[tabKey];
+    if(!allowed || !allowed.length) return true;
+    return (currentMember?.roles||[]).some(r=>allowed.includes(r));
+  };
   const [showMyProfile, setShowMyProfile] = useState(false);
   const updateMyProfile = profile => {
     if(!currentMember) return;
@@ -26028,6 +26110,7 @@ export default function App() {
   // this catches the case where an admin gets demoted mid-session while
   // still sitting on that tab.
   useEffect(()=>{ if(view==="admin" && !isAdmin) setView("projects"); },[isAdmin, view]);
+  useEffect(()=>{ if(view==="resources" && !canAccessTab("resourcing")) setView("projects"); },[view, isAdmin, tabLocks, currentMember]);
 
   // Projects (the user's actual campaigns/deliverables) are the one collection
   // that previously had no persistence at all — every other collection here
@@ -26507,7 +26590,9 @@ export default function App() {
 
   const liveSelected=selected?allProjects.find(p=>p.id===selected.id)||null:null;
 
-  const VIEWS=[{id:"projects",l:"Projects"},{id:"studio",l:"Studio"},{id:"calendar",l:"Calendar"},{id:"deliverables",l:"Deliverables"},{id:"animations",l:"Animation"},{id:"ingest",l:"Ingest"},{id:"resources",l:"Resources"},{id:"myview",l:"My View"},{id:"admin",l:"⚙ Admin"},{id:"pipeline",l:"Pipeline"},{id:"intake",l:"Intake"}].filter(v=>v.id!=="admin"||isAdmin);
+  const VIEWS=[{id:"projects",l:"Projects"},{id:"studio",l:"Studio"},{id:"calendar",l:"Calendar"},{id:"deliverables",l:"Deliverables"},{id:"animations",l:"Animation"},{id:"ingest",l:"Ingest"},{id:"resources",l:"Resources"},{id:"myview",l:"My View"},{id:"admin",l:"⚙ Admin"},{id:"pipeline",l:"Pipeline"},{id:"intake",l:"Intake"}]
+    .filter(v=>v.id!=="admin"||isAdmin)
+    .filter(v=>v.id!=="resources"||canAccessTab("resourcing"));
   // workReview is a nav-less view accessible only via the stats bar
   const NAV_VIEWS = VIEWS; // all visible in nav
   const inp={background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"6px 10px",fontSize:13,outline:"none",fontFamily:"'DM Sans',sans-serif"};
@@ -26613,7 +26698,7 @@ export default function App() {
           {view==="deliverables"&&<DeliverablesTab projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster}/>}
           {view==="ingest"&&<IngestView projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster}/>}
           {view==="resources"&&<ResourceView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
-          {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability}/>}
+          {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability} currentMember={currentMember} isAdmin={isAdmin}/>}
           {view==="admin"&&<AdminView
             team={teamRoster} onUpdateTeam={saveTeam}
             projects={allProjects} nudges={nudges} onOpenProject={openProject}
@@ -26630,10 +26715,11 @@ export default function App() {
             resourceConfig={resourceConfig} onUpdateResourceConfig={saveResourceConfig}
             lists={lists} onUpdateLists={saveLists}
             presets={appPresets} onUpdatePresets={saveAppPresets}
+            tabLocks={tabLocks} onUpdateTabLocks={saveTabLocks}
           />}
         </div>
 
-        {liveSelected&&<ProjectOverview project={liveSelected} team={allTeam} allProjects={allProjects} onClose={()=>setSelected(null)} onUpdateDel={updateDel} onAddDel={addDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} initialTab={initialTab?.tab} initialShootId={initialTab?.itemId} initialItemId={initialTab?.itemId} studioBookings={allStudioBookings} mediaCards={mediaCards} setupTypes={setupTypes} onAddSetupType={addSetupType} talentRoster={talentRoster} onUpdateTalentRoster={saveTalentRoster} nudges={nudges} onAddNudge={addNudge} furnitureList={furnitureList} propsList={propsList} screenContentOptions={screenContentOptions} gearList={gearList} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} appPresets={appPresets} onSaveAppPresets={saveAppPresets} vendorCompanies={vendorCompanies} addVendorCompany={addVendorCompany} intakes={intakes} becRequests={becRequests}/>}
+        {liveSelected&&<ProjectOverview project={liveSelected} team={allTeam} allProjects={allProjects} onClose={()=>setSelected(null)} onUpdateDel={updateDel} onAddDel={addDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} initialTab={initialTab?.tab} initialShootId={initialTab?.itemId} initialItemId={initialTab?.itemId} studioBookings={allStudioBookings} mediaCards={mediaCards} setupTypes={setupTypes} onAddSetupType={addSetupType} talentRoster={talentRoster} onUpdateTalentRoster={saveTalentRoster} nudges={nudges} onAddNudge={addNudge} furnitureList={furnitureList} propsList={propsList} screenContentOptions={screenContentOptions} gearList={gearList} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} appPresets={appPresets} onSaveAppPresets={saveAppPresets} vendorCompanies={vendorCompanies} addVendorCompany={addVendorCompany} intakes={intakes} becRequests={becRequests} canAccessBudget={canAccessTab("budget")}/>}
         {addingProject&&<AddProjectModal team={allTeam} existingProjects={allProjects} onClose={()=>setAddingProject(false)} onAdd={addProject}/>}
         {createFromIntake&&<AddProjectModal team={allTeam} existingProjects={allProjects} initialData={createFromIntake}
           onClose={()=>setCreateFromIntake(null)}
