@@ -758,6 +758,69 @@ const SidebarPortal = ({width, slotNode, onWidthChange, children}) => {
   return ReactDOM.createPortal(children, slotNode);
 };
 
+// Draggable-width sidebar. Returns [width, handleProps]: width is the
+// current pixel width (persisted to localStorage under storageKey, so a
+// user's preferred size survives across sessions and across every sidebar
+// sharing that key), and handleProps spreads onto a thin drag-handle
+// element on the sidebar's edge. Only the width is stateful here — open/
+// closed is still whatever the caller already tracks; render at width 0
+// while closed and this hook's width once open.
+const useResizableWidth = (storageKey, defaultWidth, {min=300, max=760}={}) => {
+  const [width, setWidth] = useState(()=>{
+    try {
+      const v = parseInt(localStorage.getItem(storageKey), 10);
+      return (v && v>=min && v<=max) ? v : defaultWidth;
+    } catch(e){ return defaultWidth; }
+  });
+  const [dragging, setDragging] = useState(false);
+  const dragState = useRef(null); // {startX, startWidth}
+
+  useEffect(()=>{
+    if(!dragging) return;
+    const onMove = e => {
+      const {startX, startWidth} = dragState.current;
+      setWidth(Math.max(min, Math.min(max, startWidth + (e.clientX - startX))));
+    };
+    const onUp = () => setDragging(false);
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    const prevCursor = document.body.style.cursor, prevSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevSelect;
+    };
+  },[dragging,min,max]);
+
+  useEffect(()=>{
+    try { localStorage.setItem(storageKey, String(width)); } catch(e){}
+  },[width,storageKey]);
+
+  const onMouseDown = e => {
+    e.preventDefault();
+    dragState.current = {startX:e.clientX, startWidth:width};
+    setDragging(true);
+  };
+
+  return [width, {onMouseDown, dragging}];
+};
+
+// Thin drag handle for the right edge of a left-docked resizable sidebar —
+// a slightly wider invisible hit area around a 1px visible line, matching
+// how VS Code/Slack-style resize handles behave (easy to grab, unobtrusive
+// until hovered/dragged).
+const SidebarResizeHandle = ({onMouseDown, dragging}) => (
+  <div onMouseDown={onMouseDown}
+    style={{position:"absolute",top:0,bottom:0,right:-3,width:7,cursor:"col-resize",zIndex:5}}>
+    <div style={{position:"absolute",top:0,bottom:0,left:3,width:1,background:dragging?"#6366f1":"transparent",transition:dragging?"none":"background 0.15s"}}
+      onMouseEnter={e=>{if(!dragging)e.currentTarget.style.background="#6366f180";}}
+      onMouseLeave={e=>{if(!dragging)e.currentTarget.style.background="transparent";}}/>
+  </div>
+);
+
 // Called by each panel: registers `width` while mounted with that value, and
 // cleans up on unmount. Pass 0 while the panel is animating closed (vis=false)
 // so the content slides back in lockstep with the panel's own exit animation.
@@ -5895,7 +5958,7 @@ const ChecklistPanel = ({project, team, activeTab, onClose, nudges=[], onAddNudg
 
   return (
     <div style={{
-      width:380,height:"100%",
+      width:"100%",height:"100%",
       background:"#0d1117",
       display:"grid",gridTemplateRows:"auto 1fr auto",overflow:"hidden",
     }}>
@@ -6123,7 +6186,8 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
   const [historyOpen,setHistoryOpenRaw]=useState(false);
   const setChecklistOpen = v => { setChecklistOpenRaw(v); if(v) setHistoryOpenRaw(false); };
   const setHistoryOpen = v => { setHistoryOpenRaw(v); if(v) setChecklistOpenRaw(false); };
-  const sidebarWidth = checklistOpen ? 380 : historyOpen ? 400 : 0;
+  const [projSidebarWidth, projSidebarHandle] = useResizableWidth("posttrack-project-sidebar-width", 400, {min:300,max:640});
+  const sidebarWidth = (checklistOpen||historyOpen) ? projSidebarWidth : 0;
   const lp=allProjects.find(p=>p.id===project.id)||project;
 
   const done=lp.deliverables.filter(d=>d.status==="Delivered").length;
@@ -6178,7 +6242,8 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
             browser animates this width change natively and the flex:1
             content next to it just reflows in lockstep, the same way a
             sidebar works in VS Code/Slack/Linear. */}
-        <div style={{width:sidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:sidebarWidth?"1px solid #1f2937":"none"}}>
+        <div style={{width:sidebarWidth,flexShrink:0,overflow:"hidden",position:"relative",transition:projSidebarHandle.dragging?"none":"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:sidebarWidth?"1px solid #1f2937":"none"}}>
+          {!!sidebarWidth&&<SidebarResizeHandle {...projSidebarHandle}/>}
           {checklistOpen&&<ChecklistPanel project={lp} team={team} activeTab={activeTab} onClose={()=>setChecklistOpen(false)} nudges={nudges} onAddNudge={onAddNudge}/>}
           {historyOpen&&<HistoryFeedContent title={`${lp.name} — History`} buildQuery={q=>q.eq("project_id",lp.id)} onClose={()=>setHistoryOpen(false)}/>}
         </div>
@@ -25756,7 +25821,7 @@ const HistoryFeedContent = ({title, buildQuery, onClose}) => {
   const actionColor = a => a==="created" ? "#10b981" : a==="deleted" ? "#ef4444" : a==="status_changed" ? "#f59e0b" : "#6366f1";
 
   return (
-    <div style={{width:400,height:"100%",background:"#0d1117",display:"grid",gridTemplateRows:"auto 1fr",overflow:"hidden"}}>
+    <div style={{width:"100%",height:"100%",background:"#0d1117",display:"grid",gridTemplateRows:"auto 1fr",overflow:"hidden"}}>
       <div style={{padding:"16px 20px",borderBottom:"1px solid #1f2937",background:"#111827",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:900,color:"#f1f5f9",textTransform:"uppercase",letterSpacing:"0.06em"}}>🕓 {title}</div>
         <button onClick={onClose} style={{background:"#1f2937",border:"none",borderRadius:6,color:"#9ca3af",width:28,height:28,cursor:"pointer",fontSize:19,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
@@ -26281,7 +26346,15 @@ export default function App() {
   // own content, its sidebar can span the view's full height instead of
   // being capped to start below the stats cards.
   const [sidebarSlotNode, setSidebarSlotNode] = useState(null);
-  const [activeSidebarWidth, setActiveSidebarWidth] = useState(0);
+  // 0 = closed, nonzero = some view wants its sidebar open — the actual
+  // value a view reports here doesn't drive the rendered width (see
+  // navSidebarWidth below), it's just an open/closed signal.
+  const [sidebarRequestedWidth, setSidebarRequestedWidth] = useState(0);
+  // The user's dragged/persisted width for this shared slot, applied
+  // whenever any view's sidebar is open — so resizing sticks across
+  // opening/closing and across different views, not just one session.
+  const [navSidebarWidth, navSidebarHandle] = useResizableWidth("posttrack-nav-sidebar-width", 420, {min:320,max:720});
+  const activeSidebarWidth = sidebarRequestedWidth ? navSidebarWidth : 0;
 
   const updateDel=useCallback((projectId,delId,field,value)=>{
     const prevProj = projectsRef.current.find(p=>p.id===projectId);
@@ -26717,13 +26790,15 @@ export default function App() {
             the sticky header — see SidebarPortal above for why this can't
             just be nested inside the content column itself. */}
         <div style={{display:"flex",flexDirection:"row",alignItems:"stretch",flex:1,minHeight:0}}>
-        <div ref={setSidebarSlotNode} style={{width:activeSidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:activeSidebarWidth?"1px solid #1f2937":"none"}}/>
+        <div ref={setSidebarSlotNode} style={{width:activeSidebarWidth,flexShrink:0,overflow:"hidden",position:"relative",transition:navSidebarHandle.dragging?"none":"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:activeSidebarWidth?"1px solid #1f2937":"none"}}>
+          {!!activeSidebarWidth&&<SidebarResizeHandle {...navSidebarHandle}/>}
+        </div>
         <div style={{flex:1,minWidth:0}}>
         <div style={{maxWidth:1600,margin:"0 auto",padding:"20px 24px"}}>
           <StatsBar projects={allProjects} team={allTeam} setView={v=>{setView(v);if(v!=="projects")setStatsFilter(null);}} onOpenProject={openProject} onSetStatsFilter={setStatsFilter}/>
           {view==="workReview"&&<WorkReviewView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster}/>}
           {view==="pipeline"&&<PipelineView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject}/>}
-          {view==="animations"&&<AnimationView allProjects={allProjects} team={allTeam} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setActiveSidebarWidth}/>}
+          {view==="animations"&&<AnimationView allProjects={allProjects} team={allTeam} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="intake"&&<IntakeView
             intakes={intakes}
             onSaveIntakes={saveIntakes}
@@ -26749,14 +26824,14 @@ export default function App() {
             }}
           />}
           {view==="projects"&&<ProjectsView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} statsFilter={statsFilter} onClearStatsFilter={()=>setStatsFilter(null)}/>}
-          {view==="studio"&&<StudioTab projects={allProjects} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} team={allTeam} onOpenProject={openProject} talentRoster={talentRoster} onUpdateProject={updateProject} mediaCards={mediaCards} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setActiveSidebarWidth}/>}
+          {view==="studio"&&<StudioTab projects={allProjects} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} team={allTeam} onOpenProject={openProject} talentRoster={talentRoster} onUpdateProject={updateProject} mediaCards={mediaCards} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="kanban"&&kanbanMode==="status"&&<KanbanStatus projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="kanban"&&kanbanMode==="editor"&&<KanbanEditor projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
-          {view==="calendar"&&<CalendarView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setActiveSidebarWidth}/>}
-          {view==="deliverables"&&<DeliverablesTab projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setActiveSidebarWidth}/>}
-          {view==="ingest"&&<IngestView projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setActiveSidebarWidth}/>}
+          {view==="calendar"&&<CalendarView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
+          {view==="deliverables"&&<DeliverablesTab projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
+          {view==="ingest"&&<IngestView projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="resources"&&<ResourceView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
-          {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability} currentMember={currentMember} isAdmin={isAdmin} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setActiveSidebarWidth}/>}
+          {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability} currentMember={currentMember} isAdmin={isAdmin} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="admin"&&<AdminView
             team={teamRoster} onUpdateTeam={saveTeam}
             projects={allProjects} nudges={nudges} onOpenProject={openProject}
