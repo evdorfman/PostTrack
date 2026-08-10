@@ -736,22 +736,27 @@ const _getPushSnapshot = () => _pushStack.length ? _pushStack[_pushStack.length-
 // useSyncExternalStore re-validates after commit and corrects before paint.
 const usePushOffset = () => useSyncExternalStore(_subscribePush, _getPushSnapshot);
 
-// Style for the outer row-reverse wrapper of a push-sidebar hosted inside a
-// regular (non-modal) nav view. Those views render inside App's centered,
-// padded content column (maxWidth + "0 auto" + padding), so a sidebar-slot
-// that's just a normal flex child of that row lands inset from the real
-// browser edge instead of flush against it like ProjectOverview's sidebar
-// (which lives inside a fullscreen modal with no such ambient padding).
-// The classic "breakout" trick — a negative left margin equal to the
-// distance from the viewport edge to this row's own content-box edge —
-// pulls the sidebar side out to the true left edge while leaving the main
-// content's right edge exactly where it already was. Only applied while a
-// sidebar is actually open, so the view's normal (no-sidebar) width/centering
-// is untouched.
-const sidebarBreakoutStyle = sidebarOpen => ({
-  display:"flex", flexDirection:"row-reverse", alignItems:"flex-start",
-  marginLeft: sidebarOpen ? "calc(-50vw + 50%)" : 0,
-});
+// Renders a nav view's push-sidebar into a DOM node App owns (sidebarSlotNode),
+// instead of nesting it inside the view's own content column. That column
+// sits below App's stats-bar row and inside its centered/padded max-width
+// wrapper, so a sidebar nested there can never reach the true left edge or
+// the full page height the way ProjectOverview's sidebar does (it lives in a
+// fullscreen modal with no such ambient chrome above or around it). Portaling
+// into a slot that App itself sizes and positions — as a true sibling of the
+// stats-bar+content column, not a descendant of it — gets the same result
+// without needing position:fixed (and the masking-transform juggling that
+// used to require) for every view that wants a real push-sidebar.
+// Reports its width to App via onWidthChange so App can animate the slot's
+// width with a plain CSS transition; unmounting (view switch, or sidebar
+// closing) reports 0 so the slot collapses back down.
+const SidebarPortal = ({width, slotNode, onWidthChange, children}) => {
+  useEffect(()=>{
+    onWidthChange(width);
+  },[width]);
+  useEffect(()=>()=>onWidthChange(0),[]);
+  if(!slotNode) return null;
+  return ReactDOM.createPortal(children, slotNode);
+};
 
 // Called by each panel: registers `width` while mounted with that value, and
 // cleans up on unmount. Pass 0 while the panel is animating closed (vis=false)
@@ -8577,7 +8582,7 @@ const AnimationGroupSidebar = ({row, onClose}) => {
 };
 
 // Main AnimationView — structure matches DeliverablesTab
-const AnimationView = ({allProjects, team}) => {
+const AnimationView = ({allProjects, team, sidebarSlotNode, onSidebarWidthChange}) => {
   const [subTab, setSubTab] = useState("active");
   const [groupBy, setGroupBy] = useState("animator");
   const [selected, setSelected] = useState(null);
@@ -8708,15 +8713,8 @@ const AnimationView = ({allProjects, team}) => {
   );
 
   return (
-    <div style={{...sidebarBreakoutStyle(!!sidebarWidth),flexDirection:"row"}}>
-      {/* Sidebar slot — real flex sibling with an animated width, not a
-          fixed-position overlay with a separate backdrop. */}
-      <div style={{width:sidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:sidebarWidth?"1px solid #1f2937":"none"}}>
-        {selected&&<AnimationGroupSidebar row={selectedRow} onClose={()=>setSelected(null)}/>}
-      </div>
-
-      {/* Main content */}
-      <div style={{flex:1,minWidth:0,padding:"20px 28px",display:"flex",flexDirection:"column",gap:20}}>
+    <>
+      <div style={{padding:"20px 28px",display:"flex",flexDirection:"column",gap:20}}>
         <div style={{display:"flex",alignItems:"center",gap:2,flexWrap:"wrap",justifyContent:"space-between"}}>
           <div style={{display:"flex",gap:2}}>
             {[["active","In Progress"],["completed","Completed"],["metrics","Metrics"]].map(([id,l])=>(
@@ -8785,7 +8783,10 @@ const AnimationView = ({allProjects, team}) => {
           </div>
         )}
       </div>
-    </div>
+      <SidebarPortal width={sidebarWidth} slotNode={sidebarSlotNode} onWidthChange={onSidebarWidthChange}>
+        {selected&&<AnimationGroupSidebar row={selectedRow} onClose={()=>setSelected(null)}/>}
+      </SidebarPortal>
+    </>
   );
 };
 
@@ -10598,7 +10599,7 @@ const KanbanEditor = ({projects,team,onUpdateDel}) => {
 };
 
 // ─── Calendar ─────────────────────────────────────────────────────────────────
-const CalendarView = ({projects,team,onOpenProject,onUpdateProject}) => {
+const CalendarView = ({projects,team,onOpenProject,onUpdateProject,sidebarSlotNode,onSidebarWidthChange}) => {
   const [calDrawerItem,setCalDrawerItem]=useState(null);
   const sidebarWidth = calDrawerItem ? 400 : 0;
   const [year,setYear]=useState(now.getFullYear());
@@ -10739,8 +10740,8 @@ const CalendarView = ({projects,team,onOpenProject,onUpdateProject}) => {
   };
 
   return (
-    <div style={sidebarBreakoutStyle(!!sidebarWidth)}>
-    <div onClick={()=>setCalDrawerItem(null)} style={{flex:1,minWidth:0}}>
+    <>
+    <div onClick={()=>setCalDrawerItem(null)}>
       {/* Controls */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,flexWrap:"wrap"}}>
         <button onClick={pm} style={{background:"#1f2937",border:"none",borderRadius:7,color:"#e2e8f0",width:30,height:30,cursor:"pointer",fontSize:23,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
@@ -11006,12 +11007,10 @@ const CalendarView = ({projects,team,onOpenProject,onUpdateProject}) => {
         </div>
       )}
     </div>
-    {/* Sidebar slot — real flex sibling with an animated width (see the
-        outer row-reverse wrapper), not a fixed-position portal. */}
-    <div style={{width:sidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:sidebarWidth?"1px solid #1f2937":"none"}}>
+    <SidebarPortal width={sidebarWidth} slotNode={sidebarSlotNode} onWidthChange={onSidebarWidthChange}>
       {calDrawerItem&&<CalEventDrawer item={calDrawerItem} projects={projects} team={team} onClose={()=>setCalDrawerItem(null)} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>}
-    </div>
-    </div>
+    </SidebarPortal>
+    </>
   );
 };
 
@@ -11368,7 +11367,7 @@ const DelInfoPopup = ({del, team, onClose}) => {
 };
 
 // ─── Deliverables Tab (global) ────────────────────────────────────────────────
-const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDel, onUpdateProject, talentRoster=[]}) => {
+const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDel, onUpdateProject, talentRoster=[], sidebarSlotNode, onSidebarWidthChange}) => {
   const [subTab, setSubTab] = useState("active");
   const [search, setSearch] = useState("");
   const [groupBy, setGroupBy] = useState("editor"); // editor | producer
@@ -11467,8 +11466,8 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
   };
 
   return (
-    <div style={sidebarBreakoutStyle(!!sidebarWidth)}>
-    <div onClick={()=>{ if(sidebarSel){ setSidebarSel(null); setUnlocked(false); } }} style={{flex:1,minWidth:0}}>
+    <>
+    <div onClick={()=>{ if(sidebarSel){ setSidebarSel(null); setUnlocked(false); } }}>
       <div style={{display:"flex",gap:2,marginBottom:20,flexWrap:"wrap"}}>
         {[["active","In Progress"],["completed","Completed Archive"],["metrics","Metrics"]].map(([id,l])=>(
           <button key={id} style={tabS(subTab===id)} onClick={()=>setSubTab(id)}>{l}</button>
@@ -11708,9 +11707,7 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
       {popupDel&&<DelInfoPopup del={{...popupDel,projectName:allDels.find(d=>d.id===popupDel.id)?.projectName||""}} team={team} onClose={()=>setPopupDel(null)}/>}
 
     </div>
-    {/* Sidebar slot — real flex sibling with an animated width (see the
-        outer row-reverse wrapper), not a fixed-position portal. */}
-    <div style={{width:sidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:sidebarWidth?"1px solid #1f2937":"none"}}>
+    <SidebarPortal width={sidebarWidth} slotNode={sidebarSlotNode} onWidthChange={onSidebarWidthChange}>
       {sidebarSel&&(()=>{
         const proj = projects.find(p=>p.id===sidebarSel.projectId);
         const liveDel = proj?.deliverables.find(d=>d.id===sidebarSel.delId);
@@ -11755,8 +11752,8 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
             </div>
         );
       })()}
-    </div>
-    </div>
+    </SidebarPortal>
+    </>
   );
 };
 
@@ -13526,7 +13523,7 @@ const MyOutstandingTasks = ({member, projects, team, onOpenProject, nudges=[], c
   );
 };
 
-const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOpenProject, onUpdateProject, onUpdateDel, showToast, nudges=[], customTasks=[], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, unavailability=[], onAddUnavailability, onDeleteUnavailability, currentMember=null, isAdmin=false}) => {
+const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOpenProject, onUpdateProject, onUpdateDel, showToast, nudges=[], customTasks=[], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, unavailability=[], onAddUnavailability, onDeleteUnavailability, currentMember=null, isAdmin=false, sidebarSlotNode, onSidebarWidthChange}) => {
   const [selectedMember,setSelectedMember] = useState(()=> (!isAdmin && currentMember) ? currentMember.id : null);
   useEffect(()=>{ if(!isAdmin && currentMember) setSelectedMember(currentMember.id); },[isAdmin, currentMember?.id]);
   const [customizeMode,  setCustomizeMode] = useState(false);
@@ -13667,7 +13664,7 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
         const isBroadcast= member.department==="Broadcast";
 
         if(isBroadcast)
-          return <BroadcastDashboard member={member} projects={projects} team={team} studioBookings={studioBookings} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject} onUpdateStudioBookings={onUpdateStudioBookings} showToast={showToast}/>;
+          return <BroadcastDashboard member={member} projects={projects} team={team} studioBookings={studioBookings} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject} onUpdateStudioBookings={onUpdateStudioBookings} showToast={showToast} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={onSidebarWidthChange}/>;
         if(isManager&&!isEditor&&!isProducer)
           return <ManagerDashboard member={member} projects={projects} team={team} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject} unavailability={unavailability} onAddUnavailability={onAddUnavailability} onDeleteUnavailability={onDeleteUnavailability}/>;
         if(isEditor)
@@ -19173,7 +19170,7 @@ const ProductionSection = ({productions=[], projectDeliverables=[], onUpdate, on
 
 // ─── Broadcast Team Dashboard (My View) ──────────────────────────────────────
 // ─── Broadcast Team Dashboard (My View) ──────────────────────────────────────
-const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProject, onUpdateProject, onUpdateStudioBookings, showToast}) => {
+const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProject, onUpdateProject, onUpdateStudioBookings, showToast, sidebarSlotNode, onSidebarWidthChange}) => {
   const firstName = member.name.split(" ")[0];
   const isApprover = member.roles.includes("Studio Approver");
   const now = new Date();
@@ -19255,8 +19252,8 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
   const selS = {background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"5px 9px",fontSize:14,outline:"none"};
 
   return (
-    <div style={{display:"flex",flexDirection:"row-reverse",alignItems:"flex-start"}}>
-    <div style={{flex:1,minWidth:0}}>
+    <>
+    <div>
       <div style={{marginBottom:20}}>
         <div style={{fontWeight:900,fontSize:26,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:2}}>👋 {member.name}</div>
         <div style={{fontSize:17,color: "#9ca3af"}}>{member.roles.join(" · ")} · {upcoming.filter(b=>b.bookingStatus!=="Cancelled").length} upcoming broadcast{upcoming.length!==1?"s":""}</div>
@@ -19440,9 +19437,7 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
         </div>
       </RVSec>
     </div>
-    {/* Sidebar slot — real flex sibling with an animated width (see the
-        outer row-reverse wrapper), not a fixed-position portal. */}
-    <div style={{width:sidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:sidebarWidth?"1px solid #1f2937":"none"}}>
+    <SidebarPortal width={sidebarWidth} slotNode={sidebarSlotNode} onWidthChange={onSidebarWidthChange}>
       {drawerBooking&&(()=>{
         const b = drawerBooking;
         const linkedProj = b.projectId ? projects.find(p=>p.id===b.projectId) : null;
@@ -19546,8 +19541,8 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
             </div>
         );
       })()}
-    </div>
-    </div>
+    </SidebarPortal>
+    </>
   );
 };
 
@@ -20778,7 +20773,7 @@ const ResourceView = ({projects, team, studioBookings=[], resourceConfig, onUpda
   );
 };
 
-const StudioTab = ({projects, studioBookings, onUpdateStudioBookings, team, onOpenProject, talentRoster=[], onUpdateProject, mediaCards=[]}) => {
+const StudioTab = ({projects, studioBookings, onUpdateStudioBookings, team, onOpenProject, talentRoster=[], onUpdateProject, mediaCards=[], sidebarSlotNode, onSidebarWidthChange}) => {
   const [subView, setSubView] = useState("bookings");
   const [statusHistoryOpen, setStatusHistoryOpen] = useState(false);
   const allBookings = useMemo(()=>{
@@ -20825,8 +20820,8 @@ const StudioTab = ({projects, studioBookings, onUpdateStudioBookings, team, onOp
   const subS=a=>({padding:"6px 18px",borderRadius:7,fontWeight:800,fontSize:16,cursor:"pointer",border:"none",background:a?"#6366f1":"transparent",color:a?"#fff":"#6b7280",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.07em",textTransform:"uppercase"});
   const sidebarWidth = statusHistoryOpen ? 400 : 0;
   return (
-    <div style={sidebarBreakoutStyle(!!sidebarWidth)}>
-    <div style={{flex:1,minWidth:0}}>
+    <>
+    <div>
       <div style={{display:"flex",gap:2,marginBottom:20,borderBottom:"1px solid #1f2937",paddingBottom:12,alignItems:"center"}}>
         {[["bookings","📋 Bookings"],["calendar","📅 Calendar"],["equipment","🎒 Equipment"],["display","📺 Display Board"]].map(([id,label])=>(
           <button key={id} style={subS(subView===id)} onClick={()=>setSubView(id)}>{label}</button>
@@ -20841,11 +20836,10 @@ const StudioTab = ({projects, studioBookings, onUpdateStudioBookings, team, onOp
       {subView==="equipment" && <StudioEquipmentTab mediaCards={mediaCards}/>}
       {subView==="display"   && <StudioDisplayBoard allBookings={allBookings} team={team}/>}
     </div>
-    {/* Sidebar slot — real flex sibling with an animated width. */}
-    <div style={{width:sidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:sidebarWidth?"1px solid #1f2937":"none"}}>
+    <SidebarPortal width={sidebarWidth} slotNode={sidebarSlotNode} onWidthChange={onSidebarWidthChange}>
       {statusHistoryOpen&&<HistoryFeedContent title="Production Status History" buildQuery={q=>q.eq("entity_type","production").eq("action","status_changed")} onClose={()=>setStatusHistoryOpen(false)}/>}
-    </div>
-    </div>
+    </SidebarPortal>
+    </>
   );
 };
 
@@ -24129,7 +24123,7 @@ const IngestDashboard = ({ingests, projects}) => {
   );
 };
 
-const IngestTrackingSheet = ({ingests, onUpdateRow, projects=[], team=[], onAddReviewLink, onUpdateDel, onDeleteDel, onUpdateProject, onDeleteReviewLink, onReassignReviewLink, rowKeyOf, talentRoster=[]}) => {
+const IngestTrackingSheet = ({ingests, onUpdateRow, projects=[], team=[], onAddReviewLink, onUpdateDel, onDeleteDel, onUpdateProject, onDeleteReviewLink, onReassignReviewLink, rowKeyOf, talentRoster=[], sidebarSlotNode, onSidebarWidthChange}) => {
   const [sort,      setSort]      = useState({col:"ingestDatetime",dir:-1});
   const [search,    setSearch]    = useState("");
   const [filter,    setFilter]    = useState({ws:"",bu:"",complete:""});
@@ -24177,10 +24171,10 @@ const IngestTrackingSheet = ({ingests, onUpdateRow, projects=[], team=[], onAddR
   const tdS  = {padding:"6px 8px",fontSize:13,color:"#9ca3af",borderBottom:"1px solid #0f172a",verticalAlign:"middle",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"};
 
   return (
-    <div style={{...sidebarBreakoutStyle(!!liveRow),flexDirection:"row",gap:0,minHeight:400,position:"relative"}}>
-      {/* ── Sidebar (left) ── */}
+    <>
+    <SidebarPortal width={liveRow?460:0} slotNode={sidebarSlotNode} onWidthChange={onSidebarWidthChange}>
       {liveRow&&(
-        <div style={{width:460,flexShrink:0,background:"#0d1117",borderRight:"1px solid #1f2937",borderRadius:"12px 0 0 12px",display:"flex",flexDirection:"column",overflowY:"auto",maxHeight:"80vh",position:"sticky",top:0,alignSelf:"flex-start"}}>
+        <div style={{width:460,height:"100%",background:"#0d1117",display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <div style={{padding:"14px 16px",borderBottom:"1px solid #1f2937",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
             <div>
               <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Edit Ingest</div>
@@ -24214,9 +24208,10 @@ const IngestTrackingSheet = ({ingests, onUpdateRow, projects=[], team=[], onAddR
           </div>
         </div>
       )}
+    </SidebarPortal>
 
       {/* ── Main table ── */}
-      <div style={{flex:1,minWidth:0}}>
+      <div>
         {/* Filters */}
         <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search ingests…"
@@ -24313,11 +24308,11 @@ const IngestTrackingSheet = ({ingests, onUpdateRow, projects=[], team=[], onAddR
           </table>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
-const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onDeleteDel, talentRoster=[]}) => {
+const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onDeleteDel, talentRoster=[], sidebarSlotNode, onSidebarWidthChange}) => {
   const [tab, setTab] = useState("sheet");
   const ingests = useMemo(()=>gatherIngests(projects,team),[projects,team]);
 
@@ -24421,7 +24416,7 @@ const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onD
       {tab==="sheet"     && <IngestTrackingSheet ingests={ingests} onUpdateRow={updateRow} projects={projects} team={team}
         onAddReviewLink={addReviewLinkToRow} onUpdateDel={onUpdateDel} onDeleteDel={onDeleteDel} onUpdateProject={onUpdateProject}
         onDeleteReviewLink={deleteReviewLinkFromRow} onReassignReviewLink={reassignReviewLinkForRow}
-        rowKeyOf={rowKeyOf} talentRoster={talentRoster}/>}
+        rowKeyOf={rowKeyOf} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={onSidebarWidthChange}/>}
       {tab==="dashboard" && <IngestDashboard ingests={ingests} projects={projects}/>}
     </div>
   );
@@ -26279,6 +26274,14 @@ export default function App() {
   const [selected,setSelected]=useState(null);
   const [addingProject,setAddingProject]=useState(false);
   const [statsFilter,setStatsFilter]=useState(null); // {label, ids:Set<id>} — set by StatsBar tiles
+  // Sidebar portal target: a DOM node owned by App, sized here, that regular
+  // nav views (Deliverables, Calendar, Studio, Animation, Ingest) portal
+  // their sidebar content into via <SidebarPortal>. Since the slot lives
+  // above the stats-bar row rather than nested below it inside each view's
+  // own content, its sidebar can span the view's full height instead of
+  // being capped to start below the stats cards.
+  const [sidebarSlotNode, setSidebarSlotNode] = useState(null);
+  const [activeSidebarWidth, setActiveSidebarWidth] = useState(0);
 
   const updateDel=useCallback((projectId,delId,field,value)=>{
     const prevProj = projectsRef.current.find(p=>p.id===projectId);
@@ -26661,7 +26664,7 @@ export default function App() {
           instant layout jump, then animates back to 0 over ~220ms — a pure
           compositor operation with no further reflow, so cards/filters never
           jump mid-slide, but the push still visibly animates. */}
-      <div style={{minHeight:"100vh",background:"#080c14",fontFamily:"'DM Sans',sans-serif",color:"#e2e8f0",marginLeft:pushOffset,transform:pushTransformX?`translateX(${pushTransformX}px)`:undefined,transition:pushTransitionOn?"transform 0.22s cubic-bezier(0.4,0,0.2,1)":"none"}}>
+      <div style={{minHeight:"100vh",background:"#080c14",fontFamily:"'DM Sans',sans-serif",color:"#e2e8f0",marginLeft:pushOffset,transform:pushTransformX?`translateX(${pushTransformX}px)`:undefined,transition:pushTransitionOn?"transform 0.22s cubic-bezier(0.4,0,0.2,1)":"none",display:"flex",flexDirection:"column"}}>
         <div style={{background:"#0d1117",borderBottom:"1px solid #1f2937",padding:"0 24px",position:"sticky",top:0,zIndex:20}}>
           <div style={{maxWidth:1600,margin:"0 auto",display:"flex",alignItems:"center",gap:14,height:52}}>
             <button onClick={()=>setView("projects")} style={{fontWeight:900,fontSize:26,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",flexShrink:0,letterSpacing:"-0.01em",background:"none",border:"none",cursor:"pointer",padding:0}}><span style={{color:"#6366f1"}}>POST</span>TRACK</button>
@@ -26710,11 +26713,17 @@ export default function App() {
           </div>
         </div>
 
+        {/* Sidebar slot + main content column, as true flex siblings below
+            the sticky header — see SidebarPortal above for why this can't
+            just be nested inside the content column itself. */}
+        <div style={{display:"flex",flexDirection:"row",alignItems:"stretch",flex:1,minHeight:0}}>
+        <div ref={setSidebarSlotNode} style={{width:activeSidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:activeSidebarWidth?"1px solid #1f2937":"none"}}/>
+        <div style={{flex:1,minWidth:0}}>
         <div style={{maxWidth:1600,margin:"0 auto",padding:"20px 24px"}}>
           <StatsBar projects={allProjects} team={allTeam} setView={v=>{setView(v);if(v!=="projects")setStatsFilter(null);}} onOpenProject={openProject} onSetStatsFilter={setStatsFilter}/>
           {view==="workReview"&&<WorkReviewView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster}/>}
           {view==="pipeline"&&<PipelineView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject}/>}
-          {view==="animations"&&<AnimationView allProjects={allProjects} team={allTeam}/>}
+          {view==="animations"&&<AnimationView allProjects={allProjects} team={allTeam} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setActiveSidebarWidth}/>}
           {view==="intake"&&<IntakeView
             intakes={intakes}
             onSaveIntakes={saveIntakes}
@@ -26740,14 +26749,14 @@ export default function App() {
             }}
           />}
           {view==="projects"&&<ProjectsView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} statsFilter={statsFilter} onClearStatsFilter={()=>setStatsFilter(null)}/>}
-          {view==="studio"&&<StudioTab projects={allProjects} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} team={allTeam} onOpenProject={openProject} talentRoster={talentRoster} onUpdateProject={updateProject} mediaCards={mediaCards}/>}
+          {view==="studio"&&<StudioTab projects={allProjects} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} team={allTeam} onOpenProject={openProject} talentRoster={talentRoster} onUpdateProject={updateProject} mediaCards={mediaCards} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setActiveSidebarWidth}/>}
           {view==="kanban"&&kanbanMode==="status"&&<KanbanStatus projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="kanban"&&kanbanMode==="editor"&&<KanbanEditor projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
-          {view==="calendar"&&<CalendarView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject}/>}
-          {view==="deliverables"&&<DeliverablesTab projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster}/>}
-          {view==="ingest"&&<IngestView projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster}/>}
+          {view==="calendar"&&<CalendarView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setActiveSidebarWidth}/>}
+          {view==="deliverables"&&<DeliverablesTab projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setActiveSidebarWidth}/>}
+          {view==="ingest"&&<IngestView projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setActiveSidebarWidth}/>}
           {view==="resources"&&<ResourceView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
-          {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability} currentMember={currentMember} isAdmin={isAdmin}/>}
+          {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability} currentMember={currentMember} isAdmin={isAdmin} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setActiveSidebarWidth}/>}
           {view==="admin"&&<AdminView
             team={teamRoster} onUpdateTeam={saveTeam}
             projects={allProjects} nudges={nudges} onOpenProject={openProject}
@@ -26766,6 +26775,8 @@ export default function App() {
             presets={appPresets} onUpdatePresets={saveAppPresets}
             tabLocks={tabLocks} onUpdateTabLocks={saveTabLocks}
           />}
+        </div>
+        </div>
         </div>
 
         {liveSelected&&<ProjectOverview project={liveSelected} team={allTeam} allProjects={allProjects} onClose={()=>setSelected(null)} onUpdateDel={updateDel} onAddDel={addDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} initialTab={initialTab?.tab} initialShootId={initialTab?.itemId} initialItemId={initialTab?.itemId} studioBookings={allStudioBookings} mediaCards={mediaCards} setupTypes={setupTypes} onAddSetupType={addSetupType} talentRoster={talentRoster} onUpdateTalentRoster={saveTalentRoster} nudges={nudges} onAddNudge={addNudge} furnitureList={furnitureList} propsList={propsList} screenContentOptions={screenContentOptions} gearList={gearList} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} appPresets={appPresets} onSaveAppPresets={saveAppPresets} vendorCompanies={vendorCompanies} addVendorCompany={addVendorCompany} intakes={intakes} becRequests={becRequests} canAccessBudget={canAccessTab("budget")}/>}
