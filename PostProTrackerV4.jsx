@@ -9693,7 +9693,12 @@ const QuickNoteModal = ({project, team, onClose, onUpdateProject}) => {
 
   const insertTag = (name) => {
     const firstName = name.split(" ")[0];
-    setText(t => t + `@${firstName} `);
+    // Replace the trailing partial "@ev" that triggered this dropdown with
+    // the full "@Evan " — not append after it, which left both in the text.
+    setText(t => {
+      const at = t.lastIndexOf("@");
+      return (at===-1 ? t : t.slice(0, at)) + `@${firstName} `;
+    });
     setTagging(false); setTagSearch("");
     inputRef.current?.focus();
   };
@@ -10205,7 +10210,19 @@ const ProjectSidebar = ({project, team, allProjects=[], onUpdateProject, onUpdat
   const [showProjectHandoff,setShowProjectHandoff] = useState(false); // project-level editor assignment
   const [vis,setVis]                 = useState(false);
   useEffect(()=>{ requestAnimationFrame(()=>setVis(true)); },[]);
-  usePushPanel(vis?440:0);
+  const [sidebarWidth, sidebarHandle] = useResizableWidth("posttrack-project-list-sidebar-width", 440, {min:340,max:760});
+  // The panel itself always renders at the live (possibly mid-drag)
+  // sidebarWidth — smooth, immediate, no jitter risk since it's just this
+  // one fixed-position box resizing. But usePushPanel's width feeds
+  // ProjectsView's masking-transform reflow trick, which is tuned for a
+  // single discrete jump (open/close), not continuous updates — resizing
+  // it every mousemove would re-trigger that dance dozens of times a
+  // second and reintroduce the exact CSS-grid column-snap jitter this
+  // whole mechanism exists to avoid. So the registered push width only
+  // commits to the new value once, when dragging ends.
+  const [pushWidth, setPushWidth] = useState(sidebarWidth);
+  useEffect(()=>{ if(!sidebarHandle.dragging) setPushWidth(sidebarWidth); },[sidebarHandle.dragging, sidebarWidth]);
+  usePushPanel(vis?pushWidth:0);
   const stage = project.status;
 
   // Editors and animators on this team (for HandoffModal + SidebarDelCard)
@@ -10264,14 +10281,15 @@ const ProjectSidebar = ({project, team, allProjects=[], onUpdateProject, onUpdat
 
   return ReactDOM.createPortal(
     <div onClick={e=>e.stopPropagation()} style={{
-      position:"fixed",top:0,left:0,bottom:0,width:440,zIndex:490,
+      position:"fixed",top:0,left:0,bottom:0,width:sidebarWidth,zIndex:490,
       background:"#0d1117",borderRight:"1px solid #1f2937",
       boxShadow:"16px 0 48px rgba(0,0,0,0.6)",
       transform:vis?"translateX(0)":"translateX(-100%)",
-      transition:"transform 0.22s cubic-bezier(0.4,0,0.2,1)",
+      transition:sidebarHandle.dragging?"none":"transform 0.22s cubic-bezier(0.4,0,0.2,1)",
       display:"grid",gridTemplateRows:"auto 1fr",
       overflow:"hidden",
     }}>
+        <SidebarResizeHandle {...sidebarHandle}/>
         {/* Header */}
         <div style={{padding:"16px 20px",borderBottom:"1px solid #1f2937",background:"#111827",overflow:"visible"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:10}}>
