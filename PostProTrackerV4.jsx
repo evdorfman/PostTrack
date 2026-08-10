@@ -736,6 +736,23 @@ const _getPushSnapshot = () => _pushStack.length ? _pushStack[_pushStack.length-
 // useSyncExternalStore re-validates after commit and corrects before paint.
 const usePushOffset = () => useSyncExternalStore(_subscribePush, _getPushSnapshot);
 
+// Style for the outer row-reverse wrapper of a push-sidebar hosted inside a
+// regular (non-modal) nav view. Those views render inside App's centered,
+// padded content column (maxWidth + "0 auto" + padding), so a sidebar-slot
+// that's just a normal flex child of that row lands inset from the real
+// browser edge instead of flush against it like ProjectOverview's sidebar
+// (which lives inside a fullscreen modal with no such ambient padding).
+// The classic "breakout" trick — a negative left margin equal to the
+// distance from the viewport edge to this row's own content-box edge —
+// pulls the sidebar side out to the true left edge while leaving the main
+// content's right edge exactly where it already was. Only applied while a
+// sidebar is actually open, so the view's normal (no-sidebar) width/centering
+// is untouched.
+const sidebarBreakoutStyle = sidebarOpen => ({
+  display:"flex", flexDirection:"row-reverse", alignItems:"flex-start",
+  marginLeft: sidebarOpen ? "calc(-50vw + 50%)" : 0,
+});
+
 // Called by each panel: registers `width` while mounted with that value, and
 // cleans up on unmount. Pass 0 while the panel is animating closed (vis=false)
 // so the content slides back in lockstep with the panel's own exit animation.
@@ -6760,7 +6777,8 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                         {/* Row 3: editor + handoff schedule */}
                         <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:1}}>
                           {ed&&<div style={{fontSize:14,color:"#9ca3af",display:"flex",alignItems:"center",gap:4}}><Av name={ed.name} size={14}/>{ed.name}</div>}
-                          {d._segments?.length>0&&d._segments.map((seg,i)=>{
+                          {/* Only break out the per-segment schedule when there's an actual handoff (2+ segments) — a single all-duration segment is already covered by the name above. */}
+                          {d._segments?.length>1&&d._segments.map((seg,i)=>{
                             const segEd=team.find(m=>m.id===seg.editorId);
                             const todayStr=new Date().toISOString().slice(0,10);
                             const isCurrent=(!seg.from||seg.from<=todayStr)&&(!seg.to||seg.to>=todayStr);
@@ -8690,7 +8708,7 @@ const AnimationView = ({allProjects, team}) => {
   );
 
   return (
-    <div style={{display:"flex",flexDirection:"row",alignItems:"flex-start"}}>
+    <div style={{...sidebarBreakoutStyle(!!sidebarWidth),flexDirection:"row"}}>
       {/* Sidebar slot — real flex sibling with an animated width, not a
           fixed-position overlay with a separate backdrop. */}
       <div style={{width:sidebarWidth,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:sidebarWidth?"1px solid #1f2937":"none"}}>
@@ -10021,7 +10039,7 @@ const SidebarDelCard = ({d, project, team, editors, onUpdateDel, onHandoff, stag
     ? segEditorForDay({_segments:effectiveSegments}, todayStr, projEditors)
     : projEditors[0]||null;
   const currentEditor = team.find(m=>m.id===currentEditorId);
-  const hasHandoffs = !!(d._segments?.length); // deliverable-level only for the badge
+  const hasHandoffs = (d._segments?.length||0)>1; // deliverable-level only for the badge — a single all-duration segment isn't a real handoff
   const activeR = d.rounds?.find(r=>r.status!=="Approved");
 
   return (
@@ -10052,7 +10070,7 @@ const SidebarDelCard = ({d, project, team, editors, onUpdateDel, onHandoff, stag
 
       {/* Assignment row */}
       <div style={{paddingTop:5,borderTop:"1px solid #1a2035"}}>
-        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:effectiveSegments?.length?6:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:effectiveSegments?.length>1?6:0}}>
           <div style={{flex:1,fontSize:13,color:"#8e97a6",display:"flex",alignItems:"center",gap:5,minWidth:0}}>
             <span style={{color:"#9ca3af",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{currentEditor?.name||"Unassigned"}</span>
             {hasHandoffs&&<span style={{fontSize:11,fontWeight:800,color:"#f59e0b",background:"#f59e0b15",border:"1px solid #f59e0b30",borderRadius:3,padding:"1px 4px",flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em",textTransform:"uppercase"}}>⇄ Multi-editor</span>}
@@ -10065,8 +10083,10 @@ const SidebarDelCard = ({d, project, team, editors, onUpdateDel, onHandoff, stag
             ↔ Assign Editors
           </button>
         </div>
-        {/* Inline schedule — deliverable-level or inherited from project */}
-        {effectiveSegments?.length>0&&(
+        {/* Inline schedule — deliverable-level or inherited from project. Only
+            shown for an actual handoff (2+ segments); a single all-duration
+            segment is already covered by the name above. */}
+        {effectiveSegments?.length>1&&(
           <div style={{display:"flex",flexDirection:"column",gap:2}}>
             {effectiveSegments.map((seg,i)=>{
               const editor = team.find(m=>m.id===seg.editorId);
@@ -10246,10 +10266,10 @@ const ProjectSidebar = ({project, team, allProjects=[], onUpdateProject, onUpdat
 
             {/* Project-level editor handoff — applies to all deliverables without their own override */}
             <div style={{paddingTop:6,borderTop:"1px solid #1a2035"}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,marginBottom:project._segments?.length?6:0}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,marginBottom:project._segments?.length>1?6:0}}>
                 <div style={{fontSize:13,color:"#838ba0",display:"flex",alignItems:"center",gap:5}}>
                   <span style={{fontWeight:600}}>Project-level assignment</span>
-                  {project._segments?.length>0&&<span style={{fontSize:11,fontWeight:800,color:"#f59e0b",background:"#f59e0b15",border:"1px solid #f59e0b30",borderRadius:3,padding:"1px 4px",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em",textTransform:"uppercase"}}>⇄ Active</span>}
+                  {project._segments?.length>1&&<span style={{fontSize:11,fontWeight:800,color:"#f59e0b",background:"#f59e0b15",border:"1px solid #f59e0b30",borderRadius:3,padding:"1px 4px",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em",textTransform:"uppercase"}}>⇄ Active</span>}
                 </div>
                 <button onClick={()=>setShowProjectHandoff(true)}
                   style={{fontSize:12,fontWeight:700,color:"#818cf8",background:"#6366f115",border:"1px solid #6366f140",cursor:"pointer",padding:"3px 9px",borderRadius:4,flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}
@@ -10258,8 +10278,8 @@ const ProjectSidebar = ({project, team, allProjects=[], onUpdateProject, onUpdat
                   ↔ Assign Editors
                 </button>
               </div>
-              {/* Inline project segment schedule */}
-              {project._segments?.length>0&&(()=>{
+              {/* Inline project segment schedule — only for an actual handoff (2+ segments); a single all-duration segment is already covered by the Editor row above. */}
+              {project._segments?.length>1&&(()=>{
                 const todayStr=new Date().toISOString().slice(0,10);
                 const projEditors=[...(project.assignees?.["Editor"]||[]),...(project.assignees?.["Animator"]||[])];
                 const currentProjEditorId=segEditorForDay({_segments:project._segments},todayStr,projEditors);
@@ -10719,7 +10739,7 @@ const CalendarView = ({projects,team,onOpenProject,onUpdateProject}) => {
   };
 
   return (
-    <div style={{display:"flex",flexDirection:"row-reverse",alignItems:"flex-start"}}>
+    <div style={sidebarBreakoutStyle(!!sidebarWidth)}>
     <div onClick={()=>setCalDrawerItem(null)} style={{flex:1,minWidth:0}}>
       {/* Controls */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,flexWrap:"wrap"}}>
@@ -11447,7 +11467,7 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
   };
 
   return (
-    <div style={{display:"flex",flexDirection:"row-reverse",alignItems:"flex-start"}}>
+    <div style={sidebarBreakoutStyle(!!sidebarWidth)}>
     <div onClick={()=>{ if(sidebarSel){ setSidebarSel(null); setUnlocked(false); } }} style={{flex:1,minWidth:0}}>
       <div style={{display:"flex",gap:2,marginBottom:20,flexWrap:"wrap"}}>
         {[["active","In Progress"],["completed","Completed Archive"],["metrics","Metrics"]].map(([id,l])=>(
@@ -20461,7 +20481,7 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                               <div style={{flex:1,minWidth:0}}>
                                 <div style={{fontSize:13,fontWeight:700,color:"#c4c9d4",lineHeight:1.3}}>{project.name}</div>
                                 {dels.length>1&&<div style={{fontSize:13,color:"#8e97a6",marginTop:1}}>{dels.length} deliverables</div>}
-                                {project._segments?.length>0&&<div style={{fontSize:12,color:"#f59e0b",marginTop:1}}>⇄ Project-level handoff active</div>}
+                                {project._segments?.length>1&&<div style={{fontSize:12,color:"#f59e0b",marginTop:1}}>⇄ Project-level handoff active</div>}
                               </div>
                               {/* Project-level assign button — stops chip toggle */}
                               <button onClick={e=>{e.stopPropagation();setHandoffTarget({projectId:project.id,isProjectLevel:true});}}
@@ -20479,7 +20499,7 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                                 {dels.map((del,dli)=>{
                                   const ws = getWorkflowState(del);
                                   const projEditors = [...(project.assignees?.["Editor"]||[]),...(project.assignees?.["Animator"]||[])];
-                                  const hasHandoffs = !!(del._segments?.length);
+                                  const hasHandoffs = (del._segments?.length||0)>1;
                                   const currentAssignee = editors.find(e=>e.id===editorForDay(del, fmtDay(days[di]||new Date()), projEditors));
                                   // Deadline label (separate from workflow state)
                                   const deadlineLabel = (() => {
@@ -20805,7 +20825,7 @@ const StudioTab = ({projects, studioBookings, onUpdateStudioBookings, team, onOp
   const subS=a=>({padding:"6px 18px",borderRadius:7,fontWeight:800,fontSize:16,cursor:"pointer",border:"none",background:a?"#6366f1":"transparent",color:a?"#fff":"#6b7280",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.07em",textTransform:"uppercase"});
   const sidebarWidth = statusHistoryOpen ? 400 : 0;
   return (
-    <div style={{display:"flex",flexDirection:"row-reverse",alignItems:"flex-start"}}>
+    <div style={sidebarBreakoutStyle(!!sidebarWidth)}>
     <div style={{flex:1,minWidth:0}}>
       <div style={{display:"flex",gap:2,marginBottom:20,borderBottom:"1px solid #1f2937",paddingBottom:12,alignItems:"center"}}>
         {[["bookings","📋 Bookings"],["calendar","📅 Calendar"],["equipment","🎒 Equipment"],["display","📺 Display Board"]].map(([id,label])=>(
@@ -24157,7 +24177,7 @@ const IngestTrackingSheet = ({ingests, onUpdateRow, projects=[], team=[], onAddR
   const tdS  = {padding:"6px 8px",fontSize:13,color:"#9ca3af",borderBottom:"1px solid #0f172a",verticalAlign:"middle",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"};
 
   return (
-    <div style={{display:"flex",gap:0,minHeight:400,position:"relative"}}>
+    <div style={{...sidebarBreakoutStyle(!!liveRow),flexDirection:"row",gap:0,minHeight:400,position:"relative"}}>
       {/* ── Sidebar (left) ── */}
       {liveRow&&(
         <div style={{width:460,flexShrink:0,background:"#0d1117",borderRight:"1px solid #1f2937",borderRadius:"12px 0 0 12px",display:"flex",flexDirection:"column",overflowY:"auto",maxHeight:"80vh",position:"sticky",top:0,alignSelf:"flex-start"}}>
