@@ -8570,7 +8570,7 @@ const AnimationGroupSidebar = ({row, onClose}) => {
   const {design={}, batches=[], groupName, projectName, animator, designer, producer, aeProjectName, aeProjectLocation} = row;
 
   return (
-    <div style={{width:420,height:"100%",background:"#0d1117",display:"flex",flexDirection:"column"}}>
+    <div style={{width:"100%",height:"100%",background:"#0d1117",display:"flex",flexDirection:"column"}}>
       <div style={{padding:"16px 20px",borderBottom:"1px solid #1f2937",display:"flex",alignItems:"flex-start",gap:12}}>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:13,color:"#6366f1",fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>{projectName}</div>
@@ -11782,7 +11782,7 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
         const close = ()=>{ setSidebarSel(null); setUnlocked(false); };
         return (
           <div style={{
-            width:420,height:"100%",
+            width:"100%",height:"100%",
             background:"#0d1117",
             display:"grid",gridTemplateRows:"auto 1fr",overflow:"hidden",
           }}>
@@ -14305,7 +14305,7 @@ const CalEventDrawer = ({item, projects, team, onClose, onUpdateProject, onOpenP
 
   return (
     <div style={{
-      width:400,height:"100%",
+      width:"100%",height:"100%",
       background:"#0d1117",
       display:"grid",gridTemplateRows:"auto 1fr auto",overflow:"hidden",
     }}>
@@ -19513,7 +19513,7 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
         const eqList=(b.equipmentIds||[]).map(id=>EQUIPMENT.find(e=>e.id===id)?.name||id).filter(Boolean);
         const color=PRODUCTION_COLOR[b.productionType]||"#ef4444";
         return (
-          <div style={{width:400,height:"100%",background:"#0d1117",display:"grid",gridTemplateRows:"auto 1fr auto",overflow:"hidden"}}>
+          <div style={{width:"100%",height:"100%",background:"#0d1117",display:"grid",gridTemplateRows:"auto 1fr auto",overflow:"hidden"}}>
               {/* Drawer header */}
               <div style={{padding:"16px 20px",borderBottom:"1px solid #1f2937",background:"#111827"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
@@ -24239,7 +24239,7 @@ const IngestTrackingSheet = ({ingests, onUpdateRow, projects=[], team=[], onAddR
     <>
     <SidebarPortal width={liveRow?460:0} slotNode={sidebarSlotNode} onWidthChange={onSidebarWidthChange}>
       {liveRow&&(
-        <div style={{width:460,height:"100%",background:"#0d1117",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{width:"100%",height:"100%",background:"#0d1117",display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <div style={{padding:"14px 16px",borderBottom:"1px solid #1f2937",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
             <div>
               <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Edit Ingest</div>
