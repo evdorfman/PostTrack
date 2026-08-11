@@ -26239,15 +26239,7 @@ export default function App() {
   return (
     <>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap');*{box-sizing:border-box;margin:0;padding:0;}body{background:#080c14;}::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:#0f172a;}::-webkit-scrollbar-thumb{background:#374151;border-radius:99px;}select option{background:#0d1117;color:#e2e8f0;}`}</style>
-      {/* marginLeft is applied at its final value immediately (not animated) so
-          any CSS grid auto-fill column change / filter-row wrap this triggers
-          happens once, in a single layout pass, instead of continuously as
-          margin-left itself animates. The visible slide is done separately via
-          useAnimatedPushOffset: an equal-and-opposite transform masks that
-          instant layout jump, then animates back to 0 over ~220ms — a pure
-          compositor operation with no further reflow, so cards/filters never
-          jump mid-slide, but the push still visibly animates. */}
-      <div style={{minHeight:"100vh",background:"#080c14",fontFamily:"'DM Sans',sans-serif",color:"#e2e8f0",marginLeft:pushOffset,transform:pushTransformX?`translateX(${pushTransformX}px)`:undefined,transition:pushTransitionOn?"transform 0.22s cubic-bezier(0.4,0,0.2,1)":"none",display:"flex",flexDirection:"column"}}>
+      <div style={{minHeight:"100vh",background:"#080c14",fontFamily:"'DM Sans',sans-serif",color:"#e2e8f0",display:"flex",flexDirection:"column"}}>
         <div style={{background:"#0d1117",borderBottom:"1px solid #1f2937",padding:"0 24px",position:"sticky",top:0,zIndex:20}}>
           <div style={{maxWidth:1600,margin:"0 auto",display:"flex",alignItems:"center",gap:14,height:52}}>
             <button onClick={()=>setView("projects")} style={{fontWeight:900,fontSize:26,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",flexShrink:0,letterSpacing:"-0.01em",background:"none",border:"none",cursor:"pointer",padding:0}}><span style={{color:"#6366f1"}}>POST</span>TRACK</button>
@@ -26328,7 +26320,19 @@ export default function App() {
         <div ref={setSidebarSlotNode} style={{width:activeSidebarWidth,flexShrink:0,overflow:"hidden",position:"relative",transition:navSidebarHandle.dragging?"none":"width 0.22s cubic-bezier(0.4,0,0.2,1)",borderRight:activeSidebarWidth?"1px solid #1f2937":"none"}}>
           {!!activeSidebarWidth&&<SidebarResizeHandle {...navSidebarHandle}/>}
         </div>
-        <div style={{flex:1,minWidth:0}}>
+        {/* marginLeft is applied at its final value immediately (not animated) so
+            any CSS grid auto-fill column change / filter-row wrap this triggers
+            happens once, in a single layout pass, instead of continuously as
+            margin-left itself animates. The visible slide is done separately via
+            useAnimatedPushOffset: an equal-and-opposite transform masks that
+            instant layout jump, then animates back to 0 over ~220ms — a pure
+            compositor operation with no further reflow, so cards/filters never
+            jump mid-slide, but the push still visibly animates. Scoped to just
+            this content column (not the outer app wrapper) so pages using the
+            older push-panel sidebars (ProjectSidebar, Checklist, History) only
+            push their own content over, the same way the newer portal-based
+            sidebars already leave the sticky header alone. */}
+        <div style={{flex:1,minWidth:0,marginLeft:pushOffset,transform:pushTransformX?`translateX(${pushTransformX}px)`:undefined,transition:pushTransitionOn?"transform 0.22s cubic-bezier(0.4,0,0.2,1)":"none"}}>
         {/* No auto-centering while a sidebar is open — with less room
             available, centering a capped-width column just pads out extra
             dead space next to the sidebar instead of using the space. */}
