@@ -12295,23 +12295,49 @@ const RoleCalendar = ({memberId, projects, onOpenProject, team=[], unavailabilit
 };
 
 // ── Shared: Mentions feed ─────────────────────────────────────────────────────
+// Pure lookup so both the feed itself and the notification bell's unread
+// badge (which needs a count without mounting the feed) can share it.
+const getMentionsForMember = (member, projects) => {
+  const firstName=member.name.split(" ")[0];
+  const results=[];
+  projects.forEach(p=>{
+    (p.notes||[]).forEach(note=>{
+      if(note.text.toLowerCase().includes(`@${firstName.toLowerCase()}`)){
+        results.push({...note,projectId:p.id,projectName:p.name});
+      }
+    });
+  });
+  return results.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+};
+const countUnreadMentions = (member, projects) =>
+  getMentionsForMember(member, projects).filter(n=>!(n.readBy||[]).includes(member.id)).length;
+
 const MentionsFeed = ({member, projects, onUpdateProject, onOpenProject}) => {
   const [replyNote,setReplyNote]=useState(null); // {projectId, originalNote}
   const [replyText,setReplyText]=useState("");
+  const [editNoteId,setEditNoteId]=useState(null);
+  const [editText,setEditText]=useState("");
 
-  const firstName=member.name.split(" ")[0];
-  // Not memoized so replies appear immediately
-  const mentions=(()=>{
-    const results=[];
-    projects.forEach(p=>{
-      (p.notes||[]).forEach(note=>{
-        if(note.text.toLowerCase().includes(`@${firstName.toLowerCase()}`)){
-          results.push({...note,projectId:p.id,projectName:p.name});
-        }
-      });
-    });
-    return results.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
-  })();
+  // Not memoized so replies/edits/read-toggles appear immediately
+  const mentions = getMentionsForMember(member, projects);
+
+  const patchNote = (note, patch) => {
+    const p=projects.find(x=>x.id===note.projectId);
+    if(!p) return;
+    onUpdateProject(p.id,"notes",(p.notes||[]).map(n=>n.id===note.id?{...n,...patch}:n));
+  };
+
+  const toggleRead = note => {
+    const readBy = note.readBy||[];
+    patchNote(note, {readBy: readBy.includes(member.id) ? readBy.filter(id=>id!==member.id) : [...readBy,member.id]});
+  };
+
+  const startEditNote = note => { setEditNoteId(note.id); setEditText(note.text); };
+  const saveEditNote = note => {
+    if(!editText.trim()) return;
+    patchNote(note, {text:editText.trim(), editedAt:new Date().toISOString()});
+    setEditNoteId(null); setEditText("");
+  };
 
   const sendReply=(proj,originalNote)=>{
     if(!replyText.trim()) return;
@@ -12333,28 +12359,54 @@ const MentionsFeed = ({member, projects, onUpdateProject, onOpenProject}) => {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:8}}>
       {mentions.slice(0,12).map(note=>{
-        const author=projects.flatMap(p=>p.notes||[]).find(n=>n.id===note.id);
         const isReplyOpen=replyNote?.id===note.id;
+        const isEditing=editNoteId===note.id;
+        const isUnread=!(note.readBy||[]).includes(member.id);
+        const canEdit=note.authorId===member.id;
         return (
-          <div key={note.id} style={{background:"#111827",border:"1px solid #1f293780",borderRadius:10,padding:"10px 13px"}}>
+          <div key={note.id} style={{background:"#111827",border:`1px solid ${isUnread?"#6366f150":"#1f293780"}`,borderRadius:10,padding:"10px 13px",position:"relative"}}>
+            {isUnread&&<div style={{position:"absolute",top:12,right:12,width:8,height:8,borderRadius:"50%",background:"#6366f1"}}/>}
             <div style={{fontSize:13,color: "#9ca3af",marginBottom:4}}>
-              <span style={{color:"#9ca3af",fontWeight:700}}>{note.authorName}</span> · {note.projectName} · {fmtDT(note.createdAt)}
+              <span style={{color:"#9ca3af",fontWeight:700}}>{note.authorName}</span> · {note.projectName} · {fmtDT(note.createdAt)}{note.editedAt&&<span style={{fontStyle:"italic"}}> · edited</span>}
             </div>
-            <div style={{fontSize:17,color:"#e2e8f0",marginBottom:8,lineHeight:1.4}}>
-              {note.text.split(/(@\w+)/g).map((p,i)=>p.startsWith("@")?<span key={i} style={{color:"#6366f1",fontWeight:700}}>{p}</span>:p)}
-            </div>
-            <div style={{display:"flex",gap:8,alignItems:"center",marginTop:4,flexWrap:"wrap"}}>
-              <button onClick={()=>onOpenProject&&onOpenProject(projects.find(p=>p.id===note.projectId))}
-                style={{background:"none",border:"none",color:"#6366f1",cursor:"pointer",fontSize:13,fontWeight:700,padding:0,textDecoration:"underline"}}>
-                {note.projectName} →
-              </button>
-              {!isReplyOpen&&(
-                <button onClick={()=>{setReplyNote(note);setReplyText(`@${note.authorName.split(" ")[0]} `);}}
-                  style={{background:"#1f2937",border:"none",borderRadius:5,color: "#9ca3af",padding:"3px 10px",fontSize:13,cursor:"pointer",fontWeight:600,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.05em"}}>
-                  ↩ Reply
+            {isEditing ? (
+              <div style={{marginBottom:8}}>
+                <StableInp value={editText} onChange={e=>setEditText(e.target.value)} textarea
+                  style={{background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 9px",fontSize:16,fontFamily:"'DM Sans',sans-serif"}}/>
+                <div style={{display:"flex",gap:6,marginTop:6}}>
+                  <button onClick={()=>saveEditNote(note)} style={{background:"#6366f1",border:"none",borderRadius:6,color:"#fff",padding:"4px 12px",fontSize:13,cursor:"pointer",fontWeight:700}}>Save</button>
+                  <button onClick={()=>{setEditNoteId(null);setEditText("");}} style={{background:"none",border:"none",color: "#9ca3af",cursor:"pointer",fontSize:13,fontWeight:600}}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{fontSize:17,color:"#e2e8f0",marginBottom:8,lineHeight:1.4}}>
+                {note.text.split(/(@\w+)/g).map((p,i)=>p.startsWith("@")?<span key={i} style={{color:"#6366f1",fontWeight:700}}>{p}</span>:p)}
+              </div>
+            )}
+            {!isEditing&&(
+              <div style={{display:"flex",gap:8,alignItems:"center",marginTop:4,flexWrap:"wrap"}}>
+                <button onClick={()=>onOpenProject&&onOpenProject(projects.find(p=>p.id===note.projectId))}
+                  style={{background:"none",border:"none",color:"#6366f1",cursor:"pointer",fontSize:13,fontWeight:700,padding:0,textDecoration:"underline"}}>
+                  {note.projectName} →
                 </button>
-              )}
-            </div>
+                {!isReplyOpen&&(
+                  <button onClick={()=>{setReplyNote(note);setReplyText(`@${note.authorName.split(" ")[0]} `);}}
+                    style={{background:"#1f2937",border:"none",borderRadius:5,color: "#9ca3af",padding:"3px 10px",fontSize:13,cursor:"pointer",fontWeight:600,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.05em"}}>
+                    ↩ Reply
+                  </button>
+                )}
+                {canEdit&&(
+                  <button onClick={()=>startEditNote(note)}
+                    style={{background:"#1f2937",border:"none",borderRadius:5,color: "#9ca3af",padding:"3px 10px",fontSize:13,cursor:"pointer",fontWeight:600,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.05em"}}>
+                    ✎ Edit
+                  </button>
+                )}
+                <button onClick={()=>toggleRead(note)}
+                  style={{background:"none",border:"none",color: "#6b7280",cursor:"pointer",fontSize:13,fontWeight:600,padding:"3px 4px",marginLeft:"auto"}}>
+                  {isUnread?"Mark read":"Mark unread"}
+                </button>
+              </div>
+            )}
             {isReplyOpen&&(
               <div style={{display:"flex",gap:6,marginTop:6}}>
                 <input value={replyText} onChange={e=>setReplyText(e.target.value)}
@@ -12369,6 +12421,40 @@ const MentionsFeed = ({member, projects, onUpdateProject, onOpenProject}) => {
           </div>
         );
       })}
+    </div>
+  );
+};
+
+// ── Shared: Notification bell (mentions) ──────────────────────────────────────
+// An overlay dropdown rather than a sidebar — it never shifts page layout,
+// unlike the old push-panel mentions sidebar it replaces on My View.
+const NotificationBell = ({member, projects, onUpdateProject, onOpenProject}) => {
+  const [open,setOpen]=useState(false);
+  const wrapRef=useRef(null);
+  useEffect(()=>{
+    if(!open) return;
+    const onDown=e=>{ if(wrapRef.current&&!wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown",onDown);
+    return ()=>document.removeEventListener("mousedown",onDown);
+  },[open]);
+  const unread = countUnreadMentions(member, projects);
+  return (
+    <div ref={wrapRef} style={{position:"relative"}}>
+      <button onClick={()=>setOpen(o=>!o)}
+        style={{position:"relative",background:open?"#1f2937":"#111827",border:"1px solid #1f2937",borderRadius:8,color:"#e2e8f0",width:38,height:38,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,cursor:"pointer"}}>
+        🔔
+        {unread>0&&(
+          <span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",borderRadius:99,fontSize:11,fontWeight:800,minWidth:17,height:17,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",fontFamily:"'Barlow Condensed',sans-serif"}}>
+            {unread>9?"9+":unread}
+          </span>
+        )}
+      </button>
+      {open&&(
+        <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,zIndex:200,width:380,maxHeight:480,overflowY:"auto",background:"#0d1117",border:"1px solid #1f2937",borderRadius:12,boxShadow:"0 16px 40px #000a",padding:14}}>
+          <div style={{fontWeight:900,fontSize:17,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:10}}>💬 My Mentions</div>
+          <MentionsFeed member={member} projects={projects} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>
+        </div>
+      )}
     </div>
   );
 };
@@ -12976,7 +13062,8 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
   // keeps its own purpose-built dashboard rather than the layout below.
   if(isBroadcast) return (
     <div>
-      <MyViewHeader member={member} isAdmin={isAdmin} team={team} selectedMember={selectedMember} setSelectedMember={setSelectedMember}/>
+      <MyViewHeader member={member} isAdmin={isAdmin} team={team} selectedMember={selectedMember} setSelectedMember={setSelectedMember}
+        projects={projects} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>
       <BroadcastDashboard member={member} projects={projects} team={team} studioBookings={studioBookings} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject} onUpdateStudioBookings={onUpdateStudioBookings} showToast={showToast} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={onSidebarWidthChange}/>
     </div>
   );
@@ -12997,93 +13084,82 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
   );
 
   return (
-    <>
-      {/* Mentions — persistent left panel while viewing a My View, using the
-          same App-owned sidebar slot every other push-panel renders into. */}
-      <SidebarPortal width={360} slotNode={sidebarSlotNode} onWidthChange={onSidebarWidthChange}>
-        <div style={{width:"100%",height:"100%",background:"#0d1117",display:"flex",flexDirection:"column",overflow:"hidden"}}>
-          <div style={{padding:"16px 20px",borderBottom:"1px solid #1f2937",background:"#111827",flexShrink:0}}>
-            <div style={{fontWeight:900,fontSize:19,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>💬 My Mentions</div>
-          </div>
-          <div style={{flex:1,overflowY:"auto",padding:16}}>
-            <MentionsFeed member={member} projects={projects} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>
-          </div>
+    <div>
+      <MyViewHeader member={member} isAdmin={isAdmin} team={team} selectedMember={selectedMember} setSelectedMember={setSelectedMember}
+        projects={projects} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>
+
+      {/* Calendar — hover previews + resizable height, matching the main Calendar view */}
+      <div style={{marginBottom:28}}>
+        {sectionHeader("📅","My Calendar & Time Off")}
+        <RoleCalendar memberId={member.id} projects={projects} onOpenProject={onOpenProject} team={team}
+          unavailability={unavailability} onAddUnavailability={onAddUnavailability}
+          onDeleteUnavailability={onDeleteUnavailability} onUpdateProject={onUpdateProject}/>
+      </div>
+
+      <div style={{display:"flex",gap:20,marginBottom:28,alignItems:"flex-start",flexWrap:"wrap"}}>
+        <div style={{flex:"1 1 360px",minWidth:0}}>
+          {sectionHeader("🤖","AI Assistant")}
+          <MyViewChat member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}/>
         </div>
-      </SidebarPortal>
-
-      <div>
-        <MyViewHeader member={member} isAdmin={isAdmin} team={team} selectedMember={selectedMember} setSelectedMember={setSelectedMember}/>
-
-        {/* My Projects — same card as the Projects view */}
-        <div style={{marginBottom:28}}>
-          {sectionHeader("📁","My Projects",myActiveProjects.length)}
-          {myActiveProjects.length ? (
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(285px,1fr))",gap:12}}>
-              {myActiveProjects.map(p=><ProjectCard key={p.id} project={p} team={team} onClick={()=>onOpenProject(p)} onUpdateProject={onUpdateProject}/>)}
-            </div>
-          ) : <div style={{fontSize:16,color:"#374151",fontStyle:"italic"}}>No active projects assigned right now.</div>}
-        </div>
-
-        {/* My Active Deliverables — same expandable row → full-field layout
-            as a project's Deliverables tab, reusing DeliverableDetailModal. */}
-        <div style={{marginBottom:28}}>
-          {sectionHeader("🎬","My Active Deliverables",myActiveDeliverables.length)}
-          {myActiveDeliverables.length ? (
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {myActiveDeliverables.map(d=>{
-                const isExp = expandedDelId===d.id;
-                const statusColor = DCOLOR[d.status]||"#6b7280";
-                return (
-                  <div key={d.id} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:9,overflow:"hidden"}}>
-                    <div onClick={()=>setExpandedDelId(isExp?null:d.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",cursor:"pointer"}}>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:16,fontWeight:700,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title||"Untitled"}</div>
-                        <div style={{fontSize:13,color:"#8e97a6",marginTop:2}}>{d._project.name}</div>
-                      </div>
-                      <span style={{background:statusColor+"20",color:statusColor,borderRadius:99,padding:"2px 9px",fontSize:12,fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",flexShrink:0}}>{d.status}</span>
-                      <Dl date={d.deadline}/>
-                      <span style={{color:"#8e97a6",fontSize:14,flexShrink:0}}>{isExp?"▲":"▼"}</span>
-                    </div>
-                    {isExp&&(
-                      <div onClick={e=>e.stopPropagation()} style={{borderTop:"1px solid #1f2937"}}>
-                        <DeliverableDetailModal del={d} projectId={d._project.id} team={team} allProjects={projects}
-                          onUpdateDel={onUpdateDel} onDeleteDel={onDeleteDel} onUpdateProject={onUpdateProject}
-                          project={d._project} talentRoster={[]}/>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : <div style={{fontSize:16,color:"#374151",fontStyle:"italic"}}>No active deliverables right now.</div>}
-        </div>
-
-        {/* Calendar — hover previews + resizable height, matching the main Calendar view */}
-        <div style={{marginBottom:28}}>
-          {sectionHeader("📅","My Calendar & Time Off")}
-          <RoleCalendar memberId={member.id} projects={projects} onOpenProject={onOpenProject} team={team}
-            unavailability={unavailability} onAddUnavailability={onAddUnavailability}
-            onDeleteUnavailability={onDeleteUnavailability} onUpdateProject={onUpdateProject}/>
-        </div>
-
-        <div style={{marginBottom:28}}>
+        <div style={{flex:"1 1 360px",minWidth:0}}>
           {sectionHeader("📋","Outstanding Tasks")}
           <MyOutstandingTasks member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}
             customTasks={customTasks} onAddCustomTask={onAddCustomTask} onUpdateCustomTask={onUpdateCustomTask} onDeleteCustomTask={onDeleteCustomTask}/>
         </div>
-
-        <div>
-          {sectionHeader("🤖","AI Assistant")}
-          <MyViewChat member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}/>
-        </div>
       </div>
-    </>
+
+      {/* My Projects — same card as the Projects view */}
+      <div style={{marginBottom:28}}>
+        {sectionHeader("📁","My Projects",myActiveProjects.length)}
+        {myActiveProjects.length ? (
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(285px,1fr))",gap:12}}>
+            {myActiveProjects.map(p=><ProjectCard key={p.id} project={p} team={team} onClick={()=>onOpenProject(p)} onUpdateProject={onUpdateProject}/>)}
+          </div>
+        ) : <div style={{fontSize:16,color:"#374151",fontStyle:"italic"}}>No active projects assigned right now.</div>}
+      </div>
+
+      {/* My Active Deliverables — same expandable row → full-field layout
+          as a project's Deliverables tab, reusing DeliverableDetailModal. */}
+      <div>
+        {sectionHeader("🎬","My Active Deliverables",myActiveDeliverables.length)}
+        {myActiveDeliverables.length ? (
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {myActiveDeliverables.map(d=>{
+              const isExp = expandedDelId===d.id;
+              const statusColor = DCOLOR[d.status]||"#6b7280";
+              return (
+                <div key={d.id} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:9,overflow:"hidden"}}>
+                  <div onClick={()=>setExpandedDelId(isExp?null:d.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",cursor:"pointer"}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:16,fontWeight:700,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title||"Untitled"}</div>
+                      <div style={{fontSize:13,color:"#8e97a6",marginTop:2}}>{d._project.name}</div>
+                    </div>
+                    <span style={{background:statusColor+"20",color:statusColor,borderRadius:99,padding:"2px 9px",fontSize:12,fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",flexShrink:0}}>{d.status}</span>
+                    <Dl date={d.deadline}/>
+                    <span style={{color:"#8e97a6",fontSize:14,flexShrink:0}}>{isExp?"▲":"▼"}</span>
+                  </div>
+                  {isExp&&(
+                    <div onClick={e=>e.stopPropagation()} style={{borderTop:"1px solid #1f2937"}}>
+                      <DeliverableDetailModal del={d} projectId={d._project.id} team={team} allProjects={projects}
+                        onUpdateDel={onUpdateDel} onDeleteDel={onDeleteDel} onUpdateProject={onUpdateProject}
+                        project={d._project} talentRoster={[]}/>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : <div style={{fontSize:16,color:"#374151",fontStyle:"italic"}}>No active deliverables right now.</div>}
+      </div>
+    </div>
   );
 };
 
 // Shared header for every My View layout — name/roles + (for admins) a way
-// back to the full picker grid and a quick-switch dropdown to anyone else's.
-const MyViewHeader = ({member, isAdmin, team, selectedMember, setSelectedMember}) => (
+// back to the full picker grid and a quick-switch dropdown to anyone else's,
+// plus the notifications bell (an overlay dropdown, so it never shifts the
+// page underneath it the way the old mentions sidebar used to).
+const MyViewHeader = ({member, isAdmin, team, selectedMember, setSelectedMember, projects, onUpdateProject, onOpenProject}) => (
   <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24,paddingBottom:16,borderBottom:"1px solid #1f2937"}}>
     {isAdmin&&<button onClick={()=>setSelectedMember(null)} style={{background:"#1f2937",border:"none",borderRadius:7,color:"#9ca3af",padding:"6px 12px",cursor:"pointer",fontSize:16,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>☰ Browse All My Views</button>}
     <Av name={member.name} size={40}/>
@@ -13091,14 +13167,15 @@ const MyViewHeader = ({member, isAdmin, team, selectedMember, setSelectedMember}
       <div style={{fontWeight:900,fontSize:24,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>{member.name}</div>
       <div style={{fontSize:16,color: "#9ca3af"}}>{member.roles.join(" · ")} · {member.employeeType}</div>
     </div>
-    {isAdmin&&(
-      <div style={{marginLeft:"auto"}}>
+    <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}>
+      <NotificationBell member={member} projects={projects} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>
+      {isAdmin&&(
         <select value={selectedMember} onChange={e=>setSelectedMember(Number(e.target.value))}
           style={{background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"6px 10px",fontSize:16,outline:"none"}}>
           {team.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
-      </div>
-    )}
+      )}
+    </div>
   </div>
 );
 
@@ -21566,11 +21643,11 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
     return {projects:activeProjects.length, deliverables:activeDels.length};
   };
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const startEdit = m => { setEditId(m.id); setDraft({...m}); setExpandedId(m.id); };
   const cancelEdit = () => { setEditId(null); setDraft(null); };
   const saveEdit  = () => { onUpdateTeam(team.map(m=>m.id===editId?{...m,...draft}:m)); setEditId(null); setDraft(null); };
   const deleteM   = id => {
-    if(!window.confirm("Remove this team member?")) return;
     onUpdateTeam(team.filter(m=>m.id!==id));
     if(expandedId===id) setExpandedId(null);
     if(editId===id){ setEditId(null); setDraft(null); }
@@ -21802,6 +21879,9 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
                   ) : (
                     <>
                       {/* Locked field view — same layout as editing, read-only */}
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12,padding:"6px 10px",background:"#1f293780",border:"1px solid #374151",borderRadius:6,fontSize:13,color:"#8e97a6"}}>
+                        🔒 Locked — click Edit to make changes
+                      </div>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
                         {[["Name",m.name],["Email",m.email||"—"],["Phone",m.phone||"—"]].map(([l,v])=>(
                           <div key={l}>
@@ -21846,7 +21926,7 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
                       </div>
                       <div style={{display:"flex",gap:6}}>
                         <button onClick={()=>startEdit(m)} style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"6px 16px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>✎ Edit</button>
-                        <button onClick={()=>deleteM(m.id)} style={{background:"none",border:"1px solid #ef444440",borderRadius:7,color:"#ef4444",padding:"6px 14px",fontSize:14,fontWeight:700,cursor:"pointer"}}>Remove</button>
+                        <button onClick={()=>setConfirmDeleteId(m.id)} style={{background:"none",border:"1px solid #ef444440",borderRadius:7,color:"#ef4444",padding:"6px 14px",fontSize:14,fontWeight:700,cursor:"pointer"}}>Remove</button>
                       </div>
                     </>
                   )}
@@ -21856,6 +21936,19 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
           );
         })}
       </div>
+
+      {confirmDeleteId!=null && (
+        <Modal onClose={()=>setConfirmDeleteId(null)} maxWidth={380}>
+          <div style={{fontSize:20,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:10}}>Remove Team Member?</div>
+          <div style={{fontSize:15,color:"#9ca3af",marginBottom:20}}>
+            This will permanently remove {team.find(m=>m.id===confirmDeleteId)?.name||"this member"} from the team roster.
+          </div>
+          <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+            <button onClick={()=>setConfirmDeleteId(null)} style={{background:"#1f2937",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"8px 16px",fontSize:14,fontWeight:700,cursor:"pointer"}}>Cancel</button>
+            <button onClick={()=>{deleteM(confirmDeleteId);setConfirmDeleteId(null);}} style={{background:"#ef4444",border:"none",borderRadius:7,color:"#fff",padding:"8px 16px",fontSize:14,fontWeight:800,cursor:"pointer"}}>Remove</button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
@@ -24355,10 +24448,10 @@ const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, g
         <div style={{fontSize:26,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Admin</div>
         <div style={{fontSize:16,color: "#8e97a6"}}>Manage your team roster, equipment inventory, and studio spaces.</div>
       </div>
-      <div style={{display:"flex",flexWrap:"wrap",gap:4,background:"#0d1117",borderRadius:9,padding:4,border:"1px solid #1f2937",marginBottom:20}}>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:20}}>
         {tabs.map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)}
-            style={{background:tab===t.id?"#1f2937":"transparent",border:"none",borderRadius:7,color:tab===t.id?"#f1f5f9":"#6b7280",padding:"6px 18px",fontSize:16,fontWeight:tab===t.id?800:600,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",transition:"all 0.15s"}}>
+            style={{background:tab===t.id?"#1f2937":"#0d1117",border:`1px solid ${tab===t.id?"#6366f1":"#1f2937"}`,borderRadius:8,color:tab===t.id?"#f1f5f9":"#6b7280",padding:"7px 16px",fontSize:16,fontWeight:tab===t.id?800:600,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",transition:"all 0.15s"}}>
             {t.l} <span style={{fontSize:13,color: "#838ba0",marginLeft:4}}>{t.id==="team"?team.length:t.id==="gear"?gear.length:spaces.length}</span>
           </button>
         ))}
@@ -25124,7 +25217,10 @@ export default function App() {
     setMediaCards(list);
     window.storage?.set(MEDIA_CARDS_STORAGE_KEY, JSON.stringify(list)).catch(()=>{});
   },[]);
-  const [view,setView]=useState("projects");
+  const [view,setView]=useState(()=>{
+    try { return localStorage.getItem("posttrack-last-view") || "projects"; } catch(e){ return "projects"; }
+  });
+  useEffect(()=>{ try{ localStorage.setItem("posttrack-last-view", view); }catch(e){} },[view]);
   const [toast, setToast] = useState(null);
   // How far the main app content should shift right to make room for whichever
   // side panel (Checklist, sidebars, drawers) is currently open.
@@ -25136,6 +25232,11 @@ export default function App() {
   // SEED_PROJECTS works for projects. Real people join via the onboarding
   // form on first login instead of an admin pre-seeding rows for them.
   const [teamRoster, setTeamRoster] = useState([]);
+  // Guards the onboarding-gate check below from firing on the roster's
+  // empty initial state — without this, reloading briefly flashes the
+  // "new user" form for people who are already linked, before their
+  // membership row has actually come back from Supabase.
+  const [teamRosterLoaded, setTeamRosterLoaded] = useState(false);
   const [gearList,   setGearList]   = useState([
     // Seed a basic gear inventory
     {id:uid(),name:"Sony FX9",           category:"Camera",  quantity:2, notes:""},
@@ -25378,6 +25479,7 @@ export default function App() {
     if(!authed || !sb) return;
     sb.from("team_members").select("*").then(({data,error})=>{
       if(!error && data && data.length) setTeamRoster(data.map(rowToTeamMember));
+      setTeamRosterLoaded(true);
     });
     sb.from("projects").select("*").then(({data,error})=>{
       if(!error && data) setProjects(data.map(rowToProject));
@@ -25431,7 +25533,7 @@ export default function App() {
   // pre-seed a row with a matching email. Dismissal isn't persisted, so it
   // asks again next session if skipped — a light nudge, not a hard gate.
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
-  const needsOnboarding = !!(authed && authUser && !teamRoster.some(m=>m.authUserId===authUser.id) && !onboardingDismissed);
+  const needsOnboarding = !!(authed && authUser && teamRosterLoaded && !teamRoster.some(m=>m.authUserId===authUser.id) && !onboardingDismissed);
   const completeOnboarding = profile => {
     if(!authUser) return;
     const newMember = {
@@ -25622,7 +25724,7 @@ export default function App() {
   // The user's dragged/persisted width for this shared slot, applied
   // whenever any view's sidebar is open — so resizing sticks across
   // opening/closing and across different views, not just one session.
-  const [navSidebarWidth, navSidebarHandle] = useResizableWidth("posttrack-nav-sidebar-width", 420, {min:320,max:720});
+  const [navSidebarWidth, navSidebarHandle] = useResizableWidth("posttrack-nav-sidebar-width", 480, {min:320,max:720});
   const activeSidebarWidth = sidebarRequestedWidth ? navSidebarWidth : 0;
 
   const updateDel=useCallback((projectId,delId,field,value)=>{
@@ -26088,7 +26190,10 @@ export default function App() {
           {!!activeSidebarWidth&&<SidebarResizeHandle {...navSidebarHandle}/>}
         </div>
         <div style={{flex:1,minWidth:0}}>
-        <div style={{maxWidth:1600,margin:"0 auto",padding:"20px 24px"}}>
+        {/* No auto-centering while a sidebar is open — with less room
+            available, centering a capped-width column just pads out extra
+            dead space next to the sidebar instead of using the space. */}
+        <div style={{maxWidth:1600,margin:activeSidebarWidth?"0":"0 auto",padding:"20px 24px"}}>
           <StatsBar projects={allProjects} team={allTeam} setView={v=>{setView(v);if(v!=="projects")setStatsFilter(null);}} onOpenProject={openProject} onSetStatsFilter={setStatsFilter}/>
           {view==="workReview"&&<WorkReviewView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster}/>}
           {view==="pipeline"&&<PipelineView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject}/>}
