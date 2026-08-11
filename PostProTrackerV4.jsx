@@ -26341,8 +26341,14 @@ export default function App() {
         <div style={{flex:1,minWidth:0,marginLeft:pushOffset,transform:pushTransformX?`translateX(${pushTransformX}px)`:undefined,transition:pushTransitionOn?"transform 0.22s cubic-bezier(0.4,0,0.2,1)":"none"}}>
         {/* No auto-centering while a sidebar is open — with less room
             available, centering a capped-width column just pads out extra
-            dead space next to the sidebar instead of using the space. */}
-        <div style={{maxWidth:1600,margin:activeSidebarWidth?"0":"0 auto",padding:"20px 24px"}}>
+            dead space next to the sidebar instead of using the space.
+            Checks pushOffset too, not just activeSidebarWidth — the older
+            push-panel sidebars (ProjectSidebar, Checklist, History) don't
+            drive activeSidebarWidth at all, so without this a page like
+            Projects would keep centering its content while its sidebar is
+            open, landing on a bigger/inconsistent gap than the portal-based
+            sidebars produce. */}
+        <div style={{maxWidth:1600,margin:(activeSidebarWidth||pushOffset)?"0":"0 auto",padding:"20px 24px"}}>
           <StatsBar projects={allProjects} team={allTeam} setView={v=>{setView(v);if(v!=="projects")setStatsFilter(null);}} onOpenProject={openProject} onSetStatsFilter={setStatsFilter}/>
           {view==="workReview"&&<WorkReviewView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster}/>}
           {view==="pipeline"&&<PipelineView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject}/>}
