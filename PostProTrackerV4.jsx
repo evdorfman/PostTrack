@@ -1,6 +1,30 @@
 import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
+// ─── TEMPORARY DEBUG PATCH — pinpoints the "Objects are not valid as a React
+// child (found: object with keys {})" crash by intercepting every element
+// creation and reporting exactly which component tried to render a plain
+// object as a child, with the real (unminified) component name and a stack
+// trace. Remove this block once that bug is found and fixed.
+if (typeof window !== "undefined" && window.React && !window.React.__childDebugPatched) {
+  const _origCreateElement = window.React.createElement;
+  window.React.createElement = function(type, props, ...children) {
+    const check = (c, where) => {
+      if (c && typeof c === "object" && !Array.isArray(c) && !c.$$typeof && !(c instanceof Date)) {
+        const typeName = typeof type === "function" ? (type.displayName || type.name || "Anonymous") : String(type);
+        console.error(`[CHILD-DEBUG] Plain object passed as a React child at ${where} inside <${typeName}>. Keys: [${Object.keys(c).join(", ")}]`, {value: c, props});
+        console.trace("[CHILD-DEBUG] stack");
+      }
+    };
+    children.forEach((c, i) => {
+      if (Array.isArray(c)) c.forEach((cc, j) => check(cc, `children[${i}][${j}]`));
+      else check(c, `children[${i}]`);
+    });
+    return _origCreateElement.apply(window.React, [type, props, ...children]);
+  };
+  window.React.__childDebugPatched = true;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PROJECT_STATUSES   = ["New Request","Ideation","Pre-Pro","In Production","Post","In Review","Delivered","On Hold","Canceled"];
 const BUDGET_STATUSES    = ["Not Started","Quoted","Approved"];
@@ -9464,7 +9488,7 @@ const ACTIVE_STAGES = [
   {key:"On Hold",      statuses:["On Hold"],         color: "#9ca3af"},
 ];
 
-const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateDel, statsFilter=null, onClearStatsFilter}) => {
+const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateDel, statsFilter=null, onClearStatsFilter, navSidebarWidth, navSidebarHandle}) => {
   const [search,setSearch]       = useState("");
   const [fsWS,setFsWS]           = useState("All");
   const [fsBU,setFsBU]           = useState("All");
@@ -9724,7 +9748,8 @@ const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateD
       {sidebarProject&&(
         <ProjectSidebar project={sidebarProject} team={team} allProjects={projects} onUpdateProject={onUpdateProject} onUpdateDel={onUpdateDel}
           onClose={()=>setSidebarProjectId(null)}
-          onOpenFull={()=>{ onOpenProject(sidebarProject); setSidebarProjectId(null); }}/>
+          onOpenFull={()=>{ onOpenProject(sidebarProject); setSidebarProjectId(null); }}
+          sidebarWidth={navSidebarWidth} sidebarHandle={navSidebarHandle}/>
       )}
     </div>
   );
@@ -10321,17 +10346,19 @@ const SidebarDelCard = ({d, project, team, editors, onUpdateDel, onHandoff, stag
   );
 };
 
-const ProjectSidebar = ({project, team, allProjects=[], onUpdateProject, onUpdateDel, onClose, onOpenFull}) => {
+const ProjectSidebar = ({project, team, allProjects=[], onUpdateProject, onUpdateDel, onClose, onOpenFull, sidebarWidth, sidebarHandle}) => {
   const [showNote,setShowNote]       = useState(false);
   const [showBrief,setShowBrief]     = useState(false);
   const [handoffDelId,setHandoffDelId] = useState(null);
   const [showProjectHandoff,setShowProjectHandoff] = useState(false); // project-level editor assignment
   const [vis,setVis]                 = useState(false);
   useEffect(()=>{ requestAnimationFrame(()=>setVis(true)); },[]);
-  // Shares the same storage key/range as every other sidebar (SidebarPortal's
-  // App-owned nav slot) so widths and padding stay in sync app-wide, even
-  // though this one panel is still on the older push-panel mechanism.
-  const [sidebarWidth, sidebarHandle] = useResizableWidth("posttrack-nav-sidebar-width", 480, {min:320,max:720});
+  // sidebarWidth/sidebarHandle now come from App's own useResizableWidth
+  // instance (the same one SidebarPortal's nav slot uses) instead of this
+  // component creating its own separate instance of the same hook — two
+  // instances only shared a localStorage *key*, not live state, so
+  // resizing one didn't update the other until a full page reload,
+  // letting them drift out of sync with each other.
   // The panel itself always renders at the live (possibly mid-drag)
   // sidebarWidth — smooth, immediate, no jitter risk since it's just this
   // one fixed-position box resizing. But usePushPanel's width feeds
@@ -13041,8 +13068,12 @@ const MyOutstandingTasks = ({member, projects, team, onOpenProject, nudges=[], c
   // keeps its place next to AI Assistant instead of collapsing to nothing —
   // the shell's own border/rounding is never height-clipped; only the list
   // inside it scrolls, which is what fixed the "cuts off strangely" issue.
+  // The card itself takes the fixed height (not just an inner maxHeight) so
+  // dragging the resize handle always visibly changes the box, the same way
+  // RoleCalendar's height drag already does — capping only an inner list's
+  // maxHeight doesn't grow/shrink anything once its content already fits.
   return (
-    <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 18px",display:"flex",flexDirection:"column"}}>
+    <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 18px",display:"flex",flexDirection:"column",...(contentHeight?{height:contentHeight}:{})}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexShrink:0}}>
         <div style={{fontWeight:900,fontSize:19,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>📋 Outstanding Tasks</div>
         <div style={{display:"flex",gap:6}}>
@@ -13054,7 +13085,7 @@ const MyOutstandingTasks = ({member, projects, team, onOpenProject, nudges=[], c
       {allProjectIds.length===0 ? (
         <div style={{fontSize:16,color:"#374151",fontStyle:"italic"}}>Nothing outstanding right now.</div>
       ) : (
-        <div style={{display:"flex",flexDirection:"column",gap:10,...(contentHeight?{maxHeight:contentHeight,overflowY:"auto"}:{})}}>
+        <div style={{display:"flex",flexDirection:"column",gap:10,...(contentHeight?{flex:"1 1 auto",minHeight:0,overflowY:"auto"}:{})}}>
           {allProjectIds.map(projectId=>{
             const proj = projects.find(p=>p.id===projectId);
             if(!proj) return null;
@@ -21368,9 +21399,12 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[], contentHe
 
   const visibleMsgs = msgs.filter(m=>!m.hidden);
 
+  // Fixed height on the card itself (not just an inner maxHeight) so the
+  // resize handle always visibly changes the box — see the matching note
+  // in MyOutstandingTasks for why maxHeight alone didn't work.
   return (
-    <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 18px"}}>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+    <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 18px",display:"flex",flexDirection:"column",...(contentHeight?{height:contentHeight}:{})}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexShrink:0}}>
         <div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>✦</div>
         <div>
           <div style={{fontWeight:900,fontSize:18,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>Morning Rundown</div>
@@ -21383,7 +21417,7 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[], contentHe
         )}
       </div>
 
-      <div ref={msgListRef} style={{maxHeight:contentHeight||340,overflowY:"auto",marginBottom:10}}>
+      <div ref={msgListRef} style={{marginBottom:10,...(contentHeight?{flex:"1 1 auto",minHeight:0,overflowY:"auto"}:{maxHeight:340,overflowY:"auto"})}}>
         {visibleMsgs.map((m,i)=>{
           const isUser = m.role==="user";
           return (
@@ -21403,7 +21437,7 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[], contentHe
         )}
       </div>
 
-      <div style={{display:"flex",gap:8}}>
+      <div style={{display:"flex",gap:8,flexShrink:0}}>
         <input value={input} onChange={e=>setInput(e.target.value)}
           onKeyDown={e=>{ if(e.key==="Enter"){ e.preventDefault(); send(); } }}
           placeholder="Ask about today — e.g. what's due first?"
@@ -26339,7 +26373,7 @@ export default function App() {
               });
             }}
           />}
-          {view==="projects"&&<ProjectsView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} statsFilter={statsFilter} onClearStatsFilter={()=>setStatsFilter(null)}/>}
+          {view==="projects"&&<ProjectsView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} statsFilter={statsFilter} onClearStatsFilter={()=>setStatsFilter(null)} navSidebarWidth={navSidebarWidth} navSidebarHandle={navSidebarHandle}/>}
           {view==="studio"&&<StudioTab projects={allProjects} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} team={allTeam} onOpenProject={openProject} talentRoster={talentRoster} onUpdateProject={updateProject} mediaCards={mediaCards} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="kanban"&&kanbanMode==="status"&&<KanbanStatus projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="kanban"&&kanbanMode==="editor"&&<KanbanEditor projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
