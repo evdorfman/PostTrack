@@ -1,30 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
-// ─── TEMPORARY DEBUG PATCH — pinpoints the "Objects are not valid as a React
-// child (found: object with keys {})" crash by intercepting every element
-// creation and reporting exactly which component tried to render a plain
-// object as a child, with the real (unminified) component name and a stack
-// trace. Remove this block once that bug is found and fixed.
-if (typeof window !== "undefined" && window.React && !window.React.__childDebugPatched) {
-  const _origCreateElement = window.React.createElement;
-  window.React.createElement = function(type, props, ...children) {
-    const check = (c, where) => {
-      if (c && typeof c === "object" && !Array.isArray(c) && !c.$$typeof && !(c instanceof Date)) {
-        const typeName = typeof type === "function" ? (type.displayName || type.name || "Anonymous") : String(type);
-        console.error(`[CHILD-DEBUG] Plain object passed as a React child at ${where} inside <${typeName}>. Keys: [${Object.keys(c).join(", ")}]`, {value: c, props});
-        console.trace("[CHILD-DEBUG] stack");
-      }
-    };
-    children.forEach((c, i) => {
-      if (Array.isArray(c)) c.forEach((cc, j) => check(cc, `children[${i}][${j}]`));
-      else check(c, `children[${i}]`);
-    });
-    return _origCreateElement.apply(window.React, [type, props, ...children]);
-  };
-  window.React.__childDebugPatched = true;
-}
-
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PROJECT_STATUSES   = ["New Request","Ideation","Pre-Pro","In Production","Post","In Review","Delivered","On Hold","Canceled"];
 const BUDGET_STATUSES    = ["Not Started","Quoted","Approved"];
@@ -3336,7 +3312,7 @@ const LocationBookingPanel = ({production, allProjects=[], onUpdate}) => {
                 <div key={b.id||"_p"} style={{display:"flex",alignItems:"center",gap:4,fontSize:13,color: "#9ca3af"}}>
                   <div style={{width:8,height:8,borderRadius:2,background:color,flexShrink:0}}/>
                   <span style={{color}}>{b.isOverall?"Overall Production":b._isPrimaryShoot?"Primary Shoot":b.type}</span>
-                  {b.location&&<span style={{color: "#838ba0"}}>· {b.location}</span>}
+                  {locStr(b.location)&&<span style={{color: "#838ba0"}}>· {locStr(b.location)}</span>}
                   {b.startTime&&<span>{fmtH(isoToHours(b.startTime))}–{fmtH(isoToHours(b.endTime))}</span>}
                 </div>
               );
@@ -6648,7 +6624,7 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                                   <div style={{fontSize:16,fontWeight:700,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.title||p.type}</div>
                                   <div style={{display:"flex",gap:6,alignItems:"center",marginTop:2,flexWrap:"wrap"}}>
                                     <span style={{fontSize:13,fontWeight:700,color:tColor,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>{p.type}</span>
-                                    {p.location&&<span style={{fontSize:13,color: "#8e97a6"}}>· 📍 {p.location}</span>}
+                                    {locStr(p.location)&&<span style={{fontSize:13,color: "#8e97a6"}}>· 📍 {locStr(p.location)}</span>}
                                     {p.startTime&&<span style={{fontSize:13,color: "#9ca3af"}}>· {fmtDate(p.startTime)}</span>}
                                   </div>
                                 </div>
@@ -9319,7 +9295,7 @@ const PipelineView = ({projects, team, onOpenProject, onUpdateProject}) => {
                                 <div style={{fontSize:13,fontWeight:700,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{pr.title||pr.type||"Production"}</div>
                                 <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
                                   {dateStr&&<span style={{fontSize:12,color:"#9ca3af"}}>📅 {dateStr}</span>}
-                                  {pr.location&&<span style={{fontSize:12,color:"#9ca3af",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:80}}>📍 {pr.location}</span>}
+                                  {locStr(pr.location)&&<span style={{fontSize:12,color:"#9ca3af",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:80}}>📍 {locStr(pr.location)}</span>}
                                   <span style={{fontSize:11,fontWeight:700,color:prodColor,background:prodColor+"18",borderRadius:3,padding:"1px 5px",whiteSpace:"nowrap",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>{prodStatus}</span>
                                 </div>
                               </div>
@@ -10180,7 +10156,7 @@ const ProjectCard = ({project,team,onClick,onUpdateProject}) => {
           <div style={{fontSize:14,color:"#9ca3af",background:"#0f172a",borderRadius:7,padding:"6px 10px",border:"1px solid #1f2937"}}>
             <span style={{color: "#8e97a6"}}>Next up:</span>{" "}
             <span style={{fontWeight:700,color:"#e2e8f0"}}>{next.title||next.type}</span>
-            {next.location&&<span style={{color: "#9ca3af"}}> · 📍 {next.location}</span>}
+            {locStr(next.location)&&<span style={{color: "#9ca3af"}}> · 📍 {locStr(next.location)}</span>}
             {next.startTime&&<span style={{color:"#9ca3af"}}> · {fmtDT(next.startTime)}</span>}
           </div>
         )}
@@ -11213,7 +11189,7 @@ const CalendarView = ({projects,team,onOpenProject,onUpdateProject,sidebarSlotNo
                   <>
                     <div style={{fontSize:18,fontWeight:700,color:"#f1f5f9",marginBottom:4}}>{item.title}</div>
                     <div style={{fontSize:14,color: "#9ca3af",marginBottom:2}}>🕐 {fmtDT(item.deadline)}{item.endTime?" → "+fmtTime(item.endTime):""}</div>
-                    {item.location&&<div style={{fontSize:14,color: "#9ca3af",marginBottom:2}}>📍 {item.location}</div>}
+                    {locStr(item.location)&&<div style={{fontSize:14,color: "#9ca3af",marginBottom:2}}>📍 {locStr(item.location)}</div>}
                     {item.crew&&(()=>{
                       const crewItems = [
                         ...(item.crew.crewInternal||[]).map(c=>{const m=team.find(t=>t.id===c.memberId);return m?`${m.name} (${c.role||"Crew"})`:null;}).filter(Boolean),
@@ -12386,7 +12362,7 @@ const RoleCalendar = ({memberId, projects, onOpenProject, team=[], unavailabilit
             <div style={{fontSize:18,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>{item.isRound?item.label:item.title}</div>
             {item.isRound&&item.delTitle&&<div style={{fontSize:15,color:"#9ca3af",marginBottom:6}}>{item.delTitle}</div>}
             <div style={{fontSize:14,color:"#9ca3af",marginBottom:3}}>📅 {fmtDT(item.deadline)}</div>
-            {item.location&&<div style={{fontSize:14,color:"#9ca3af",marginBottom:3}}>📍 {item.location}</div>}
+            {locStr(item.location)&&<div style={{fontSize:14,color:"#9ca3af",marginBottom:3}}>📍 {locStr(item.location)}</div>}
           </div>
         );
       })()}
@@ -13584,6 +13560,12 @@ const StatsBar = ({projects, team, setView, onOpenProject, onSetStatsFilter}) =>
 // calcCrewCall defined above near LocationBookingPanel
 const calcHMUWindow = st => { if(!st)return null; return {start:calcCrewCall(st),end:st}; };
 const fmtCrewCall = iso => { if(!iso)return ""; return new Date(iso).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true}); };
+// Some bookings/productions still carry a `location` field written by an
+// earlier data shape (from before the location/timing model rework) where
+// it wasn't always a plain string — rendering one of those bare as a React
+// child throws "Objects are not valid as a React child". Coerces safely
+// instead of crashing the whole page.
+const locStr = loc => typeof loc === "string" ? loc : "";
 const makeHMUBooking = (parent, station) => { const w=calcHMUWindow(parent.startTime); if(!w)return null; return {id:uid(),title:`${parent.title} — HMU Prep`,projectId:parent.projectId||null,parentBookingId:parent.id,bookingStatus:"Tentative",productionType:parent.productionType||"Content Filming",location:station,startTime:w.start,endTime:w.end,crewCallTime:null,notes:`Auto-created: HMU prep for "${parent.title}".`,equipmentIds:[],confirmations:[],crewInternal:[],crewExternal:[{id:uid(),role:"Hair & Makeup Artist",name:"",company:"",callTime:fmtCrewCall(w.start)}]}; };
 const detectConflicts = (location,startTime,endTime,allBookings,excludeId=null) => { if(!location||!startTime||!endTime)return []; const st=new Date(startTime).getTime(),et=new Date(endTime).getTime(); return allBookings.filter(b=>{if(b.id===excludeId||b.location!==location||["Cancelled","Completed"].includes(b.bookingStatus)||!b.startTime||!b.endTime)return false; const bst=new Date(b.startTime).getTime(),bet=new Date(b.endTime).getTime(); return !(bet<=st||bst>=et);}); };
 
@@ -17855,7 +17837,7 @@ const ProductionCard = ({production, idx, projectId, allProductions, allProjectD
           <div style={{display:"flex",gap:10,fontSize:13,color: "#9ca3af",flexWrap:"wrap"}}>
             {production.status==="Planning"&&<span style={{color: "#9ca3af",fontStyle:"italic"}}>🔒 In Planning — not visible to approvers yet</span>}
             {production.startTime&&<span>📅 {fmtDate(production.startTime)} · {fmtTime(production.startTime)}</span>}
-            {production.location&&<span>📍 {production.location}</span>}
+            {locStr(production.location)&&<span>📍 {locStr(production.location)}</span>}
             {hasShoot&&<span>📞 Crew call {crewCallDisplay}</span>}
             {(production.deliverables||[]).length>0&&<span>📦 {production.deliverables.length} del.</span>}
             {isHybrid&&playbackDel&&<span style={{color:"#f97316"}}>📼 Playback: {playbackDel.title}</span>}
@@ -18910,7 +18892,7 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
                     onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:700,fontSize:17,color:"#f1f5f9"}}>{b.title}</div>
-                      <div style={{fontSize:13,color: "#9ca3af",marginTop:1}}>📍 {b.location} · {b.startTime?fmtDT(b.startTime):"TBD"}</div>
+                      <div style={{fontSize:13,color: "#9ca3af",marginTop:1}}>📍 {locStr(b.location)} · {b.startTime?fmtDT(b.startTime):"TBD"}</div>
                       {linkedProj&&<div style={{fontSize:13,color:"#6366f1",marginTop:1}}>↗ {linkedProj.name}</div>}
                       {b.notes&&<div style={{fontSize:13,color: "#9ca3af",marginTop:2,fontStyle:"italic"}}>{b.notes.slice(0,80)}{b.notes.length>80?"…":""}</div>}
                     </div>
@@ -18949,7 +18931,7 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
                   <div style={{width:6,height:6,borderRadius:"50%",background:color,flexShrink:0}}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:16,fontWeight:700,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.title}</div>
-                    <div style={{fontSize:13,color: "#9ca3af"}}>📍 {h.location}{h.startTime?` · ${fmtDate(h.startTime)}`:""} · by {h.decidedBy}</div>
+                    <div style={{fontSize:13,color: "#9ca3af"}}>📍 {locStr(h.location)}{h.startTime?` · ${fmtDate(h.startTime)}`:""} · by {h.decidedBy}</div>
                   </div>
                   <div style={{display:"flex",gap:5,flexShrink:0,alignItems:"center"}}>
                     <Chip label={h.decision} color={color} xs/>
@@ -19029,7 +19011,7 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
                 <div style={{display:"flex",justifyContent:"space-between",gap:8,marginBottom:4}}>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontWeight:700,fontSize:17,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.title}</div>
-                    <div style={{fontSize:13,color: "#9ca3af",marginTop:1}}>📍 {b.location} · {fmtDT(b.startTime)}{b.endTime?" → "+fmtTime(b.endTime):""}</div>
+                    <div style={{fontSize:13,color: "#9ca3af",marginTop:1}}>📍 {locStr(b.location)} · {fmtDT(b.startTime)}{b.endTime?" → "+fmtTime(b.endTime):""}</div>
                     {linkedProj&&<div style={{fontSize:13,color:"#6366f1",marginTop:1}}>↗ {linkedProj.name}</div>}
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:3,alignItems:"flex-end",flexShrink:0}}>
@@ -19065,7 +19047,7 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
               onMouseLeave={e=>{e.currentTarget.style.opacity="0.8";e.currentTarget.style.borderColor="#1f2937";}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:16,fontWeight:700,color:"#9ca3af",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.title}</div>
-                <div style={{fontSize:13,color: "#8e97a6"}}>{b.location} · {fmtDate(b.startTime)}</div>
+                <div style={{fontSize:13,color: "#8e97a6"}}>{locStr(b.location)} · {fmtDate(b.startTime)}</div>
               </div>
               <Chip label="Completed" color="#10b981" xs/>
             </div>
@@ -19101,7 +19083,7 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
                   </div>
                 )}
                 <div style={{fontWeight:900,fontSize:20,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",lineHeight:1.2}}>{b.title}</div>
-                <div style={{fontSize:14,color: "#9ca3af",marginTop:4}}>📍 {b.location} · {b.startTime?fmtDT(b.startTime):"TBD"}</div>
+                <div style={{fontSize:14,color: "#9ca3af",marginTop:4}}>📍 {locStr(b.location)} · {b.startTime?fmtDT(b.startTime):"TBD"}</div>
               </div>
               {/* Drawer body */}
               <div style={{overflowY:"scroll",WebkitOverflowScrolling:"touch",padding:"16px 20px 40px",minHeight:0}}>
@@ -20640,14 +20622,14 @@ const StudioBookingsList = ({allBookings, projects, team, studioBookings, onUpda
                 <div style={{display:"flex",flexDirection:"column",gap:4}}>
                   {/* Main window */}
                   <div style={{display:"flex",alignItems:"center",gap:10,background:"#111827",borderRadius:7,padding:"7px 12px",borderLeft:"3px solid #3b82f6"}}>
-                    <span style={{fontSize:13,fontWeight:700,color:"#3b82f6",minWidth:80,flexShrink:0}}>📍 {b.location}</span>
+                    <span style={{fontSize:13,fontWeight:700,color:"#3b82f6",minWidth:80,flexShrink:0}}>📍 {locStr(b.location)}</span>
                     <span style={{fontSize:14,color:"#e2e8f0",fontWeight:600}}>{fmtTime(b.startTime)} → {fmtTime(b.endTime||b.startTime)}</span>
                     {b.crewCallTime&&<span style={{fontSize:13,color:"#6b7280",marginLeft:"auto"}}>📞 Crew {fmtCrewCall(b.crewCallTime)}</span>}
                   </div>
                   {/* Aux spaces */}
                   {(b.secondaryLocations||[]).filter(l=>l.location&&!l._isPrimaryShoot).map((l,i)=>(
                     <div key={i} style={{display:"flex",alignItems:"center",gap:10,background:"#0d1117",borderRadius:7,padding:"6px 12px",marginLeft:16,borderLeft:"2px solid #6366f140"}}>
-                      <span style={{fontSize:13,color:"#818cf8",minWidth:80,flexShrink:0}}>📍 {l.location}</span>
+                      <span style={{fontSize:13,color:"#818cf8",minWidth:80,flexShrink:0}}>📍 {locStr(l.location)}</span>
                       <span style={{fontSize:13,color:"#9ca3af"}}>{l.startTime?fmtTime(l.startTime):"—"}{l.endTime?" → "+fmtTime(l.endTime):""}</span>
                       {l.type&&<span style={{fontSize:12,color:"#4b5563"}}>· {l.type}</span>}
                     </div>
@@ -20655,7 +20637,7 @@ const StudioBookingsList = ({allBookings, projects, team, studioBookings, onUpda
                   {/* HMU children */}
                   {linkedChildren.map(hmu=>(
                     <div key={hmu.id} style={{display:"flex",alignItems:"center",gap:10,background:"#120d1f",borderRadius:7,padding:"6px 12px",marginLeft:16,borderLeft:"2px solid #8b5cf640"}}>
-                      <span style={{fontSize:13,color:"#a78bfa",minWidth:80,flexShrink:0}}>💄 {hmu.location}</span>
+                      <span style={{fontSize:13,color:"#a78bfa",minWidth:80,flexShrink:0}}>💄 {locStr(hmu.location)}</span>
                       <span style={{fontSize:13,color:"#9ca3af"}}>{fmtTime(hmu.startTime)} → {fmtTime(hmu.endTime)}</span>
                       <Chip label={hmu.bookingStatus} color={BKSTATUS_COLOR[hmu.bookingStatus]} xs/>
                     </div>
@@ -20819,13 +20801,13 @@ const StudioBookingsList = ({allBookings, projects, team, studioBookings, onUpda
                     <div style={{background:"#111827",borderRadius:7,padding:"10px 12px",display:"flex",flexDirection:"column",gap:5}}>
                       <div style={{fontSize:12,fontWeight:800,color:"#838ba0",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.07em",marginBottom:2}}>Space Booking</div>
                       <div style={{display:"flex",alignItems:"center",gap:8,fontSize:14}}>
-                        <span style={{color:"#3b82f6",fontWeight:700}}>📍 {b.location}</span>
+                        <span style={{color:"#3b82f6",fontWeight:700}}>📍 {locStr(b.location)}</span>
                         <span style={{color:"#9ca3af"}}>{fmtTime(b.startTime)} → {fmtTime(b.endTime||b.startTime)}</span>
                         {b.crewCallTime&&<span style={{color:"#6b7280"}}>Crew call: {fmtCrewCall(b.crewCallTime)}</span>}
                       </div>
                       {(b.secondaryLocations||[]).filter(l=>l.location).map((l,i)=>(
                         <div key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:13,paddingLeft:12,borderLeft:"2px solid #1f2937"}}>
-                          <span style={{color:"#8b5cf6"}}>📍 {l.location}</span>
+                          <span style={{color:"#8b5cf6"}}>📍 {locStr(l.location)}</span>
                           {l.startTime&&<span style={{color:"#6b7280"}}>{fmtTime(l.startTime)}{l.endTime?" → "+fmtTime(l.endTime):""}</span>}
                           {l.type&&<span style={{color:"#4b5563"}}>· {l.type}</span>}
                         </div>
@@ -24989,7 +24971,7 @@ const MobileCalendar = ({projects}) => {
                     <div style={{fontSize:17,fontWeight:700,color:"#e2e8f0",marginBottom:5,fontFamily:"'Barlow Condensed',sans-serif"}}>{prod.projectName}</div>
                     <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
                       {prod.title&&<span style={{fontSize:14,color:"#9ca3af"}}>{prod.title}</span>}
-                      {prod.location&&<span style={{fontSize:14,color:"#9ca3af"}}>📍 {prod.location}</span>}
+                      {locStr(prod.location)&&<span style={{fontSize:14,color:"#9ca3af"}}>📍 {locStr(prod.location)}</span>}
                       {prod.startTime&&<span style={{fontSize:14,color:"#9ca3af"}}>⏰ {fmtT(prod.startTime)}{prod.endTime?` – ${fmtT(prod.endTime)}`:""}</span>}
                       {prod.status&&<Chip label={prod.status} color={PCOLOR[prod.status]||"#6366f1"} xs/>}
                     </div>
