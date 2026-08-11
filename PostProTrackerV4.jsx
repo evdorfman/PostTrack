@@ -1,29 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
-// ─── TEMPORARY DEBUG PATCH (round 2) — the first empty-object-as-child crash
-// (BookingRow's location span) is fixed, but the same error signature is
-// still happening for one specific production, so this is back to pinpoint
-// wherever the next spot is. Remove once found and fixed.
-if (typeof window !== "undefined" && window.React && !window.React.__childDebugPatched) {
-  const _origCreateElement = window.React.createElement;
-  window.React.createElement = function(type, props, ...children) {
-    const check = (c, where) => {
-      if (c && typeof c === "object" && !Array.isArray(c) && !c.$$typeof && !(c instanceof Date)) {
-        const typeName = typeof type === "function" ? (type.displayName || type.name || "Anonymous") : String(type);
-        console.error(`[CHILD-DEBUG] Plain object passed as a React child at ${where} inside <${typeName}>. Keys: [${Object.keys(c).join(", ")}]`, {value: c, props});
-        console.trace("[CHILD-DEBUG] stack");
-      }
-    };
-    children.forEach((c, i) => {
-      if (Array.isArray(c)) c.forEach((cc, j) => check(cc, `children[${i}][${j}]`));
-      else check(c, `children[${i}]`);
-    });
-    return _origCreateElement.apply(window.React, [type, props, ...children]);
-  };
-  window.React.__childDebugPatched = true;
-}
-
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PROJECT_STATUSES   = ["New Request","Ideation","Pre-Pro","In Production","Post","In Review","Delivered","On Hold","Canceled"];
 const BUDGET_STATUSES    = ["Not Started","Quoted","Approved"];
@@ -13589,6 +13566,12 @@ const fmtCrewCall = iso => { if(!iso)return ""; return new Date(iso).toLocaleTim
 // child throws "Objects are not valid as a React child". Coerces safely
 // instead of crashing the whole page.
 const locStr = loc => typeof loc === "string" ? loc : "";
+// Same defensive coercion as locStr, for the other field that turned out to
+// carry the same kind of stray legacy object value: setup screenContent is
+// normally a string or array of strings, but a malformed non-array,
+// non-string value (e.g. an old empty-object shape) rendered bare crashes
+// exactly the same way.
+const screenContentStr = v => Array.isArray(v) ? v.join(", ") : (typeof v === "string" ? v : "");
 const makeHMUBooking = (parent, station) => { const w=calcHMUWindow(parent.startTime); if(!w)return null; return {id:uid(),title:`${parent.title} — HMU Prep`,projectId:parent.projectId||null,parentBookingId:parent.id,bookingStatus:"Tentative",productionType:parent.productionType||"Content Filming",location:station,startTime:w.start,endTime:w.end,crewCallTime:null,notes:`Auto-created: HMU prep for "${parent.title}".`,equipmentIds:[],confirmations:[],crewInternal:[],crewExternal:[{id:uid(),role:"Hair & Makeup Artist",name:"",company:"",callTime:fmtCrewCall(w.start)}]}; };
 const detectConflicts = (location,startTime,endTime,allBookings,excludeId=null) => { if(!location||!startTime||!endTime)return []; const st=new Date(startTime).getTime(),et=new Date(endTime).getTime(); return allBookings.filter(b=>{if(b.id===excludeId||b.location!==location||["Cancelled","Completed"].includes(b.bookingStatus)||!b.startTime||!b.endTime)return false; const bst=new Date(b.startTime).getTime(),bet=new Date(b.endTime).getTime(); return !(bet<=st||bst>=et);}); };
 
@@ -20685,7 +20668,7 @@ const StudioBookingsList = ({allBookings, projects, team, studioBookings, onUpda
                         {acParts.length>0&&<div><span style={{fontSize:12,color:"#4b5563",textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:"'Barlow Condensed',sans-serif"}}>Audio </span><span style={{fontSize:14,color:"#9ca3af"}}>🎤 {acParts.join(" · ")}</span></div>}
                         {(s.equipmentIds||[]).length>0&&<div><span style={{fontSize:12,color:"#4b5563",textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:"'Barlow Condensed',sans-serif"}}>Gear </span><span style={{fontSize:14,color:"#9ca3af"}}>🎒 {s.equipmentIds.length} items</span></div>}
                         {(s.furnitureList||[]).length>0||(s.propsList||[]).length>0?<div><span style={{fontSize:12,color:"#4b5563",textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:"'Barlow Condensed',sans-serif"}}>Props/Furniture </span><span style={{fontSize:14,color:"#9ca3af"}}>🪑 {[...(s.furnitureList||[]),(s.propsList||[])].join(", ").slice(0,60)||"—"}</span></div>:null}
-                        {s.screenContent&&<div><span style={{fontSize:12,color:"#4b5563",textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:"'Barlow Condensed',sans-serif"}}>Screen </span><span style={{fontSize:14,color:"#9ca3af"}}>🖥 {Array.isArray(s.screenContent)?s.screenContent.join(", "):s.screenContent}</span></div>}
+                        {screenContentStr(s.screenContent)&&<div><span style={{fontSize:12,color:"#4b5563",textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:"'Barlow Condensed',sans-serif"}}>Screen </span><span style={{fontSize:14,color:"#9ca3af"}}>🖥 {screenContentStr(s.screenContent)}</span></div>}
                         {(s.mediaCardIds||[]).length>0&&<div><span style={{fontSize:12,color:"#4b5563",textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:"'Barlow Condensed',sans-serif"}}>Media </span><span style={{fontSize:14,color:"#9ca3af"}}>💾 {s.mediaCardIds.length} cards</span></div>}
                       </div>
                       {s.notes&&<div style={{fontSize:13,color:"#4b5563",fontStyle:"italic",borderTop:"1px solid #1a2035",paddingTop:5}}>📝 {s.notes}</div>}
