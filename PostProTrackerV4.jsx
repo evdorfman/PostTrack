@@ -6211,6 +6211,31 @@ const ProjectTeamPanel = ({project, lp, team, onUpdateProject}) => {
   );
 };
 
+// Catches any render-time crash inside ProjectOverview (the biggest, most
+// deeply-nested piece of UI in the app — a lot of surface area for a stray
+// undefined field to slip through) so it shows a recoverable error instead
+// of blanking the whole app, which previously required a hard reload to
+// escape. Keyed by project id at the call site so a crash on one project
+// doesn't leave every subsequently opened project stuck on the error screen.
+class ProjectOverviewErrorBoundary extends React.Component {
+  constructor(props){ super(props); this.state={hasError:false}; }
+  static getDerivedStateFromError(){ return {hasError:true}; }
+  componentDidCatch(error,info){ console.error("ProjectOverview crashed:",error,info); }
+  render(){
+    if(this.state.hasError) return (
+      <div onClick={this.props.onClose} style={{position:"fixed",inset:0,background:"#000d",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#0d1117",border:"1px solid #ef444440",borderRadius:16,padding:32,maxWidth:440,textAlign:"center"}}>
+          <div style={{fontSize:38,marginBottom:12}}>⚠️</div>
+          <div style={{fontSize:22,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:8}}>Something went wrong</div>
+          <div style={{fontSize:16,color:"#9ca3af",marginBottom:20}}>This project view hit an error and couldn't load. Nothing else was affected — close this and try again.</div>
+          <button onClick={this.props.onClose} style={{background:"#6366f1",border:"none",borderRadius:8,color:"#fff",padding:"10px 24px",fontSize:16,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>Close</button>
+        </div>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
 const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,onDeleteDel,onUpdateProject,initialDelId,initialTab,initialShootId,initialItemId,studioBookings=[],mediaCards=[],setupTypes=[],onAddSetupType,talentRoster=[],onUpdateTalentRoster,nudges=[],onAddNudge,furnitureList=[],propsList=[],screenContentOptions={},gearList=[],customTasks=[],onAddCustomTask,onUpdateCustomTask,onDeleteCustomTask,appPresets=[],onSaveAppPresets,vendorCompanies=[],addVendorCompany,intakes=[],becRequests=[],canAccessBudget=true}) => {
   const [activeDelModal,setActiveDelModal]=useState(initialDelId||((initialTab==="deliverables"||initialTab==="ingest")?initialItemId:null)||null);
   const [handoffDelId,  setHandoffDelId]  = useState(null); // for editor assignment modal in deliverables tab
@@ -10433,8 +10458,12 @@ const ProjectSidebar = ({project, team, allProjects=[], onUpdateProject, onUpdat
         {showNote&&<QuickNoteModal project={project} team={team} onClose={()=>setShowNote(false)} onUpdateProject={onUpdateProject}/>}
         {showBrief&&<BriefPreviewModal project={project} onClose={()=>setShowBrief(false)}/>}
 
-        {/* Scrollable body */}
-        <div style={{overflowY:"auto",WebkitOverflowScrolling:"touch",padding:"16px 20px 40px",display:"flex",flexDirection:"column",gap:10,minHeight:0}}>
+        {/* Scrollable body — overflowY:"scroll" (not "auto") to match every
+            other sidebar: "auto" only reserves scrollbar-gutter space when
+            content overflows, so short content sits flush against the right
+            edge instead of keeping the same padding other sidebars always
+            have. */}
+        <div style={{overflowY:"scroll",WebkitOverflowScrolling:"touch",padding:"16px 20px 40px",display:"flex",flexDirection:"column",gap:10,minHeight:0}}>
 
           {/* Always-visible meta block — now editable */}
           <div style={{display:"flex",flexDirection:"column",gap:7,background:"#0f172a",border:"1px solid #1f2937",borderRadius:10,padding:"12px 14px",flexShrink:0}}>
@@ -12485,10 +12514,11 @@ const NotificationBell = ({member, projects, onUpdateProject, onOpenProject}) =>
   return (
     <div ref={wrapRef} style={{position:"relative"}}>
       <button onClick={()=>setOpen(o=>!o)}
-        style={{position:"relative",background:open?"#1f2937":"#111827",border:"1px solid #1f2937",borderRadius:8,color:"#e2e8f0",width:38,height:38,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,cursor:"pointer"}}>
+        style={{position:"relative",display:"flex",alignItems:"center",gap:8,background:open?"#1f2937":"#111827",border:`1px solid ${unread>0?"#6366f180":"#374151"}`,borderRadius:9,color:"#e2e8f0",padding:"8px 16px",fontSize:22,cursor:"pointer"}}>
         🔔
+        <span style={{fontSize:15,fontWeight:800,color:"#e2e8f0",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>Notifications</span>
         {unread>0&&(
-          <span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",borderRadius:99,fontSize:11,fontWeight:800,minWidth:17,height:17,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",fontFamily:"'Barlow Condensed',sans-serif"}}>
+          <span style={{background:"#ef4444",color:"#fff",borderRadius:99,fontSize:12,fontWeight:800,minWidth:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 5px",fontFamily:"'Barlow Condensed',sans-serif"}}>
             {unread>9?"9+":unread}
           </span>
         )}
@@ -12989,7 +13019,7 @@ const ProjectTaskCard = ({project, automatedItems=[], customItems=[], onOpenProj
 // Shown at the top of every person's My View, regardless of role — every
 // incomplete checklist item assigned to them, across every project, with a
 // button straight to the tab that needs attention.
-const MyOutstandingTasks = ({member, projects, team, onOpenProject, nudges=[], customTasks=[], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask}) => {
+const MyOutstandingTasks = ({member, projects, team, onOpenProject, nudges=[], customTasks=[], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, contentHeight}) => {
   const automatedTasks = useMemo(()=>getOutstandingTasksForMember(member.id, projects, team, nudges), [member.id, projects, team, nudges]);
   const nudgedCount = automatedTasks.filter(t=>t.nudgedAt).length;
   const openCustomTasks = customTasks.filter(t=>!t.done);
@@ -13000,8 +13030,6 @@ const MyOutstandingTasks = ({member, projects, team, onOpenProject, nudges=[], c
     ...customTasks.map(t=>t.projectId),
   ])];
 
-  if(allProjectIds.length===0) return null;
-
   // Group automated by project
   const autoByProject = {};
   automatedTasks.forEach(t=>{
@@ -13009,9 +13037,13 @@ const MyOutstandingTasks = ({member, projects, team, onOpenProject, nudges=[], c
     autoByProject[t.projectId].push(t);
   });
 
+  // Always renders the same card shell (even with nothing outstanding) so it
+  // keeps its place next to AI Assistant instead of collapsing to nothing —
+  // the shell's own border/rounding is never height-clipped; only the list
+  // inside it scrolls, which is what fixed the "cuts off strangely" issue.
   return (
-    <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 18px",marginBottom:20}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+    <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 18px",display:"flex",flexDirection:"column"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexShrink:0}}>
         <div style={{fontWeight:900,fontSize:19,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>📋 Outstanding Tasks</div>
         <div style={{display:"flex",gap:6}}>
           {nudgedCount>0&&<Chip label={`🔔 ${nudgedCount} nudged`} color="#f59e0b"/>}
@@ -13019,24 +13051,28 @@ const MyOutstandingTasks = ({member, projects, team, onOpenProject, nudges=[], c
           {openCustomTasks.length>0&&<Chip label={`${openCustomTasks.length} custom`} color="#6366f1"/>}
         </div>
       </div>
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {allProjectIds.map(projectId=>{
-          const proj = projects.find(p=>p.id===projectId);
-          if(!proj) return null;
-          return (
-            <ProjectTaskCard key={projectId}
-              project={proj}
-              automatedItems={autoByProject[projectId]||[]}
-              customItems={customTasks.filter(t=>t.projectId===projectId)}
-              onOpenProject={onOpenProject}
-              onAddCustomTask={onAddCustomTask}
-              onUpdateCustomTask={onUpdateCustomTask}
-              onDeleteCustomTask={onDeleteCustomTask}
-              allProjects={projects}
-            />
-          );
-        })}
-      </div>
+      {allProjectIds.length===0 ? (
+        <div style={{fontSize:16,color:"#374151",fontStyle:"italic"}}>Nothing outstanding right now.</div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:10,...(contentHeight?{maxHeight:contentHeight,overflowY:"auto"}:{})}}>
+          {allProjectIds.map(projectId=>{
+            const proj = projects.find(p=>p.id===projectId);
+            if(!proj) return null;
+            return (
+              <ProjectTaskCard key={projectId}
+                project={proj}
+                automatedItems={autoByProject[projectId]||[]}
+                customItems={customTasks.filter(t=>t.projectId===projectId)}
+                onOpenProject={onOpenProject}
+                onAddCustomTask={onAddCustomTask}
+                onUpdateCustomTask={onUpdateCustomTask}
+                onDeleteCustomTask={onDeleteCustomTask}
+                allProjects={projects}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
@@ -13049,7 +13085,13 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
   useEffect(()=>{ if(currentMember) setSelectedMember(m=>m??currentMember.id); },[currentMember?.id]);
   const [expandedDelId, setExpandedDelId] = useState(null);
   const [calendarOpen, setCalendarOpen] = useState(true);
-  const [sideHeight, sideHeightHandle] = useResizableHeight("posttrack-myview-side-height", 380, {min:220,max:900});
+  const [aiOpen, setAiOpen] = useState(true);
+  const [tasksOpen, setTasksOpen] = useState(true);
+  const [projectsOpen, setProjectsOpen] = useState(true);
+  const [delsOpen, setDelsOpen] = useState(true);
+  // Same default (340) for both, and each resizes independently now.
+  const [aiHeight, aiHeightHandle] = useResizableHeight("posttrack-myview-ai-height", 340, {min:160,max:800});
+  const [tasksHeight, tasksHeightHandle] = useResizableHeight("posttrack-myview-tasks-height", 340, {min:160,max:800});
   const member = team.find(m=>m.id===selectedMember);
 
   const roleGroups = [
@@ -13108,7 +13150,7 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
   // keeps its own purpose-built dashboard rather than the layout below.
   if(isBroadcast) return (
     <div>
-      <MyViewHeader member={member} isAdmin={isAdmin} team={team} selectedMember={selectedMember} setSelectedMember={setSelectedMember}
+      <MyViewHeader member={member} isAdmin={isAdmin} setSelectedMember={setSelectedMember}
         projects={projects} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>
       <BroadcastDashboard member={member} projects={projects} team={team} studioBookings={studioBookings} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject} onUpdateStudioBookings={onUpdateStudioBookings} showToast={showToast} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={onSidebarWidthChange}/>
     </div>
@@ -13123,26 +13165,25 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
     .map(d=>({...d,_project:p}))
   ).sort((a,b)=>(a.deadline||"9999").localeCompare(b.deadline||"9999"));
 
-  const sectionHeader = (icon,label,count) => (
-    <div style={{fontSize:13,fontWeight:800,color: "#8e97a6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:10}}>
-      {icon} {label}{count!=null&&<span style={{color:"#374151",fontWeight:400}}> ({count})</span>}
+  // Arrow lives inline in the title itself now (not a separate button off to
+  // the right) — click anywhere on the header to collapse/expand.
+  const sectionHeader = (icon,label,count,open,onToggle) => (
+    <div onClick={onToggle} style={{display:"flex",alignItems:"center",gap:6,marginBottom:open?10:0,cursor:onToggle?"pointer":"default",userSelect:"none"}}>
+      <span style={{fontSize:13,fontWeight:800,color: "#8e97a6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif"}}>
+        {icon} {label}{count!=null&&<span style={{color:"#374151",fontWeight:400}}> ({count})</span>}
+      </span>
+      {onToggle&&<span style={{color:"#6b7280",fontSize:12}}>{open?"▲":"▼"}</span>}
     </div>
   );
 
   return (
     <div style={{paddingBottom:80}}>
-      <MyViewHeader member={member} isAdmin={isAdmin} team={team} selectedMember={selectedMember} setSelectedMember={setSelectedMember}
+      <MyViewHeader member={member} isAdmin={isAdmin} setSelectedMember={setSelectedMember}
         projects={projects} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>
 
       {/* Calendar — hover previews + resizable height, matching the main Calendar view; collapsible for anyone who doesn't need it */}
       <div style={{marginBottom:28}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:calendarOpen?10:0}}>
-          {sectionHeader("📅","My Calendar & Time Off")}
-          <button onClick={()=>setCalendarOpen(o=>!o)}
-            style={{background:"#1f2937",border:"none",borderRadius:6,color:"#9ca3af",padding:"3px 10px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.05em"}}>
-            {calendarOpen?"▲ Minimize":"▼ Show Calendar"}
-          </button>
-        </div>
+        {sectionHeader("📅","My Calendar",null,calendarOpen,()=>setCalendarOpen(o=>!o))}
         {calendarOpen&&(
           <RoleCalendar memberId={member.id} projects={projects} onOpenProject={onOpenProject} team={team}
             unavailability={unavailability} onAddUnavailability={onAddUnavailability}
@@ -13150,42 +13191,52 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
         )}
       </div>
 
-      {/* AI Assistant + Outstanding Tasks — locked to the same height, and
-          draggable together via the shared handle beneath them. */}
-      <div style={{display:"flex",gap:20,alignItems:"stretch",flexWrap:"wrap"}}>
-        <div style={{flex:"1 1 360px",minWidth:0,display:"flex",flexDirection:"column"}}>
-          {sectionHeader("🤖","AI Assistant")}
-          <div style={{height:sideHeight,overflowY:"auto"}}>
-            <MyViewChat member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}/>
-          </div>
+      {/* AI Assistant + Outstanding Tasks — each has its own independent
+          collapse and its own drag handle, but both start at the same
+          default height. */}
+      <div style={{display:"flex",gap:20,alignItems:"flex-start",flexWrap:"wrap",marginBottom:28}}>
+        <div style={{flex:"1 1 360px",minWidth:0}}>
+          {sectionHeader("🤖","AI Assistant",null,aiOpen,()=>setAiOpen(o=>!o))}
+          {aiOpen&&(
+            <>
+              <MyViewChat member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges} contentHeight={aiHeight}/>
+              <VerticalResizeHandle {...aiHeightHandle}/>
+            </>
+          )}
         </div>
-        <div style={{flex:"1 1 360px",minWidth:0,display:"flex",flexDirection:"column"}}>
-          {sectionHeader("📋","Outstanding Tasks")}
-          <div style={{height:sideHeight,overflowY:"auto"}}>
-            <MyOutstandingTasks member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}
-              customTasks={customTasks} onAddCustomTask={onAddCustomTask} onUpdateCustomTask={onUpdateCustomTask} onDeleteCustomTask={onDeleteCustomTask}/>
-          </div>
+        <div style={{flex:"1 1 360px",minWidth:0}}>
+          {sectionHeader("📋","Outstanding Tasks",null,tasksOpen,()=>setTasksOpen(o=>!o))}
+          {tasksOpen&&(
+            <>
+              <MyOutstandingTasks member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}
+                customTasks={customTasks} onAddCustomTask={onAddCustomTask} onUpdateCustomTask={onUpdateCustomTask} onDeleteCustomTask={onDeleteCustomTask}
+                contentHeight={tasksHeight}/>
+              <VerticalResizeHandle {...tasksHeightHandle}/>
+            </>
+          )}
         </div>
       </div>
-      <VerticalResizeHandle {...sideHeightHandle}/>
-      <div style={{marginBottom:20}}/>
 
       {/* My Projects — same card as the Projects view, in its own panel so a
           partial row of cards doesn't look like it's floating on its own */}
-      <div style={{marginBottom:28,background:"#0d1117",border:"1px solid #1f2937",borderRadius:12,padding:16}}>
-        {sectionHeader("📁","My Projects",myActiveProjects.length)}
-        {myActiveProjects.length ? (
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(285px,1fr))",gap:12}}>
-            {myActiveProjects.map(p=><ProjectCard key={p.id} project={p} team={team} onClick={()=>onOpenProject(p)} onUpdateProject={onUpdateProject}/>)}
+      <div style={{marginBottom:28}}>
+        {sectionHeader("📁","My Projects",myActiveProjects.length,projectsOpen,()=>setProjectsOpen(o=>!o))}
+        {projectsOpen&&(
+          <div style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:12,padding:16}}>
+            {myActiveProjects.length ? (
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(285px,1fr))",gap:12}}>
+                {myActiveProjects.map(p=><ProjectCard key={p.id} project={p} team={team} onClick={()=>onOpenProject(p)} onUpdateProject={onUpdateProject}/>)}
+              </div>
+            ) : <div style={{fontSize:16,color:"#374151",fontStyle:"italic"}}>No active projects assigned right now.</div>}
           </div>
-        ) : <div style={{fontSize:16,color:"#374151",fontStyle:"italic"}}>No active projects assigned right now.</div>}
+        )}
       </div>
 
       {/* My Active Deliverables — same expandable row → full-field layout
           as a project's Deliverables tab, reusing DeliverableDetailModal. */}
       <div>
-        {sectionHeader("🎬","My Active Deliverables",myActiveDeliverables.length)}
-        {myActiveDeliverables.length ? (
+        {sectionHeader("🎬","My Active Deliverables",myActiveDeliverables.length,delsOpen,()=>setDelsOpen(o=>!o))}
+        {delsOpen&&(myActiveDeliverables.length ? (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {myActiveDeliverables.map(d=>{
               const isExp = expandedDelId===d.id;
@@ -13212,17 +13263,18 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
               );
             })}
           </div>
-        ) : <div style={{fontSize:16,color:"#374151",fontStyle:"italic"}}>No active deliverables right now.</div>}
+        ) : <div style={{fontSize:16,color:"#374151",fontStyle:"italic"}}>No active deliverables right now.</div>)}
       </div>
     </div>
   );
 };
 
 // Shared header for every My View layout — name/roles + (for admins) a way
-// back to the full picker grid and a quick-switch dropdown to anyone else's,
-// plus the notifications bell (an overlay dropdown, so it never shifts the
-// page underneath it the way the old mentions sidebar used to).
-const MyViewHeader = ({member, isAdmin, team, selectedMember, setSelectedMember, projects, onUpdateProject, onOpenProject}) => (
+// back to the full picker grid, plus the notifications bell (an overlay
+// dropdown, so it never shifts the page underneath it the way the old
+// mentions sidebar used to). No separate member-switcher dropdown next to
+// the bell anymore — "Browse All My Views" already covers that.
+const MyViewHeader = ({member, isAdmin, setSelectedMember, projects, onUpdateProject, onOpenProject}) => (
   <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24,paddingBottom:16,borderBottom:"1px solid #1f2937"}}>
     {isAdmin&&<button onClick={()=>setSelectedMember(null)} style={{background:"#1f2937",border:"none",borderRadius:7,color:"#9ca3af",padding:"6px 12px",cursor:"pointer",fontSize:16,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>☰ Browse All My Views</button>}
     <Av name={member.name} size={40}/>
@@ -13230,14 +13282,8 @@ const MyViewHeader = ({member, isAdmin, team, selectedMember, setSelectedMember,
       <div style={{fontWeight:900,fontSize:24,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>{member.name}</div>
       <div style={{fontSize:16,color: "#9ca3af"}}>{member.roles.join(" · ")} · {member.employeeType}</div>
     </div>
-    <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}>
+    <div style={{marginLeft:"auto"}}>
       <NotificationBell member={member} projects={projects} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>
-      {isAdmin&&(
-        <select value={selectedMember} onChange={e=>setSelectedMember(Number(e.target.value))}
-          style={{background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"6px 10px",fontSize:16,outline:"none"}}>
-          {team.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
-      )}
     </div>
   </div>
 );
@@ -21229,7 +21275,7 @@ ${outstandingTasks.map(t=>`- "${t.taskLabel}" on "${t.projectName}" — ${t.rema
 Today's date: ${new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})}.`;
 };
 
-const MyViewChat = ({member, projects, team, onOpenProject, nudges=[]}) => {
+const MyViewChat = ({member, projects, team, onOpenProject, nudges=[], contentHeight}) => {
   const todayKey = new Date().toISOString().slice(0,10);
   const storageKey = `${RUNDOWN_STORAGE_PREFIX}${member.id}`;
   const [msgs, setMsgs] = useState([]);
@@ -21323,7 +21369,7 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[]}) => {
   const visibleMsgs = msgs.filter(m=>!m.hidden);
 
   return (
-    <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 18px",marginBottom:20}}>
+    <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 18px"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
         <div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>✦</div>
         <div>
@@ -21337,7 +21383,7 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[]}) => {
         )}
       </div>
 
-      <div ref={msgListRef} style={{maxHeight:340,overflowY:"auto",marginBottom:10}}>
+      <div ref={msgListRef} style={{maxHeight:contentHeight||340,overflowY:"auto",marginBottom:10}}>
         {visibleMsgs.map((m,i)=>{
           const isUser = m.role==="user";
           return (
@@ -26324,7 +26370,11 @@ export default function App() {
         </div>
         </div>
 
-        {liveSelected&&<ProjectOverview project={liveSelected} team={allTeam} allProjects={allProjects} onClose={()=>setSelected(null)} onUpdateDel={updateDel} onAddDel={addDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} initialTab={initialTab?.tab} initialShootId={initialTab?.itemId} initialItemId={initialTab?.itemId} studioBookings={allStudioBookings} mediaCards={mediaCards} setupTypes={setupTypes} onAddSetupType={addSetupType} talentRoster={talentRoster} onUpdateTalentRoster={saveTalentRoster} nudges={nudges} onAddNudge={addNudge} furnitureList={furnitureList} propsList={propsList} screenContentOptions={screenContentOptions} gearList={gearList} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} appPresets={appPresets} onSaveAppPresets={saveAppPresets} vendorCompanies={vendorCompanies} addVendorCompany={addVendorCompany} intakes={intakes} becRequests={becRequests} canAccessBudget={canAccessTab("budget")}/>}
+        {liveSelected&&(
+          <ProjectOverviewErrorBoundary key={liveSelected.id} onClose={()=>setSelected(null)}>
+            <ProjectOverview project={liveSelected} team={allTeam} allProjects={allProjects} onClose={()=>setSelected(null)} onUpdateDel={updateDel} onAddDel={addDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} initialTab={initialTab?.tab} initialShootId={initialTab?.itemId} initialItemId={initialTab?.itemId} studioBookings={allStudioBookings} mediaCards={mediaCards} setupTypes={setupTypes} onAddSetupType={addSetupType} talentRoster={talentRoster} onUpdateTalentRoster={saveTalentRoster} nudges={nudges} onAddNudge={addNudge} furnitureList={furnitureList} propsList={propsList} screenContentOptions={screenContentOptions} gearList={gearList} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} appPresets={appPresets} onSaveAppPresets={saveAppPresets} vendorCompanies={vendorCompanies} addVendorCompany={addVendorCompany} intakes={intakes} becRequests={becRequests} canAccessBudget={canAccessTab("budget")}/>
+          </ProjectOverviewErrorBoundary>
+        )}
         {addingProject&&<AddProjectModal team={allTeam} existingProjects={allProjects} onClose={()=>setAddingProject(false)} onAdd={addProject}/>}
         {createFromIntake&&<AddProjectModal team={allTeam} existingProjects={allProjects} initialData={createFromIntake}
           onClose={()=>setCreateFromIntake(null)}

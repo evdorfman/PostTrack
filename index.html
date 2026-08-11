@@ -4392,6 +4392,22 @@ Brief content: ${content}`;
       /* @__PURE__ */ React.createElement("span", { style: { color: "#6366f1" } }, "\u21BA")
     )))));
   };
+  var ProjectOverviewErrorBoundary = class extends React.Component {
+    constructor(props) {
+      super(props);
+      this.state = { hasError: false };
+    }
+    static getDerivedStateFromError() {
+      return { hasError: true };
+    }
+    componentDidCatch(error, info) {
+      console.error("ProjectOverview crashed:", error, info);
+    }
+    render() {
+      if (this.state.hasError) return /* @__PURE__ */ React.createElement("div", { onClick: this.props.onClose, style: { position: "fixed", inset: 0, background: "#000d", zIndex: 1e3, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 } }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { background: "#0d1117", border: "1px solid #ef444440", borderRadius: 16, padding: 32, maxWidth: 440, textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 38, marginBottom: 12 } }, "\u26A0\uFE0F"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 8 } }, "Something went wrong"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#9ca3af", marginBottom: 20 } }, "This project view hit an error and couldn't load. Nothing else was affected \u2014 close this and try again."), /* @__PURE__ */ React.createElement("button", { onClick: this.props.onClose, style: { background: "#6366f1", border: "none", borderRadius: 8, color: "#fff", padding: "10px 24px", fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "Close")));
+      return this.props.children;
+    }
+  };
   var ProjectOverview = ({ project, team, allProjects, onClose, onUpdateDel, onAddDel, onDeleteDel, onUpdateProject, initialDelId, initialTab, initialShootId, initialItemId, studioBookings = [], mediaCards = [], setupTypes = [], onAddSetupType, talentRoster = [], onUpdateTalentRoster, nudges = [], onAddNudge, furnitureList = [], propsList = [], screenContentOptions = {}, gearList = [], customTasks = [], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, appPresets = [], onSaveAppPresets, vendorCompanies = [], addVendorCompany, intakes = [], becRequests = [], canAccessBudget = true }) => {
     const [activeDelModal, setActiveDelModal] = (0, import_react.useState)(initialDelId || (initialTab === "deliverables" || initialTab === "ingest" ? initialItemId : null) || null);
     const [handoffDelId, setHandoffDelId] = (0, import_react.useState)(null);
@@ -6954,7 +6970,7 @@ Brief content: ${content}`;
           style: { background: project.inPipeline ? "#6366f120" : "transparent", border: `1px solid ${project.inPipeline ? "#6366f160" : "#374151"}`, borderRadius: 5, color: project.inPipeline ? "#818cf8" : "#6b7280", padding: "3px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.07em", whiteSpace: "nowrap" }
         },
         project.inPipeline ? "\u25CF Pipeline" : "+ Pipeline"
-      ))), showNote && /* @__PURE__ */ React.createElement(QuickNoteModal, { project, team, onClose: () => setShowNote(false), onUpdateProject }), showBrief && /* @__PURE__ */ React.createElement(BriefPreviewModal, { project, onClose: () => setShowBrief(false) }), /* @__PURE__ */ React.createElement("div", { style: { overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "16px 20px 40px", display: "flex", flexDirection: "column", gap: 10, minHeight: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 7, background: "#0f172a", border: "1px solid #1f2937", borderRadius: 10, padding: "12px 14px", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Producer", role: "Producer", currentId: producerId, filterRoles: ["Producer"] }), /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Editor", role: "Editor", currentId: editorId, filterRoles: ["Editor", "Animator", "Designer"] }), showPPMRole ? /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Post Production Mgr", role: "Post Production Manager", currentId: ppmId, filterRoles: ["Post Production Manager"] }) : /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Project Manager", role: "Project Manager", currentId: pmId, filterRoles: ["Project Manager", "Producer"] }), /* @__PURE__ */ React.createElement("div", { style: { paddingTop: 6, borderTop: "1px solid #1a2035" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: project._segments?.length > 1 ? 6 : 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600 } }, "Project-level assignment"), project._segments?.length > 1 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 800, color: "#f59e0b", background: "#f59e0b15", border: "1px solid #f59e0b30", borderRadius: 3, padding: "1px 4px", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", textTransform: "uppercase" } }, "\u21C4 Active")), /* @__PURE__ */ React.createElement(
+      ))), showNote && /* @__PURE__ */ React.createElement(QuickNoteModal, { project, team, onClose: () => setShowNote(false), onUpdateProject }), showBrief && /* @__PURE__ */ React.createElement(BriefPreviewModal, { project, onClose: () => setShowBrief(false) }), /* @__PURE__ */ React.createElement("div", { style: { overflowY: "scroll", WebkitOverflowScrolling: "touch", padding: "16px 20px 40px", display: "flex", flexDirection: "column", gap: 10, minHeight: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 7, background: "#0f172a", border: "1px solid #1f2937", borderRadius: 10, padding: "12px 14px", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Producer", role: "Producer", currentId: producerId, filterRoles: ["Producer"] }), /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Editor", role: "Editor", currentId: editorId, filterRoles: ["Editor", "Animator", "Designer"] }), showPPMRole ? /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Post Production Mgr", role: "Post Production Manager", currentId: ppmId, filterRoles: ["Post Production Manager"] }) : /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Project Manager", role: "Project Manager", currentId: pmId, filterRoles: ["Project Manager", "Producer"] }), /* @__PURE__ */ React.createElement("div", { style: { paddingTop: 6, borderTop: "1px solid #1a2035" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: project._segments?.length > 1 ? 6 : 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600 } }, "Project-level assignment"), project._segments?.length > 1 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 800, color: "#f59e0b", background: "#f59e0b15", border: "1px solid #f59e0b30", borderRadius: 3, padding: "1px 4px", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", textTransform: "uppercase" } }, "\u21C4 Active")), /* @__PURE__ */ React.createElement(
         "button",
         {
           onClick: () => setShowProjectHandoff(true),
@@ -8319,10 +8335,11 @@ Brief content: ${content}`;
       "button",
       {
         onClick: () => setOpen((o) => !o),
-        style: { position: "relative", background: open ? "#1f2937" : "#111827", border: "1px solid #1f2937", borderRadius: 8, color: "#e2e8f0", width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, cursor: "pointer" }
+        style: { position: "relative", display: "flex", alignItems: "center", gap: 8, background: open ? "#1f2937" : "#111827", border: `1px solid ${unread > 0 ? "#6366f180" : "#374151"}`, borderRadius: 9, color: "#e2e8f0", padding: "8px 16px", fontSize: 22, cursor: "pointer" }
       },
       "\u{1F514}",
-      unread > 0 && /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", top: -4, right: -4, background: "#ef4444", color: "#fff", borderRadius: 99, fontSize: 11, fontWeight: 800, minWidth: 17, height: 17, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", fontFamily: "'Barlow Condensed',sans-serif" } }, unread > 9 ? "9+" : unread)
+      /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, fontWeight: 800, color: "#e2e8f0", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" } }, "Notifications"),
+      unread > 0 && /* @__PURE__ */ React.createElement("span", { style: { background: "#ef4444", color: "#fff", borderRadius: 99, fontSize: 12, fontWeight: 800, minWidth: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", fontFamily: "'Barlow Condensed',sans-serif" } }, unread > 9 ? "9+" : unread)
     ), open && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 200, width: 380, maxHeight: 480, overflowY: "auto", background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, boxShadow: "0 16px 40px #000a", padding: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 17, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 } }, "\u{1F4AC} My Mentions"), /* @__PURE__ */ React.createElement(MentionsFeed, { member, projects, onUpdateProject, onOpenProject })));
   };
   var RVSec = ({ title, count, color = "#6366f1", action, children, defaultOpen = true }) => {
@@ -8675,7 +8692,7 @@ Brief content: ${content}`;
       "+ Add custom task"
     ));
   };
-  var MyOutstandingTasks = ({ member, projects, team, onOpenProject, nudges = [], customTasks = [], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask }) => {
+  var MyOutstandingTasks = ({ member, projects, team, onOpenProject, nudges = [], customTasks = [], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, contentHeight }) => {
     const automatedTasks = (0, import_react.useMemo)(() => getOutstandingTasksForMember(member.id, projects, team, nudges), [member.id, projects, team, nudges]);
     const nudgedCount = automatedTasks.filter((t) => t.nudgedAt).length;
     const openCustomTasks = customTasks.filter((t) => !t.done);
@@ -8683,13 +8700,12 @@ Brief content: ${content}`;
       ...automatedTasks.map((t) => t.projectId),
       ...customTasks.map((t) => t.projectId)
     ])];
-    if (allProjectIds.length === 0) return null;
     const autoByProject = {};
     automatedTasks.forEach((t) => {
       if (!autoByProject[t.projectId]) autoByProject[t.projectId] = [];
       autoByProject[t.projectId].push(t);
     });
-    return /* @__PURE__ */ React.createElement("div", { style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 18px", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 19, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, "\u{1F4CB} Outstanding Tasks"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, nudgedCount > 0 && /* @__PURE__ */ React.createElement(Chip, { label: `\u{1F514} ${nudgedCount} nudged`, color: "#f59e0b" }), automatedTasks.length > 0 && /* @__PURE__ */ React.createElement(Chip, { label: `${automatedTasks.length} checklist`, color: "#6b7280" }), openCustomTasks.length > 0 && /* @__PURE__ */ React.createElement(Chip, { label: `${openCustomTasks.length} custom`, color: "#6366f1" }))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, allProjectIds.map((projectId) => {
+    return /* @__PURE__ */ React.createElement("div", { style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 18px", display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 19, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, "\u{1F4CB} Outstanding Tasks"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, nudgedCount > 0 && /* @__PURE__ */ React.createElement(Chip, { label: `\u{1F514} ${nudgedCount} nudged`, color: "#f59e0b" }), automatedTasks.length > 0 && /* @__PURE__ */ React.createElement(Chip, { label: `${automatedTasks.length} checklist`, color: "#6b7280" }), openCustomTasks.length > 0 && /* @__PURE__ */ React.createElement(Chip, { label: `${openCustomTasks.length} custom`, color: "#6366f1" }))), allProjectIds.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#374151", fontStyle: "italic" } }, "Nothing outstanding right now.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, ...contentHeight ? { maxHeight: contentHeight, overflowY: "auto" } : {} } }, allProjectIds.map((projectId) => {
       const proj = projects.find((p) => p.id === projectId);
       if (!proj) return null;
       return /* @__PURE__ */ React.createElement(
@@ -8715,7 +8731,12 @@ Brief content: ${content}`;
     }, [currentMember?.id]);
     const [expandedDelId, setExpandedDelId] = (0, import_react.useState)(null);
     const [calendarOpen, setCalendarOpen] = (0, import_react.useState)(true);
-    const [sideHeight, sideHeightHandle] = useResizableHeight("posttrack-myview-side-height", 380, { min: 220, max: 900 });
+    const [aiOpen, setAiOpen] = (0, import_react.useState)(true);
+    const [tasksOpen, setTasksOpen] = (0, import_react.useState)(true);
+    const [projectsOpen, setProjectsOpen] = (0, import_react.useState)(true);
+    const [delsOpen, setDelsOpen] = (0, import_react.useState)(true);
+    const [aiHeight, aiHeightHandle] = useResizableHeight("posttrack-myview-ai-height", 340, { min: 160, max: 800 });
+    const [tasksHeight, tasksHeightHandle] = useResizableHeight("posttrack-myview-tasks-height", 340, { min: 160, max: 800 });
     const member = team.find((m) => m.id === selectedMember);
     const roleGroups = [
       { label: "Editors & Post", roles: ["Editor", "Animator", "Designer", "Head of Post Production", "Colorist", "Audio Mixer"] },
@@ -8746,8 +8767,6 @@ Brief content: ${content}`;
       {
         member,
         isAdmin,
-        team,
-        selectedMember,
         setSelectedMember,
         projects,
         onUpdateProject,
@@ -8760,27 +8779,18 @@ Brief content: ${content}`;
     const myActiveDeliverables = projects.flatMap(
       (p) => (p.deliverables || []).filter((d) => (d.editorId === member.id || d.animatorId === member.id || d.producerId === member.id) && !["Delivered", "On Hold"].includes(d.status)).map((d) => ({ ...d, _project: p }))
     ).sort((a, b) => (a.deadline || "9999").localeCompare(b.deadline || "9999"));
-    const sectionHeader = (icon, label, count) => /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, icon, " ", label, count != null && /* @__PURE__ */ React.createElement("span", { style: { color: "#374151", fontWeight: 400 } }, " (", count, ")"));
+    const sectionHeader = (icon, label, count, open, onToggle) => /* @__PURE__ */ React.createElement("div", { onClick: onToggle, style: { display: "flex", alignItems: "center", gap: 6, marginBottom: open ? 10 : 0, cursor: onToggle ? "pointer" : "default", userSelect: "none" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" } }, icon, " ", label, count != null && /* @__PURE__ */ React.createElement("span", { style: { color: "#374151", fontWeight: 400 } }, " (", count, ")")), onToggle && /* @__PURE__ */ React.createElement("span", { style: { color: "#6b7280", fontSize: 12 } }, open ? "\u25B2" : "\u25BC"));
     return /* @__PURE__ */ React.createElement("div", { style: { paddingBottom: 80 } }, /* @__PURE__ */ React.createElement(
       MyViewHeader,
       {
         member,
         isAdmin,
-        team,
-        selectedMember,
         setSelectedMember,
         projects,
         onUpdateProject,
         onOpenProject
       }
-    ), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 28 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: calendarOpen ? 10 : 0 } }, sectionHeader("\u{1F4C5}", "My Calendar & Time Off"), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        onClick: () => setCalendarOpen((o) => !o),
-        style: { background: "#1f2937", border: "none", borderRadius: 6, color: "#9ca3af", padding: "3px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }
-      },
-      calendarOpen ? "\u25B2 Minimize" : "\u25BC Show Calendar"
-    )), calendarOpen && /* @__PURE__ */ React.createElement(
+    ), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 28 } }, sectionHeader("\u{1F4C5}", "My Calendar", null, calendarOpen, () => setCalendarOpen((o) => !o)), calendarOpen && /* @__PURE__ */ React.createElement(
       RoleCalendar,
       {
         memberId: member.id,
@@ -8792,7 +8802,7 @@ Brief content: ${content}`;
         onDeleteUnavailability,
         onUpdateProject
       }
-    )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 20, alignItems: "stretch", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 360px", minWidth: 0, display: "flex", flexDirection: "column" } }, sectionHeader("\u{1F916}", "AI Assistant"), /* @__PURE__ */ React.createElement("div", { style: { height: sideHeight, overflowY: "auto" } }, /* @__PURE__ */ React.createElement(MyViewChat, { member, projects, team, onOpenProject, nudges }))), /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 360px", minWidth: 0, display: "flex", flexDirection: "column" } }, sectionHeader("\u{1F4CB}", "Outstanding Tasks"), /* @__PURE__ */ React.createElement("div", { style: { height: sideHeight, overflowY: "auto" } }, /* @__PURE__ */ React.createElement(
+    )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap", marginBottom: 28 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 360px", minWidth: 0 } }, sectionHeader("\u{1F916}", "AI Assistant", null, aiOpen, () => setAiOpen((o) => !o)), aiOpen && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(MyViewChat, { member, projects, team, onOpenProject, nudges, contentHeight: aiHeight }), /* @__PURE__ */ React.createElement(VerticalResizeHandle, { ...aiHeightHandle }))), /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 360px", minWidth: 0 } }, sectionHeader("\u{1F4CB}", "Outstanding Tasks", null, tasksOpen, () => setTasksOpen((o) => !o)), tasksOpen && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
       MyOutstandingTasks,
       {
         member,
@@ -8803,9 +8813,10 @@ Brief content: ${content}`;
         customTasks,
         onAddCustomTask,
         onUpdateCustomTask,
-        onDeleteCustomTask
+        onDeleteCustomTask,
+        contentHeight: tasksHeight
       }
-    )))), /* @__PURE__ */ React.createElement(VerticalResizeHandle, { ...sideHeightHandle }), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 28, background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, padding: 16 } }, sectionHeader("\u{1F4C1}", "My Projects", myActiveProjects.length), myActiveProjects.length ? /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(285px,1fr))", gap: 12 } }, myActiveProjects.map((p) => /* @__PURE__ */ React.createElement(ProjectCard, { key: p.id, project: p, team, onClick: () => onOpenProject(p), onUpdateProject }))) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#374151", fontStyle: "italic" } }, "No active projects assigned right now.")), /* @__PURE__ */ React.createElement("div", null, sectionHeader("\u{1F3AC}", "My Active Deliverables", myActiveDeliverables.length), myActiveDeliverables.length ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, myActiveDeliverables.map((d) => {
+    ), /* @__PURE__ */ React.createElement(VerticalResizeHandle, { ...tasksHeightHandle })))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 28 } }, sectionHeader("\u{1F4C1}", "My Projects", myActiveProjects.length, projectsOpen, () => setProjectsOpen((o) => !o)), projectsOpen && /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, padding: 16 } }, myActiveProjects.length ? /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(285px,1fr))", gap: 12 } }, myActiveProjects.map((p) => /* @__PURE__ */ React.createElement(ProjectCard, { key: p.id, project: p, team, onClick: () => onOpenProject(p), onUpdateProject }))) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#374151", fontStyle: "italic" } }, "No active projects assigned right now."))), /* @__PURE__ */ React.createElement("div", null, sectionHeader("\u{1F3AC}", "My Active Deliverables", myActiveDeliverables.length, delsOpen, () => setDelsOpen((o) => !o)), delsOpen && (myActiveDeliverables.length ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, myActiveDeliverables.map((d) => {
       const isExp = expandedDelId === d.id;
       const statusColor = DCOLOR[d.status] || "#6b7280";
       return /* @__PURE__ */ React.createElement("div", { key: d.id, style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 9, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { onClick: () => setExpandedDelId(isExp ? null : d.id), style: { display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", cursor: "pointer" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, d.title || "Untitled"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 2 } }, d._project.name)), /* @__PURE__ */ React.createElement("span", { style: { background: statusColor + "20", color: statusColor, borderRadius: 99, padding: "2px 9px", fontSize: 12, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", flexShrink: 0 } }, d.status), /* @__PURE__ */ React.createElement(Dl, { date: d.deadline }), /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontSize: 14, flexShrink: 0 } }, isExp ? "\u25B2" : "\u25BC")), isExp && /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { borderTop: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement(
@@ -8822,17 +8833,9 @@ Brief content: ${content}`;
           talentRoster: []
         }
       )));
-    })) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#374151", fontStyle: "italic" } }, "No active deliverables right now.")));
+    })) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#374151", fontStyle: "italic" } }, "No active deliverables right now."))));
   };
-  var MyViewHeader = ({ member, isAdmin, team, selectedMember, setSelectedMember, projects, onUpdateProject, onOpenProject }) => /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 24, paddingBottom: 16, borderBottom: "1px solid #1f2937" } }, isAdmin && /* @__PURE__ */ React.createElement("button", { onClick: () => setSelectedMember(null), style: { background: "#1f2937", border: "none", borderRadius: 7, color: "#9ca3af", padding: "6px 12px", cursor: "pointer", fontSize: 16, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "\u2630 Browse All My Views"), /* @__PURE__ */ React.createElement(Av, { name: member.name, size: 40 }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 24, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, member.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#9ca3af" } }, member.roles.join(" \xB7 "), " \xB7 ", member.employeeType)), /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement(NotificationBell, { member, projects, onUpdateProject, onOpenProject }), isAdmin && /* @__PURE__ */ React.createElement(
-    "select",
-    {
-      value: selectedMember,
-      onChange: (e) => setSelectedMember(Number(e.target.value)),
-      style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "6px 10px", fontSize: 16, outline: "none" }
-    },
-    team.map((m) => /* @__PURE__ */ React.createElement("option", { key: m.id, value: m.id }, m.name))
-  )));
+  var MyViewHeader = ({ member, isAdmin, setSelectedMember, projects, onUpdateProject, onOpenProject }) => /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 24, paddingBottom: 16, borderBottom: "1px solid #1f2937" } }, isAdmin && /* @__PURE__ */ React.createElement("button", { onClick: () => setSelectedMember(null), style: { background: "#1f2937", border: "none", borderRadius: 7, color: "#9ca3af", padding: "6px 12px", cursor: "pointer", fontSize: 16, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "\u2630 Browse All My Views"), /* @__PURE__ */ React.createElement(Av, { name: member.name, size: 40 }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 24, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, member.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#9ca3af" } }, member.roles.join(" \xB7 "), " \xB7 ", member.employeeType)), /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto" } }, /* @__PURE__ */ React.createElement(NotificationBell, { member, projects, onUpdateProject, onOpenProject })));
   var WorkReviewView = ({ projects, team = [], onOpenProject, onUpdateProject, onUpdateDel, onDeleteDel, talentRoster = [] }) => {
     const now2 = /* @__PURE__ */ new Date();
     const wStart = getWeekStart(now2);
@@ -14209,7 +14212,7 @@ ${outstandingTasks.map((t) => `- "${t.taskLabel}" on "${t.projectName}" \u2014 $
 
 Today's date: ${(/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}.`;
   };
-  var MyViewChat = ({ member, projects, team, onOpenProject, nudges = [] }) => {
+  var MyViewChat = ({ member, projects, team, onOpenProject, nudges = [], contentHeight }) => {
     const todayKey = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const storageKey = `${RUNDOWN_STORAGE_PREFIX}${member.id}`;
     const [msgs, setMsgs] = (0, import_react.useState)([]);
@@ -14308,7 +14311,7 @@ Today's date: ${(/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { weekd
       setLoading(false);
     };
     const visibleMsgs = msgs.filter((m) => !m.hidden);
-    return /* @__PURE__ */ React.createElement("div", { style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 18px", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 } }, "\u2726"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 18, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, "Morning Rundown"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6" } }, "Refreshes automatically each day \u2014 ask follow-ups any time")), loading && !visibleMsgs.length && /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", display: "flex", gap: 5 } }, [0, 0.2, 0.4].map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { width: 6, height: 6, borderRadius: "50%", background: "#6366f1", animation: `pulse 1.2s ${d}s infinite` } })))), /* @__PURE__ */ React.createElement("div", { ref: msgListRef, style: { maxHeight: 340, overflowY: "auto", marginBottom: 10 } }, visibleMsgs.map((m, i) => {
+    return /* @__PURE__ */ React.createElement("div", { style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 18px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 } }, "\u2726"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 18, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, "Morning Rundown"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6" } }, "Refreshes automatically each day \u2014 ask follow-ups any time")), loading && !visibleMsgs.length && /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", display: "flex", gap: 5 } }, [0, 0.2, 0.4].map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { width: 6, height: 6, borderRadius: "50%", background: "#6366f1", animation: `pulse 1.2s ${d}s infinite` } })))), /* @__PURE__ */ React.createElement("div", { ref: msgListRef, style: { maxHeight: contentHeight || 340, overflowY: "auto", marginBottom: 10 } }, visibleMsgs.map((m, i) => {
       const isUser = m.role === "user";
       return /* @__PURE__ */ React.createElement("div", { key: m.msgId || i, style: { display: "flex", flexDirection: "column", alignItems: isUser ? "flex-end" : "flex-start", marginBottom: 10 } }, !isUser && m.isRundown && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#818cf8", fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "\u2600\uFE0F Today's Rundown"), /* @__PURE__ */ React.createElement("div", { style: {
         maxWidth: "92%",
@@ -17915,7 +17918,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         tabLocks,
         onUpdateTabLocks: saveTabLocks
       }
-    )))), liveSelected && /* @__PURE__ */ React.createElement(ProjectOverview, { project: liveSelected, team: allTeam, allProjects, onClose: () => setSelected(null), onUpdateDel: updateDel, onAddDel: addDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, initialTab: initialTab?.tab, initialShootId: initialTab?.itemId, initialItemId: initialTab?.itemId, studioBookings: allStudioBookings, mediaCards, setupTypes, onAddSetupType: addSetupType, talentRoster, onUpdateTalentRoster: saveTalentRoster, nudges, onAddNudge: addNudge, furnitureList, propsList, screenContentOptions, gearList, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, appPresets, onSaveAppPresets: saveAppPresets, vendorCompanies, addVendorCompany, intakes, becRequests, canAccessBudget: canAccessTab("budget") }), addingProject && /* @__PURE__ */ React.createElement(AddProjectModal, { team: allTeam, existingProjects: allProjects, onClose: () => setAddingProject(false), onAdd: addProject }), createFromIntake && /* @__PURE__ */ React.createElement(
+    )))), liveSelected && /* @__PURE__ */ React.createElement(ProjectOverviewErrorBoundary, { key: liveSelected.id, onClose: () => setSelected(null) }, /* @__PURE__ */ React.createElement(ProjectOverview, { project: liveSelected, team: allTeam, allProjects, onClose: () => setSelected(null), onUpdateDel: updateDel, onAddDel: addDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, initialTab: initialTab?.tab, initialShootId: initialTab?.itemId, initialItemId: initialTab?.itemId, studioBookings: allStudioBookings, mediaCards, setupTypes, onAddSetupType: addSetupType, talentRoster, onUpdateTalentRoster: saveTalentRoster, nudges, onAddNudge: addNudge, furnitureList, propsList, screenContentOptions, gearList, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, appPresets, onSaveAppPresets: saveAppPresets, vendorCompanies, addVendorCompany, intakes, becRequests, canAccessBudget: canAccessTab("budget") })), addingProject && /* @__PURE__ */ React.createElement(AddProjectModal, { team: allTeam, existingProjects: allProjects, onClose: () => setAddingProject(false), onAdd: addProject }), createFromIntake && /* @__PURE__ */ React.createElement(
       AddProjectModal,
       {
         team: allTeam,
