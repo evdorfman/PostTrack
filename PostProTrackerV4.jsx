@@ -313,7 +313,6 @@ const DEFAULT_PROPS_LIST     = [];
 const FURNITURE_STORAGE_KEY   = "posttrack-admin-furniture";
 const PROPS_STORAGE_KEY       = "posttrack-admin-props";
 const SCREEN_CONTENT_STORAGE_KEY = "posttrack-admin-screen-content";
-const MYVIEW_ORDER_KEY           = "posttrack-myview-order-v3";
 const UNAVAILABILITY_STORAGE_KEY = "posttrack-unavailability";
 
 const DEFAULT_SCREEN_CONTENT_OPTIONS = {
@@ -818,6 +817,59 @@ const SidebarResizeHandle = ({onMouseDown, dragging}) => (
     <div style={{position:"absolute",top:0,bottom:0,left:3,width:1,background:dragging?"#6366f1":"transparent",transition:dragging?"none":"background 0.15s"}}
       onMouseEnter={e=>{if(!dragging)e.currentTarget.style.background="#6366f180";}}
       onMouseLeave={e=>{if(!dragging)e.currentTarget.style.background="transparent";}}/>
+  </div>
+);
+
+// Vertical counterpart to useResizableWidth — drag a handle on the bottom
+// edge of a block (e.g. a calendar) to grow/shrink its height, clamped and
+// persisted the same way.
+const useResizableHeight = (storageKey, defaultHeight, {min=160, max=900}={}) => {
+  const [height, setHeight] = useState(()=>{
+    try {
+      const v = parseInt(localStorage.getItem(storageKey), 10);
+      return (v && v>=min && v<=max) ? v : defaultHeight;
+    } catch(e){ return defaultHeight; }
+  });
+  const [dragging, setDragging] = useState(false);
+  const dragState = useRef(null);
+
+  useEffect(()=>{
+    if(!dragging) return;
+    const onMove = e => {
+      const {startY, startHeight} = dragState.current;
+      setHeight(Math.max(min, Math.min(max, startHeight + (e.clientY - startY))));
+    };
+    const onUp = () => setDragging(false);
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    const prevCursor = document.body.style.cursor, prevSelect = document.body.style.userSelect;
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevSelect;
+    };
+  },[dragging,min,max]);
+
+  useEffect(()=>{
+    try { localStorage.setItem(storageKey, String(height)); } catch(e){}
+  },[height,storageKey]);
+
+  const onMouseDown = e => {
+    e.preventDefault();
+    dragState.current = {startY:e.clientY, startHeight:height};
+    setDragging(true);
+  };
+
+  return [height, {onMouseDown, dragging}];
+};
+
+const VerticalResizeHandle = ({onMouseDown, dragging}) => (
+  <div onMouseDown={onMouseDown}
+    style={{height:10,margin:"-5px 0",cursor:"row-resize",display:"flex",alignItems:"center",justifyContent:"center",position:"relative",zIndex:5}}>
+    <div style={{width:36,height:3,borderRadius:99,background:dragging?"#6366f1":"#374151",transition:dragging?"none":"background 0.15s"}}/>
   </div>
 );
 
@@ -12036,6 +12088,8 @@ const RoleCalendar = ({memberId, projects, onOpenProject, team=[], unavailabilit
   const [calView,setCalView] = useState("week");
   const [selDate,setSelDate] = useState(null);
   const [showAddTimeOff, setShowAddTimeOff] = useState(false);
+  const [tooltip,setTooltip] = useState(null); // {item,x,y} — same hover-preview pattern as the main Calendar view
+  const [gridHeight, gridHeightHandle] = useResizableHeight("posttrack-myview-cal-height", 300, {min:180,max:800});
   const now = new Date();
   const todayStr = now.toISOString().slice(0,10);
   const member = team?.find(m=>m.id===memberId);
@@ -12138,8 +12192,10 @@ const RoleCalendar = ({memberId, projects, onOpenProject, team=[], unavailabilit
         )}
       </div>
 
-      {/* Week grid */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,padding:"8px"}}>
+      {/* Week grid — height is user-resizable (drag the handle below), so a
+          busy day's items scroll within its own cell instead of truncating
+          behind a hard "+N" cap. */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,padding:"8px",height:gridHeight}}>
         {weekDays.map((d,i)=>{
           const items=getDayItems(d);
           const isT=d.toDateString()===now.toDateString();
@@ -12151,33 +12207,37 @@ const RoleCalendar = ({memberId, projects, onOpenProject, team=[], unavailabilit
             <div key={i} style={{
               background:blocked?(partial?"#0e1420":"#1a1005"):isT?"#1e3a5f":"#0f172a",
               border:`1px solid ${blocked?(partial?"#6366f130":"#f59e0b30"):isT?"#3b82f640":"#1f2937"}`,
-              borderRadius:8,padding:"6px 4px",minHeight:80,position:"relative",overflow:"hidden",
+              borderRadius:8,padding:"6px 4px",position:"relative",overflow:"hidden",
+              display:"flex",flexDirection:"column",
             }}>
               {blocked&&<div style={{position:"absolute",inset:0,background:partial
                 ?"repeating-linear-gradient(45deg,#6366f107,#6366f107 4px,transparent 4px,transparent 12px)"
                 :"repeating-linear-gradient(45deg,#f59e0b07,#f59e0b07 4px,transparent 4px,transparent 12px)",
                 pointerEvents:"none"}}/>}
-              <div style={{fontSize:13,fontWeight:isT?800:600,color:blocked?(partial?"#818cf880":"#f59e0b80"):isT?"#60a5fa":"#6b7280",textAlign:"center",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif"}}>
+              <div style={{fontSize:13,fontWeight:isT?800:600,color:blocked?(partial?"#818cf880":"#f59e0b80"):isT?"#60a5fa":"#6b7280",textAlign:"center",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",flexShrink:0}}>
                 {d.toLocaleDateString("en-US",{weekday:"short"})[0]} {d.getDate()}
               </div>
               {blocked&&(
-                <div style={{fontSize:11,fontWeight:700,color:partial?"#818cf880":"#f59e0b80",textAlign:"center",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:2}}>
+                <div style={{fontSize:11,fontWeight:700,color:partial?"#818cf880":"#f59e0b80",textAlign:"center",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:2,flexShrink:0}}>
                   {partial?`🕐 ${block.startTime}`:(block?.type==="Vacation"?"🏖":block?.type==="Medical"?"🏥":block?.type==="Conference"?"🎤":"🚫")+" Away"}
                 </div>
               )}
-              <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                {items.slice(0,blocked?2:4).map((item,ii)=>(
-                  <div key={ii} onClick={()=>onOpenProject(projects.find(p=>p.id===item.projectId))}
-                    style={{background:getColor(item)+"25",borderLeft:`2px solid ${getColor(item)}`,borderRadius:"0 3px 3px 0",padding:"1px 3px",fontSize:13,color:getColor(item),fontWeight:700,cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Barlow Condensed',sans-serif",opacity:blocked?0.6:1}}>
+              <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minHeight:0,overflowY:"auto"}}>
+                {items.map((item,ii)=>(
+                  <div key={ii}
+                    onClick={()=>onOpenProject(projects.find(p=>p.id===item.projectId))}
+                    onMouseEnter={e=>{const r=e.currentTarget.getBoundingClientRect();setTooltip({item,x:Math.min(r.right+4,window.innerWidth-290),y:Math.max(8,r.top-8)});}}
+                    onMouseLeave={e=>{const rt=e.relatedTarget;if(rt&&rt.closest&&rt.closest('[data-tooltip]'))return;setTooltip(null);}}
+                    style={{background:getColor(item)+"25",borderLeft:`2px solid ${getColor(item)}`,borderRadius:"0 3px 3px 0",padding:"1px 3px",fontSize:13,color:getColor(item),fontWeight:700,cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Barlow Condensed',sans-serif",opacity:blocked?0.6:1,flexShrink:0}}>
                     {item.isRound?"↺ ":item.isShoot?"🎬 ":item.isIngest?"📥 ":""}{item.isRound?item.label:item.title}
                   </div>
                 ))}
-                {items.length>(blocked?2:4)&&<div style={{fontSize:13,color:"#8e97a6",textAlign:"center"}}>+{items.length-(blocked?2:4)}</div>}
               </div>
             </div>
           );
         })}
       </div>
+      <VerticalResizeHandle {...gridHeightHandle}/>
 
       {/* Upcoming time-off strip */}
       {myTimeOff.length>0&&(
@@ -12206,6 +12266,30 @@ const RoleCalendar = ({memberId, projects, onOpenProject, team=[], unavailabilit
           onUpdateProject={onUpdateProject}
           onClose={()=>setShowAddTimeOff(false)}/>
       )}
+
+      {/* Hover tooltip — same pattern as the main Calendar view */}
+      {tooltip&&(()=>{
+        const item = tooltip.item;
+        const typeColor = getColor(item);
+        const typeLabel = item.isShoot?"🎬 Production":item.isIngest?"📥 Ingest":item.isRound?"↺ Review Round":"🔴 Final Due";
+        return (
+          <div data-tooltip="true" onMouseEnter={()=>{}} onMouseLeave={()=>setTooltip(null)}
+            style={{position:"fixed",
+              left:tooltip.x+290<window.innerWidth ? tooltip.x : tooltip.x-300,
+              top:Math.max(8,Math.min(tooltip.y, window.innerHeight-260)),
+              zIndex:500,background:"#1a2235",border:`1px solid ${typeColor}50`,
+              borderRadius:12,padding:"13px 15px",width:280,boxShadow:"0 12px 40px #000c",pointerEvents:"auto"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <div style={{fontSize:13,fontWeight:800,color:typeColor,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.08em",textTransform:"uppercase"}}>{typeLabel}</div>
+            </div>
+            <div style={{fontSize:16,fontWeight:800,color:"#818cf8",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif"}}>{item.projectName}</div>
+            <div style={{fontSize:18,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>{item.isRound?item.label:item.title}</div>
+            {item.isRound&&item.delTitle&&<div style={{fontSize:15,color:"#9ca3af",marginBottom:6}}>{item.delTitle}</div>}
+            <div style={{fontSize:14,color:"#9ca3af",marginBottom:3}}>📅 {fmtDT(item.deadline)}</div>
+            {item.location&&<div style={{fontSize:14,color:"#9ca3af",marginBottom:3}}>📍 {item.location}</div>}
+          </div>
+        );
+      })()}
     </div>
   );
 };
@@ -12302,785 +12386,6 @@ const RVSec = ({title,count,color="#6366f1",action,children,defaultOpen=true}) =
         <span style={{color: "#8e97a6",fontSize:14}}>{open?"▲":"▼"}</span>
       </div>
       {open&&children}
-    </div>
-  );
-};
-
-// ── Editor Dashboard ──────────────────────────────────────────────────────────
-const EditorDashboard = ({member, projects, team=[], onOpenProject, onUpdateProject, onUpdateDel, unavailability=[], onAddUnavailability, onDeleteUnavailability}) => {
-  const STAGE_ORDER=["New Request","Ideation","Pre-Pro","In Production","Post","In Review","On Hold"];
-
-  const myDels = useMemo(()=>
-    projects.flatMap(p=>p.deliverables
-      .filter(d=>d.editorId===member.id||d.animatorId===member.id)
-      .map(d=>({...d,projectId:p.id,projectName:p.name,workstream:p.workstream,projectStatus:p.status}))
-    ).sort((a,b)=>{if(!a.deadline)return 1;if(!b.deadline)return -1;return new Date(a.deadline)-new Date(b.deadline);}),
-    [projects,member.id]);
-
-  const active    = myDels.filter(d=>d.status!=="Delivered");
-  const completed = myDels.filter(d=>d.status==="Delivered");
-
-  // Group active by project
-  const byProject = useMemo(()=>{
-    const m={};
-    active.forEach(d=>{if(!m[d.projectName])m[d.projectName]={projectId:d.projectId,projectStatus:d.projectStatus,dels:[]};m[d.projectName].dels.push(d);});
-    return Object.entries(m).sort((a,b)=>{
-      const earliest=g=>g.dels.reduce((mn,d)=>d.deadline&&(!mn||new Date(d.deadline)<new Date(mn))?d.deadline:mn,null);
-      const ea=earliest(a[1]),eb=earliest(b[1]);
-      if(!ea)return 1;if(!eb)return -1;return new Date(ea)-new Date(eb);
-    });
-  },[active]);
-
-  // Group completed by quarter
-  const completedByQ = useMemo(()=>{
-    const m={};
-    completed.forEach(d=>{
-      if(!d.deadline)return;
-      const dt=new Date(d.deadline);
-      const k=`${dt.getFullYear()} Q${Math.floor(dt.getMonth()/3)+1}`;
-      if(!m[k])m[k]=[];m[k].push(d);
-    });
-    return Object.entries(m).sort((a,b)=>b[0].localeCompare(a[0]));
-  },[completed]);
-
-  const nowQ=(()=>{const n=new Date();return `${n.getFullYear()} Q${Math.floor(n.getMonth()/3)+1}`;})();
-  const [showAllCompletes,setShowAllCompletes]=useState(false);
-  const visibleQ=showAllCompletes?completedByQ:completedByQ.filter(([q])=>q===nowQ);
-
-  const [expandedDel,setExpandedDel]=useState(null);
-
-  const DelCard=({d})=>{
-    const changes=d.rounds.some(r=>r.status==="Changes Requested");
-    const c=changes?"#ef4444":DCOLOR[d.status];
-    const isExp=expandedDel===d.id;
-    const proj=projects.find(p=>p.id===d.projectId);
-    return (
-      <div style={{border:`1px solid ${isExp?"#6366f1":changes?"#ef444430":"#1f2937"}`,borderRadius:9,overflow:"hidden",marginBottom:4}}>
-        <div onClick={()=>setExpandedDel(isExp?null:d.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",background:isExp?"#1f2937":"#111827",cursor:"pointer"}}>
-          <div style={{width:8,height:8,borderRadius:"50%",background:c,flexShrink:0}}/>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:17,fontWeight:700,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title}</div>
-            <div style={{fontSize:14,color: "#9ca3af"}}>{d.projectName} · <Dl date={d.deadline} inline/></div>
-          </div>
-          <DelStatusSel status={d.status} onChange={v=>onUpdateDel(d.projectId,d.id,"status",v)} xs/>
-          {changes&&<Chip label="↩" color="#ef4444" xs/>}
-          <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW} small/>
-          <span style={{color: "#8e97a6",fontSize:14}}>{isExp?"▲":"›"}</span>
-        </div>
-        {isExp&&proj&&(
-          <div style={{padding:"12px 14px",background:"#0d1117",borderTop:"1px solid #1f2937",display:"flex",flexDirection:"column",gap:10}}>
-            {/* Quick status change */}
-            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-              <div style={{fontSize:13,fontWeight:800,color: "#8e97a6",letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",flexShrink:0}}>Status</div>
-              <select value={d.status} onChange={e=>onUpdateDel(d.projectId,d.id,"status",e.target.value)}
-                style={{background:DCOLOR[d.status]+"18",border:`1px solid ${DCOLOR[d.status]}40`,borderRadius:6,color:DCOLOR[d.status],padding:"4px 8px",fontSize:16,outline:"none",fontWeight:700}}>
-                {DELIVERABLE_STATUSES.map(s=><option key={s} style={{background:"#0d1117",color:"#e2e8f0"}}>{s}</option>)}
-              </select>
-              <Btn small onClick={()=>onOpenProject(proj,"deliverables",d.id)}>Open full detail →</Btn>
-            </div>
-            {/* Frame link quick edit */}
-            <div style={{display:"flex",gap:8,alignItems:"center"}}>
-              <div style={{fontSize:13,fontWeight:800,color: "#8e97a6",letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",flexShrink:0,width:80}}>Frame.io</div>
-              <input value={d.frameLink||""} onChange={e=>onUpdateDel(d.projectId,d.id,"frameLink",e.target.value)}
-                placeholder="https://frame.io/…"
-                style={{flex:1,background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#e2e8f0",padding:"5px 8px",fontSize:14,outline:"none",fontFamily:"'DM Sans',sans-serif"}}/>
-              {d.framePW&&<span style={{fontSize:13,color: "#9ca3af"}}>PW: <span style={{fontFamily:"monospace",color:"#9ca3af"}}>{d.framePW}</span></span>}
-            </div>
-            {/* Active round summary */}
-            {d.rounds.length>0&&(()=>{
-              const ar=d.rounds.find(r=>r.status!=="Approved");
-              return ar&&<div style={{background:"#1e3a5f22",border:"1px solid #3b82f640",borderRadius:7,padding:"7px 10px",fontSize:14}}>
-                <span style={{color:"#60a5fa",fontWeight:700}}>{ar.label}</span> <span style={{color: "#8e97a6"}}>· {ar.status} · Due {fmtDate(ar.deadline)}</span>
-              </div>;
-            })()}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  return (
-    <div>
-      <div style={{marginBottom:20}}>
-        <div style={{fontWeight:900,fontSize:26,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:2}}>
-          👋 {member.name}
-        </div>
-        <div style={{fontSize:17,color: "#9ca3af"}}>{member.roles.join(" · ")} · {active.length} active deliverable{active.length!==1?"s":""}</div>
-      </div>
-
-      {/* Calendar */}
-
-
-      {/* Mentions */}
-      <RVSec title="My Mentions" count={projects.flatMap(p=>p.notes||[]).filter(n=>n.text.toLowerCase().includes(`@${member.name.split(" ")[0].toLowerCase()}`)).length} color="#f59e0b">
-        <MentionsFeed member={member} projects={projects} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>
-      </RVSec>
-
-      {/* Active Deliverables */}
-      <RVSec title="My Active Deliverables" count={active.length} color="#10b981">
-        {active.length===0&&<div style={{textAlign:"center",padding:"20px 0",color: "#838ba0",fontSize:17}}>No active deliverables.</div>}
-        {byProject.map(([projName,{projectId,dels}])=>(
-          <div key={projName} style={{marginBottom:16}}>
-            <div style={{fontSize:13,fontWeight:800,color: "#8e97a6",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6,paddingLeft:2}}>{projName}</div>
-            {dels.map(d=><DelCard key={d.id} d={d}/>)}
-          </div>
-        ))}
-      </RVSec>
-
-      {/* Completes */}
-      <RVSec title="My Completes" count={completed.length} color="#6b7280" defaultOpen={false}>
-        {completed.length===0&&<div style={{textAlign:"center",padding:"20px 0",color: "#838ba0",fontSize:17}}>No completed deliverables yet.</div>}
-        {visibleQ.map(([q,dels])=>(
-          <div key={q} style={{marginBottom:16}}>
-            <div style={{fontSize:14,fontWeight:800,color:"#6366f1",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:6}}>{q} <span style={{color: "#838ba0",fontWeight:400}}>({dels.length})</span></div>
-            <div style={{display:"flex",flexDirection:"column",gap:4}}>
-              {dels.map(d=>(
-                <div key={d.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:"#111827",border:"1px solid #1f2937",borderRadius:8}}>
-                  <div style={{width:7,height:7,borderRadius:"50%",background:"#10b981",flexShrink:0}}/>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:16,fontWeight:700,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title}</div>
-                    <div style={{fontSize:13,color: "#9ca3af"}}>{d.projectName}</div>
-                  </div>
-                  <Chip label={d.status} color={DCOLOR[d.status]||"#10b981"} xs/>
-                  <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW} small/>
-                  <span style={{fontSize:13,color: "#8e97a6"}}>{fmtDate(d.deadline)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-        {completedByQ.length>1&&(
-          <button onClick={()=>setShowAllCompletes(s=>!s)} style={{background:"none",border:"none",color:"#6366f1",cursor:"pointer",fontSize:16,fontWeight:700,padding:"4px 0"}}>
-            {showAllCompletes?"Show less ▲":`Show all ${completed.length} completes ▼`}
-          </button>
-        )}
-      </RVSec>
-    </div>
-  );
-};
-
-// ── Producer Dashboard ────────────────────────────────────────────────────────
-const ProducerDashboard = ({member, projects, team=[], onOpenProject, onUpdateProject, unavailability=[], onAddUnavailability, onDeleteUnavailability}) => {
-  const myProjects = useMemo(()=>
-    projects.filter(p=>
-      (p.assignees?.Producer||[]).includes(member.id)||
-      (p.assignees?.["Project Manager"]||[]).includes(member.id)||
-      Object.values(p.assignees||{}).flat().includes(member.id)
-    ),[projects,member.id]);
-
-  const STAGE_ORDER=["New Request","Ideation","Pre-Pro","In Production","Post","In Review","On Hold"];
-  const active=myProjects.filter(p=>!p.closedAt&&!["Delivered","Canceled"].includes(p.status))
-    .sort((a,b)=>STAGE_ORDER.indexOf(a.status)-STAGE_ORDER.indexOf(b.status));
-  const completed=myProjects.filter(p=>p.closedAt||["Delivered","Canceled"].includes(p.status))
-    .sort((a,b)=>new Date(b.closedAt||b.deadline)-new Date(a.closedAt||a.deadline));
-
-  const upcomingShoots=useMemo(()=>{
-    const now=new Date();
-    return myProjects.flatMap(p=>(p.shoots||[])
-      .filter(s=>s.startTime&&new Date(s.startTime)>=now)
-      .map(s=>({...s,projectName:p.name,projectId:p.id}))
-    ).sort((a,b)=>new Date(a.startTime)-new Date(b.startTime));
-  },[myProjects]);
-
-  const firstName=member.name.split(" ")[0];
-  const mentionCount=projects.flatMap(p=>p.notes||[]).filter(n=>n.text.toLowerCase().includes(`@${firstName.toLowerCase()}`)).length;
-
-  return (
-    <div>
-      <div style={{marginBottom:20}}>
-        <div style={{fontWeight:900,fontSize:26,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:2}}>👋 {member.name}</div>
-        <div style={{fontSize:17,color: "#9ca3af"}}>{member.roles.join(" · ")} · {active.length} active project{active.length!==1?"s":""}</div>
-      </div>
-
-      {/* Calendar */}
-
-
-      {/* Mentions */}
-      <RVSec title="My Mentions" count={mentionCount} color="#f59e0b">
-        <MentionsFeed member={member} projects={projects} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>
-      </RVSec>
-
-      {/* Active Projects */}
-      <RVSec title="My Active Projects" count={active.length} color="#3b82f6">
-        {active.length===0&&<div style={{textAlign:"center",padding:"20px 0",color: "#838ba0",fontSize:17}}>No active projects.</div>}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:10}}>
-          {active.map(p=>{
-            const done=p.deliverables.filter(d=>d.status==="Delivered").length;
-            const pct=p.deliverables.length?Math.round(done/p.deliverables.length*100):0;
-            const changes=p.deliverables.some(d=>d.rounds.some(r=>r.status==="Changes Requested"));
-            const nextDel=[...p.deliverables].filter(d=>d.deadline&&d.status!=="Delivered").sort((a,b)=>new Date(a.deadline)-new Date(b.deadline))[0];
-            return (
-              <div key={p.id} onClick={()=>onOpenProject(p)} style={{background:"#111827",border:`1px solid ${changes?"#ef444440":"#1f2937"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor=changes?"#ef4444":"#374151"}
-                onMouseLeave={e=>e.currentTarget.style.borderColor=changes?"#ef444440":"#1f2937"}>
-                <div style={{display:"flex",justifyContent:"space-between",gap:6,marginBottom:8}}>
-                  <div style={{fontWeight:800,fontSize:18,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",flex:1}}>{p.name}</div>
-                  <Chip label={p.status} color={PCOLOR[p.status]} xs/>
-                </div>
-                <div style={{height:3,borderRadius:99,background:"#1f2937",marginBottom:6}}>
-                  <div style={{height:3,borderRadius:99,width:`${pct}%`,background:pct===100?"#10b981":"linear-gradient(90deg,#6366f1,#8b5cf6)"}}/>
-                </div>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:14,color: "#9ca3af"}}>
-                  <span>{done}/{p.deliverables.length} delivered</span>
-                  {nextDel&&<span style={{color:"#f59e0b"}}>Next: {fmtDate(nextDel.deadline)}</span>}
-                </div>
-                {changes&&<div style={{fontSize:13,color:"#ef4444",marginTop:4,fontWeight:700}}>↩ Changes requested</div>}
-              </div>
-            );
-          })}
-        </div>
-      </RVSec>
-
-      {/* Upcoming Shoots */}
-      <RVSec title="Upcoming Shoots" count={upcomingShoots.length} color="#06b6d4">
-        {upcomingShoots.length===0&&<div style={{textAlign:"center",padding:"20px 0",color: "#838ba0",fontSize:17}}>No upcoming shoots.</div>}
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {upcomingShoots.slice(0,8).map(s=>(
-            <div key={s.id} onClick={()=>onOpenProject(projects.find(p=>p.id===s.projectId),"production",s.id)}
-              style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:"#111827",border:"1px solid #3b82f630",borderRadius:10,cursor:"pointer"}}
-              onMouseEnter={e=>e.currentTarget.style.borderColor="#3b82f6"}
-              onMouseLeave={e=>e.currentTarget.style.borderColor="#3b82f630"}>
-              <div style={{width:36,height:36,borderRadius:8,background:"#3b82f620",border:"1px solid #3b82f640",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🎬</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:17,fontWeight:700,color:"#f1f5f9"}}>{s.title||"Shoot"}</div>
-                <div style={{fontSize:14,color: "#9ca3af"}}>{s.projectName} · {s.location||"TBD"}</div>
-              </div>
-              <div style={{textAlign:"right",flexShrink:0}}>
-                <div style={{fontSize:16,fontWeight:700,color:"#3b82f6"}}>{fmtDate(s.startTime)}</div>
-                <div style={{fontSize:13,color: "#8e97a6"}}>{fmtTime(s.startTime)}{s.endTime?" → "+fmtTime(s.endTime):""}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </RVSec>
-
-      {/* Completed Projects */}
-      <RVSec title="Completed Projects" count={completed.length} color="#6b7280" defaultOpen={false}>
-        {completed.length===0&&<div style={{textAlign:"center",padding:"20px 0",color: "#838ba0",fontSize:17}}>No completed projects.</div>}
-        <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {completed.map(p=>(
-            <div key={p.id} onClick={()=>onOpenProject(p)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#0f172a",border:"1px solid #1f2937",borderRadius:9,cursor:"pointer",opacity:0.85}}
-              onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.borderColor="#374151";}}
-              onMouseLeave={e=>{e.currentTarget.style.opacity="0.85";e.currentTarget.style.borderColor="#1f2937";}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:17,fontWeight:700,color:"#9ca3af"}}>{p.name}</div>
-                <div style={{fontSize:13,color: "#8e97a6"}}>{p.workstream} · Closed {fmtDate(p.closedAt||p.deadline)}</div>
-              </div>
-              <Chip label="Delivered" color="#10b981" xs/>
-            </div>
-          ))}
-        </div>
-      </RVSec>
-    </div>
-  );
-};
-
-// ── Media Manager Dashboard ───────────────────────────────────────────────────
-const MediaManagerDashboard = ({member, projects, team=[], onOpenProject, onUpdateProject, unavailability=[], onAddUnavailability, onDeleteUnavailability}) => {
-  const firstName=member.name.split(" ")[0];
-  const mentionCount=projects.flatMap(p=>p.notes||[]).filter(n=>n.text.toLowerCase().includes(`@${firstName.toLowerCase()}`)).length;
-  const now=new Date();
-  const twoWeeks=new Date(now.getTime()+14*24*60*60*1000);
-  const [mediaList, setMediaList] = useState(MEDIA_CARDS_SEED);
-  const [invSearch, setInvSearch] = useState("");
-  const [invCat, setInvCat] = useState("All");
-  const [invStat, setInvStat] = useState("All");
-
-  // Stats
-  const totalMedia = mediaList.length;
-  const byStatus = MEDIA_CARD_STATUSES.reduce((a,s)=>({...a,[s]:mediaList.filter(m=>m.status===s).length}),{});
-  const miaItems = mediaList.filter(m=>m.notes?.toLowerCase().includes("mia"));
-  const holdItems = mediaList.filter(m=>m.status==="Hold");
-
-  // Filtered inventory
-  const invFiltered = mediaList.filter(m=>
-    (!invSearch || m.label.toLowerCase().includes(invSearch.toLowerCase()) || (m.folderName||"").toLowerCase().includes(invSearch.toLowerCase()) || (m.projectRef||"").toLowerCase().includes(invSearch.toLowerCase()) || (m.assignedTo||"").toLowerCase().includes(invSearch.toLowerCase()))&&
-    (invCat==="All" || m.category===invCat)&&
-    (invStat==="All" || m.status===invStat)
-  );
-  const invByCategory={};
-  MEDIA_CATEGORIES.forEach(c=>{invByCategory[c]=[];});
-  invFiltered.forEach(m=>{if(invByCategory[m.category])invByCategory[m.category].push(m);});
-
-  // Upcoming ingests from productions[]
-  const upcomingIngests = useMemo(()=>{
-    const items=[];
-    projects.forEach(p=>{
-      (p.productions||[]).forEach(prod=>{
-        if(prod.ingest?.datetime){
-          const dt=new Date(prod.ingest.datetime);
-          if(dt>=now&&dt<=twoWeeks) items.push({...prod.ingest,shootTitle:prod.title,shootId:prod.id,projectId:p.id,projectName:p.name,id:`ig-${prod.id}`});
-        }
-      });
-      // legacy shoots
-      (p.shoots||[]).forEach(s=>{
-        if(s.ingest?.datetime){
-          const dt=new Date(s.ingest.datetime);
-          if(dt>=now&&dt<=twoWeeks) items.push({...s.ingest,shootTitle:s.title,shootId:s.id,projectId:p.id,projectName:p.name,id:`ig-s-${s.id}`});
-        }
-      });
-      (p.ingestDates||[]).forEach(ig=>{
-        if(ig.datetime){
-          const dt=new Date(ig.datetime);
-          if(dt>=now&&dt<=twoWeeks) items.push({...ig,projectId:p.id,projectName:p.name});
-        }
-      });
-    });
-    return items.sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));
-  },[projects]);
-
-  const INGEST_STATUSES=["Not Received","Media Received","Media Processing","Media Ingested"];
-  const statusColor={"Not Received":"#ef4444","Media Received":"#3b82f6","Media Processing":"#f59e0b","Media Ingested":"#10b981"};
-
-  const selS={background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"5px 9px",fontSize:14,outline:"none"};
-
-  return (
-    <div>
-      <div style={{marginBottom:20}}>
-        <div style={{fontWeight:900,fontSize:26,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:2}}>👋 {member.name}</div>
-        <div style={{fontSize:17,color: "#9ca3af"}}>{member.roles.join(" · ")} · {upcomingIngests.length} ingests in the next 14 days · {byStatus["Available"]||0} items available</div>
-      </div>
-
-      {/* Storage summary */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:8,marginBottom:20}}>
-        {[["Total",totalMedia,"#6366f1"],["Available",byStatus["Available"]||0,"#10b981"],["In Use",byStatus["In Use"]||0,"#3b82f6"],["On Hold",byStatus["Hold"]||0,"#f59e0b"],["MIA",miaItems.length,"#a855f7"],["Offloaded",byStatus["Offloaded"]||0,"#6b7280"]].map(([l,n,c])=>(
-          <div key={l} style={{background:"#111827",border:`1px solid ${c}30`,borderRadius:10,padding:"10px",textAlign:"center",cursor:"pointer"}} onClick={()=>setInvStat(l==="Total"?"All":l==="MIA"?"In Use":l)}>
-            <div style={{fontSize:24,fontWeight:900,color:c,fontFamily:"'Barlow Condensed',sans-serif"}}>{n}</div>
-            <div style={{fontSize:13,color: "#9ca3af",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.08em"}}>{l}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* MIA / Hold alerts */}
-      {(miaItems.length>0||holdItems.length>0)&&(
-        <div style={{marginBottom:20,display:"flex",flexDirection:"column",gap:6}}>
-          {miaItems.map(m=>(
-            <div key={m.id} style={{background:"#a855f710",border:"1px solid #a855f730",borderRadius:8,padding:"8px 14px",display:"flex",gap:10,alignItems:"center"}}>
-              <span style={{fontSize:17}}>⚠️</span>
-              <div style={{flex:1}}>
-                <span style={{fontSize:16,fontWeight:700,color:"#a855f7"}}>{m.label}</span>
-                <span style={{fontSize:14,color: "#9ca3af",marginLeft:8}}>{m.notes}</span>
-              </div>
-              <Chip label="MIA" color="#a855f7" xs/>
-              {m.assignedTo&&<span style={{fontSize:13,color: "#9ca3af"}}>Last seen: {m.assignedTo}</span>}
-            </div>
-          ))}
-          {holdItems.map(m=>(
-            <div key={m.id} style={{background:"#f59e0b10",border:"1px solid #f59e0b30",borderRadius:8,padding:"8px 14px",display:"flex",gap:10,alignItems:"center"}}>
-              <span style={{fontSize:17}}>🔒</span>
-              <div style={{flex:1}}>
-                <span style={{fontSize:16,fontWeight:700,color:"#f59e0b"}}>{m.label}</span>
-                {m.notes&&<span style={{fontSize:14,color: "#9ca3af",marginLeft:8}}>{m.notes}</span>}
-              </div>
-              <Chip label="Hold" color="#f59e0b" xs/>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Full inventory */}
-      <RVSec title="Media Inventory" count={`${byStatus["Available"]||0}/${totalMedia} available`} color="#06b6d4" defaultOpen>
-        <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-          <input value={invSearch} onChange={e=>setInvSearch(e.target.value)} placeholder="Search label, folder, project, person…" style={{...selS,flex:"1 1 200px"}}/>
-          <select value={invCat} onChange={e=>setInvCat(e.target.value)} style={selS}>
-            <option value="All">All Categories</option>
-            {MEDIA_CATEGORIES.map(c=><option key={c}>{c}</option>)}
-          </select>
-          <select value={invStat} onChange={e=>setInvStat(e.target.value)} style={selS}>
-            <option value="All">All Statuses</option>
-            {MEDIA_CARD_STATUSES.map(s=><option key={s}>{s}</option>)}
-          </select>
-          {(invSearch||invCat!=="All"||invStat!=="All")&&<button onClick={()=>{setInvSearch("");setInvCat("All");setInvStat("All");}} style={{background:"none",border:"1px solid #374151",borderRadius:6,color: "#9ca3af",padding:"4px 10px",fontSize:14,cursor:"pointer"}}>Clear</button>}
-          <div style={{fontSize:14,color: "#8e97a6"}}>{invFiltered.length} items</div>
-        </div>
-        {MEDIA_CATEGORIES.map(cat=>{
-          const items=invByCategory[cat]||[];
-          if(!items.length) return null;
-          const avail=items.filter(m=>m.status==="Available").length;
-          return(
-            <div key={cat} style={{marginBottom:16}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-                <div style={{fontWeight:900,fontSize:16,color:"#06b6d4",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.05em"}}>{cat}</div>
-                <div style={{background:"#06b6d422",color:"#06b6d4",borderRadius:99,padding:"1px 8px",fontSize:13,fontWeight:800}}>{avail}/{items.length} available</div>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:3}}>
-                {items.map(m=>{
-                  const sc=MEDIA_STATUS_COLOR[m.status]||"#6b7280";
-                  const isMIA=m.notes?.toLowerCase().includes("mia");
-                  return(
-                    <div key={m.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 12px",background:"#111827",border:`1px solid ${isMIA?"#a855f730":m.status==="Hold"?"#f59e0b30":"#1f2937"}`,borderRadius:8}}>
-                      <div style={{width:7,height:7,borderRadius:"50%",background:sc,flexShrink:0}}/>
-                      <div style={{minWidth:140,flexShrink:0}}>
-                        <div style={{fontSize:16,fontWeight:700,color:"#f1f5f9"}}>{m.label}</div>
-                        {m.folderName&&<div style={{fontSize:13,color: "#8e97a6",fontFamily:"monospace"}}>{m.folderName}</div>}
-                      </div>
-                      <div style={{fontSize:13,color:"#9ca3af",fontWeight:600,flexShrink:0,width:50,textAlign:"right"}}>{m.capacityGB>=1000?`${m.capacityGB/1000}TB`:`${m.capacityGB}GB`}</div>
-                      <div style={{flex:1,minWidth:0}}>
-                        {m.projectRef&&<div style={{fontSize:13,color:"#6366f1",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📁 {m.projectRef}</div>}
-                        {m.assignedTo&&<div style={{fontSize:13,color: "#9ca3af"}}>👤 {m.assignedTo}</div>}
-                      </div>
-                      {m.notes&&<div style={{fontSize:13,color:isMIA?"#a855f7":"#f59e0b",maxWidth:150,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flexShrink:0,fontStyle:"italic"}}>{m.notes}</div>}
-                      <Chip label={m.status} color={sc} xs/>
-                      {/* Quick status update */}
-                      <select value={m.status} onChange={e=>{const ns=e.target.value;setMediaList(prev=>prev.map(x=>x.id!==m.id?x:{...x,status:ns}));}}
-                        style={{background:"transparent",border:"none",color: "#8e97a6",fontSize:13,cursor:"pointer",outline:"none",flexShrink:0}}>
-                        {MEDIA_CARD_STATUSES.map(s=><option key={s} style={{background:"#0d1117",color:"#e2e8f0"}}>{s}</option>)}
-                      </select>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-        {invFiltered.length===0&&<div style={{textAlign:"center",padding:"24px 0",color: "#838ba0",fontSize:16}}>No items match the current filters.</div>}
-      </RVSec>
-
-      {/* Upcoming ingests */}
-      <RVSec title="Upcoming Ingests (Next 14 Days)" count={upcomingIngests.length} color="#06b6d4">
-        {upcomingIngests.length===0&&<div style={{textAlign:"center",padding:"20px 0",color: "#838ba0",fontSize:17}}>No ingests scheduled in the next 14 days.</div>}
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {upcomingIngests.map(ig=>(
-            <div key={ig.id} onClick={()=>onOpenProject(projects.find(p=>p.id===ig.projectId),"ingest",ig.id)}
-              style={{background:"#111827",border:"1px solid #06b6d430",borderRadius:10,padding:"12px 16px",cursor:"pointer"}}
-              onMouseEnter={e=>e.currentTarget.style.borderColor="#06b6d4"}
-              onMouseLeave={e=>e.currentTarget.style.borderColor="#06b6d430"}>
-              <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <div style={{fontSize:26,flexShrink:0}}>📥</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:17,fontWeight:700,color:"#f1f5f9"}}>{ig.projectName}</div>
-                  <div style={{fontSize:14,color: "#9ca3af"}}>{ig.shootTitle||"Manual ingest"} · {fmtDT(ig.datetime)}</div>
-                  {ig.notes&&<div style={{fontSize:14,color: "#8e97a6",marginTop:2}}>{ig.notes}</div>}
-                </div>
-                <select value={ig.status||"Not Received"} onClick={e=>e.stopPropagation()} onChange={e=>e.stopPropagation()}
-                  style={{background:(statusColor[ig.status||"Not Received"])+"18",border:`1px solid ${statusColor[ig.status||"Not Received"]}40`,borderRadius:6,color:statusColor[ig.status||"Not Received"],padding:"3px 8px",fontSize:14,fontWeight:700,outline:"none"}}>
-                  {INGEST_STATUSES.map(s=><option key={s} style={{background:"#0d1117",color:"#e2e8f0"}}>{s}</option>)}
-                </select>
-              </div>
-            </div>
-          ))}
-        </div>
-      </RVSec>
-
-      {/* ── Asset Requests from Productions ── */}
-      {(()=>{
-        const allRequests = projects.flatMap(p=>
-          (p.productions||[]).flatMap(prod=>
-            (prod.assetRequests||[]).map(r=>({...r,projectName:p.name,productionTitle:prod.title,projectId:p.id}))
-          )
-        );
-        const pending=allRequests.filter(r=>r.status==="Pending");
-        const fulfilled=allRequests.filter(r=>r.status==="Fulfilled");
-        if(allRequests.length===0) return null;
-        return(
-          <RVSec title="📦 Asset Requests" count={pending.length>0?`${pending.length} pending`:allRequests.length} color="#a855f7" defaultOpen={pending.length>0}>
-            {pending.length===0&&fulfilled.length===0&&<div style={{textAlign:"center",padding:"14px 0",color: "#838ba0",fontSize:16}}>No asset requests.</div>}
-            {pending.length>0&&(
-              <div style={{marginBottom:12}}>
-                <div style={{fontSize:13,fontWeight:800,color:"#a855f7",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.08em",marginBottom:6}}>Pending ({pending.length})</div>
-                {pending.map(r=>(
-                  <div key={r.id} style={{background:"#111827",border:"1px solid #a855f730",borderRadius:9,padding:"10px 14px",marginBottom:6}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
-                      <div>
-                        <div style={{fontSize:16,fontWeight:700,color:"#f1f5f9"}}>{r.title}</div>
-                        <div style={{fontSize:13,color: "#9ca3af"}}>↗ {r.projectName} / {r.productionTitle} · {fmtDate(r.requestedAt)}</div>
-                        {r.format&&<div style={{fontSize:13,color: "#9ca3af"}}>Format: {r.format}</div>}
-                        {r.notes&&<div style={{fontSize:13,color: "#9ca3af",fontStyle:"italic"}}>{r.notes}</div>}
-                      </div>
-                      <Chip label="Pending" color="#f59e0b" xs/>
-                    </div>
-                    <button onClick={()=>{
-                      // Mark as fulfilled (in a real app would update the project)
-                    }} style={{background:"#10b98120",border:"1px solid #10b98140",borderRadius:6,color:"#10b981",padding:"4px 10px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
-                      Mark Fulfilled
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {fulfilled.length>0&&(
-              <div>
-                <div style={{fontSize:13,fontWeight:800,color: "#9ca3af",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.08em",marginBottom:6}}>Fulfilled ({fulfilled.length})</div>
-                {fulfilled.map(r=>(
-                  <div key={r.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",background:"#0f172a",borderRadius:7,opacity:0.7,marginBottom:3}}>
-                    <span style={{fontSize:14,color:"#9ca3af",flex:1}}>{r.title}</span>
-                    <span style={{fontSize:13,color: "#8e97a6"}}>{r.projectName}</span>
-                    <Chip label="Fulfilled" color="#10b981" xs/>
-                  </div>
-                ))}
-              </div>
-            )}
-          </RVSec>
-        );
-      })()}
-
-      <RVSec title="My Mentions" count={mentionCount} color="#f59e0b">
-        <MentionsFeed member={member} projects={projects} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>
-      </RVSec>
-    </div>
-  );
-};
-const ProjectManagerDashboard = ({member, projects, team=[], onOpenProject, onUpdateProject, unavailability=[], onAddUnavailability, onDeleteUnavailability}) => {
-  const firstName=member.name.split(" ")[0];
-  const mentionCount=projects.flatMap(p=>p.notes||[]).filter(n=>n.text.toLowerCase().includes(`@${firstName.toLowerCase()}`)).length;
-  const STAGE_ORDER=["New Request","Ideation","Pre-Pro","In Production","Post","In Review","On Hold"];
-
-  const myProjects=useMemo(()=>projects.filter(p=>
-    Object.values(p.assignees||{}).flat().includes(member.id)
-  ),[projects,member.id]);
-
-  const active=myProjects.filter(p=>!p.closedAt&&!["Delivered","Canceled"].includes(p.status))
-    .sort((a,b)=>STAGE_ORDER.indexOf(a.status)-STAGE_ORDER.indexOf(b.status));
-  const completed=myProjects.filter(p=>p.closedAt||["Delivered","Canceled"].includes(p.status))
-    .sort((a,b)=>new Date(b.closedAt||b.deadline)-new Date(a.closedAt||a.deadline));
-
-  // Projects with unassigned key roles
-  const unassignedProjects=useMemo(()=>projects.filter(p=>{
-    if(p.closedAt||["Delivered","Canceled"].includes(p.status)) return false;
-    const a=p.assignees||{};
-    const missingEditor=p.deliverables.some(d=>!d.editorId&&!d.animatorId&&d.status!=="Delivered");
-    const missingProducer=!(a.Producer||[]).length&&!(a["Project Manager"]||[]).length;
-    return missingEditor||missingProducer;
-  }),[projects]);
-
-  return (
-    <div>
-      <div style={{marginBottom:20}}>
-        <div style={{fontWeight:900,fontSize:26,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:2}}>👋 {member.name}</div>
-        <div style={{fontSize:17,color: "#9ca3af"}}>{member.roles.join(" · ")} · {active.length} active project{active.length!==1?"s":""}</div>
-      </div>
-
-
-
-      <RVSec title="My Mentions" count={mentionCount} color="#f59e0b">
-        <MentionsFeed member={member} projects={projects} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>
-      </RVSec>
-
-      <RVSec title="My Active Projects" count={active.length} color="#3b82f6">
-        {active.length===0&&<div style={{textAlign:"center",padding:"20px 0",color: "#838ba0",fontSize:17}}>No active projects.</div>}
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {active.map(p=>{
-            const done=p.deliverables.filter(d=>d.status==="Delivered").length;
-            const pct=p.deliverables.length?Math.round(done/p.deliverables.length*100):0;
-            return (
-              <div key={p.id} onClick={()=>onOpenProject(p)} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:10,padding:"12px 16px",cursor:"pointer"}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor="#374151"}
-                onMouseLeave={e=>e.currentTarget.style.borderColor="#1f2937"}>
-                <div style={{display:"flex",justifyContent:"space-between",gap:6,marginBottom:6}}>
-                  <div style={{fontWeight:800,fontSize:17,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>{p.name}</div>
-                  <Chip label={p.status} color={PCOLOR[p.status]} xs/>
-                </div>
-                <div style={{height:3,borderRadius:99,background:"#1f2937"}}>
-                  <div style={{height:3,borderRadius:99,width:`${pct}%`,background:pct===100?"#10b981":"linear-gradient(90deg,#6366f1,#8b5cf6)"}}/>
-                </div>
-                <div style={{fontSize:14,color: "#8e97a6",marginTop:4}}>{done}/{p.deliverables.length} delivered</div>
-              </div>
-            );
-          })}
-        </div>
-      </RVSec>
-
-      {/* Unassigned Roles */}
-      <RVSec title={`⚠ Needs Assignment`} count={unassignedProjects.length} color="#ef4444" defaultOpen={unassignedProjects.length>0}>
-        {unassignedProjects.length===0&&<div style={{textAlign:"center",padding:"20px 0",color: "#838ba0",fontSize:17}}>All projects have roles assigned.</div>}
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {unassignedProjects.map(p=>{
-            const a=p.assignees||{};
-            const missing=[];
-            if(p.deliverables.some(d=>!d.editorId&&!d.animatorId&&d.status!=="Delivered")) missing.push("Editor/Animator");
-            if(!(a.Producer||[]).length&&!(a["Project Manager"]||[]).length) missing.push("Producer/PM");
-            return (
-              <div key={p.id} onClick={()=>onOpenProject(p)} style={{background:"#111827",border:"1px solid #ef444430",borderRadius:10,padding:"12px 16px",cursor:"pointer"}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor="#ef4444"}
-                onMouseLeave={e=>e.currentTarget.style.borderColor="#ef444430"}>
-                <div style={{fontWeight:700,fontSize:17,color:"#f1f5f9",marginBottom:6}}>{p.name}</div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {missing.map(r=><Chip key={r} label={`Missing: ${r}`} color="#ef4444" xs/>)}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </RVSec>
-
-      <RVSec title="Completed Projects" count={completed.length} color="#6b7280" defaultOpen={false}>
-        {completed.length===0&&<div style={{textAlign:"center",padding:"20px 0",color: "#838ba0",fontSize:17}}>No completed projects.</div>}
-        <div style={{display:"flex",flexDirection:"column",gap:5}}>
-          {completed.map(p=>(
-            <div key={p.id} onClick={()=>onOpenProject(p)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",background:"#0f172a",border:"1px solid #1f2937",borderRadius:9,cursor:"pointer",opacity:0.85}}
-              onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.borderColor="#374151";}}
-              onMouseLeave={e=>{e.currentTarget.style.opacity="0.85";e.currentTarget.style.borderColor="#1f2937";}}>
-              <div style={{flex:1}}><div style={{fontSize:16,fontWeight:700,color:"#9ca3af"}}>{p.name}</div></div>
-              <Chip label="Delivered" color="#10b981" xs/>
-              <span style={{fontSize:13,color: "#8e97a6"}}>{fmtDate(p.closedAt||p.deadline)}</span>
-            </div>
-          ))}
-        </div>
-      </RVSec>
-    </div>
-  );
-};
-
-// ── DP Dashboard (similar to Producer) ───────────────────────────────────────
-const DPDashboard = ({member, projects, team=[], onOpenProject, onUpdateProject, unavailability=[], onAddUnavailability, onDeleteUnavailability}) => {
-  const firstName=member.name.split(" ")[0];
-  const mentionCount=projects.flatMap(p=>p.notes||[]).filter(n=>n.text.toLowerCase().includes(`@${firstName.toLowerCase()}`)).length;
-  const now=new Date();
-
-  const myShootsRaw=useMemo(()=>{
-    const items=[];
-    projects.forEach(p=>{
-      (p.shoots||[]).forEach(s=>{
-        const isOnShoot=(s.crewInternal||[]).some(c=>c.memberId===member.id)||
-          (s.crewExternal||[]).some(c=>c.name===member.name);
-        if(isOnShoot) items.push({...s,projectId:p.id,projectName:p.name});
-      });
-    });
-    return items;
-  },[projects,member]);
-
-  const upcomingShoots=myShootsRaw.filter(s=>s.startTime&&new Date(s.startTime)>=now)
-    .sort((a,b)=>new Date(a.startTime)-new Date(b.startTime));
-  const prevShoots=myShootsRaw.filter(s=>s.startTime&&new Date(s.startTime)<now)
-    .sort((a,b)=>new Date(b.startTime)-new Date(a.startTime));
-
-  return (
-    <div>
-      <div style={{marginBottom:20}}>
-        <div style={{fontWeight:900,fontSize:26,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:2}}>👋 {member.name}</div>
-        <div style={{fontSize:17,color: "#9ca3af"}}>{member.roles.join(" · ")} · {upcomingShoots.length} upcoming shoot{upcomingShoots.length!==1?"s":""}</div>
-      </div>
-
-
-
-      <RVSec title="My Mentions" count={mentionCount} color="#f59e0b">
-        <MentionsFeed member={member} projects={projects} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>
-      </RVSec>
-
-      <RVSec title="Upcoming Shoots" count={upcomingShoots.length} color="#3b82f6">
-        {upcomingShoots.length===0&&<div style={{textAlign:"center",padding:"20px 0",color: "#838ba0",fontSize:17}}>No upcoming shoots assigned.</div>}
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {upcomingShoots.map(s=>(
-            <div key={s.id} onClick={()=>onOpenProject(projects.find(p=>p.id===s.projectId),"production",s.id)}
-              style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",background:"#111827",border:"1px solid #3b82f630",borderRadius:10,cursor:"pointer"}}
-              onMouseEnter={e=>e.currentTarget.style.borderColor="#3b82f6"}
-              onMouseLeave={e=>e.currentTarget.style.borderColor="#3b82f630"}>
-              <div style={{fontSize:26,flexShrink:0}}>🎬</div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:17,fontWeight:700,color:"#f1f5f9"}}>{s.title||"Shoot"}</div>
-                <div style={{fontSize:14,color: "#9ca3af"}}>{s.projectName} · {s.location||"TBD"}</div>
-                {/* Personal call time vs shoot call time */}
-                {(()=>{
-                  const myEntry=(s.crewInternal||[]).find(c=>c.memberId===member.id)||(s.crewExternal||[]).find(c=>c.name===member.name);
-                  const myCall=myEntry?.callTime;
-                  return (
-                    <div style={{fontSize:13,marginTop:3}}>
-                      {myCall&&myCall!==fmtTime(s.startTime)&&(
-                        <span style={{color:"#60a5fa",fontWeight:700}}>Your call: {myCall} · </span>
-                      )}
-                      <span style={{color: "#8e97a6"}}>Shoot: {fmtTime(s.startTime)}{s.endTime?" → "+fmtTime(s.endTime):""}</span>
-                    </div>
-                  );
-                })()}
-                {s.ingest?.datetime&&<div style={{fontSize:13,color:"#06b6d4",marginTop:2}}>📥 Ingest: {fmtDT(s.ingest.datetime)}</div>}
-              </div>
-              <div style={{textAlign:"right",flexShrink:0}}>
-                <div style={{fontSize:16,fontWeight:700,color:"#3b82f6"}}>{fmtDate(s.startTime)}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </RVSec>
-
-      <RVSec title="Previous Shoots" count={prevShoots.length} color="#6b7280" defaultOpen={false}>
-        <div style={{display:"flex",flexDirection:"column",gap:5}}>
-          {prevShoots.map(s=>(
-            <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",background:"#0f172a",border:"1px solid #1f2937",borderRadius:9,opacity:0.8}}>
-              <span style={{fontSize:17}}>📁</span>
-              <div style={{flex:1}}><div style={{fontSize:16,fontWeight:700,color:"#9ca3af"}}>{s.title||"Shoot"}</div><div style={{fontSize:13,color: "#8e97a6"}}>{s.projectName}</div></div>
-              <span style={{fontSize:13,color: "#8e97a6"}}>{fmtDate(s.startTime)}</span>
-            </div>
-          ))}
-        </div>
-      </RVSec>
-    </div>
-  );
-};
-
-// ── Manager Dashboard ─────────────────────────────────────────────────────────
-const ManagerDashboard = ({member, projects, team=[], onOpenProject, onUpdateProject, unavailability=[], onAddUnavailability, onDeleteUnavailability}) => {
-  const STAGE_ORDER=["New Request","Ideation","Pre-Pro","In Production","Post","In Review","On Hold"];
-  const active=projects.filter(p=>!p.closedAt&&!["Delivered","Canceled"].includes(p.status))
-    .sort((a,b)=>STAGE_ORDER.indexOf(a.status)-STAGE_ORDER.indexOf(b.status));
-  const completed=projects.filter(p=>p.closedAt||["Delivered","Canceled"].includes(p.status));
-  const allActiveDels=projects.flatMap(p=>p.deliverables.filter(d=>d.status!=="Delivered").map(d=>({...d,projectName:p.name,projectId:p.id})));
-  const changesNeeded=allActiveDels.filter(d=>d.rounds.some(r=>r.status==="Changes Requested"));
-
-  const statusCounts={};
-  DELIVERABLE_STATUSES.forEach(s=>{statusCounts[s]=(allActiveDels.filter(d=>d.status===s).length);});
-
-  return (
-    <div>
-      <div style={{marginBottom:20}}>
-        <div style={{fontWeight:900,fontSize:26,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:2}}>👋 {member.name}</div>
-        <div style={{fontSize:17,color: "#9ca3af"}}>Manager Overview · {active.length} active projects · {allActiveDels.length} active deliverables</div>
-      </div>
-
-      {/* Quick stats */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:24}}>
-        {[["Active Projects",active.length,"#3b82f6"],["Active Deliverables",allActiveDels.length,"#6366f1"],["Changes Needed",changesNeeded.length,"#ef4444"],["Completed Projects",completed.length,"#10b981"]].map(([label,val,color])=>(
-          <div key={label} style={{background:"#111827",border:`1px solid ${color}30`,borderRadius:12,padding:"16px",textAlign:"center"}}>
-            <div style={{fontSize:34,fontWeight:900,color,fontFamily:"'Barlow Condensed',sans-serif"}}>{val}</div>
-            <div style={{fontSize:14,color: "#9ca3af",marginTop:2}}>{label}</div>
-          </div>
-        ))}
-      </div>
-
-
-
-      <RVSec title="All Active Projects" count={active.length} color="#3b82f6">
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:10}}>
-          {active.map(p=>{
-            const done=p.deliverables.filter(d=>d.status==="Delivered").length;
-            const pct=p.deliverables.length?Math.round(done/p.deliverables.length*100):0;
-            const changes=p.deliverables.some(d=>d.rounds.some(r=>r.status==="Changes Requested"));
-            return (
-              <div key={p.id} onClick={()=>onOpenProject(p)} style={{background:"#111827",border:`1px solid ${changes?"#ef444430":"#1f2937"}`,borderRadius:12,padding:"13px 15px",cursor:"pointer"}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor=changes?"#ef4444":"#374151"}
-                onMouseLeave={e=>e.currentTarget.style.borderColor=changes?"#ef444430":"#1f2937"}>
-                <div style={{display:"flex",justifyContent:"space-between",gap:6,marginBottom:6}}>
-                  <div style={{fontWeight:700,fontSize:17,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",flex:1}}>{p.name}</div>
-                  <Chip label={p.status} color={PCOLOR[p.status]} xs/>
-                </div>
-                <div style={{height:3,borderRadius:99,background:"#1f2937",marginBottom:4}}>
-                  <div style={{height:3,borderRadius:99,width:`${pct}%`,background:pct===100?"#10b981":"linear-gradient(90deg,#6366f1,#8b5cf6)"}}/>
-                </div>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:14,color: "#8e97a6"}}>
-                  <span>{done}/{p.deliverables.length} del.</span>
-                  {changes&&<span style={{color:"#ef4444",fontWeight:700}}>↩ Changes</span>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </RVSec>
-
-      {changesNeeded.length>0&&(
-        <RVSec title="Changes Requested" count={changesNeeded.length} color="#ef4444">
-          <div style={{display:"flex",flexDirection:"column",gap:5}}>
-            {changesNeeded.map(d=>(
-              <div key={d.id} onClick={()=>onOpenProject(projects.find(p=>p.id===d.projectId),"deliverables",d.id)}
-                style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",background:"#111827",border:"1px solid #ef444430",borderRadius:9,cursor:"pointer"}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor="#ef4444"}
-                onMouseLeave={e=>e.currentTarget.style.borderColor="#ef444430"}>
-                <div style={{flex:1}}><div style={{fontSize:16,fontWeight:700,color:"#f1f5f9"}}>{d.title}</div><div style={{fontSize:13,color: "#9ca3af"}}>{d.projectName}</div></div>
-                <Chip label="↩ Changes" color="#ef4444" xs/>
-                <Dl date={d.deadline}/>
-              </div>
-            ))}
-          </div>
-        </RVSec>
-      )}
     </div>
   );
 };
@@ -13606,21 +12911,13 @@ const MyOutstandingTasks = ({member, projects, team, onOpenProject, nudges=[], c
   );
 };
 
-const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOpenProject, onUpdateProject, onUpdateDel, showToast, nudges=[], customTasks=[], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, unavailability=[], onAddUnavailability, onDeleteUnavailability, currentMember=null, isAdmin=false, sidebarSlotNode, onSidebarWidthChange}) => {
-  const [selectedMember,setSelectedMember] = useState(()=> (!isAdmin && currentMember) ? currentMember.id : null);
-  useEffect(()=>{ if(!isAdmin && currentMember) setSelectedMember(currentMember.id); },[isAdmin, currentMember?.id]);
-  const [customizeMode,  setCustomizeMode] = useState(false);
-  const DEFAULT_ORDER = ["cal","chat","tasks"];
-  const [sectionOrder, setSectionOrder] = useState(()=>{
-    try { const s=localStorage.getItem(MYVIEW_ORDER_KEY); return s?JSON.parse(s):DEFAULT_ORDER; } catch(e){ return DEFAULT_ORDER; }
-  });
-  const moveSection = (idx,dir) => {
-    const next=[...sectionOrder]; const swap=idx+dir;
-    if(swap<0||swap>=next.length) return;
-    [next[idx],next[swap]]=[next[swap],next[idx]];
-    setSectionOrder(next);
-    try{localStorage.setItem(MYVIEW_ORDER_KEY,JSON.stringify(next));}catch(e){}
-  };
+const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOpenProject, onUpdateProject, onUpdateDel, onDeleteDel, showToast, nudges=[], customTasks=[], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, unavailability=[], onAddUnavailability, onDeleteUnavailability, currentMember=null, isAdmin=false, sidebarSlotNode, onSidebarWidthChange}) => {
+  // Everyone — admins included — lands on their own view by default now;
+  // admins additionally get a "Browse all" entry point (the switch dropdown
+  // + a Back button) to reach anyone else's, rather than starting there.
+  const [selectedMember,setSelectedMember] = useState(()=> currentMember ? currentMember.id : null);
+  useEffect(()=>{ if(currentMember) setSelectedMember(m=>m??currentMember.id); },[currentMember?.id]);
+  const [expandedDelId, setExpandedDelId] = useState(null);
   const member = team.find(m=>m.id===selectedMember);
 
   const roleGroups = [
@@ -13672,99 +12969,138 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
     </div>
   );
 
-  const isEditor = member.roles.some(r=>["Editor","Animator","Designer","Head of Post Production","Media Manager"].includes(r));
-  const isProducer= member.roles.some(r=>["Producer","Executive Producer","Project Manager","Post Production Manager"].includes(r));
+  const isBroadcast = member.department==="Broadcast";
 
-  return (
+  // Broadcast crew's "My View" is fundamentally a different job (live
+  // production bookings, crew calls) rather than a deliverables pipeline —
+  // keeps its own purpose-built dashboard rather than the layout below.
+  if(isBroadcast) return (
     <div>
-      {/* Back + member header */}
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24,paddingBottom:16,borderBottom:"1px solid #1f2937"}}>
-        {isAdmin&&<button onClick={()=>setSelectedMember(null)} style={{background:"#1f2937",border:"none",borderRadius:7,color:"#9ca3af",padding:"6px 12px",cursor:"pointer",fontSize:16,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>← Back</button>}
-        <Av name={member.name} size={40}/>
-        <div>
-          <div style={{fontWeight:900,fontSize:24,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>{member.name}</div>
-          <div style={{fontSize:16,color: "#9ca3af"}}>{member.roles.join(" · ")} · {member.employeeType}</div>
-        </div>
-        {/* Switch to another person + Customize */}
-        <div style={{marginLeft:"auto",display:"flex",gap:6,alignItems:"center"}}>
-          {isAdmin&&<select value={selectedMember} onChange={e=>setSelectedMember(Number(e.target.value))}
-            style={{background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"6px 10px",fontSize:16,outline:"none"}}>
-            {team.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>}
-          <button onClick={()=>setCustomizeMode(o=>!o)}
-            style={{background:customizeMode?"#6366f1":"#1f2937",border:"none",borderRadius:7,color:customizeMode?"#fff":"#9ca3af",padding:"6px 12px",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em",whiteSpace:"nowrap"}}>
-            {customizeMode?"✓ Done":"⇅ Layout"}
-          </button>
-        </div>
-      </div>
-
-      {/* Reorderable sections */}
-      {(()=>{
-        const DEFAULT_SECTIONS = {
-          cal: (
-            <RoleCalendar memberId={member.id} projects={projects} onOpenProject={onOpenProject} team={team}
-              unavailability={unavailability} onAddUnavailability={onAddUnavailability}
-              onDeleteUnavailability={onDeleteUnavailability} onUpdateProject={onUpdateProject}/>
-          ),
-          tasks: (
-            <MyOutstandingTasks member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}
-              customTasks={customTasks} onAddCustomTask={onAddCustomTask} onUpdateCustomTask={onUpdateCustomTask} onDeleteCustomTask={onDeleteCustomTask}/>
-          ),
-          chat: (
-            <MyViewChat member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}/>
-          ),
-          timeoff: (
-            <UnavailabilityPanel member={member} projects={projects} unavailability={unavailability}
-              onAdd={onAddUnavailability} onDelete={onDeleteUnavailability} onUpdateProject={onUpdateProject}/>
-          ),
-        };
-        const order = (sectionOrder||["cal","chat","tasks"]).filter(id=>DEFAULT_SECTIONS[id]);
-        const sectionLabels = {cal:"📅 My Calendar & Time Off",tasks:"📋 Outstanding Tasks",chat:"🤖 AI Assistant",timeoff:"🗓 Time Off"};
-        return order.map((id,idx)=>(
-          <div key={id} style={{position:"relative"}}>
-            {customizeMode&&(
-              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,padding:"6px 10px",background:"#1a2035",borderRadius:8,border:"1px solid #374151"}}>
-                <span style={{fontSize:14,fontWeight:700,color:"#9ca3af",flex:1,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>{sectionLabels[id]}</span>
-                <button onClick={()=>moveSection(idx,-1)} disabled={idx===0}
-                  style={{background:"none",border:"1px solid #374151",borderRadius:5,color:idx===0?"#1f2937":"#9ca3af",cursor:idx===0?"default":"pointer",padding:"2px 8px",fontSize:14}}>↑</button>
-                <button onClick={()=>moveSection(idx,1)} disabled={idx===order.length-1}
-                  style={{background:"none",border:"1px solid #374151",borderRadius:5,color:idx===order.length-1?"#1f2937":"#9ca3af",cursor:idx===order.length-1?"default":"pointer",padding:"2px 8px",fontSize:14}}>↓</button>
-              </div>
-            )}
-            {DEFAULT_SECTIONS[id]}
-          </div>
-        ));
-      })()}
-
-      {(()=>{
-        const roles=member.roles;
-        const isEditor   = roles.some(r=>["Editor","Animator","Designer","Head of Post Production"].includes(r));
-        const isProducer = roles.some(r=>["Producer","Executive Producer"].includes(r));
-        const isMediaMgr = roles.some(r=>["Media Manager"].includes(r));
-        const isPM       = roles.some(r=>["Project Manager","Post Production Manager"].includes(r));
-        const isDP       = roles.some(r=>["DP","Camera Op","Gaffer"].includes(r))&&!isEditor&&!isProducer;
-        const isManager  = roles.some(r=>["Executive Producer"].includes(r));
-        const isBroadcast= member.department==="Broadcast";
-
-        if(isBroadcast)
-          return <BroadcastDashboard member={member} projects={projects} team={team} studioBookings={studioBookings} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject} onUpdateStudioBookings={onUpdateStudioBookings} showToast={showToast} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={onSidebarWidthChange}/>;
-        if(isManager&&!isEditor&&!isProducer)
-          return <ManagerDashboard member={member} projects={projects} team={team} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject} unavailability={unavailability} onAddUnavailability={onAddUnavailability} onDeleteUnavailability={onDeleteUnavailability}/>;
-        if(isEditor)
-          return <EditorDashboard member={member} projects={projects} team={team} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject} onUpdateDel={onUpdateDel} unavailability={unavailability} onAddUnavailability={onAddUnavailability} onDeleteUnavailability={onDeleteUnavailability}/>;
-        if(isProducer)
-          return <ProducerDashboard member={member} projects={projects} team={team} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject} unavailability={unavailability} onAddUnavailability={onAddUnavailability} onDeleteUnavailability={onDeleteUnavailability}/>;
-        if(isMediaMgr)
-          return <MediaManagerDashboard member={member} projects={projects} team={team} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject} unavailability={unavailability} onAddUnavailability={onAddUnavailability} onDeleteUnavailability={onDeleteUnavailability}/>;
-        if(isPM)
-          return <ProjectManagerDashboard member={member} projects={projects} team={team} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject} unavailability={unavailability} onAddUnavailability={onAddUnavailability} onDeleteUnavailability={onDeleteUnavailability}/>;
-        if(isDP)
-          return <DPDashboard member={member} projects={projects} team={team} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject} unavailability={unavailability} onAddUnavailability={onAddUnavailability} onDeleteUnavailability={onDeleteUnavailability}/>;
-        return <ManagerDashboard member={member} projects={projects} team={team} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject} unavailability={unavailability} onAddUnavailability={onAddUnavailability} onDeleteUnavailability={onDeleteUnavailability}/>;
-      })()}
+      <MyViewHeader member={member} isAdmin={isAdmin} team={team} selectedMember={selectedMember} setSelectedMember={setSelectedMember}/>
+      <BroadcastDashboard member={member} projects={projects} team={team} studioBookings={studioBookings} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject} onUpdateStudioBookings={onUpdateStudioBookings} showToast={showToast} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={onSidebarWidthChange}/>
     </div>
   );
+
+  const myActiveProjects = projects.filter(p=>
+    Object.values(p.assignees||{}).some(ids=>(ids||[]).includes(member.id)) &&
+    !["Delivered","Canceled"].includes(p.status)
+  );
+  const myActiveDeliverables = projects.flatMap(p=>(p.deliverables||[])
+    .filter(d=>(d.editorId===member.id||d.animatorId===member.id||d.producerId===member.id)&&!["Delivered","On Hold"].includes(d.status))
+    .map(d=>({...d,_project:p}))
+  ).sort((a,b)=>(a.deadline||"9999").localeCompare(b.deadline||"9999"));
+
+  const sectionHeader = (icon,label,count) => (
+    <div style={{fontSize:13,fontWeight:800,color: "#8e97a6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:10}}>
+      {icon} {label}{count!=null&&<span style={{color:"#374151",fontWeight:400}}> ({count})</span>}
+    </div>
+  );
+
+  return (
+    <>
+      {/* Mentions — persistent left panel while viewing a My View, using the
+          same App-owned sidebar slot every other push-panel renders into. */}
+      <SidebarPortal width={360} slotNode={sidebarSlotNode} onWidthChange={onSidebarWidthChange}>
+        <div style={{width:"100%",height:"100%",background:"#0d1117",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <div style={{padding:"16px 20px",borderBottom:"1px solid #1f2937",background:"#111827",flexShrink:0}}>
+            <div style={{fontWeight:900,fontSize:19,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>💬 My Mentions</div>
+          </div>
+          <div style={{flex:1,overflowY:"auto",padding:16}}>
+            <MentionsFeed member={member} projects={projects} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>
+          </div>
+        </div>
+      </SidebarPortal>
+
+      <div>
+        <MyViewHeader member={member} isAdmin={isAdmin} team={team} selectedMember={selectedMember} setSelectedMember={setSelectedMember}/>
+
+        {/* My Projects — same card as the Projects view */}
+        <div style={{marginBottom:28}}>
+          {sectionHeader("📁","My Projects",myActiveProjects.length)}
+          {myActiveProjects.length ? (
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(285px,1fr))",gap:12}}>
+              {myActiveProjects.map(p=><ProjectCard key={p.id} project={p} team={team} onClick={()=>onOpenProject(p)} onUpdateProject={onUpdateProject}/>)}
+            </div>
+          ) : <div style={{fontSize:16,color:"#374151",fontStyle:"italic"}}>No active projects assigned right now.</div>}
+        </div>
+
+        {/* My Active Deliverables — same expandable row → full-field layout
+            as a project's Deliverables tab, reusing DeliverableDetailModal. */}
+        <div style={{marginBottom:28}}>
+          {sectionHeader("🎬","My Active Deliverables",myActiveDeliverables.length)}
+          {myActiveDeliverables.length ? (
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {myActiveDeliverables.map(d=>{
+                const isExp = expandedDelId===d.id;
+                const statusColor = DCOLOR[d.status]||"#6b7280";
+                return (
+                  <div key={d.id} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:9,overflow:"hidden"}}>
+                    <div onClick={()=>setExpandedDelId(isExp?null:d.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",cursor:"pointer"}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:16,fontWeight:700,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title||"Untitled"}</div>
+                        <div style={{fontSize:13,color:"#8e97a6",marginTop:2}}>{d._project.name}</div>
+                      </div>
+                      <span style={{background:statusColor+"20",color:statusColor,borderRadius:99,padding:"2px 9px",fontSize:12,fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",flexShrink:0}}>{d.status}</span>
+                      <Dl date={d.deadline}/>
+                      <span style={{color:"#8e97a6",fontSize:14,flexShrink:0}}>{isExp?"▲":"▼"}</span>
+                    </div>
+                    {isExp&&(
+                      <div onClick={e=>e.stopPropagation()} style={{borderTop:"1px solid #1f2937"}}>
+                        <DeliverableDetailModal del={d} projectId={d._project.id} team={team} allProjects={projects}
+                          onUpdateDel={onUpdateDel} onDeleteDel={onDeleteDel} onUpdateProject={onUpdateProject}
+                          project={d._project} talentRoster={[]}/>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : <div style={{fontSize:16,color:"#374151",fontStyle:"italic"}}>No active deliverables right now.</div>}
+        </div>
+
+        {/* Calendar — hover previews + resizable height, matching the main Calendar view */}
+        <div style={{marginBottom:28}}>
+          {sectionHeader("📅","My Calendar & Time Off")}
+          <RoleCalendar memberId={member.id} projects={projects} onOpenProject={onOpenProject} team={team}
+            unavailability={unavailability} onAddUnavailability={onAddUnavailability}
+            onDeleteUnavailability={onDeleteUnavailability} onUpdateProject={onUpdateProject}/>
+        </div>
+
+        <div style={{marginBottom:28}}>
+          {sectionHeader("📋","Outstanding Tasks")}
+          <MyOutstandingTasks member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}
+            customTasks={customTasks} onAddCustomTask={onAddCustomTask} onUpdateCustomTask={onUpdateCustomTask} onDeleteCustomTask={onDeleteCustomTask}/>
+        </div>
+
+        <div>
+          {sectionHeader("🤖","AI Assistant")}
+          <MyViewChat member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}/>
+        </div>
+      </div>
+    </>
+  );
 };
+
+// Shared header for every My View layout — name/roles + (for admins) a way
+// back to the full picker grid and a quick-switch dropdown to anyone else's.
+const MyViewHeader = ({member, isAdmin, team, selectedMember, setSelectedMember}) => (
+  <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24,paddingBottom:16,borderBottom:"1px solid #1f2937"}}>
+    {isAdmin&&<button onClick={()=>setSelectedMember(null)} style={{background:"#1f2937",border:"none",borderRadius:7,color:"#9ca3af",padding:"6px 12px",cursor:"pointer",fontSize:16,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>☰ Browse All My Views</button>}
+    <Av name={member.name} size={40}/>
+    <div>
+      <div style={{fontWeight:900,fontSize:24,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>{member.name}</div>
+      <div style={{fontSize:16,color: "#9ca3af"}}>{member.roles.join(" · ")} · {member.employeeType}</div>
+    </div>
+    {isAdmin&&(
+      <div style={{marginLeft:"auto"}}>
+        <select value={selectedMember} onChange={e=>setSelectedMember(Number(e.target.value))}
+          style={{background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"6px 10px",fontSize:16,outline:"none"}}>
+          {team.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+      </div>
+    )}
+  </div>
+);
 
 
 // ─── Stats Bar ────────────────────────────────────────────────────────────────
@@ -22111,9 +21447,9 @@ const StudioAgent = ({projects, team, onApplyUpdate, onOpenProject}) => {
 
   return (
     <>
-      {/* FAB — launcher only; once the panel is open it has its own close
-          button in the header below, since this fixed bottom-right position
-          otherwise sits on top of the panel's own send button. */}
+      {/* FAB — launcher only; once the panel is open, this same button
+          relocates to the panel's own header (below) and becomes the
+          close control, rather than a separate X elsewhere. */}
       {!open&&(
         <button onClick={()=>setOpen(true)}
           style={{position:"fixed",bottom:28,right:28,zIndex:900,width:52,height:52,borderRadius:"50%",
@@ -22124,15 +21460,24 @@ const StudioAgent = ({projects, team, onApplyUpdate, onOpenProject}) => {
         </button>
       )}
 
-      {/* Panel */}
-      {open&&(
-        <div style={{position:"fixed",right:0,top:0,bottom:0,zIndex:800,width:390,
-          background:"#0d1117",borderLeft:"1px solid #1f2937",
-          display:"flex",flexDirection:"column",boxShadow:"-8px 0 40px #000a"}}>
+      {/* Panel — slides up from the bottom-right corner (bottom sheet /
+          chat-widget style) rather than in from the right edge. Always
+          mounted so the slide animates both ways; translated fully below
+          the viewport and pointer-events disabled while closed. */}
+      <div style={{position:"fixed",left:0,right:0,bottom:0,zIndex:800,display:"flex",justifyContent:"flex-end",pointerEvents:open?"auto":"none"}}>
+        <div style={{width:"min(420px,100vw)",height:"min(640px,80vh)",marginRight:20,
+          background:"#0d1117",border:"1px solid #1f2937",borderBottom:"none",borderRadius:"16px 16px 0 0",
+          display:"flex",flexDirection:"column",boxShadow:"0 -8px 40px #000a",
+          transform:open?"translateY(0)":"translateY(100%)",
+          transition:"transform 0.28s cubic-bezier(0.4,0,0.2,1)"}}>
 
-          {/* Header */}
-          <div style={{padding:"16px 18px",borderBottom:"1px solid #1f2937",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-            <div style={{width:32,height:32,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,flexShrink:0}}>✦</div>
+          {/* Header — the ✦ button here IS the FAB that opened this panel;
+              clicking it now closes it. */}
+          <div style={{padding:"14px 16px",borderBottom:"1px solid #1f2937",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+            <button onClick={()=>setOpen(false)} title="Close"
+              style={{width:32,height:32,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0,color:"#fff"}}>
+              ✦
+            </button>
             <div>
               <div style={{fontWeight:800,fontSize:17,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>PostTrack Agent</div>
               <div style={{fontSize:13,color: "#8e97a6"}}>AI assistant · knows all projects & workflow</div>
@@ -22140,11 +21485,6 @@ const StudioAgent = ({projects, team, onApplyUpdate, onOpenProject}) => {
             <button onClick={()=>{ setMsgs([{role:"assistant",content:"Conversation cleared. How can I help?",msgId:uid()}]); setPendingId(null); }}
               style={{marginLeft:"auto",background:"none",border:"none",color: "#838ba0",cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}
               title="Clear chat">CLR</button>
-            <button onClick={()=>setOpen(false)}
-              onMouseEnter={e=>{e.currentTarget.style.background="#ef4444";e.currentTarget.style.borderColor="#ef4444";e.currentTarget.style.color="#fff";}}
-              onMouseLeave={e=>{e.currentTarget.style.background="#374151";e.currentTarget.style.borderColor="#4b5563";e.currentTarget.style.color="#f1f5f9";}}
-              style={{background:"#374151",border:"1px solid #4b5563",borderRadius:8,color:"#f1f5f9",width:30,height:30,cursor:"pointer",fontSize:22,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"background 0.15s,border-color 0.15s,color 0.15s"}}
-              title="Close">×</button>
           </div>
 
           {/* Messages */}
@@ -22190,7 +21530,7 @@ const StudioAgent = ({projects, team, onApplyUpdate, onOpenProject}) => {
             </button>
           </div>
         </div>
-      )}
+      </div>
     </>
   );
 };
@@ -22202,13 +21542,12 @@ const ROLE_OPTIONS = ["Executive Producer","Producer","Director","DP","Camera Op
 const DEPT_OPTIONS = ["Production","Post Production","Creative","Broadcast","Management"];
 const EMP_TYPE_OPTIONS = ["Internal","Contractor","Freelancer"];
 
-const AdminTeamTab = ({team, onUpdateTeam}) => {
+const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
+  const [expandedId, setExpandedId] = useState(null);
   const [editId, setEditId]     = useState(null);
   const [search, setSearch]     = useState("");
   const [draft, setDraft]       = useState(null);
   const [showAdd, setShowAdd]   = useState(false);
-  const [importMsg, setImportMsg] = useState(null); // {type:"success"|"error", text}
-  const fileInputRef = useRef();
   const [newMember, setNewMember] = useState({name:"",roles:[],department:"Production",employeeType:"Internal",available:true,email:"",phone:"",skills:[],workHours:{days:[1,2,3,4,5],start:9,end:17,timezone:"EST"},color:null,isAdmin:false});
 
   const filtered = team.filter(m=>
@@ -22217,87 +21556,30 @@ const AdminTeamTab = ({team, onUpdateTeam}) => {
     m.department?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const startEdit = m => { setEditId(m.id); setDraft({...m}); };
+  // Active (non-Delivered/Canceled project, non-Delivered/On-Hold deliverable)
+  // workload counts for the collapsed card.
+  const countsFor = m => {
+    const myProjects = projects.filter(p=>Object.values(p.assignees||{}).some(ids=>(ids||[]).includes(m.id)));
+    const activeProjects = myProjects.filter(p=>!["Delivered","Canceled"].includes(p.status));
+    const myDels = projects.flatMap(p=>(p.deliverables||[]).filter(d=>d.editorId===m.id||d.animatorId===m.id||d.producerId===m.id));
+    const activeDels = myDels.filter(d=>!["Delivered","On Hold"].includes(d.status));
+    return {projects:activeProjects.length, deliverables:activeDels.length};
+  };
+
+  const startEdit = m => { setEditId(m.id); setDraft({...m}); setExpandedId(m.id); };
+  const cancelEdit = () => { setEditId(null); setDraft(null); };
   const saveEdit  = () => { onUpdateTeam(team.map(m=>m.id===editId?{...m,...draft}:m)); setEditId(null); setDraft(null); };
-  const deleteM   = id => { if(window.confirm("Remove this team member?")) onUpdateTeam(team.filter(m=>m.id!==id)); };
+  const deleteM   = id => {
+    if(!window.confirm("Remove this team member?")) return;
+    onUpdateTeam(team.filter(m=>m.id!==id));
+    if(expandedId===id) setExpandedId(null);
+    if(editId===id){ setEditId(null); setDraft(null); }
+  };
   const addMember = () => {
     if(!newMember.name.trim()) return;
     onUpdateTeam([...team, {...newMember, id:Math.max(...team.map(m=>m.id))+1}]);
     setNewMember({name:"",roles:[],department:"Production",employeeType:"Internal",available:true,email:"",phone:"",skills:[]});
     setShowAdd(false);
-  };
-
-  // Anonymise all names
-  const clearNames = () => {
-    if(!window.confirm("Replace all names with 'Team Member 1, 2, 3…'? You can restore them later by importing the original CSV.")) return;
-    onUpdateTeam(team.map((m,i)=>({...m, name:`Team Member ${i+1}`, email:"", phone:""})));
-  };
-
-  // Parse CSV text → array of row objects
-  const parseCSV = text => {
-    const lines = text.trim().split(/\r?\n/);
-    if(lines.length < 2) return null;
-    // Un-quote a CSV field
-    const unq = s => {
-      s = s.trim();
-      if(s.startsWith('"') && s.endsWith('"')) s = s.slice(1,-1).replace(/""/g,'"');
-      return s;
-    };
-    // Naive CSV splitter (handles quoted commas)
-    const splitRow = line => {
-      const cols = []; let cur = "", inQ = false;
-      for(let i=0;i<line.length;i++){
-        const c=line[i];
-        if(c==='"'){ if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ; }
-        else if(c===','&&!inQ){cols.push(unq(cur));cur="";}
-        else cur+=c;
-      }
-      cols.push(unq(cur));
-      return cols;
-    };
-    const headers = splitRow(lines[0]).map(h=>h.toLowerCase().trim());
-    return lines.slice(1).filter(l=>l.trim()).map(l=>{
-      const cols = splitRow(l);
-      const row = {};
-      headers.forEach((h,i)=>{ row[h]=cols[i]||""; });
-      return row;
-    });
-  };
-
-  const handleImport = e => {
-    const file = e.target.files?.[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const rows = parseCSV(ev.target.result);
-      if(!rows||rows.length===0){
-        setImportMsg({type:"error",text:"Couldn't parse file — make sure it's the PostTrack team CSV."});
-        return;
-      }
-      // Map CSV rows → team member objects
-      // Match on ID if present, otherwise match by name, otherwise add as new
-      const imported = rows.map(r=>{
-        const id = r["id"] ? parseInt(r["id"]) : null;
-        const existing = id ? team.find(m=>m.id===id) : team.find(m=>m.name.toLowerCase()===r["name"]?.toLowerCase());
-        return {
-          ...(existing||{}),
-          id:           existing?.id || (Math.max(0,...team.map(m=>m.id))+1),
-          name:         r["name"]||existing?.name||"",
-          department:   r["department"]||existing?.department||"Production",
-          employeeType: r["employee type"]||existing?.employeeType||"Internal",
-          available:    r["available"]?.toLowerCase()==="yes",
-          roles:        r["roles"] ? r["roles"].split(/[;|]/).map(s=>s.trim()).filter(Boolean) : (existing?.roles||[]),
-          email:        r["email"]||existing?.email||"",
-          phone:        r["phone"]||existing?.phone||"",
-          skills:       r["skills"] ? r["skills"].split(/[;|]/).map(s=>s.trim()).filter(Boolean) : (existing?.skills||[]),
-        };
-      });
-      onUpdateTeam(imported);
-      setImportMsg({type:"success",text:`✓ Imported ${imported.length} team member${imported.length!==1?"s":""}.`});
-      setTimeout(()=>setImportMsg(null),4000);
-    };
-    reader.readAsText(file);
-    e.target.value=""; // reset so same file can be re-imported
   };
 
   const RoleToggle = ({roles, onChange}) => (
@@ -22348,36 +21630,15 @@ const AdminTeamTab = ({team, onUpdateTeam}) => {
 
   return (
     <div>
-      {/* Hidden file input for CSV import */}
-      <input ref={fileInputRef} type="file" accept=".csv,text/csv" onChange={handleImport} style={{display:"none"}}/>
-
       {/* Toolbar */}
       <div style={{display:"flex",gap:8,marginBottom:16,alignItems:"center",flexWrap:"wrap"}}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search team…"
           style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"7px 12px",fontSize:16,outline:"none",flex:1,minWidth:160,fontFamily:"'DM Sans',sans-serif"}}/>
-        {/* Import CSV */}
-        <button onClick={()=>fileInputRef.current?.click()}
-          style={{background:"#22c55e15",border:"1px solid #22c55e40",borderRadius:7,color:"#22c55e",padding:"7px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",flexShrink:0}}>
-          ↑ Import CSV
-        </button>
-        {/* Clear names */}
-        <button onClick={clearNames}
-          style={{background:"#f59e0b15",border:"1px solid #f59e0b40",borderRadius:7,color:"#f59e0b",padding:"7px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",flexShrink:0}}>
-          Anonymise
-        </button>
         <button onClick={()=>setShowAdd(s=>!s)}
           style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"7px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",flexShrink:0}}>
           {showAdd?"Cancel":"+ Add"}
         </button>
       </div>
-
-      {/* Import feedback */}
-      {importMsg&&(
-        <div style={{background:importMsg.type==="success"?"#22c55e18":"#ef444418",border:`1px solid ${importMsg.type==="success"?"#22c55e40":"#ef444440"}`,borderRadius:8,padding:"9px 14px",marginBottom:12,fontSize:14,color:importMsg.type==="success"?"#22c55e":"#ef4444",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          {importMsg.text}
-          <button onClick={()=>setImportMsg(null)} style={{background:"none",border:"none",color:"inherit",cursor:"pointer",fontSize:17,lineHeight:1}}>×</button>
-        </div>
-      )}
 
       {showAdd&&(
         <div style={{background:"#0d1117",border:"1px solid #6366f140",borderRadius:10,padding:16,marginBottom:16}}>
@@ -22442,71 +21703,23 @@ const AdminTeamTab = ({team, onUpdateTeam}) => {
       )}
 
       <div style={{display:"flex",flexDirection:"column",gap:4}}>
-        {filtered.map(m=>(
-          <div key={m.id} style={{background:"#0d1117",border:`1px solid ${editId===m.id?"#6366f140":"#1f2937"}`,borderRadius:10,overflow:"hidden"}}>
-            {editId===m.id && draft ? (
-              <div style={{padding:14}}>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
-                  {[["Name","name"],["Email","email"],["Phone","phone"]].map(([l,k])=>(
-                    <div key={k}>
-                      <div style={{fontSize:13,color: "#8e97a6",marginBottom:3,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>{l}</div>
-                      <input value={draft[k]||""} onChange={e=>setDraft(p=>({...p,[k]:e.target.value}))}
-                        style={{width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 10px",fontSize:14,outline:"none",fontFamily:"'DM Sans',sans-serif"}}/>
-                    </div>
-                  ))}
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
-                  {[["Department","department",DEPT_OPTIONS],["Employee Type","employeeType",EMP_TYPE_OPTIONS]].map(([l,k,opts])=>(
-                    <div key={k}>
-                      <div style={{fontSize:13,color: "#8e97a6",marginBottom:3,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>{l}</div>
-                      <select value={draft[k]||""} onChange={e=>setDraft(p=>({...p,[k]:e.target.value}))}
-                        style={{width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:14,outline:"none"}}>
-                        {opts.map(o=><option key={o}>{o}</option>)}
-                      </select>
-                    </div>
-                  ))}
-                  <div>
-                    <div style={{fontSize:13,color: "#8e97a6",marginBottom:3,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Available</div>
-                    <button onClick={()=>setDraft(p=>({...p,available:!p.available}))}
-                      style={{background:draft.available?"#22c55e20":"#0a0f1a",border:`1px solid ${draft.available?"#22c55e":"#374151"}`,borderRadius:6,color:draft.available?"#22c55e":"#4b5563",padding:"6px 14px",fontSize:14,fontWeight:700,cursor:"pointer"}}>
-                      {draft.available?"Available":"Unavailable"}
-                    </button>
-                  </div>
-                </div>
-                <div style={{marginBottom:10}}>
-                  <div style={{fontSize:13,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Roles</div>
-                  <RoleToggle roles={draft.roles||[]} onChange={r=>setDraft(p=>({...p,roles:r}))}/>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                  <div>
-                    <div style={{fontSize:13,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Profile Color</div>
-                    <ColorSwatchPicker value={draft.color} onChange={c=>setDraft(p=>({...p,color:c}))}/>
-                  </div>
-                  <div>
-                    <div style={{fontSize:13,color: "#8e97a6",marginBottom:3,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Admin Access</div>
-                    <button onClick={()=>setDraft(p=>({...p,isAdmin:!p.isAdmin}))}
-                      style={{background:draft.isAdmin?"#f59e0b20":"#0a0f1a",border:`1px solid ${draft.isAdmin?"#f59e0b":"#374151"}`,borderRadius:6,color:draft.isAdmin?"#f59e0b":"#4b5563",padding:"6px 14px",fontSize:14,fontWeight:700,cursor:"pointer"}}>
-                      {draft.isAdmin?"Admin":"Member"}
-                    </button>
-                  </div>
-                </div>
-                <div style={{marginBottom:10}}>
-                  <div style={{fontSize:13,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Hours of Availability</div>
-                  <WorkHoursPicker workHours={draft.workHours} onChange={wh=>setDraft(p=>({...p,workHours:wh}))}/>
-                </div>
-                <div style={{marginBottom:10}}>
-                  <div style={{fontSize:13,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Skills</div>
-                  <KeywordsEditor value={draft.skills||[]} onChange={v=>setDraft(p=>({...p,skills:v}))}/>
-                </div>
-                <div style={{display:"flex",gap:6}}>
-                  <button onClick={saveEdit} style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"6px 16px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>Save</button>
-                  <button onClick={()=>setEditId(null)} style={{background:"#1f2937",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"6px 14px",fontSize:14,fontWeight:700,cursor:"pointer"}}>Cancel</button>
-                  <button onClick={()=>deleteM(m.id)} style={{marginLeft:"auto",background:"none",border:"none",color:"#ef444470",cursor:"pointer",fontSize:13,fontWeight:700,padding:0}}
-                    onMouseEnter={e=>e.currentTarget.style.color="#ef4444"} onMouseLeave={e=>e.currentTarget.style.color="#ef444470"}>Remove</button>
-                </div>
-              </div>
-            ):(
-              <div style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",cursor:"pointer"}} onClick={()=>startEdit(m)}>
+        {filtered.map(m=>{
+          const isExpanded = expandedId===m.id;
+          const isEditing = editId===m.id && draft;
+          const counts = countsFor(m);
+          const workHoursLabel = (()=>{
+            if(!m.workHours) return "—";
+            const DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+            const days=m.workHours.days||[];
+            const dayLabel = days.length===5&&[1,2,3,4,5].every(d=>days.includes(d)) ? "Mon–Fri" : days.map(d=>DOW[d]).join(",");
+            const hr=h=>{const ap=h>=12?"pm":"am";const h12=h%12===0?12:h%12;return `${h12}${ap}`;};
+            return `${dayLabel} ${hr(m.workHours.start)}–${hr(m.workHours.end)} ${m.workHours.timezone}`;
+          })();
+          return (
+            <div key={m.id} style={{background:"#0d1117",border:`1px solid ${isExpanded?"#6366f140":"#1f2937"}`,borderRadius:10,overflow:"hidden"}}>
+              {/* Collapsed summary row — always visible; click toggles expand */}
+              <div onClick={()=>{ if(!isEditing) setExpandedId(isExpanded?null:m.id); }}
+                style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",cursor:isEditing?"default":"pointer"}}>
                 <div style={{width:36,height:36,borderRadius:"50%",background:m.color?m.color+"22":"#111827",border:`1px solid ${m.color||"#1f2937"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,fontWeight:800,color:m.color||"#6366f1",flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif"}}>
                   {m.name.split(" ").map(n=>n[0]).join("").slice(0,2)}
                 </div>
@@ -22515,26 +21728,133 @@ const AdminTeamTab = ({team, onUpdateTeam}) => {
                     <span style={{fontWeight:700,fontSize:17,color:"#f1f5f9"}}>{m.name}</span>
                     <span style={{fontSize:13,padding:"1px 6px",borderRadius:3,background:m.available?"#22c55e15":"#374151",color:m.available?"#22c55e":"#4b5563",fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>{m.available?"Available":"Unavailable"}</span>
                     {m.isAdmin&&<span style={{fontSize:13,padding:"1px 6px",borderRadius:3,background:"#f59e0b15",color:"#f59e0b",fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>Admin</span>}
-                    <span style={{fontSize:13,color: "#838ba0",fontFamily:"'Barlow Condensed',sans-serif"}}>{m.employeeType}</span>
                   </div>
-                  <div style={{fontSize:13,color: "#8e97a6"}}>{m.roles.join(", ")}</div>
-                  {m.workHours&&(()=>{
-                    const DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-                    const days=m.workHours.days||[];
-                    const dayLabel = days.length===5&&[1,2,3,4,5].every(d=>days.includes(d)) ? "Mon–Fri" : days.map(d=>DOW[d]).join(",");
-                    const hr=h=>{const ap=h>=12?"pm":"am";const h12=h%12===0?12:h%12;return `${h12}${ap}`;};
-                    return <div style={{fontSize:13,color: "#838ba0",marginTop:1}}>🕐 {dayLabel} {hr(m.workHours.start)}–{hr(m.workHours.end)} {m.workHours.timezone}</div>;
-                  })()}
+                  <div style={{fontSize:13,color: "#8e97a6"}}>{m.roles.join(", ")||"No roles set"}</div>
                 </div>
                 <div style={{fontSize:13,color: "#838ba0",textAlign:"right",flexShrink:0}}>
-                  <div>{m.department}</div>
-                  <div style={{color:"#1f2937"}}>{m.email}</div>
+                  <div>{counts.projects} project{counts.projects!==1?"s":""} · {counts.deliverables} deliverable{counts.deliverables!==1?"s":""}</div>
+                  <div style={{marginTop:1}}>🕐 {workHoursLabel}</div>
                 </div>
-                <div style={{color: "#838ba0",fontSize:17,flexShrink:0}}>›</div>
+                <div style={{color: "#838ba0",fontSize:17,flexShrink:0}}>{isExpanded?"▲":"▼"}</div>
               </div>
-            )}
-          </div>
-        ))}
+
+              {isExpanded && (
+                <div style={{borderTop:"1px solid #1f2937",padding:14}}>
+                  {isEditing ? (
+                    <>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
+                        {[["Name","name"],["Email","email"],["Phone","phone"]].map(([l,k])=>(
+                          <div key={k}>
+                            <div style={{fontSize:13,color: "#8e97a6",marginBottom:3,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>{l}</div>
+                            <input value={draft[k]||""} onChange={e=>setDraft(p=>({...p,[k]:e.target.value}))}
+                              style={{width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 10px",fontSize:14,outline:"none",fontFamily:"'DM Sans',sans-serif"}}/>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
+                        {[["Department","department",DEPT_OPTIONS],["Employee Type","employeeType",EMP_TYPE_OPTIONS]].map(([l,k,opts])=>(
+                          <div key={k}>
+                            <div style={{fontSize:13,color: "#8e97a6",marginBottom:3,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>{l}</div>
+                            <select value={draft[k]||""} onChange={e=>setDraft(p=>({...p,[k]:e.target.value}))}
+                              style={{width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:14,outline:"none"}}>
+                              {opts.map(o=><option key={o}>{o}</option>)}
+                            </select>
+                          </div>
+                        ))}
+                        <div>
+                          <div style={{fontSize:13,color: "#8e97a6",marginBottom:3,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Available</div>
+                          <button onClick={()=>setDraft(p=>({...p,available:!p.available}))}
+                            style={{background:draft.available?"#22c55e20":"#0a0f1a",border:`1px solid ${draft.available?"#22c55e":"#374151"}`,borderRadius:6,color:draft.available?"#22c55e":"#4b5563",padding:"6px 14px",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                            {draft.available?"Available":"Unavailable"}
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{marginBottom:10}}>
+                        <div style={{fontSize:13,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Roles</div>
+                        <RoleToggle roles={draft.roles||[]} onChange={r=>setDraft(p=>({...p,roles:r}))}/>
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                        <div>
+                          <div style={{fontSize:13,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Profile Color</div>
+                          <ColorSwatchPicker value={draft.color} onChange={c=>setDraft(p=>({...p,color:c}))}/>
+                        </div>
+                        <div>
+                          <div style={{fontSize:13,color: "#8e97a6",marginBottom:3,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Admin Access</div>
+                          <button onClick={()=>setDraft(p=>({...p,isAdmin:!p.isAdmin}))}
+                            style={{background:draft.isAdmin?"#f59e0b20":"#0a0f1a",border:`1px solid ${draft.isAdmin?"#f59e0b":"#374151"}`,borderRadius:6,color:draft.isAdmin?"#f59e0b":"#4b5563",padding:"6px 14px",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                            {draft.isAdmin?"Admin":"Member"}
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{marginBottom:10}}>
+                        <div style={{fontSize:13,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Hours of Availability</div>
+                        <WorkHoursPicker workHours={draft.workHours} onChange={wh=>setDraft(p=>({...p,workHours:wh}))}/>
+                      </div>
+                      <div style={{marginBottom:10}}>
+                        <div style={{fontSize:13,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Skills</div>
+                        <KeywordsEditor value={draft.skills||[]} onChange={v=>setDraft(p=>({...p,skills:v}))}/>
+                      </div>
+                      <div style={{display:"flex",gap:6}}>
+                        <button onClick={saveEdit} style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"6px 16px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>Save</button>
+                        <button onClick={cancelEdit} style={{background:"#1f2937",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"6px 14px",fontSize:14,fontWeight:700,cursor:"pointer"}}>Cancel</button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Locked field view — same layout as editing, read-only */}
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
+                        {[["Name",m.name],["Email",m.email||"—"],["Phone",m.phone||"—"]].map(([l,v])=>(
+                          <div key={l}>
+                            <div style={{fontSize:13,color: "#8e97a6",marginBottom:3,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>{l}</div>
+                            <div style={{width:"100%",background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#9ca3af",padding:"6px 10px",fontSize:14}}>{v}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
+                        {[["Department",m.department||"—"],["Employee Type",m.employeeType||"—"],["Available",m.available?"Yes":"No"]].map(([l,v])=>(
+                          <div key={l}>
+                            <div style={{fontSize:13,color: "#8e97a6",marginBottom:3,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>{l}</div>
+                            <div style={{width:"100%",background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#9ca3af",padding:"6px 10px",fontSize:14}}>{v}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{marginBottom:10}}>
+                        <div style={{fontSize:13,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Roles</div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                          {m.roles.length ? m.roles.map(r=><Chip key={r} label={r} color="#4b5563" xs/>) : <span style={{fontSize:14,color:"#4b5563",fontStyle:"italic"}}>None set</span>}
+                        </div>
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                        <div>
+                          <div style={{fontSize:13,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Profile Color</div>
+                          <div style={{width:26,height:26,borderRadius:"50%",background:m.color||"#1f2937",border:"1px solid #374151"}}/>
+                        </div>
+                        <div>
+                          <div style={{fontSize:13,color: "#8e97a6",marginBottom:3,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Admin Access</div>
+                          <div style={{width:"100%",background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:m.isAdmin?"#f59e0b":"#9ca3af",padding:"6px 10px",fontSize:14}}>{m.isAdmin?"Admin":"Member"}</div>
+                        </div>
+                      </div>
+                      <div style={{marginBottom:10}}>
+                        <div style={{fontSize:13,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Hours of Availability</div>
+                        <div style={{width:"100%",background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#9ca3af",padding:"6px 10px",fontSize:14}}>{workHoursLabel}</div>
+                      </div>
+                      <div style={{marginBottom:14}}>
+                        <div style={{fontSize:13,color: "#8e97a6",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>Skills</div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                          {(m.skills||[]).length ? m.skills.map(s=><Chip key={s} label={s} color="#4b5563" xs/>) : <span style={{fontSize:14,color:"#4b5563",fontStyle:"italic"}}>None set</span>}
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:6}}>
+                        <button onClick={()=>startEdit(m)} style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"6px 16px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>✎ Edit</button>
+                        <button onClick={()=>deleteM(m.id)} style={{background:"none",border:"1px solid #ef444440",borderRadius:7,color:"#ef4444",padding:"6px 14px",fontSize:14,fontWeight:700,cursor:"pointer"}}>Remove</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -24612,24 +23932,30 @@ const LOCKABLE_TABS = [
   {key:"budget", label:"Budget", hint:"The Budget tab inside each project. The project's overall budget status still shows in the project summary even when this is locked."},
 ];
 const AdminAccessTab = ({tabLocks={}, onUpdateTabLocks}) => {
+  // Every role is treated as allowed until explicitly unchecked — an empty
+  // stored list is the "everyone" sentinel, not "nobody"; canAccessTab reads
+  // it the same way. Selecting/unselecting always operates on who CAN
+  // access, never on an exclude-list.
+  const allowedFor = key => tabLocks[key]?.length ? tabLocks[key] : ROLE_OPTIONS;
   const toggleRole = (tabKey, role) => {
-    const current = tabLocks[tabKey] || [];
+    const current = allowedFor(tabKey);
     const next = current.includes(role) ? current.filter(r=>r!==role) : [...current, role];
-    onUpdateTabLocks({...tabLocks, [tabKey]: next});
+    onUpdateTabLocks({...tabLocks, [tabKey]: next.length===ROLE_OPTIONS.length ? [] : next});
   };
   return (
     <div>
       <div style={{fontSize:16,color:"#9ca3af",marginBottom:16,lineHeight:1.5}}>
-        Pick which job roles can see each tab below. Leave a tab with no roles selected to keep it open to everyone. Admins can always see everything, regardless of these settings.
+        Every role can access each tab below by default. Unselect a role to remove that role's access. Admins can always see everything, regardless of these settings.
       </div>
       {LOCKABLE_TABS.map(({key,label,hint})=>{
-        const selected = tabLocks[key]||[];
+        const selected = allowedFor(key);
+        const isRestricted = selected.length < ROLE_OPTIONS.length;
         return (
           <div key={key} style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:10,padding:16,marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
               <div style={{fontSize:17,fontWeight:800,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>{label}</div>
-              <span style={{fontSize:13,fontWeight:700,color:selected.length?"#f59e0b":"#10b981",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
-                {selected.length ? `Locked — ${selected.length} role${selected.length!==1?"s":""}` : "Open to everyone"}
+              <span style={{fontSize:13,fontWeight:700,color:isRestricted?"#f59e0b":"#10b981",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
+                {isRestricted ? `${selected.length} role${selected.length!==1?"s":""} allowed` : "Everyone allowed"}
               </span>
             </div>
             <div style={{fontSize:14,color:"#6b7280",marginBottom:10}}>{hint}</div>
@@ -25021,111 +24347,23 @@ const ProductionPresetsAdmin = ({presets=[], onUpdatePresets, setupTypes=[], tea
 const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, gear, onUpdateGear, mediaCards=[], onUpdateMediaCards, furniture=[], onUpdateFurniture, props_=[], onUpdateProps, screenContent={}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes=[], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations=[], onUpdateWorkstations, talentRoster=[], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists={}, onUpdateLists, presets=[], onUpdatePresets, tabLocks={}, onUpdateTabLocks}) => {
   const [gearSubTab, setGearSubTab] = useState("equipment"); // "equipment" | "media"
   const [tab, setTab] = useState("team");
-  const [csvModal, setCsvModal] = useState(null); // {filename, content}
   const tabs = [{id:"team",l:"👥 Team"},{id:"gear",l:"🎒 Gear"},{id:"props",l:"🪑 Props & Furniture"},{id:"screen",l:"📺 Screen Content"},{id:"spaces",l:"📍 Spaces"},{id:"setups",l:"🎬 Setups"},{id:"workstations",l:"💻 Workstations"},{id:"talent",l:"🎤 Talent"},{id:"resources",l:"📊 Resources"},{id:"lists",l:"🗂 Metadata"},{id:"presets",l:"⭐ Production Presets"},{id:"access",l:"🔒 Access"}];
-
-  const buildAndDownload = (filename, rows) => {
-    const escape = v => {
-      const s = v==null?"":String(v);
-      return s.includes(",")||s.includes('"')||s.includes("\n") ? `"${s.replace(/"/g,'""')}"` : s;
-    };
-    const csv = rows.map(r=>r.map(escape).join(",")).join("\n");
-    // Open in new tab — browser will offer Save As for CSV content
-    const w = window.open("","_blank");
-    if(w) {
-      w.document.write(`<pre style="font-family:monospace;white-space:pre">${csv.replace(/</g,"&lt;")}</pre>`);
-      w.document.title = filename;
-    }
-    // Also show copy modal as fallback
-    setCsvModal({filename, content:csv});
-  };
-
-  const downloadTeamCSV = () => buildAndDownload("posttrack-team.csv",[
-    ["ID","Name","Department","Employee Type","Available","Roles","Email","Phone","Skills"],
-    ...team.map(m=>[m.id,m.name,m.department||"",m.employeeType||"",m.available?"Yes":"No",(m.roles||[]).join("; "),m.email||"",m.phone||"",(m.skills||[]).join("; ")]),
-  ]);
-  const downloadGearCSV = () => buildAndDownload("posttrack-gear.csv",[
-    ["Name","Category","Quantity","Notes"],
-    ...gear.map(g=>[g.name,g.category,g.quantity,g.notes||""]),
-  ]);
-  const downloadMediaCardsCSV = () => buildAndDownload("posttrack-media-cards.csv",[
-    ["Label","Category","Type","Format","Capacity (GB)","Manufacturer","Model","Folder Name","Status","Assigned To","Project Ref","Home Location","Notes"],
-    ...mediaCards.map(m=>[m.label,m.category,m.type||"",m.format||"",m.capacityGB||0,m.manufacturer||"",m.model||"",m.folderName||"",m.status,m.assignedTo||"",m.projectRef||"",m.homeLocation||"",m.notes||""]),
-  ]);
-  const downloadSpacesCSV = () => buildAndDownload("posttrack-spaces.csv",[
-    ["Name","Type","Is HMU","Is Green Room","Is PCR","Suggest HMU","Linked Green Room"],
-    ...spaces.map(s=>{
-      const m=spaceMeta[s]||{};
-      const type=m.isHMU?"HMU Station":m.isGreenRoom?"Green Room":m.isPCR?"PCR":"Shoot Space";
-      return [s,type,m.isHMU?"Yes":"No",m.isGreenRoom?"Yes":"No",m.isPCR?"Yes":"No",m.suggestHMU?"Yes":"No",m.linkedGreenRoom||""];
-    }),
-  ]);
-
-  const downloadFns = {team:downloadTeamCSV, gear:gearSubTab==="media"?downloadMediaCardsCSV:downloadGearCSV, spaces:downloadSpacesCSV};
 
   return (
     <div style={{maxWidth:900,margin:"0 auto"}}>
-      {/* CSV modal */}
-      {csvModal&&(
-        <div style={{position:"fixed",inset:0,zIndex:3000,background:"#000c",display:"flex",alignItems:"center",justifyContent:"center"}}
-          onClick={e=>e.target===e.currentTarget&&setCsvModal(null)}>
-          <div style={{background:"#111827",border:"1px solid #374151",borderRadius:14,padding:24,width:640,maxHeight:"80vh",display:"flex",flexDirection:"column",boxShadow:"0 24px 80px #000c"}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-              <div>
-                <div style={{fontSize:17,fontWeight:800,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>{csvModal.filename}</div>
-                <div style={{fontSize:13,color: "#8e97a6",marginTop:2}}>Copy the content below and paste into Excel, Google Sheets, or save as a .csv file</div>
-              </div>
-              <button onClick={()=>setCsvModal(null)} style={{background:"none",border:"none",color: "#8e97a6",cursor:"pointer",fontSize:24,lineHeight:1}}>×</button>
-            </div>
-            <textarea readOnly value={csvModal.content}
-              style={{flex:1,background:"#0a0f1a",border:"1px solid #374151",borderRadius:8,color:"#9ca3af",padding:"10px 12px",fontSize:13,fontFamily:"monospace",resize:"none",outline:"none",overflowY:"auto",minHeight:200,lineHeight:1.5}}
-              onClick={e=>e.target.select()}/>
-            <div style={{display:"flex",gap:8,marginTop:12}}>
-              <button onClick={()=>{ navigator.clipboard.writeText(csvModal.content).then(()=>{ const b=document.getElementById("csv-copy-btn"); if(b){b.textContent="✓ Copied!"; setTimeout(()=>{b.textContent="Copy to Clipboard";},2000);}}); }}
-                id="csv-copy-btn"
-                style={{flex:1,background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"8px 0",fontSize:16,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>
-                Copy to Clipboard
-              </button>
-              <button onClick={()=>setCsvModal(null)}
-                style={{background:"#1f2937",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"8px 16px",fontSize:14,fontWeight:700,cursor:"pointer"}}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       <div style={{marginBottom:20}}>
         <div style={{fontSize:26,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Admin</div>
         <div style={{fontSize:16,color: "#8e97a6"}}>Manage your team roster, equipment inventory, and studio spaces.</div>
       </div>
-      <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:20}}>
-        <div style={{display:"flex",gap:4,background:"#0d1117",borderRadius:9,padding:4,border:"1px solid #1f2937"}}>
-          {tabs.map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id)}
-              style={{background:tab===t.id?"#1f2937":"transparent",border:"none",borderRadius:7,color:tab===t.id?"#f1f5f9":"#6b7280",padding:"6px 18px",fontSize:16,fontWeight:tab===t.id?800:600,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",transition:"all 0.15s"}}>
-              {t.l} <span style={{fontSize:13,color: "#838ba0",marginLeft:4}}>{t.id==="team"?team.length:t.id==="gear"?gear.length:spaces.length}</span>
-            </button>
-          ))}
-        </div>
-        {/* CSV download button for active tab */}
-        <button onClick={downloadFns[tab]}
-          style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6,background:"#111827",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"6px 14px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}
-          onMouseEnter={e=>{e.currentTarget.style.background="#1f2937";e.currentTarget.style.color="#e2e8f0";}}
-          onMouseLeave={e=>{e.currentTarget.style.background="#111827";e.currentTarget.style.color="#9ca3af";}}>
-          ↓ Export CSV
-        </button>
+      <div style={{display:"flex",flexWrap:"wrap",gap:4,background:"#0d1117",borderRadius:9,padding:4,border:"1px solid #1f2937",marginBottom:20}}>
+        {tabs.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            style={{background:tab===t.id?"#1f2937":"transparent",border:"none",borderRadius:7,color:tab===t.id?"#f1f5f9":"#6b7280",padding:"6px 18px",fontSize:16,fontWeight:tab===t.id?800:600,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",transition:"all 0.15s"}}>
+            {t.l} <span style={{fontSize:13,color: "#838ba0",marginLeft:4}}>{t.id==="team"?team.length:t.id==="gear"?gear.length:spaces.length}</span>
+          </button>
+        ))}
       </div>
-      {tab==="team"&&(
-        <div style={{display:"flex",flexDirection:"column",gap:20}}>
-          {/* Team overview — same as the old standalone Team tab */}
-          <TeamView team={team} projects={projects} onOpenProject={onOpenProject} nudges={nudges}/>
-          {/* Divider */}
-          <div style={{borderTop:"1px solid #1f2937",paddingTop:20}}>
-            <div style={{fontSize:13,fontWeight:800,color:"#838ba0",textTransform:"uppercase",letterSpacing:"0.1em",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:14}}>⚙ Edit Team Members</div>
-            <AdminTeamTab team={team} onUpdateTeam={onUpdateTeam}/>
-          </div>
-        </div>
-      )}
+      {tab==="team"&&<AdminTeamTab team={team} onUpdateTeam={onUpdateTeam} projects={projects}/>}
       {tab==="gear"&&(
         <div>
           <div style={{display:"flex",gap:4,marginBottom:18,borderBottom:"1px solid #1f2937",paddingBottom:12}}>
@@ -26225,6 +25463,19 @@ export default function App() {
     return (currentMember?.roles||[]).some(r=>allowed.includes(r));
   };
   const [showMyProfile, setShowMyProfile] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuBtnRef = useRef(null);
+  const userMenuRef = useRef(null);
+  useEffect(()=>{
+    if(!showUserMenu) return;
+    const h = e => {
+      if(userMenuRef.current && !userMenuRef.current.contains(e.target) &&
+         userMenuBtnRef.current && !userMenuBtnRef.current.contains(e.target))
+        setShowUserMenu(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  },[showUserMenu]);
   const updateMyProfile = profile => {
     if(!currentMember) return;
     const updated = {...currentMember, ...profile};
@@ -26791,15 +26042,40 @@ export default function App() {
               </div>
               <Btn onClick={()=>setAddingProject(true)}>+ New Project</Btn>
               {currentMember&&(
-                <button onClick={()=>setShowMyProfile(true)} title="My Profile"
-                  style={{width:26,height:26,borderRadius:"50%",background:currentMember.color?currentMember.color+"33":"#111827",border:`1px solid ${currentMember.color||"#1f2937"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:currentMember.color||"#6366f1",cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",flexShrink:0}}>
-                  {currentMember.name.split(" ").map(n=>n[0]).join("").slice(0,2)}
-                </button>
+                <div style={{position:"relative"}}>
+                  <button ref={userMenuBtnRef} onClick={()=>setShowUserMenu(v=>!v)} title={currentMember.name}
+                    style={{width:26,height:26,borderRadius:"50%",background:currentMember.color?currentMember.color+"33":"#111827",border:`1px solid ${currentMember.color||"#1f2937"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:currentMember.color||"#6366f1",cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",flexShrink:0}}>
+                    {currentMember.name.split(" ").map(n=>n[0]).join("").slice(0,2)}
+                  </button>
+                  {showUserMenu&&(
+                    <div ref={userMenuRef} style={{position:"absolute",top:"calc(100% + 8px)",right:0,zIndex:200,background:"#111827",border:"1px solid #1f2937",borderRadius:9,padding:6,minWidth:170,boxShadow:"0 12px 32px #000a"}}>
+                      <div style={{padding:"6px 10px 8px",borderBottom:"1px solid #1f2937",marginBottom:4}}>
+                        <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{currentMember.name}</div>
+                        <div style={{fontSize:12,color:"#6b7280"}}>{(currentMember.roles||[])[0]}</div>
+                      </div>
+                      {[
+                        {label:"My View", icon:"👤", onClick:()=>setView("myview")},
+                        {label:"Profile", icon:"⚙", onClick:()=>setShowMyProfile(true)},
+                      ].map(item=>(
+                        <button key={item.label} onClick={()=>{item.onClick();setShowUserMenu(false);}}
+                          style={{width:"100%",display:"flex",alignItems:"center",gap:8,background:"none",border:"none",borderRadius:6,color:"#e2e8f0",padding:"7px 10px",fontSize:14,fontWeight:600,cursor:"pointer",textAlign:"left",fontFamily:"'DM Sans',sans-serif"}}
+                          onMouseEnter={e=>e.currentTarget.style.background="#1f2937"}
+                          onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                          <span style={{width:16,textAlign:"center"}}>{item.icon}</span>{item.label}
+                        </button>
+                      ))}
+                      {sb&&(
+                        <button onClick={()=>{setShowUserMenu(false);sb.auth.signOut();}}
+                          style={{width:"100%",display:"flex",alignItems:"center",gap:8,background:"none",border:"none",borderRadius:6,color:"#ef4444",padding:"7px 10px",fontSize:14,fontWeight:600,cursor:"pointer",textAlign:"left",fontFamily:"'DM Sans',sans-serif",marginTop:2,borderTop:"1px solid #1f2937",paddingTop:9}}
+                          onMouseEnter={e=>e.currentTarget.style.background="#ef444415"}
+                          onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                          <span style={{width:16,textAlign:"center"}}>↪</span>Sign Out
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
-              {sb&&<button onClick={()=>sb.auth.signOut()} title="Sign out"
-                style={{background:"transparent",border:"1px solid #1f2937",borderRadius:5,color:"#6b7280",padding:"3px 10px",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",whiteSpace:"nowrap"}}>
-                Sign Out
-              </button>}
             </div>
           </div>
         </div>
@@ -26849,7 +26125,7 @@ export default function App() {
           {view==="deliverables"&&<DeliverablesTab projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="ingest"&&<IngestView projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="resources"&&<ResourceView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
-          {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability} currentMember={currentMember} isAdmin={isAdmin} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
+          {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability} currentMember={currentMember} isAdmin={isAdmin} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="admin"&&<AdminView
             team={teamRoster} onUpdateTeam={saveTeam}
             projects={allProjects} nudges={nudges} onOpenProject={openProject}
