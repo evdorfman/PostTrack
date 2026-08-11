@@ -9726,6 +9726,9 @@ const QuickNoteModal = ({project, team, onClose, onUpdateProject}) => {
   const [author, setAuthor] = useState(team[0]?.id||"");
   const [tagging, setTagging] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
+  const [editNoteId, setEditNoteId] = useState(null);
+  const [editText, setEditText] = useState("");
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const inputRef = useRef();
 
   const addNote = () => {
@@ -9788,7 +9791,10 @@ const QuickNoteModal = ({project, team, onClose, onUpdateProject}) => {
               placeholder="Type a note… Use @name to tag. Enter to save, Shift+Enter for new line."
               style={{width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:7,color:"#e2e8f0",padding:"12px 14px",fontSize:18,outline:"none",resize:"vertical",minHeight:100,fontFamily:"'DM Sans',sans-serif"}}/>
             {tagging&&(
-              <div style={{position:"absolute",bottom:"calc(100% + 4px)",left:0,right:0,background:"#111827",border:"1px solid #374151",borderRadius:9,overflow:"hidden",zIndex:50,boxShadow:"0 8px 24px #000a",maxHeight:200,overflowY:"auto"}}>
+              // Opens downward, not upward — this sits near the top of the
+              // modal (right under the header), so anchoring "up" from here
+              // ran out of room and got clipped by the modal's own edge.
+              <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:"#111827",border:"1px solid #374151",borderRadius:9,overflow:"hidden",zIndex:50,boxShadow:"0 8px 24px #000a",maxHeight:200,overflowY:"auto"}}>
                 {matchedTeam.length===0&&<div style={{padding:"10px 14px",fontSize:16,color: "#8e97a6"}}>No match</div>}
                 {matchedTeam.map(m=>(
                   <div key={m.id} onClick={()=>insertTag(m.name)}
@@ -9817,6 +9823,7 @@ const QuickNoteModal = ({project, team, onClose, onUpdateProject}) => {
         <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:320,overflowY:"auto"}}>
           {[...(project.notes||[])].reverse().map(note=>{
             const author = team.find(m=>m.id===note.authorId);
+            const isEditing = editNoteId===note.id;
             // Render @tags in blue
             const renderText = (t) => {
               const parts = t.split(/(@\w+)/g);
@@ -9825,23 +9832,57 @@ const QuickNoteModal = ({project, team, onClose, onUpdateProject}) => {
                 : p
               );
             };
+            const saveEdit = () => {
+              if(!editText.trim()) return;
+              onUpdateProject(project.id,"notes",(project.notes||[]).map(n=>n.id===note.id?{...n,text:editText.trim(),editedAt:new Date().toISOString()}:n));
+              setEditNoteId(null); setEditText("");
+            };
             return (
               <div key={note.id} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:9,padding:"10px 13px"}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
                   {author&&<Av name={author.name} size={22} email={author.email}/>}
                   <div style={{flex:1}}>
                     <div style={{fontSize:16,fontWeight:700,color:"#e2e8f0"}}>{note.authorName}</div>
-                    <div style={{fontSize:13,color: "#8e97a6"}}>{fmtDT(note.createdAt)}</div>
+                    <div style={{fontSize:13,color: "#8e97a6"}}>{fmtDT(note.createdAt)}{note.editedAt&&<span style={{fontStyle:"italic"}}> · edited</span>}</div>
                   </div>
-                  <button onClick={()=>onUpdateProject(project.id,"notes",(project.notes||[]).filter(n=>n.id!==note.id))}
-                    style={{background:"none",border:"none",color: "#838ba0",cursor:"pointer",fontSize:17,lineHeight:1}}>×</button>
+                  {!isEditing&&(
+                    <>
+                      <button onClick={()=>{setEditNoteId(note.id);setEditText(note.text);}}
+                        style={{background:"none",border:"none",color: "#838ba0",cursor:"pointer",fontSize:13,fontWeight:700,padding:"0 4px"}}>✎</button>
+                      <button onClick={()=>setDeleteConfirmId(note.id)}
+                        style={{background:"none",border:"none",color: "#838ba0",cursor:"pointer",fontSize:17,lineHeight:1}}>×</button>
+                    </>
+                  )}
                 </div>
-                <div style={{fontSize:17,color:"#d1d5db",lineHeight:1.5}}>{renderText(note.text)}</div>
+                {isEditing ? (
+                  <div>
+                    <StableInp value={editText} onChange={e=>setEditText(e.target.value)} textarea
+                      style={{background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"7px 10px",fontSize:16,fontFamily:"'DM Sans',sans-serif"}}/>
+                    <div style={{display:"flex",gap:6,marginTop:6}}>
+                      <button onClick={saveEdit} style={{background:"#6366f1",border:"none",borderRadius:6,color:"#fff",padding:"4px 12px",fontSize:13,cursor:"pointer",fontWeight:700}}>Save</button>
+                      <button onClick={()=>{setEditNoteId(null);setEditText("");}} style={{background:"none",border:"none",color: "#9ca3af",cursor:"pointer",fontSize:13,fontWeight:600}}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{fontSize:17,color:"#d1d5db",lineHeight:1.5}}>{renderText(note.text)}</div>
+                )}
               </div>
             );
           })}
         </div>
       </div>
+
+      {deleteConfirmId!=null && (
+        <Modal onClose={()=>setDeleteConfirmId(null)} maxWidth={380}>
+          <div style={{fontSize:20,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:10}}>Delete Note?</div>
+          <div style={{fontSize:15,color:"#9ca3af",marginBottom:20}}>This note will be permanently removed.</div>
+          <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+            <button onClick={()=>setDeleteConfirmId(null)} style={{background:"#1f2937",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"8px 16px",fontSize:14,fontWeight:700,cursor:"pointer"}}>Cancel</button>
+            <button onClick={()=>{onUpdateProject(project.id,"notes",(project.notes||[]).filter(n=>n.id!==deleteConfirmId));setDeleteConfirmId(null);}}
+              style={{background:"#ef4444",border:"none",borderRadius:7,color:"#fff",padding:"8px 16px",fontSize:14,fontWeight:800,cursor:"pointer"}}>Delete</button>
+          </div>
+        </Modal>
+      )}
     </Modal>
   );
 };
@@ -10262,7 +10303,10 @@ const ProjectSidebar = ({project, team, allProjects=[], onUpdateProject, onUpdat
   const [showProjectHandoff,setShowProjectHandoff] = useState(false); // project-level editor assignment
   const [vis,setVis]                 = useState(false);
   useEffect(()=>{ requestAnimationFrame(()=>setVis(true)); },[]);
-  const [sidebarWidth, sidebarHandle] = useResizableWidth("posttrack-project-list-sidebar-width", 440, {min:340,max:760});
+  // Shares the same storage key/range as every other sidebar (SidebarPortal's
+  // App-owned nav slot) so widths and padding stay in sync app-wide, even
+  // though this one panel is still on the older push-panel mechanism.
+  const [sidebarWidth, sidebarHandle] = useResizableWidth("posttrack-nav-sidebar-width", 480, {min:320,max:720});
   // The panel itself always renders at the live (possibly mid-drag)
   // sidebarWidth — smooth, immediate, no jitter risk since it's just this
   // one fixed-position box resizing. But usePushPanel's width feeds
@@ -10390,7 +10434,7 @@ const ProjectSidebar = ({project, team, allProjects=[], onUpdateProject, onUpdat
         {showBrief&&<BriefPreviewModal project={project} onClose={()=>setShowBrief(false)}/>}
 
         {/* Scrollable body */}
-        <div style={{overflowY:"auto",WebkitOverflowScrolling:"touch",padding:"14px 16px 40px",display:"flex",flexDirection:"column",gap:10,minHeight:0}}>
+        <div style={{overflowY:"auto",WebkitOverflowScrolling:"touch",padding:"16px 20px 40px",display:"flex",flexDirection:"column",gap:10,minHeight:0}}>
 
           {/* Always-visible meta block — now editable */}
           <div style={{display:"flex",flexDirection:"column",gap:7,background:"#0f172a",border:"1px solid #1f2937",borderRadius:10,padding:"12px 14px",flexShrink:0}}>
@@ -13004,6 +13048,8 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
   const [selectedMember,setSelectedMember] = useState(()=> currentMember ? currentMember.id : null);
   useEffect(()=>{ if(currentMember) setSelectedMember(m=>m??currentMember.id); },[currentMember?.id]);
   const [expandedDelId, setExpandedDelId] = useState(null);
+  const [calendarOpen, setCalendarOpen] = useState(true);
+  const [sideHeight, sideHeightHandle] = useResizableHeight("posttrack-myview-side-height", 380, {min:220,max:900});
   const member = team.find(m=>m.id===selectedMember);
 
   const roleGroups = [
@@ -13084,32 +13130,49 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
   );
 
   return (
-    <div>
+    <div style={{paddingBottom:80}}>
       <MyViewHeader member={member} isAdmin={isAdmin} team={team} selectedMember={selectedMember} setSelectedMember={setSelectedMember}
         projects={projects} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>
 
-      {/* Calendar — hover previews + resizable height, matching the main Calendar view */}
+      {/* Calendar — hover previews + resizable height, matching the main Calendar view; collapsible for anyone who doesn't need it */}
       <div style={{marginBottom:28}}>
-        {sectionHeader("📅","My Calendar & Time Off")}
-        <RoleCalendar memberId={member.id} projects={projects} onOpenProject={onOpenProject} team={team}
-          unavailability={unavailability} onAddUnavailability={onAddUnavailability}
-          onDeleteUnavailability={onDeleteUnavailability} onUpdateProject={onUpdateProject}/>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:calendarOpen?10:0}}>
+          {sectionHeader("📅","My Calendar & Time Off")}
+          <button onClick={()=>setCalendarOpen(o=>!o)}
+            style={{background:"#1f2937",border:"none",borderRadius:6,color:"#9ca3af",padding:"3px 10px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.05em"}}>
+            {calendarOpen?"▲ Minimize":"▼ Show Calendar"}
+          </button>
+        </div>
+        {calendarOpen&&(
+          <RoleCalendar memberId={member.id} projects={projects} onOpenProject={onOpenProject} team={team}
+            unavailability={unavailability} onAddUnavailability={onAddUnavailability}
+            onDeleteUnavailability={onDeleteUnavailability} onUpdateProject={onUpdateProject}/>
+        )}
       </div>
 
-      <div style={{display:"flex",gap:20,marginBottom:28,alignItems:"flex-start",flexWrap:"wrap"}}>
-        <div style={{flex:"1 1 360px",minWidth:0}}>
+      {/* AI Assistant + Outstanding Tasks — locked to the same height, and
+          draggable together via the shared handle beneath them. */}
+      <div style={{display:"flex",gap:20,alignItems:"stretch",flexWrap:"wrap"}}>
+        <div style={{flex:"1 1 360px",minWidth:0,display:"flex",flexDirection:"column"}}>
           {sectionHeader("🤖","AI Assistant")}
-          <MyViewChat member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}/>
+          <div style={{height:sideHeight,overflowY:"auto"}}>
+            <MyViewChat member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}/>
+          </div>
         </div>
-        <div style={{flex:"1 1 360px",minWidth:0}}>
+        <div style={{flex:"1 1 360px",minWidth:0,display:"flex",flexDirection:"column"}}>
           {sectionHeader("📋","Outstanding Tasks")}
-          <MyOutstandingTasks member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}
-            customTasks={customTasks} onAddCustomTask={onAddCustomTask} onUpdateCustomTask={onUpdateCustomTask} onDeleteCustomTask={onDeleteCustomTask}/>
+          <div style={{height:sideHeight,overflowY:"auto"}}>
+            <MyOutstandingTasks member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}
+              customTasks={customTasks} onAddCustomTask={onAddCustomTask} onUpdateCustomTask={onUpdateCustomTask} onDeleteCustomTask={onDeleteCustomTask}/>
+          </div>
         </div>
       </div>
+      <VerticalResizeHandle {...sideHeightHandle}/>
+      <div style={{marginBottom:20}}/>
 
-      {/* My Projects — same card as the Projects view */}
-      <div style={{marginBottom:28}}>
+      {/* My Projects — same card as the Projects view, in its own panel so a
+          partial row of cards doesn't look like it's floating on its own */}
+      <div style={{marginBottom:28,background:"#0d1117",border:"1px solid #1f2937",borderRadius:12,padding:16}}>
         {sectionHeader("📁","My Projects",myActiveProjects.length)}
         {myActiveProjects.length ? (
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(285px,1fr))",gap:12}}>
@@ -21174,7 +21237,7 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[]}) => {
   const [loaded, setLoaded] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const bottomRef = useRef();
+  const msgListRef = useRef();
 
   const outstandingTasks = useMemo(()=>getOutstandingTasksForMember(member.id, projects, team, nudges), [member.id, projects, team, nudges]);
 
@@ -21189,7 +21252,14 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[]}) => {
     }).catch(()=>{}).finally(()=>setLoaded(true));
   },[member.id]);
 
-  useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:"smooth"}); },[msgs,loading]);
+  // Scroll only the message list's own scroll container, never the page —
+  // scrollIntoView() walks every ancestor (including the page itself) to
+  // bring the target on-screen, which is what was auto-scrolling the whole
+  // My View page down whenever the rundown auto-generated on mount.
+  useEffect(()=>{
+    const el = msgListRef.current;
+    if(el) el.scrollTop = el.scrollHeight;
+  },[msgs,loading]);
 
   const persist = (newMsgs, date) => {
     window.storage?.set(storageKey, JSON.stringify({msgs:newMsgs, date}), true).catch(()=>{});
@@ -21267,7 +21337,7 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[]}) => {
         )}
       </div>
 
-      <div style={{maxHeight:340,overflowY:"auto",marginBottom:10}}>
+      <div ref={msgListRef} style={{maxHeight:340,overflowY:"auto",marginBottom:10}}>
         {visibleMsgs.map((m,i)=>{
           const isUser = m.role==="user";
           return (
@@ -21285,7 +21355,6 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[]}) => {
             {[0,0.2,0.4].map((d,i)=><div key={i} style={{width:6,height:6,borderRadius:"50%",background:"#6366f1",animation:`pulse 1.2s ${d}s infinite`}}/>)}
           </div>
         )}
-        <div ref={bottomRef}/>
       </div>
 
       <div style={{display:"flex",gap:8}}>
@@ -21878,9 +21947,11 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
                     </>
                   ) : (
                     <>
-                      {/* Locked field view — same layout as editing, read-only */}
-                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12,padding:"6px 10px",background:"#1f293780",border:"1px solid #374151",borderRadius:6,fontSize:13,color:"#8e97a6"}}>
-                        🔒 Locked — click Edit to make changes
+                      {/* Read-only view of the selected member — same layout as
+                          editing, styled as a "selected" state rather than a
+                          disabled/locked one. */}
+                      <div style={{display:"inline-flex",alignItems:"center",gap:6,marginBottom:12,padding:"4px 12px",background:"#6366f11a",border:"1px solid #6366f150",borderRadius:99,fontSize:13,fontWeight:700,color:"#818cf8",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.05em"}}>
+                        ✓ Selected — click Edit to make changes
                       </div>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
                         {[["Name",m.name],["Email",m.email||"—"],["Phone",m.phone||"—"]].map(([l,v])=>(
@@ -24448,11 +24519,11 @@ const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, g
         <div style={{fontSize:26,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Admin</div>
         <div style={{fontSize:16,color: "#8e97a6"}}>Manage your team roster, equipment inventory, and studio spaces.</div>
       </div>
-      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:20}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8,marginBottom:20}}>
         {tabs.map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)}
-            style={{background:tab===t.id?"#1f2937":"#0d1117",border:`1px solid ${tab===t.id?"#6366f1":"#1f2937"}`,borderRadius:8,color:tab===t.id?"#f1f5f9":"#6b7280",padding:"7px 16px",fontSize:16,fontWeight:tab===t.id?800:600,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",transition:"all 0.15s"}}>
-            {t.l} <span style={{fontSize:13,color: "#838ba0",marginLeft:4}}>{t.id==="team"?team.length:t.id==="gear"?gear.length:spaces.length}</span>
+            style={{background:tab===t.id?"#1f2937":"#0d1117",border:`1px solid ${tab===t.id?"#6366f1":"#1f2937"}`,borderRadius:8,color:tab===t.id?"#f1f5f9":"#6b7280",padding:"7px 14px",fontSize:16,fontWeight:tab===t.id?800:600,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",transition:"all 0.15s",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+            {t.l}
           </button>
         ))}
       </div>
