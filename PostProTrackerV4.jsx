@@ -1,6 +1,29 @@
 import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
+// ─── TEMPORARY DEBUG PATCH (round 2) — the first empty-object-as-child crash
+// (BookingRow's location span) is fixed, but the same error signature is
+// still happening for one specific production, so this is back to pinpoint
+// wherever the next spot is. Remove once found and fixed.
+if (typeof window !== "undefined" && window.React && !window.React.__childDebugPatched) {
+  const _origCreateElement = window.React.createElement;
+  window.React.createElement = function(type, props, ...children) {
+    const check = (c, where) => {
+      if (c && typeof c === "object" && !Array.isArray(c) && !c.$$typeof && !(c instanceof Date)) {
+        const typeName = typeof type === "function" ? (type.displayName || type.name || "Anonymous") : String(type);
+        console.error(`[CHILD-DEBUG] Plain object passed as a React child at ${where} inside <${typeName}>. Keys: [${Object.keys(c).join(", ")}]`, {value: c, props});
+        console.trace("[CHILD-DEBUG] stack");
+      }
+    };
+    children.forEach((c, i) => {
+      if (Array.isArray(c)) c.forEach((cc, j) => check(cc, `children[${i}][${j}]`));
+      else check(c, `children[${i}]`);
+    });
+    return _origCreateElement.apply(window.React, [type, props, ...children]);
+  };
+  window.React.__childDebugPatched = true;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PROJECT_STATUSES   = ["New Request","Ideation","Pre-Pro","In Production","Post","In Review","Delivered","On Hold","Canceled"];
 const BUDGET_STATUSES    = ["Not Started","Quoted","Approved"];

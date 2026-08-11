@@ -374,6 +374,24 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   // build_src.jsx
   var import_react = __require("react");
   var import_recharts = __require("recharts");
+  if (typeof window !== "undefined" && window.React && !window.React.__childDebugPatched) {
+    const _origCreateElement = window.React.createElement;
+    window.React.createElement = function(type, props, ...children) {
+      const check = (c, where) => {
+        if (c && typeof c === "object" && !Array.isArray(c) && !c.$$typeof && !(c instanceof Date)) {
+          const typeName = typeof type === "function" ? type.displayName || type.name || "Anonymous" : String(type);
+          console.error(`[CHILD-DEBUG] Plain object passed as a React child at ${where} inside <${typeName}>. Keys: [${Object.keys(c).join(", ")}]`, { value: c, props });
+          console.trace("[CHILD-DEBUG] stack");
+        }
+      };
+      children.forEach((c, i) => {
+        if (Array.isArray(c)) c.forEach((cc, j) => check(cc, `children[${i}][${j}]`));
+        else check(c, `children[${i}]`);
+      });
+      return _origCreateElement.apply(window.React, [type, props, ...children]);
+    };
+    window.React.__childDebugPatched = true;
+  }
   var PROJECT_STATUSES = ["New Request", "Ideation", "Pre-Pro", "In Production", "Post", "In Review", "Delivered", "On Hold", "Canceled"];
   var BUDGET_STATUSES = ["Not Started", "Quoted", "Approved"];
   var ANIM_ROUND_STATUSES = ["Not Started", "In Progress", "Ready for Editor", "Changes Requested", "Complete"];
