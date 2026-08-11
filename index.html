@@ -7660,7 +7660,8 @@ Brief content: ${content}`;
     };
     const Bar2 = ({ label, count, max, color }) => /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 7 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 130, fontSize: 17, color: "#9ca3af", textAlign: "right", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, label), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: 22, background: "#1f2937", borderRadius: 5, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { height: "100%", width: `${Math.max(count / max * 100, 8)}%`, background: color, borderRadius: 5, display: "flex", alignItems: "center", paddingLeft: 8, transition: "width 0.4s", minWidth: 28 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: "#fff" } }, count))));
     const tabS = (a) => ({ padding: "5px 16px", borderRadius: 7, fontWeight: 800, fontSize: 16, cursor: "pointer", border: "none", background: a ? "#6366f1" : "transparent", color: a ? "#fff" : "#6b7280", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.07em", textTransform: "uppercase" });
-    const openDel = (d) => {
+    const openDel = (d, e) => {
+      e?.stopPropagation();
       if (d._fromProduction) {
         setPopupDel(d);
         return;
@@ -7676,7 +7677,7 @@ Brief content: ${content}`;
       return /* @__PURE__ */ React.createElement(
         "div",
         {
-          onClick: () => openDel(d),
+          onClick: (e) => openDel(d, e),
           style: { display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", background: "#111827", border: `1px solid ${changes ? "#ef444430" : "#1f2937"}`, borderRadius: 9, cursor: "pointer" },
           onMouseEnter: (e) => e.currentTarget.style.borderColor = changes ? "#ef4444" : "#374151",
           onMouseLeave: (e) => e.currentTarget.style.borderColor = changes ? "#ef444430" : "#1f2937"
@@ -7777,7 +7778,8 @@ Brief content: ${content}`;
           "div",
           {
             key: d.id,
-            onClick: () => {
+            onClick: (e) => {
+              e.stopPropagation();
               if (d._fromProduction) {
                 setPopupDel(d);
                 return;
@@ -8694,7 +8696,7 @@ Brief content: ${content}`;
       "+ Add custom task"
     ));
   };
-  var MyOutstandingTasks = ({ member, projects, team, onOpenProject, nudges = [], customTasks = [], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, contentHeight }) => {
+  var MyOutstandingTasks = ({ member, projects, team, onOpenProject, nudges = [], customTasks = [], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, minHeight }) => {
     const automatedTasks = (0, import_react.useMemo)(() => getOutstandingTasksForMember(member.id, projects, team, nudges), [member.id, projects, team, nudges]);
     const nudgedCount = automatedTasks.filter((t) => t.nudgedAt).length;
     const openCustomTasks = customTasks.filter((t) => !t.done);
@@ -8707,7 +8709,7 @@ Brief content: ${content}`;
       if (!autoByProject[t.projectId]) autoByProject[t.projectId] = [];
       autoByProject[t.projectId].push(t);
     });
-    return /* @__PURE__ */ React.createElement("div", { style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 18px", display: "flex", flexDirection: "column", ...contentHeight ? { height: contentHeight } : {} } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 19, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, "\u{1F4CB} Outstanding Tasks"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, nudgedCount > 0 && /* @__PURE__ */ React.createElement(Chip, { label: `\u{1F514} ${nudgedCount} nudged`, color: "#f59e0b" }), automatedTasks.length > 0 && /* @__PURE__ */ React.createElement(Chip, { label: `${automatedTasks.length} checklist`, color: "#6b7280" }), openCustomTasks.length > 0 && /* @__PURE__ */ React.createElement(Chip, { label: `${openCustomTasks.length} custom`, color: "#6366f1" }))), allProjectIds.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#374151", fontStyle: "italic" } }, "Nothing outstanding right now.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, ...contentHeight ? { flex: "1 1 auto", minHeight: 0, overflowY: "auto" } : {} } }, allProjectIds.map((projectId) => {
+    return /* @__PURE__ */ React.createElement("div", { style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 18px", display: "flex", flexDirection: "column", minHeight, flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 19, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, "\u{1F4CB} Outstanding Tasks"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, nudgedCount > 0 && /* @__PURE__ */ React.createElement(Chip, { label: `\u{1F514} ${nudgedCount} nudged`, color: "#f59e0b" }), automatedTasks.length > 0 && /* @__PURE__ */ React.createElement(Chip, { label: `${automatedTasks.length} checklist`, color: "#6b7280" }), openCustomTasks.length > 0 && /* @__PURE__ */ React.createElement(Chip, { label: `${openCustomTasks.length} custom`, color: "#6366f1" }))), allProjectIds.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#374151", fontStyle: "italic" } }, "Nothing outstanding right now.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, allProjectIds.map((projectId) => {
       const proj = projects.find((p) => p.id === projectId);
       if (!proj) return null;
       return /* @__PURE__ */ React.createElement(
@@ -8737,8 +8739,6 @@ Brief content: ${content}`;
     const [tasksOpen, setTasksOpen] = (0, import_react.useState)(true);
     const [projectsOpen, setProjectsOpen] = (0, import_react.useState)(true);
     const [delsOpen, setDelsOpen] = (0, import_react.useState)(true);
-    const [aiHeight, aiHeightHandle] = useResizableHeight("posttrack-myview-ai-height", 340, { min: 160, max: 800 });
-    const [tasksHeight, tasksHeightHandle] = useResizableHeight("posttrack-myview-tasks-height", 340, { min: 160, max: 800 });
     const member = team.find((m) => m.id === selectedMember);
     const roleGroups = [
       { label: "Editors & Post", roles: ["Editor", "Animator", "Designer", "Head of Post Production", "Colorist", "Audio Mixer"] },
@@ -8804,7 +8804,7 @@ Brief content: ${content}`;
         onDeleteUnavailability,
         onUpdateProject
       }
-    )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap", marginBottom: 28 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 360px", minWidth: 0 } }, sectionHeader("\u{1F916}", "AI Assistant", null, aiOpen, () => setAiOpen((o) => !o)), aiOpen && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(MyViewChat, { member, projects, team, onOpenProject, nudges, contentHeight: aiHeight }), /* @__PURE__ */ React.createElement(VerticalResizeHandle, { ...aiHeightHandle }))), /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 360px", minWidth: 0 } }, sectionHeader("\u{1F4CB}", "Outstanding Tasks", null, tasksOpen, () => setTasksOpen((o) => !o)), tasksOpen && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+    )), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: aiOpen && tasksOpen ? "1fr 1fr" : "1fr", gap: 20, marginBottom: 28 } }, /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, display: "flex", flexDirection: "column" } }, sectionHeader("\u{1F916}", "AI Assistant", null, aiOpen, () => setAiOpen((o) => !o)), aiOpen && /* @__PURE__ */ React.createElement(MyViewChat, { member, projects, team, onOpenProject, nudges, minHeight: 340 })), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, display: "flex", flexDirection: "column" } }, sectionHeader("\u{1F4CB}", "Outstanding Tasks", null, tasksOpen, () => setTasksOpen((o) => !o)), tasksOpen && /* @__PURE__ */ React.createElement(
       MyOutstandingTasks,
       {
         member,
@@ -8816,9 +8816,9 @@ Brief content: ${content}`;
         onAddCustomTask,
         onUpdateCustomTask,
         onDeleteCustomTask,
-        contentHeight: tasksHeight
+        minHeight: 340
       }
-    ), /* @__PURE__ */ React.createElement(VerticalResizeHandle, { ...tasksHeightHandle })))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 28 } }, sectionHeader("\u{1F4C1}", "My Projects", myActiveProjects.length, projectsOpen, () => setProjectsOpen((o) => !o)), projectsOpen && /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, padding: 16 } }, myActiveProjects.length ? /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(285px,1fr))", gap: 12 } }, myActiveProjects.map((p) => /* @__PURE__ */ React.createElement(ProjectCard, { key: p.id, project: p, team, onClick: () => onOpenProject(p), onUpdateProject }))) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#374151", fontStyle: "italic" } }, "No active projects assigned right now."))), /* @__PURE__ */ React.createElement("div", null, sectionHeader("\u{1F3AC}", "My Active Deliverables", myActiveDeliverables.length, delsOpen, () => setDelsOpen((o) => !o)), delsOpen && (myActiveDeliverables.length ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, myActiveDeliverables.map((d) => {
+    ))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 28 } }, sectionHeader("\u{1F4C1}", "My Projects", myActiveProjects.length, projectsOpen, () => setProjectsOpen((o) => !o)), projectsOpen && /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, padding: 16 } }, myActiveProjects.length ? /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(285px,1fr))", gap: 12 } }, myActiveProjects.map((p) => /* @__PURE__ */ React.createElement(ProjectCard, { key: p.id, project: p, team, onClick: () => onOpenProject(p), onUpdateProject }))) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#374151", fontStyle: "italic" } }, "No active projects assigned right now."))), /* @__PURE__ */ React.createElement("div", null, sectionHeader("\u{1F3AC}", "My Active Deliverables", myActiveDeliverables.length, delsOpen, () => setDelsOpen((o) => !o)), delsOpen && (myActiveDeliverables.length ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, myActiveDeliverables.map((d) => {
       const isExp = expandedDelId === d.id;
       const statusColor = DCOLOR[d.status] || "#6b7280";
       return /* @__PURE__ */ React.createElement("div", { key: d.id, style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 9, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { onClick: () => setExpandedDelId(isExp ? null : d.id), style: { display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", cursor: "pointer" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, d.title || "Untitled"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 2 } }, d._project.name)), /* @__PURE__ */ React.createElement("span", { style: { background: statusColor + "20", color: statusColor, borderRadius: 99, padding: "2px 9px", fontSize: 12, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", flexShrink: 0 } }, d.status), /* @__PURE__ */ React.createElement(Dl, { date: d.deadline }), /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontSize: 14, flexShrink: 0 } }, isExp ? "\u25B2" : "\u25BC")), isExp && /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { borderTop: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement(
@@ -14216,7 +14216,7 @@ ${outstandingTasks.map((t) => `- "${t.taskLabel}" on "${t.projectName}" \u2014 $
 
 Today's date: ${(/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}.`;
   };
-  var MyViewChat = ({ member, projects, team, onOpenProject, nudges = [], contentHeight }) => {
+  var MyViewChat = ({ member, projects, team, onOpenProject, nudges = [], minHeight }) => {
     const todayKey = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const storageKey = `${RUNDOWN_STORAGE_PREFIX}${member.id}`;
     const [msgs, setMsgs] = (0, import_react.useState)([]);
@@ -14315,7 +14315,7 @@ Today's date: ${(/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { weekd
       setLoading(false);
     };
     const visibleMsgs = msgs.filter((m) => !m.hidden);
-    return /* @__PURE__ */ React.createElement("div", { style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 18px", display: "flex", flexDirection: "column", ...contentHeight ? { height: contentHeight } : {} } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 } }, "\u2726"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 18, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, "Morning Rundown"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6" } }, "Refreshes automatically each day \u2014 ask follow-ups any time")), loading && !visibleMsgs.length && /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", display: "flex", gap: 5 } }, [0, 0.2, 0.4].map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { width: 6, height: 6, borderRadius: "50%", background: "#6366f1", animation: `pulse 1.2s ${d}s infinite` } })))), /* @__PURE__ */ React.createElement("div", { ref: msgListRef, style: { marginBottom: 10, ...contentHeight ? { flex: "1 1 auto", minHeight: 0, overflowY: "auto" } : { maxHeight: 340, overflowY: "auto" } } }, visibleMsgs.map((m, i) => {
+    return /* @__PURE__ */ React.createElement("div", { style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 18px", display: "flex", flexDirection: "column", minHeight, flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 } }, "\u2726"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 18, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, "Morning Rundown"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6" } }, "Refreshes automatically each day \u2014 ask follow-ups any time")), loading && !visibleMsgs.length && /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", display: "flex", gap: 5 } }, [0, 0.2, 0.4].map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { width: 6, height: 6, borderRadius: "50%", background: "#6366f1", animation: `pulse 1.2s ${d}s infinite` } })))), /* @__PURE__ */ React.createElement("div", { ref: msgListRef, style: { marginBottom: 10, flex: "1 1 auto", minHeight: 0, overflowY: "auto" } }, visibleMsgs.map((m, i) => {
       const isUser = m.role === "user";
       return /* @__PURE__ */ React.createElement("div", { key: m.msgId || i, style: { display: "flex", flexDirection: "column", alignItems: isUser ? "flex-end" : "flex-start", marginBottom: 10 } }, !isUser && m.isRundown && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#818cf8", fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "\u2600\uFE0F Today's Rundown"), /* @__PURE__ */ React.createElement("div", { style: {
         maxWidth: "92%",
@@ -14583,7 +14583,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         title: "Close",
         style: { width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0, color: "#fff" }
       },
-      "\u2726"
+      "\u2715"
     ), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 17, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "PostTrack Agent"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6" } }, "AI assistant \xB7 knows all projects & workflow")), /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -16654,12 +16654,36 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       }
     ), tab === "access" && /* @__PURE__ */ React.createElement(AdminAccessTab, { tabLocks, onUpdateTabLocks }));
   };
+  var passwordComplexityError = (pw) => {
+    if (pw.length < 8) return "Password must be at least 8 characters.";
+    if (!/[A-Z]/.test(pw)) return "Password must include an uppercase letter.";
+    if (!/[a-z]/.test(pw)) return "Password must include a lowercase letter.";
+    if (!/[0-9]/.test(pw)) return "Password must include a number.";
+    return null;
+  };
+  var AUTH_SCREEN_WRAP = { display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", minHeight: "100dvh", background: "#060a12", padding: 20 };
+  var AUTH_CARD = { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 16, padding: 32, width: "100%", maxWidth: 380, boxShadow: "0 24px 80px #000c" };
+  var AUTH_TITLE = { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 34, fontWeight: 900, color: "#f1f5f9", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 };
+  var AUTH_SUB = { fontSize: 16, color: "#9ca3af", marginBottom: 24 };
+  var AUTH_LABEL = { fontSize: 13, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 6 };
+  var AUTH_INPUT = { width: "100%", background: "#0a0f1a", border: "1px solid #374151", borderRadius: 10, color: "#f1f5f9", padding: "14px 16px", fontSize: 19, outline: "none", fontFamily: "'DM Sans',sans-serif", marginBottom: 12, colorScheme: "dark" };
+  var AUTH_BUTTON = (busy) => ({ width: "100%", background: busy ? "#374151" : "#6366f1", border: "none", borderRadius: 10, color: "#fff", padding: "13px 0", fontSize: 17, fontWeight: 800, cursor: busy ? "default" : "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.08em" });
+  var AUTH_LINK_ROW = { display: "flex", justifyContent: "space-between", marginTop: 16, fontSize: 14 };
+  var AUTH_LINK = { background: "none", border: "none", color: "#818cf8", cursor: "pointer", fontSize: 14, fontFamily: "'DM Sans',sans-serif", padding: 0, textDecoration: "underline" };
   var SupabaseAuthGate = () => {
+    const [mode, setMode] = (0, import_react.useState)("signin");
     const [email, setEmail] = (0, import_react.useState)("");
     const [pw, setPw] = (0, import_react.useState)("");
+    const [pw2, setPw2] = (0, import_react.useState)("");
     const [err, setErr] = (0, import_react.useState)("");
     const [busy, setBusy] = (0, import_react.useState)(false);
-    const submit = async () => {
+    const switchMode = (m) => {
+      setMode(m);
+      setErr("");
+      setPw("");
+      setPw2("");
+    };
+    const signIn = async () => {
       if (!sb) {
         setErr("Backend is not configured.");
         return;
@@ -16677,38 +16701,184 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         setPw("");
       }
     };
-    const inp = { width: "100%", background: "#0a0f1a", border: "1px solid #374151", borderRadius: 10, color: "#f1f5f9", padding: "14px 16px", fontSize: 19, outline: "none", fontFamily: "'DM Sans',sans-serif", marginBottom: 12, colorScheme: "dark" };
-    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", minHeight: "100dvh", background: "#060a12", padding: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 16, padding: 32, width: "100%", maxWidth: 380, boxShadow: "0 24px 80px #000c" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 34, fontWeight: 900, color: "#f1f5f9", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 } }, "PostTrack"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#9ca3af", marginBottom: 24 } }, "Sign in with your team account"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 6 } }, "Email"), /* @__PURE__ */ React.createElement(
+    const signUp = async () => {
+      if (!sb) {
+        setErr("Backend is not configured.");
+        return;
+      }
+      if (!email.trim()) {
+        setErr("Enter your email.");
+        return;
+      }
+      const complexityErr = passwordComplexityError(pw);
+      if (complexityErr) {
+        setErr(complexityErr);
+        return;
+      }
+      if (pw !== pw2) {
+        setErr("Passwords don't match.");
+        return;
+      }
+      setBusy(true);
+      setErr("");
+      const { data, error } = await sb.auth.signUp({ email: email.trim(), password: pw });
+      setBusy(false);
+      if (error) {
+        setErr(error.message || "Could not create account.");
+        return;
+      }
+      if (data?.session) {
+        return;
+      }
+      setMode("signup-sent");
+    };
+    const sendReset = async () => {
+      if (!sb) {
+        setErr("Backend is not configured.");
+        return;
+      }
+      if (!email.trim()) {
+        setErr("Enter your email.");
+        return;
+      }
+      setBusy(true);
+      setErr("");
+      const redirectTo = window.location.origin + window.location.pathname;
+      const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+      setBusy(false);
+      if (error) {
+        setErr(error.message || "Could not send reset email.");
+        return;
+      }
+      setMode("forgot-sent");
+    };
+    const onEnter = (fn) => (e) => {
+      if (e.key === "Enter") fn();
+    };
+    if (mode === "signup-sent") return /* @__PURE__ */ React.createElement("div", { style: AUTH_SCREEN_WRAP }, /* @__PURE__ */ React.createElement("div", { style: AUTH_CARD }, /* @__PURE__ */ React.createElement("div", { style: AUTH_TITLE }, "PostTrack"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, color: "#e2e8f0", lineHeight: 1.6, marginBottom: 20 } }, "Check ", /* @__PURE__ */ React.createElement("span", { style: { color: "#818cf8" } }, email.trim()), " for a confirmation link, then come back and sign in."), /* @__PURE__ */ React.createElement("button", { onClick: () => switchMode("signin"), style: AUTH_BUTTON(false) }, "Back to Sign In")));
+    if (mode === "forgot-sent") return /* @__PURE__ */ React.createElement("div", { style: AUTH_SCREEN_WRAP }, /* @__PURE__ */ React.createElement("div", { style: AUTH_CARD }, /* @__PURE__ */ React.createElement("div", { style: AUTH_TITLE }, "PostTrack"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, color: "#e2e8f0", lineHeight: 1.6, marginBottom: 20 } }, "If an account exists for ", /* @__PURE__ */ React.createElement("span", { style: { color: "#818cf8" } }, email.trim()), ", a password reset link is on its way."), /* @__PURE__ */ React.createElement("button", { onClick: () => switchMode("signin"), style: AUTH_BUTTON(false) }, "Back to Sign In")));
+    if (mode === "forgot") return /* @__PURE__ */ React.createElement("div", { style: AUTH_SCREEN_WRAP }, /* @__PURE__ */ React.createElement("div", { style: AUTH_CARD }, /* @__PURE__ */ React.createElement("div", { style: AUTH_TITLE }, "PostTrack"), /* @__PURE__ */ React.createElement("div", { style: AUTH_SUB }, "Enter your email and we'll send you a reset link"), /* @__PURE__ */ React.createElement("div", { style: AUTH_LABEL }, "Email"), /* @__PURE__ */ React.createElement(
       "input",
       {
-        style: inp,
+        style: AUTH_INPUT,
         type: "email",
         value: email,
         placeholder: "you@company.com",
         onChange: (e) => setEmail(e.target.value),
-        onKeyDown: (e) => e.key === "Enter" && submit(),
-        autoComplete: "username"
+        onKeyDown: onEnter(sendReset),
+        autoComplete: "username",
+        autoFocus: true
       }
-    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 6 } }, "Password"), /* @__PURE__ */ React.createElement(
+    ), /* @__PURE__ */ React.createElement("button", { onClick: sendReset, disabled: busy, style: AUTH_BUTTON(busy) }, busy ? "Sending\u2026" : "Send Reset Link \u2192"), err && /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 16, marginTop: 10, textAlign: "center" } }, err), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginTop: 18 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => switchMode("signin"), style: AUTH_LINK }, "Back to Sign In"))));
+    if (mode === "signup") return /* @__PURE__ */ React.createElement("div", { style: AUTH_SCREEN_WRAP }, /* @__PURE__ */ React.createElement("div", { style: AUTH_CARD }, /* @__PURE__ */ React.createElement("div", { style: AUTH_TITLE }, "PostTrack"), /* @__PURE__ */ React.createElement("div", { style: AUTH_SUB }, "Create your team account"), /* @__PURE__ */ React.createElement("div", { style: AUTH_LABEL }, "Email"), /* @__PURE__ */ React.createElement(
       "input",
       {
-        style: inp,
+        style: AUTH_INPUT,
+        type: "email",
+        value: email,
+        placeholder: "you@company.com",
+        onChange: (e) => setEmail(e.target.value),
+        autoComplete: "username",
+        autoFocus: true
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: AUTH_LABEL }, "Password"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        style: AUTH_INPUT,
+        type: "password",
+        value: pw,
+        placeholder: "At least 8 characters",
+        onChange: (e) => setPw(e.target.value),
+        autoComplete: "new-password"
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: AUTH_LABEL }, "Confirm Password"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        style: AUTH_INPUT,
+        type: "password",
+        value: pw2,
+        placeholder: "Re-enter password",
+        onChange: (e) => setPw2(e.target.value),
+        onKeyDown: onEnter(signUp),
+        autoComplete: "new-password"
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280", marginBottom: 14, marginTop: -4 } }, "Needs an uppercase letter, a lowercase letter, and a number."), /* @__PURE__ */ React.createElement("button", { onClick: signUp, disabled: busy, style: AUTH_BUTTON(busy) }, busy ? "Creating account\u2026" : "Create Account \u2192"), err && /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 16, marginTop: 10, textAlign: "center" } }, err), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginTop: 18 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => switchMode("signin"), style: AUTH_LINK }, "Already have an account? Sign in"))));
+    return /* @__PURE__ */ React.createElement("div", { style: AUTH_SCREEN_WRAP }, /* @__PURE__ */ React.createElement("div", { style: AUTH_CARD }, /* @__PURE__ */ React.createElement("div", { style: AUTH_TITLE }, "PostTrack"), /* @__PURE__ */ React.createElement("div", { style: AUTH_SUB }, "Sign in with your team account"), /* @__PURE__ */ React.createElement("div", { style: AUTH_LABEL }, "Email"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        style: AUTH_INPUT,
+        type: "email",
+        value: email,
+        placeholder: "you@company.com",
+        onChange: (e) => setEmail(e.target.value),
+        onKeyDown: onEnter(signIn),
+        autoComplete: "username"
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: AUTH_LABEL }, "Password"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        style: AUTH_INPUT,
         type: "password",
         value: pw,
         placeholder: "Enter password",
         onChange: (e) => setPw(e.target.value),
-        onKeyDown: (e) => e.key === "Enter" && submit(),
+        onKeyDown: onEnter(signIn),
         autoComplete: "current-password"
       }
-    ), /* @__PURE__ */ React.createElement(
-      "button",
+    ), /* @__PURE__ */ React.createElement("button", { onClick: signIn, disabled: busy, style: AUTH_BUTTON(busy) }, busy ? "Signing in\u2026" : "Sign In \u2192"), err && /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 16, marginTop: 10, textAlign: "center" } }, err), /* @__PURE__ */ React.createElement("div", { style: AUTH_LINK_ROW }, /* @__PURE__ */ React.createElement("button", { onClick: () => switchMode("signup"), style: AUTH_LINK }, "Create an account"), /* @__PURE__ */ React.createElement("button", { onClick: () => switchMode("forgot"), style: AUTH_LINK }, "Forgot password?"))));
+  };
+  var SetNewPasswordScreen = ({ onDone }) => {
+    const [pw, setPw] = (0, import_react.useState)("");
+    const [pw2, setPw2] = (0, import_react.useState)("");
+    const [err, setErr] = (0, import_react.useState)("");
+    const [busy, setBusy] = (0, import_react.useState)(false);
+    const submit = async () => {
+      if (!sb) {
+        setErr("Backend is not configured.");
+        return;
+      }
+      const complexityErr = passwordComplexityError(pw);
+      if (complexityErr) {
+        setErr(complexityErr);
+        return;
+      }
+      if (pw !== pw2) {
+        setErr("Passwords don't match.");
+        return;
+      }
+      setBusy(true);
+      setErr("");
+      const { error } = await sb.auth.updateUser({ password: pw });
+      setBusy(false);
+      if (error) {
+        setErr(error.message || "Could not update password.");
+        return;
+      }
+      onDone();
+    };
+    return /* @__PURE__ */ React.createElement("div", { style: AUTH_SCREEN_WRAP }, /* @__PURE__ */ React.createElement("div", { style: AUTH_CARD }, /* @__PURE__ */ React.createElement("div", { style: AUTH_TITLE }, "PostTrack"), /* @__PURE__ */ React.createElement("div", { style: AUTH_SUB }, "Set a new password"), /* @__PURE__ */ React.createElement("div", { style: AUTH_LABEL }, "New Password"), /* @__PURE__ */ React.createElement(
+      "input",
       {
-        onClick: submit,
-        disabled: busy,
-        style: { width: "100%", background: busy ? "#374151" : "#6366f1", border: "none", borderRadius: 10, color: "#fff", padding: "13px 0", fontSize: 17, fontWeight: 800, cursor: busy ? "default" : "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.08em" }
-      },
-      busy ? "Signing in\u2026" : "Sign In \u2192"
-    ), err && /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 16, marginTop: 10, textAlign: "center" } }, err), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", marginTop: 18, textAlign: "center" } }, "Contact your studio coordinator for access")));
+        style: AUTH_INPUT,
+        type: "password",
+        value: pw,
+        placeholder: "At least 8 characters",
+        onChange: (e) => setPw(e.target.value),
+        autoComplete: "new-password",
+        autoFocus: true
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: AUTH_LABEL }, "Confirm Password"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        style: AUTH_INPUT,
+        type: "password",
+        value: pw2,
+        placeholder: "Re-enter password",
+        onChange: (e) => setPw2(e.target.value),
+        onKeyDown: (e) => e.key === "Enter" && submit(),
+        autoComplete: "new-password"
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280", marginBottom: 14, marginTop: -4 } }, "Needs an uppercase letter, a lowercase letter, and a number."), /* @__PURE__ */ React.createElement("button", { onClick: submit, disabled: busy, style: AUTH_BUTTON(busy) }, busy ? "Saving\u2026" : "Save Password \u2192"), err && /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 16, marginTop: 10, textAlign: "center" } }, err)));
   };
   var OnboardingModal = ({ email, onSubmit, onSkip }) => {
     const [name, setName] = (0, import_react.useState)("");
@@ -16853,6 +17023,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
   function App() {
     const [authed, setAuthed] = (0, import_react.useState)(false);
     const [authChecked, setAuthChecked] = (0, import_react.useState)(false);
+    const [passwordRecovery, setPasswordRecovery] = (0, import_react.useState)(false);
     (0, import_react.useEffect)(() => {
       if (!sb) {
         setAuthChecked(true);
@@ -16864,6 +17035,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       });
       const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
         setAuthed(!!session);
+        if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
       });
       return () => sub?.subscription?.unsubscribe();
     }, []);
@@ -17800,6 +17972,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const inp = { background: "#111827", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "6px 10px", fontSize: 16, outline: "none", fontFamily: "'DM Sans',sans-serif" };
     const tabS = (a) => ({ padding: "5px 14px", borderRadius: 7, fontWeight: 800, fontSize: 16, cursor: "pointer", border: "none", background: a ? "#6366f1" : "transparent", color: a ? "#fff" : "#6b7280", transition: "all 0.18s", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.07em", textTransform: "uppercase" });
     if (!authChecked) return null;
+    if (passwordRecovery) return React.createElement(SetNewPasswordScreen, { onDone: () => setPasswordRecovery(false) });
     if (!authed) return React.createElement(SupabaseAuthGate, null);
     return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("style", null, `@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap');*{box-sizing:border-box;margin:0;padding:0;}body{background:#080c14;}::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:#0f172a;}::-webkit-scrollbar-thumb{background:#374151;border-radius:99px;}select option{background:#0d1117;color:#e2e8f0;}`), /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100vh", background: "#080c14", fontFamily: "'DM Sans',sans-serif", color: "#e2e8f0", display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", borderBottom: "1px solid #1f2937", padding: "0 24px", position: "sticky", top: 0, zIndex: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1600, margin: "0 auto", display: "flex", alignItems: "center", gap: 14, height: 52 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setView("projects"), style: { fontWeight: 900, fontSize: 26, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", flexShrink: 0, letterSpacing: "-0.01em", background: "none", border: "none", cursor: "pointer", padding: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#6366f1" } }, "POST"), "TRACK"), /* @__PURE__ */ React.createElement("div", { style: { height: 16, width: 1, background: "#1f2937" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 2 } }, VIEWS.map((v) => /* @__PURE__ */ React.createElement("button", { key: v.id, style: tabS(view === v.id), onClick: () => setView(v.id) }, v.l))), view === "kanban" && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 2, background: "#0f172a", borderRadius: 7, padding: 3, border: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement("button", { style: { ...tabS(kanbanMode === "status"), background: kanbanMode === "status" ? "#1f2937" : "transparent", color: kanbanMode === "status" ? "#e2e8f0" : "#6b7280", fontSize: 14 }, onClick: () => setKanbanMode("status") }, "By Status"), /* @__PURE__ */ React.createElement("button", { style: { ...tabS(kanbanMode === "editor"), background: kanbanMode === "editor" ? "#1f2937" : "transparent", color: kanbanMode === "editor" ? "#e2e8f0" : "#6b7280", fontSize: 14 }, onClick: () => setKanbanMode("editor") }, "By Editor")), /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", display: "flex", gap: 7, alignItems: "center" } }, view === "kanban" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("input", { value: search, onChange: (e) => setSearch(e.target.value), placeholder: "Search...", style: { ...inp, width: 150 } }), /* @__PURE__ */ React.createElement("select", { value: filterStatus, onChange: (e) => setFilterStatus(e.target.value), style: inp }, /* @__PURE__ */ React.createElement("option", null, "All"), PROJECT_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s }, s)))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, borderLeft: "1px solid #1f2937", paddingLeft: 10 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "#4b5563", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" } }, "Test Data"), /* @__PURE__ */ React.createElement(
       "button",
@@ -17854,7 +18027,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       },
       /* @__PURE__ */ React.createElement("span", { style: { width: 16, textAlign: "center" } }, "\u21AA"),
       "Sign Out"
-    )))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "row", alignItems: "stretch", flex: 1, minHeight: 0 } }, /* @__PURE__ */ React.createElement("div", { ref: setSidebarSlotNode, style: { width: activeSidebarWidth, flexShrink: 0, overflow: "hidden", position: "relative", transition: navSidebarHandle.dragging ? "none" : "width 0.22s cubic-bezier(0.4,0,0.2,1)", borderRight: activeSidebarWidth ? "1px solid #1f2937" : "none" } }, !!activeSidebarWidth && /* @__PURE__ */ React.createElement(SidebarResizeHandle, { ...navSidebarHandle })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, marginLeft: pushOffset, transform: pushTransformX ? `translateX(${pushTransformX}px)` : void 0, transition: pushTransitionOn ? "transform 0.22s cubic-bezier(0.4,0,0.2,1)" : "none" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1600, margin: activeSidebarWidth || pushOffset ? "0" : "0 auto", padding: "20px 24px" } }, /* @__PURE__ */ React.createElement(StatsBar, { projects: allProjects, team: allTeam, setView: (v) => {
+    )))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "row", alignItems: "stretch", flex: 1, minHeight: 0 } }, /* @__PURE__ */ React.createElement("div", { ref: setSidebarSlotNode, style: { width: activeSidebarWidth, flexShrink: 0, overflow: "hidden", position: "relative", transition: navSidebarHandle.dragging ? "none" : "width 0.22s cubic-bezier(0.4,0,0.2,1)", borderRight: activeSidebarWidth ? "1px solid #1f2937" : "none" } }, !!activeSidebarWidth && /* @__PURE__ */ React.createElement(SidebarResizeHandle, { ...navSidebarHandle })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, marginLeft: pushOffset, transform: pushTransformX ? `translateX(${pushTransformX}px)` : void 0, transition: pushTransitionOn ? "transform 0.22s cubic-bezier(0.4,0,0.2,1)" : "none" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: view === "pipeline" ? 2e3 : 1600, margin: activeSidebarWidth || pushOffset ? "0" : "0 auto", padding: "20px 24px" } }, /* @__PURE__ */ React.createElement(StatsBar, { projects: allProjects, team: allTeam, setView: (v) => {
       setView(v);
       if (v !== "projects") setStatsFilter(null);
     }, onOpenProject: openProject, onSetStatsFilter: setStatsFilter }), view === "workReview" && /* @__PURE__ */ React.createElement(WorkReviewView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster }), view === "pipeline" && /* @__PURE__ */ React.createElement(PipelineView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject }), view === "animations" && /* @__PURE__ */ React.createElement(AnimationView, { allProjects, team: allTeam, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "intake" && /* @__PURE__ */ React.createElement(

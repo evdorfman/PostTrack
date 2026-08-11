@@ -11648,7 +11648,13 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
 
   const tabS=a=>({padding:"5px 16px",borderRadius:7,fontWeight:800,fontSize:16,cursor:"pointer",border:"none",background:a?"#6366f1":"transparent",color:a?"#fff":"#6b7280",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.07em",textTransform:"uppercase"});
 
-  const openDel = d => {
+  // Stops propagation so the page wrapper's click-outside-closes handler
+  // (below) doesn't immediately undo this selection — without it, clicking
+  // a different deliverable while the sidebar is already open would bubble
+  // up and null out the very selection this click just made, closing the
+  // sidebar instead of swapping it to the newly clicked deliverable.
+  const openDel = (d, e) => {
+    e?.stopPropagation();
     if(d._fromProduction){ setPopupDel(d); return; }
     setUnlocked(true);
     setSidebarSel({delId:d.id, projectId:d.projectId});
@@ -11660,7 +11666,7 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
     const activeR=d.rounds.find(r=>!["Approved"].includes(r.status));
     const c=changes?"#ef4444":inRev?"#f59e0b":DCOLOR[d.status];
     return (
-      <div onClick={()=>openDel(d)}
+      <div onClick={e=>openDel(d,e)}
         style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",background:"#111827",border:`1px solid ${changes?"#ef444430":"#1f2937"}`,borderRadius:9,cursor:"pointer"}}
         onMouseEnter={e=>e.currentTarget.style.borderColor=changes?"#ef4444":"#374151"}
         onMouseLeave={e=>e.currentTarget.style.borderColor=changes?"#ef444430":"#1f2937"}>
@@ -11865,7 +11871,7 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
                       {mData.items.map(d=>{
                         const ed=team.find(m=>m.id===d.editorId);
                         return (
-                          <div key={d.id} onClick={()=>{ if(d._fromProduction){ setPopupDel(d); return; } setUnlocked(false); setSidebarSel({delId:d.id, projectId:d.projectId}); }}
+                          <div key={d.id} onClick={e=>{ e.stopPropagation(); if(d._fromProduction){ setPopupDel(d); return; } setUnlocked(false); setSidebarSel({delId:d.id, projectId:d.projectId}); }}
                             style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#111827",border:"1px solid #1f2937",borderRadius:9,cursor:"pointer"}}
                             onMouseEnter={e=>e.currentTarget.style.borderColor="#374151"}
                             onMouseLeave={e=>e.currentTarget.style.borderColor="#1f2937"}>
@@ -13028,7 +13034,7 @@ const ProjectTaskCard = ({project, automatedItems=[], customItems=[], onOpenProj
 // Shown at the top of every person's My View, regardless of role — every
 // incomplete checklist item assigned to them, across every project, with a
 // button straight to the tab that needs attention.
-const MyOutstandingTasks = ({member, projects, team, onOpenProject, nudges=[], customTasks=[], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, contentHeight}) => {
+const MyOutstandingTasks = ({member, projects, team, onOpenProject, nudges=[], customTasks=[], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, minHeight}) => {
   const automatedTasks = useMemo(()=>getOutstandingTasksForMember(member.id, projects, team, nudges), [member.id, projects, team, nudges]);
   const nudgedCount = automatedTasks.filter(t=>t.nudgedAt).length;
   const openCustomTasks = customTasks.filter(t=>!t.done);
@@ -13046,16 +13052,16 @@ const MyOutstandingTasks = ({member, projects, team, onOpenProject, nudges=[], c
     autoByProject[t.projectId].push(t);
   });
 
-  // Always renders the same card shell (even with nothing outstanding) so it
-  // keeps its place next to AI Assistant instead of collapsing to nothing —
-  // the shell's own border/rounding is never height-clipped; only the list
-  // inside it scrolls, which is what fixed the "cuts off strangely" issue.
-  // The card itself takes the fixed height (not just an inner maxHeight) so
-  // dragging the resize handle always visibly changes the box, the same way
-  // RoleCalendar's height drag already does — capping only an inner list's
-  // maxHeight doesn't grow/shrink anything once its content already fits.
+  // Always auto-height, driven purely by content — every task card is shown
+  // in full, never scroll-clipped. minHeight only sets a floor so the card
+  // doesn't shrink below the shared default when there's little to show; the
+  // AI Assistant card (its CSS Grid row sibling in MyView) stretches to match
+  // whatever height this settles on, so the two stay the same length without
+  // either needing its own manual resize handle. flex:1 lets this card fill
+  // its own MyView grid wrapper the same way, for the (rarer) case where AI
+  // Assistant's content ends up the taller one.
   return (
-    <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 18px",display:"flex",flexDirection:"column",...(contentHeight?{height:contentHeight}:{})}}>
+    <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 18px",display:"flex",flexDirection:"column",minHeight,flex:1}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexShrink:0}}>
         <div style={{fontWeight:900,fontSize:19,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>📋 Outstanding Tasks</div>
         <div style={{display:"flex",gap:6}}>
@@ -13067,7 +13073,7 @@ const MyOutstandingTasks = ({member, projects, team, onOpenProject, nudges=[], c
       {allProjectIds.length===0 ? (
         <div style={{fontSize:16,color:"#374151",fontStyle:"italic"}}>Nothing outstanding right now.</div>
       ) : (
-        <div style={{display:"flex",flexDirection:"column",gap:10,...(contentHeight?{flex:"1 1 auto",minHeight:0,overflowY:"auto"}:{})}}>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {allProjectIds.map(projectId=>{
             const proj = projects.find(p=>p.id===projectId);
             if(!proj) return null;
@@ -13102,9 +13108,6 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
   const [tasksOpen, setTasksOpen] = useState(true);
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [delsOpen, setDelsOpen] = useState(true);
-  // Same default (340) for both, and each resizes independently now.
-  const [aiHeight, aiHeightHandle] = useResizableHeight("posttrack-myview-ai-height", 340, {min:160,max:800});
-  const [tasksHeight, tasksHeightHandle] = useResizableHeight("posttrack-myview-tasks-height", 340, {min:160,max:800});
   const member = team.find(m=>m.id===selectedMember);
 
   const roleGroups = [
@@ -13204,28 +13207,27 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
         )}
       </div>
 
-      {/* AI Assistant + Outstanding Tasks — each has its own independent
-          collapse and its own drag handle, but both start at the same
-          default height. */}
-      <div style={{display:"flex",gap:20,alignItems:"flex-start",flexWrap:"wrap",marginBottom:28}}>
-        <div style={{flex:"1 1 360px",minWidth:0}}>
+      {/* AI Assistant + Outstanding Tasks — no manual resize handles anymore.
+          Both share a fixed default minimum height and, when both are open,
+          sit in a two-column CSS Grid: grid rows auto-size to the taller
+          item's natural content height, and same-row items stretch to fill
+          it by default — so Outstanding Tasks (whose content varies with
+          however many projects need attention) and AI Assistant always end
+          up the same height with no JS measuring or dragging needed.
+          Collapsing either one drops the grid to a single column so the
+          remaining open section fills the full row width instead of
+          staying pinned to half. */}
+      <div style={{display:"grid",gridTemplateColumns:(aiOpen&&tasksOpen)?"1fr 1fr":"1fr",gap:20,marginBottom:28}}>
+        <div style={{minWidth:0,display:"flex",flexDirection:"column"}}>
           {sectionHeader("🤖","AI Assistant",null,aiOpen,()=>setAiOpen(o=>!o))}
-          {aiOpen&&(
-            <>
-              <MyViewChat member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges} contentHeight={aiHeight}/>
-              <VerticalResizeHandle {...aiHeightHandle}/>
-            </>
-          )}
+          {aiOpen&&<MyViewChat member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges} minHeight={340}/>}
         </div>
-        <div style={{flex:"1 1 360px",minWidth:0}}>
+        <div style={{minWidth:0,display:"flex",flexDirection:"column"}}>
           {sectionHeader("📋","Outstanding Tasks",null,tasksOpen,()=>setTasksOpen(o=>!o))}
           {tasksOpen&&(
-            <>
-              <MyOutstandingTasks member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}
-                customTasks={customTasks} onAddCustomTask={onAddCustomTask} onUpdateCustomTask={onUpdateCustomTask} onDeleteCustomTask={onDeleteCustomTask}
-                contentHeight={tasksHeight}/>
-              <VerticalResizeHandle {...tasksHeightHandle}/>
-            </>
+            <MyOutstandingTasks member={member} projects={projects} team={team} onOpenProject={onOpenProject} nudges={nudges}
+              customTasks={customTasks} onAddCustomTask={onAddCustomTask} onUpdateCustomTask={onUpdateCustomTask} onDeleteCustomTask={onDeleteCustomTask}
+              minHeight={340}/>
           )}
         </div>
       </div>
@@ -21300,7 +21302,7 @@ ${outstandingTasks.map(t=>`- "${t.taskLabel}" on "${t.projectName}" — ${t.rema
 Today's date: ${new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})}.`;
 };
 
-const MyViewChat = ({member, projects, team, onOpenProject, nudges=[], contentHeight}) => {
+const MyViewChat = ({member, projects, team, onOpenProject, nudges=[], minHeight}) => {
   const todayKey = new Date().toISOString().slice(0,10);
   const storageKey = `${RUNDOWN_STORAGE_PREFIX}${member.id}`;
   const [msgs, setMsgs] = useState([]);
@@ -21393,11 +21395,11 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[], contentHe
 
   const visibleMsgs = msgs.filter(m=>!m.hidden);
 
-  // Fixed height on the card itself (not just an inner maxHeight) so the
-  // resize handle always visibly changes the box — see the matching note
-  // in MyOutstandingTasks for why maxHeight alone didn't work.
+  // flex:1 so this fills whatever height its MyView grid wrapper stretched
+  // to (matching Outstanding Tasks) rather than only ever being its own
+  // natural content height; minHeight is just the shared floor.
   return (
-    <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 18px",display:"flex",flexDirection:"column",...(contentHeight?{height:contentHeight}:{})}}>
+    <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 18px",display:"flex",flexDirection:"column",minHeight,flex:1}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexShrink:0}}>
         <div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>✦</div>
         <div>
@@ -21411,7 +21413,7 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[], contentHe
         )}
       </div>
 
-      <div ref={msgListRef} style={{marginBottom:10,...(contentHeight?{flex:"1 1 auto",minHeight:0,overflowY:"auto"}:{maxHeight:340,overflowY:"auto"})}}>
+      <div ref={msgListRef} style={{marginBottom:10,flex:"1 1 auto",minHeight:0,overflowY:"auto"}}>
         {visibleMsgs.map((m,i)=>{
           const isUser = m.role==="user";
           return (
@@ -21696,7 +21698,7 @@ const StudioAgent = ({projects, team, onApplyUpdate, onOpenProject}) => {
           <div style={{padding:"14px 16px",borderBottom:"1px solid #1f2937",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
             <button onClick={()=>setOpen(false)} title="Close"
               style={{width:32,height:32,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0,color:"#fff"}}>
-              ✦
+              ✕
             </button>
             <div>
               <div style={{fontWeight:800,fontSize:17,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>PostTrack Agent</div>
@@ -25028,13 +25030,40 @@ const MobileApp = ({projects, team, customTasks, onUpdateProject, onUpdateDel, o
   );
 };
 
-// ── In-app password gate (works in artifact preview AND in the HTML file) ─────
+// Shared complexity rule for every place someone sets/changes their own
+// password (signup here, and the post-recovery-link reset screen below).
+// Returns an error string, or null when the password is acceptable.
+const passwordComplexityError = pw => {
+  if(pw.length<8) return "Password must be at least 8 characters.";
+  if(!/[A-Z]/.test(pw)) return "Password must include an uppercase letter.";
+  if(!/[a-z]/.test(pw)) return "Password must include a lowercase letter.";
+  if(!/[0-9]/.test(pw)) return "Password must include a number.";
+  return null;
+};
+
+const AUTH_SCREEN_WRAP = {display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',minHeight:'100dvh',background:'#060a12',padding:20};
+const AUTH_CARD = {background:'#0d1117',border:'1px solid #1f2937',borderRadius:16,padding:32,width:'100%',maxWidth:380,boxShadow:'0 24px 80px #000c'};
+const AUTH_TITLE = {fontFamily:"'Barlow Condensed',sans-serif",fontSize:34,fontWeight:900,color:'#f1f5f9',textTransform:'uppercase',letterSpacing:'0.12em',marginBottom:6};
+const AUTH_SUB = {fontSize:16,color:'#9ca3af',marginBottom:24};
+const AUTH_LABEL = {fontSize:13,fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.08em',fontFamily:"'Barlow Condensed',sans-serif",marginBottom:6};
+const AUTH_INPUT = {width:'100%',background:'#0a0f1a',border:'1px solid #374151',borderRadius:10,color:'#f1f5f9',padding:'14px 16px',fontSize:19,outline:'none',fontFamily:"'DM Sans',sans-serif",marginBottom:12,colorScheme:'dark'};
+const AUTH_BUTTON = busy=>({width:'100%',background:busy?'#374151':'#6366f1',border:'none',borderRadius:10,color:'#fff',padding:'13px 0',fontSize:17,fontWeight:800,cursor:busy?'default':'pointer',fontFamily:"'Barlow Condensed',sans-serif",textTransform:'uppercase',letterSpacing:'0.08em'});
+const AUTH_LINK_ROW = {display:'flex',justifyContent:'space-between',marginTop:16,fontSize:14};
+const AUTH_LINK = {background:'none',border:'none',color:'#818cf8',cursor:'pointer',fontSize:14,fontFamily:"'DM Sans',sans-serif",padding:0,textDecoration:'underline'};
+
+// ── In-app auth gate: sign in, create account, and forgot-password, all in
+// one component (works in artifact preview AND in the HTML file) ─────────────
 const SupabaseAuthGate = () => {
+  const [mode,setMode]=useState('signin'); // signin | signup | signup-sent | forgot | forgot-sent
   const [email,setEmail]=useState('');
   const [pw,setPw]=useState('');
+  const [pw2,setPw2]=useState('');
   const [err,setErr]=useState('');
   const [busy,setBusy]=useState(false);
-  const submit=async()=>{
+
+  const switchMode = m => { setMode(m); setErr(''); setPw(''); setPw2(''); };
+
+  const signIn=async()=>{
     if(!sb){ setErr('Backend is not configured.'); return; }
     if(!email.trim()||!pw){ setErr('Enter your email and password.'); return; }
     setBusy(true); setErr('');
@@ -25044,24 +25073,162 @@ const SupabaseAuthGate = () => {
     // On success, the onAuthStateChange listener in App flips `authed` — no
     // local state to set here.
   };
-  const inp={width:'100%',background:'#0a0f1a',border:'1px solid #374151',borderRadius:10,color:'#f1f5f9',padding:'14px 16px',fontSize:19,outline:'none',fontFamily:"'DM Sans',sans-serif",marginBottom:12,colorScheme:'dark'};
-  return (
-    <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',minHeight:'100dvh',background:'#060a12',padding:20}}>
-      <div style={{background:'#0d1117',border:'1px solid #1f2937',borderRadius:16,padding:32,width:'100%',maxWidth:380,boxShadow:'0 24px 80px #000c'}}>
-        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:34,fontWeight:900,color:'#f1f5f9',textTransform:'uppercase',letterSpacing:'0.12em',marginBottom:6}}>PostTrack</div>
-        <div style={{fontSize:16,color:'#9ca3af',marginBottom:24}}>Sign in with your team account</div>
-        <div style={{fontSize:13,fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.08em',fontFamily:"'Barlow Condensed',sans-serif",marginBottom:6}}>Email</div>
-        <input style={inp} type="email" value={email} placeholder="you@company.com"
-          onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} autoComplete="username"/>
-        <div style={{fontSize:13,fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.08em',fontFamily:"'Barlow Condensed',sans-serif",marginBottom:6}}>Password</div>
-        <input style={inp} type="password" value={pw} placeholder="Enter password"
-          onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} autoComplete="current-password"/>
-        <button onClick={submit} disabled={busy}
-          style={{width:'100%',background:busy?'#374151':'#6366f1',border:'none',borderRadius:10,color:'#fff',padding:'13px 0',fontSize:17,fontWeight:800,cursor:busy?'default':'pointer',fontFamily:"'Barlow Condensed',sans-serif",textTransform:'uppercase',letterSpacing:'0.08em'}}>
-          {busy?'Signing in…':'Sign In →'}
-        </button>
+
+  const signUp=async()=>{
+    if(!sb){ setErr('Backend is not configured.'); return; }
+    if(!email.trim()){ setErr('Enter your email.'); return; }
+    const complexityErr = passwordComplexityError(pw);
+    if(complexityErr){ setErr(complexityErr); return; }
+    if(pw!==pw2){ setErr("Passwords don't match."); return; }
+    setBusy(true); setErr('');
+    const {data,error} = await sb.auth.signUp({email:email.trim(), password:pw});
+    setBusy(false);
+    if(error){ setErr(error.message||'Could not create account.'); return; }
+    if(data?.session){
+      // Email confirmation is off for this project — already signed in;
+      // onAuthStateChange flips `authed` and the onboarding modal (for a
+      // signed-in user with no linked team_members row yet) takes it from here.
+      return;
+    }
+    setMode('signup-sent');
+  };
+
+  const sendReset=async()=>{
+    if(!sb){ setErr('Backend is not configured.'); return; }
+    if(!email.trim()){ setErr('Enter your email.'); return; }
+    setBusy(true); setErr('');
+    const redirectTo = window.location.origin + window.location.pathname;
+    const {error} = await sb.auth.resetPasswordForEmail(email.trim(), {redirectTo});
+    setBusy(false);
+    if(error){ setErr(error.message||'Could not send reset email.'); return; }
+    setMode('forgot-sent');
+  };
+
+  const onEnter = fn => e => { if(e.key==='Enter') fn(); };
+
+  if(mode==='signup-sent') return (
+    <div style={AUTH_SCREEN_WRAP}>
+      <div style={AUTH_CARD}>
+        <div style={AUTH_TITLE}>PostTrack</div>
+        <div style={{fontSize:17,color:'#e2e8f0',lineHeight:1.6,marginBottom:20}}>
+          Check <span style={{color:'#818cf8'}}>{email.trim()}</span> for a confirmation link, then come back and sign in.
+        </div>
+        <button onClick={()=>switchMode('signin')} style={AUTH_BUTTON(false)}>Back to Sign In</button>
+      </div>
+    </div>
+  );
+
+  if(mode==='forgot-sent') return (
+    <div style={AUTH_SCREEN_WRAP}>
+      <div style={AUTH_CARD}>
+        <div style={AUTH_TITLE}>PostTrack</div>
+        <div style={{fontSize:17,color:'#e2e8f0',lineHeight:1.6,marginBottom:20}}>
+          If an account exists for <span style={{color:'#818cf8'}}>{email.trim()}</span>, a password reset link is on its way.
+        </div>
+        <button onClick={()=>switchMode('signin')} style={AUTH_BUTTON(false)}>Back to Sign In</button>
+      </div>
+    </div>
+  );
+
+  if(mode==='forgot') return (
+    <div style={AUTH_SCREEN_WRAP}>
+      <div style={AUTH_CARD}>
+        <div style={AUTH_TITLE}>PostTrack</div>
+        <div style={AUTH_SUB}>Enter your email and we'll send you a reset link</div>
+        <div style={AUTH_LABEL}>Email</div>
+        <input style={AUTH_INPUT} type="email" value={email} placeholder="you@company.com"
+          onChange={e=>setEmail(e.target.value)} onKeyDown={onEnter(sendReset)} autoComplete="username" autoFocus/>
+        <button onClick={sendReset} disabled={busy} style={AUTH_BUTTON(busy)}>{busy?'Sending…':'Send Reset Link →'}</button>
         {err&&<div style={{color:'#ef4444',fontSize:16,marginTop:10,textAlign:'center'}}>{err}</div>}
-        <div style={{fontSize:13,color:'#838ba0',marginTop:18,textAlign:'center'}}>Contact your studio coordinator for access</div>
+        <div style={{textAlign:'center',marginTop:18}}>
+          <button onClick={()=>switchMode('signin')} style={AUTH_LINK}>Back to Sign In</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if(mode==='signup') return (
+    <div style={AUTH_SCREEN_WRAP}>
+      <div style={AUTH_CARD}>
+        <div style={AUTH_TITLE}>PostTrack</div>
+        <div style={AUTH_SUB}>Create your team account</div>
+        <div style={AUTH_LABEL}>Email</div>
+        <input style={AUTH_INPUT} type="email" value={email} placeholder="you@company.com"
+          onChange={e=>setEmail(e.target.value)} autoComplete="username" autoFocus/>
+        <div style={AUTH_LABEL}>Password</div>
+        <input style={AUTH_INPUT} type="password" value={pw} placeholder="At least 8 characters"
+          onChange={e=>setPw(e.target.value)} autoComplete="new-password"/>
+        <div style={AUTH_LABEL}>Confirm Password</div>
+        <input style={AUTH_INPUT} type="password" value={pw2} placeholder="Re-enter password"
+          onChange={e=>setPw2(e.target.value)} onKeyDown={onEnter(signUp)} autoComplete="new-password"/>
+        <div style={{fontSize:13,color:'#6b7280',marginBottom:14,marginTop:-4}}>Needs an uppercase letter, a lowercase letter, and a number.</div>
+        <button onClick={signUp} disabled={busy} style={AUTH_BUTTON(busy)}>{busy?'Creating account…':'Create Account →'}</button>
+        {err&&<div style={{color:'#ef4444',fontSize:16,marginTop:10,textAlign:'center'}}>{err}</div>}
+        <div style={{textAlign:'center',marginTop:18}}>
+          <button onClick={()=>switchMode('signin')} style={AUTH_LINK}>Already have an account? Sign in</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={AUTH_SCREEN_WRAP}>
+      <div style={AUTH_CARD}>
+        <div style={AUTH_TITLE}>PostTrack</div>
+        <div style={AUTH_SUB}>Sign in with your team account</div>
+        <div style={AUTH_LABEL}>Email</div>
+        <input style={AUTH_INPUT} type="email" value={email} placeholder="you@company.com"
+          onChange={e=>setEmail(e.target.value)} onKeyDown={onEnter(signIn)} autoComplete="username"/>
+        <div style={AUTH_LABEL}>Password</div>
+        <input style={AUTH_INPUT} type="password" value={pw} placeholder="Enter password"
+          onChange={e=>setPw(e.target.value)} onKeyDown={onEnter(signIn)} autoComplete="current-password"/>
+        <button onClick={signIn} disabled={busy} style={AUTH_BUTTON(busy)}>{busy?'Signing in…':'Sign In →'}</button>
+        {err&&<div style={{color:'#ef4444',fontSize:16,marginTop:10,textAlign:'center'}}>{err}</div>}
+        <div style={AUTH_LINK_ROW}>
+          <button onClick={()=>switchMode('signup')} style={AUTH_LINK}>Create an account</button>
+          <button onClick={()=>switchMode('forgot')} style={AUTH_LINK}>Forgot password?</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Shown when someone lands back on the app from a password-reset email link
+// (Supabase parses the recovery token from the URL and fires a
+// PASSWORD_RECOVERY auth event before this ever renders — see App's
+// onAuthStateChange listener). They already have a valid session at this
+// point; this just collects + applies the new password via updateUser,
+// rather than requiring a second sign-in.
+const SetNewPasswordScreen = ({onDone}) => {
+  const [pw,setPw]=useState('');
+  const [pw2,setPw2]=useState('');
+  const [err,setErr]=useState('');
+  const [busy,setBusy]=useState(false);
+  const submit=async()=>{
+    if(!sb){ setErr('Backend is not configured.'); return; }
+    const complexityErr = passwordComplexityError(pw);
+    if(complexityErr){ setErr(complexityErr); return; }
+    if(pw!==pw2){ setErr("Passwords don't match."); return; }
+    setBusy(true); setErr('');
+    const {error} = await sb.auth.updateUser({password:pw});
+    setBusy(false);
+    if(error){ setErr(error.message||'Could not update password.'); return; }
+    onDone();
+  };
+  return (
+    <div style={AUTH_SCREEN_WRAP}>
+      <div style={AUTH_CARD}>
+        <div style={AUTH_TITLE}>PostTrack</div>
+        <div style={AUTH_SUB}>Set a new password</div>
+        <div style={AUTH_LABEL}>New Password</div>
+        <input style={AUTH_INPUT} type="password" value={pw} placeholder="At least 8 characters"
+          onChange={e=>setPw(e.target.value)} autoComplete="new-password" autoFocus/>
+        <div style={AUTH_LABEL}>Confirm Password</div>
+        <input style={AUTH_INPUT} type="password" value={pw2} placeholder="Re-enter password"
+          onChange={e=>setPw2(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} autoComplete="new-password"/>
+        <div style={{fontSize:13,color:'#6b7280',marginBottom:14,marginTop:-4}}>Needs an uppercase letter, a lowercase letter, and a number.</div>
+        <button onClick={submit} disabled={busy} style={AUTH_BUTTON(busy)}>{busy?'Saving…':'Save Password →'}</button>
+        {err&&<div style={{color:'#ef4444',fontSize:16,marginTop:10,textAlign:'center'}}>{err}</div>}
       </div>
     </div>
   );
@@ -25349,10 +25516,19 @@ export default function App() {
   // login screen for someone who's already signed in from a previous visit.
   const [authed,setAuthed]=useState(false);
   const [authChecked,setAuthChecked]=useState(false);
+  // Set when someone lands here from a password-reset email — Supabase
+  // parses the recovery token out of the URL and fires this event with a
+  // (temporary but valid) session already attached, same as a normal
+  // sign-in. Gating on it separately below routes them to SetNewPasswordScreen
+  // instead of straight into the app on their still-forgotten old password.
+  const [passwordRecovery,setPasswordRecovery]=useState(false);
   useEffect(()=>{
     if(!sb){ setAuthChecked(true); return; }
     sb.auth.getSession().then(({data})=>{ setAuthed(!!data?.session); setAuthChecked(true); });
-    const {data:sub} = sb.auth.onAuthStateChange((event,session)=>{ setAuthed(!!session); });
+    const {data:sub} = sb.auth.onAuthStateChange((event,session)=>{
+      setAuthed(!!session);
+      if(event==="PASSWORD_RECOVERY") setPasswordRecovery(true);
+    });
     return ()=>sub?.subscription?.unsubscribe();
   },[]);
   const [projects,setProjects]=useState(SEED_PROJECTS);
@@ -26240,6 +26416,7 @@ export default function App() {
   const tabS=a=>({padding:"5px 14px",borderRadius:7,fontWeight:800,fontSize:16,cursor:"pointer",border:"none",background:a?"#6366f1":"transparent",color:a?"#fff":"#6b7280",transition:"all 0.18s",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.07em",textTransform:"uppercase"});
 
   if(!authChecked) return null;
+  if(passwordRecovery) return React.createElement(SetNewPasswordScreen,{onDone:()=>setPasswordRecovery(false)});
   if(!authed) return React.createElement(SupabaseAuthGate,null);
 
   return (
@@ -26348,7 +26525,13 @@ export default function App() {
             Projects would keep centering its content while its sidebar is
             open, landing on a bigger/inconsistent gap than the portal-based
             sidebars produce. */}
-        <div style={{maxWidth:1600,margin:(activeSidebarWidth||pushOffset)?"0":"0 auto",padding:"20px 24px"}}>
+        {/* Pipeline's table (# / Project / Status / Producer / PM / Editor /
+            Animator / Designer / Productions / Deliverables / Next Due /
+            Brief / Notes) is ~1850px wide at its default column widths — past
+            the standard 1600px cap it'd need a horizontal scrollbar just to
+            show the default layout. Give that one view more room; every
+            other view keeps the standard cap. */}
+        <div style={{maxWidth:view==="pipeline"?2000:1600,margin:(activeSidebarWidth||pushOffset)?"0":"0 auto",padding:"20px 24px"}}>
           <StatsBar projects={allProjects} team={allTeam} setView={v=>{setView(v);if(v!=="projects")setStatsFilter(null);}} onOpenProject={openProject} onSetStatsFilter={setStatsFilter}/>
           {view==="workReview"&&<WorkReviewView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster}/>}
           {view==="pipeline"&&<PipelineView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject}/>}
