@@ -374,6 +374,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   // build_src.jsx
   var import_react = __require("react");
   var import_recharts = __require("recharts");
+  var NAV_HEADER_HEIGHT = 53;
   var PROJECT_STATUSES = ["New Request", "Ideation", "Pre-Pro", "In Production", "Post", "In Review", "Delivered", "On Hold", "Canceled"];
   var BUDGET_STATUSES = ["Not Started", "Quoted", "Approved"];
   var ANIM_ROUND_STATUSES = ["Not Started", "In Progress", "Ready for Editor", "Changes Requested", "Complete"];
@@ -6927,7 +6928,7 @@ Brief content: ${content}`;
     return ReactDOM.createPortal(
       /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: {
         position: "fixed",
-        top: 0,
+        top: NAV_HEADER_HEIGHT,
         left: 0,
         bottom: 0,
         width: sidebarWidth,

@@ -2,6 +2,12 @@ import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect, use
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+// The sticky top nav's rendered height (52px content + 1px border-bottom, see
+// App's header div). ProjectSidebar is a position:fixed overlay portaled to
+// document.body — outside the header's own stacking context — so it needs
+// this to offset its top edge below the header instead of the header's
+// z-index alone, which just decides which one wins when they overlap.
+const NAV_HEADER_HEIGHT = 53;
 const PROJECT_STATUSES   = ["New Request","Ideation","Pre-Pro","In Production","Post","In Review","Delivered","On Hold","Canceled"];
 const BUDGET_STATUSES    = ["Not Started","Quoted","Approved"];
 
@@ -10405,7 +10411,7 @@ const ProjectSidebar = ({project, team, allProjects=[], onUpdateProject, onUpdat
 
   return ReactDOM.createPortal(
     <div onClick={e=>e.stopPropagation()} style={{
-      position:"fixed",top:0,left:0,bottom:0,width:sidebarWidth,zIndex:490,
+      position:"fixed",top:NAV_HEADER_HEIGHT,left:0,bottom:0,width:sidebarWidth,zIndex:490,
       background:"#0d1117",borderRight:"1px solid #1f2937",
       boxShadow:"16px 0 48px rgba(0,0,0,0.6)",
       transform:vis?"translateX(0)":"translateX(-100%)",
