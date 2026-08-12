@@ -6321,7 +6321,7 @@ Brief content: ${content}`;
     { key: "Post", statuses: ["Post", "In Review"], color: "#8b5cf6" },
     { key: "On Hold", statuses: ["On Hold"], color: "#9ca3af" }
   ];
-  var ProjectsView = ({ projects, team, onOpenProject, onUpdateProject, onUpdateDel, statsFilter = null, onClearStatsFilter, navSidebarWidth, navSidebarHandle }) => {
+  var ProjectsView = ({ projects, team, onOpenProject, onUpdateProject, onUpdateDel, statsFilter = null, onClearStatsFilter, navSidebarWidth, navSidebarHandle, projectsLoaded = true }) => {
     const [search, setSearch] = (0, import_react.useState)("");
     const [fsWS, setFsWS] = (0, import_react.useState)("All");
     const [fsBU, setFsBU] = (0, import_react.useState)("All");
@@ -6400,7 +6400,7 @@ Brief content: ${content}`;
       const stageProjects = active.filter((p) => stage.statuses.includes(p.status));
       if (!stageProjects.length) return null;
       return /* @__PURE__ */ React.createElement("div", { key: stage.key, style: { marginBottom: 28 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 3, height: 22, borderRadius: 99, background: stage.color, flexShrink: 0 } }), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 20, color: stage.color, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", textTransform: "uppercase" } }, stage.key), /* @__PURE__ */ React.createElement("div", { style: { background: stage.color + "22", color: stage.color, borderRadius: 99, padding: "2px 11px", fontSize: 14, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif" } }, stageProjects.length)), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(285px,1fr))", gap: 12 } }, stageProjects.map((p) => /* @__PURE__ */ React.createElement(ProjectCard, { key: p.id, project: p, team, onClick: openSidebar, onUpdateProject }))));
-    }), groupMode === "stage" && onHold.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 28 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 3, height: 22, borderRadius: 99, background: "#6b7280", flexShrink: 0 } }), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 20, color: "#9ca3af", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", textTransform: "uppercase" } }, "On Hold"), /* @__PURE__ */ React.createElement("div", { style: { background: "#6b728022", color: "#9ca3af", borderRadius: 99, padding: "2px 11px", fontSize: 14, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif" } }, onHold.length)), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(285px,1fr))", gap: 12 } }, onHold.map((p) => /* @__PURE__ */ React.createElement(ProjectCard, { key: p.id, project: p, team, onClick: openSidebar, onUpdateProject })))), groupMode === "stage" && active.length === 0 && onHold.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#8e97a6", padding: "40px 0", fontSize: 18 } }, "No active projects match"), groupMode === "producer" && (() => {
+    }), groupMode === "stage" && onHold.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 28 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 3, height: 22, borderRadius: 99, background: "#6b7280", flexShrink: 0 } }), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 20, color: "#9ca3af", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", textTransform: "uppercase" } }, "On Hold"), /* @__PURE__ */ React.createElement("div", { style: { background: "#6b728022", color: "#9ca3af", borderRadius: 99, padding: "2px 11px", fontSize: 14, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif" } }, onHold.length)), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(285px,1fr))", gap: 12 } }, onHold.map((p) => /* @__PURE__ */ React.createElement(ProjectCard, { key: p.id, project: p, team, onClick: openSidebar, onUpdateProject })))), groupMode === "stage" && active.length === 0 && onHold.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#8e97a6", padding: "40px 0", fontSize: 18 } }, projectsLoaded ? "No active projects match" : "Loading projects\u2026"), groupMode === "producer" && (() => {
       const prods = team.filter((m) => m.roles.some((r) => r === "Producer"));
       const STAGE_ORD = ["New Request", "Ideation", "Pre-Pro", "In Production", "Post", "In Review", "On Hold"];
       const sortS = (ps) => [...ps].sort((a, b) => STAGE_ORD.indexOf(a.status) - STAGE_ORD.indexOf(b.status));
@@ -17165,8 +17165,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         return prev && JSON.stringify(prev) !== JSON.stringify(n);
       });
       setTeamRoster(t);
-      window.storage?.set("posttrack-admin-team", JSON.stringify(t)).catch(() => {
-      });
       if (sb) {
         if (removed.length) sb.from("team_members").delete().in("id", removed.map((m) => m.id)).then(({ error }) => reportSbError("Team member removal", error));
         sb.from("team_members").upsert(t.map(teamMemberToRow)).then(({ error }) => reportSbError("Team roster", error));
@@ -17282,6 +17280,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       });
     };
     const projectsLoadedRef = (0, import_react.useRef)(false);
+    const [projectsLoaded, setProjectsLoaded] = (0, import_react.useState)(false);
     const bookingsLoadedRef = (0, import_react.useRef)(false);
     const projectsRef = (0, import_react.useRef)(projects);
     (0, import_react.useEffect)(() => {
@@ -17290,7 +17289,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     (0, import_react.useEffect)(() => {
       const safeGet = (key, shared) => (window.storage?.get(key, shared) || Promise.reject()).catch(() => null);
       Promise.all([
-        safeGet("posttrack-admin-team"),
         safeGet("posttrack-admin-gear"),
         safeGet("posttrack-admin-spaces"),
         safeGet("posttrack-admin-meta"),
@@ -17303,11 +17301,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         safeGet(PROPS_STORAGE_KEY),
         safeGet(SCREEN_CONTENT_STORAGE_KEY),
         safeGet(CUSTOM_TASKS_STORAGE_KEY)
-      ]).then(([t, g, s, m, st, tr, nd, rc, ls, furn, prps, sc, ct]) => {
-        try {
-          if (t?.value) setTeamRoster(JSON.parse(t.value));
-        } catch (e) {
-        }
+      ]).then(([g, s, m, st, tr, nd, rc, ls, furn, prps, sc, ct]) => {
         try {
           if (g?.value) setGearList(JSON.parse(g.value));
         } catch (e) {
@@ -17428,6 +17422,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       sb.from("projects").select("*").then(({ data, error }) => {
         if (!error && data) setProjects(data.map(rowToProject));
         projectsLoadedRef.current = true;
+        setProjectsLoaded(true);
       });
       sb.from("studio_bookings").select("*").then(({ data, error }) => {
         if (!error && data) setStudioBookings(data.map(rowToBooking));
@@ -18057,7 +18052,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           });
         }
       }
-    ), view === "projects" && /* @__PURE__ */ React.createElement(ProjectsView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, statsFilter, onClearStatsFilter: () => setStatsFilter(null), navSidebarWidth, navSidebarHandle }), view === "studio" && /* @__PURE__ */ React.createElement(StudioTab, { projects: allProjects, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, team: allTeam, onOpenProject: openProject, talentRoster, onUpdateProject: updateProject, mediaCards, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "kanban" && kanbanMode === "status" && /* @__PURE__ */ React.createElement(KanbanStatus, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "kanban" && kanbanMode === "editor" && /* @__PURE__ */ React.createElement(KanbanEditor, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "calendar" && /* @__PURE__ */ React.createElement(CalendarView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "deliverables" && /* @__PURE__ */ React.createElement(DeliverablesTab, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "ingest" && /* @__PURE__ */ React.createElement(IngestView, { projects: allProjects, team: allTeam, onUpdateProject: updateProject, onAddDel: addDel, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "resources" && /* @__PURE__ */ React.createElement(ResourceView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, resourceConfig, onUpdateProject: updateProject, unavailability, onUpdateDel: updateDel }), view === "myview" && /* @__PURE__ */ React.createElement(MyView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, showToast, nudges, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, unavailability, onAddUnavailability: addUnavailability, onDeleteUnavailability: deleteUnavailability, currentMember, isAdmin, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "admin" && /* @__PURE__ */ React.createElement(
+    ), view === "projects" && /* @__PURE__ */ React.createElement(ProjectsView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, statsFilter, onClearStatsFilter: () => setStatsFilter(null), navSidebarWidth, navSidebarHandle, projectsLoaded }), view === "studio" && /* @__PURE__ */ React.createElement(StudioTab, { projects: allProjects, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, team: allTeam, onOpenProject: openProject, talentRoster, onUpdateProject: updateProject, mediaCards, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "kanban" && kanbanMode === "status" && /* @__PURE__ */ React.createElement(KanbanStatus, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "kanban" && kanbanMode === "editor" && /* @__PURE__ */ React.createElement(KanbanEditor, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "calendar" && /* @__PURE__ */ React.createElement(CalendarView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "deliverables" && /* @__PURE__ */ React.createElement(DeliverablesTab, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "ingest" && /* @__PURE__ */ React.createElement(IngestView, { projects: allProjects, team: allTeam, onUpdateProject: updateProject, onAddDel: addDel, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "resources" && /* @__PURE__ */ React.createElement(ResourceView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, resourceConfig, onUpdateProject: updateProject, unavailability, onUpdateDel: updateDel }), view === "myview" && /* @__PURE__ */ React.createElement(MyView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, showToast, nudges, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, unavailability, onAddUnavailability: addUnavailability, onDeleteUnavailability: deleteUnavailability, currentMember, isAdmin, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "admin" && /* @__PURE__ */ React.createElement(
       AdminView,
       {
         team: teamRoster,

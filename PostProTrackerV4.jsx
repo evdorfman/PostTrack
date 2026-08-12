@@ -9470,7 +9470,7 @@ const ACTIVE_STAGES = [
   {key:"On Hold",      statuses:["On Hold"],         color: "#9ca3af"},
 ];
 
-const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateDel, statsFilter=null, onClearStatsFilter, navSidebarWidth, navSidebarHandle}) => {
+const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateDel, statsFilter=null, onClearStatsFilter, navSidebarWidth, navSidebarHandle, projectsLoaded=true}) => {
   const [search,setSearch]       = useState("");
   const [fsWS,setFsWS]           = useState("All");
   const [fsBU,setFsBU]           = useState("All");
@@ -9605,7 +9605,11 @@ const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateD
         </div>
       )}
 
-      {groupMode==="stage"&&active.length===0&&onHold.length===0&&<div style={{textAlign:"center",color: "#8e97a6",padding:"40px 0",fontSize:18}}>No active projects match</div>}
+      {groupMode==="stage"&&active.length===0&&onHold.length===0&&(
+        <div style={{textAlign:"center",color: "#8e97a6",padding:"40px 0",fontSize:18}}>
+          {projectsLoaded?"No active projects match":"Loading projects…"}
+        </div>
+      )}
 
       {/* Group by Producer — Producer role only */}
       {groupMode==="producer"&&(()=>{
@@ -25669,7 +25673,6 @@ export default function App() {
       return prev && JSON.stringify(prev)!==JSON.stringify(n);
     });
     setTeamRoster(t);
-    window.storage?.set("posttrack-admin-team",   JSON.stringify(t)).catch(()=>{});
     if(sb){
       if(removed.length) sb.from("team_members").delete().in("id", removed.map(m=>m.id)).then(({error})=>reportSbError("Team member removal", error));
       sb.from("team_members").upsert(t.map(teamMemberToRow)).then(({error})=>reportSbError("Team roster", error));
@@ -25744,6 +25747,12 @@ export default function App() {
   // fire with the initial SEED_PROJECTS default and clobber real saved data
   // before the async load in the mount effect below has had a chance to apply it.
   const projectsLoadedRef = useRef(false);
+  // Reactive twin of the ref above, for UI: `projects` starts out as
+  // SEED_PROJECTS (all _isSeedData, filtered out of every real view below),
+  // so between mount and the Supabase fetch resolving, the Projects page has
+  // nothing to show and no way to tell "genuinely empty" apart from "still
+  // loading" — reading a plain ref here wouldn't re-render once it flips.
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
   // Same guard, for studio bookings (which start at [] rather than a seed
   // constant, so there's no clobbering risk from the default — this still
   // exists so the very first authed load doesn't race the persist effect).
@@ -25759,10 +25768,18 @@ export default function App() {
   // brand-new key that doesn't exist yet on someone's first load after an update)
   // can't cause Promise.all to reject as a whole and silently skip loading
   // everything else that *did* save successfully.
+  // Deliberately does NOT include "posttrack-admin-team" — team_members moved
+  // to Supabase (see the fetch below, gated on `authed`) and this legacy,
+  // per-browser window.storage snapshot used to race it: whichever of the two
+  // resolved last silently won. When this one won, it clobbered the real
+  // roster with a stale local copy that never had a just-onboarded person in
+  // it — hiding them from every other admin/session, and (since the local
+  // copy also lacked *their own* row) re-triggering the onboarding modal for
+  // them on their next reload, which then failed with a duplicate-key error
+  // against the row Supabase already had.
   useEffect(()=>{
     const safeGet = (key, shared) => (window.storage?.get(key, shared) || Promise.reject()).catch(()=>null);
     Promise.all([
-      safeGet("posttrack-admin-team"),
       safeGet("posttrack-admin-gear"),
       safeGet("posttrack-admin-spaces"),
       safeGet("posttrack-admin-meta"),
@@ -25775,8 +25792,7 @@ export default function App() {
       safeGet(PROPS_STORAGE_KEY),
       safeGet(SCREEN_CONTENT_STORAGE_KEY),
       safeGet(CUSTOM_TASKS_STORAGE_KEY),
-    ]).then(([t,g,s,m,st,tr,nd,rc,ls,furn,prps,sc,ct])=>{
-      try { if(t?.value) setTeamRoster(JSON.parse(t.value)); } catch(e){}
+    ]).then(([g,s,m,st,tr,nd,rc,ls,furn,prps,sc,ct])=>{
       try { if(g?.value) setGearList(JSON.parse(g.value)); }   catch(e){}
       try { if(s?.value) setStudioSpaces(JSON.parse(s.value)); } catch(e){}
       try { if(m?.value) setStudioSpaceMeta(JSON.parse(m.value)); } catch(e){}
@@ -25816,6 +25832,7 @@ export default function App() {
     sb.from("projects").select("*").then(({data,error})=>{
       if(!error && data) setProjects(data.map(rowToProject));
       projectsLoadedRef.current = true;
+      setProjectsLoaded(true);
     });
     sb.from("studio_bookings").select("*").then(({data,error})=>{
       if(!error && data) setStudioBookings(data.map(rowToBooking));
@@ -26571,7 +26588,7 @@ export default function App() {
               });
             }}
           />}
-          {view==="projects"&&<ProjectsView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} statsFilter={statsFilter} onClearStatsFilter={()=>setStatsFilter(null)} navSidebarWidth={navSidebarWidth} navSidebarHandle={navSidebarHandle}/>}
+          {view==="projects"&&<ProjectsView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} statsFilter={statsFilter} onClearStatsFilter={()=>setStatsFilter(null)} navSidebarWidth={navSidebarWidth} navSidebarHandle={navSidebarHandle} projectsLoaded={projectsLoaded}/>}
           {view==="studio"&&<StudioTab projects={allProjects} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} team={allTeam} onOpenProject={openProject} talentRoster={talentRoster} onUpdateProject={updateProject} mediaCards={mediaCards} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="kanban"&&kanbanMode==="status"&&<KanbanStatus projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="kanban"&&kanbanMode==="editor"&&<KanbanEditor projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
