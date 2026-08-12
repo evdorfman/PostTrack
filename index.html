@@ -16721,7 +16721,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       }
       setBusy(true);
       setErr("");
-      const { data, error } = await sb.auth.signUp({ email: email.trim(), password: pw });
+      const emailRedirectTo = window.location.origin + window.location.pathname;
+      const { data, error } = await sb.auth.signUp({ email: email.trim(), password: pw, options: { emailRedirectTo } });
       setBusy(false);
       if (error) {
         setErr(error.message || "Could not create account.");

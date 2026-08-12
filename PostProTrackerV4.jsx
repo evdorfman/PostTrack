@@ -25081,7 +25081,18 @@ const SupabaseAuthGate = () => {
     if(complexityErr){ setErr(complexityErr); return; }
     if(pw!==pw2){ setErr("Passwords don't match."); return; }
     setBusy(true); setErr('');
-    const {data,error} = await sb.auth.signUp({email:email.trim(), password:pw});
+    // Without an explicit emailRedirectTo, Supabase sends the confirmation
+    // link to whatever "Site URL" is configured in the project's Auth
+    // settings — which may not match wherever this build is actually
+    // deployed (GitHub Pages, a preview URL, etc.), landing people on an
+    // unreachable page after they click it. Pointing it at the origin this
+    // page is actually running from fixes that regardless of what the
+    // dashboard's Site URL is set to — as long as that origin is also on
+    // the project's Redirect URLs allowlist (Authentication → URL
+    // Configuration in the Supabase dashboard); Supabase silently falls
+    // back to the Site URL for any target not on that allowlist.
+    const emailRedirectTo = window.location.origin + window.location.pathname;
+    const {data,error} = await sb.auth.signUp({email:email.trim(), password:pw, options:{emailRedirectTo}});
     setBusy(false);
     if(error){ setErr(error.message||'Could not create account.'); return; }
     if(data?.session){
