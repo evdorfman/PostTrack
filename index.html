@@ -3236,7 +3236,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const effectiveWS = del.workstream || project?.workstream || "";
     const effectiveProducerId = del.producerId || project?.assignees?.["Producer"]?.[0] || null;
     const F = ({ label, children, span }) => /* @__PURE__ */ React.createElement("div", { style: { gridColumn: span ? "1/-1" : "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 5 } }, label), children);
-    return /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", borderRadius: "0 0 12px 12px", overflow: "hidden" } }, locked && /* @__PURE__ */ React.createElement("div", { style: { background: "#f59e0b14", borderBottom: "1px solid #f59e0b30", padding: "10px 16px", display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 17 } }, "\u{1F512}"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#f59e0b", fontWeight: 700 } }, "This deliverable is archived and locked. Unlock to make changes.")), /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 16px", display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { border: "1px solid #1f2937", borderRadius: 10, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { onClick: () => toggleSec("rounds"), style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#0f172a", cursor: "pointer", userSelect: "none" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: "#e2e8f0", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", textTransform: "uppercase" } }, "Review Rounds (", del.rounds.length, ")"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } }, activeRound && !allApproved && /* @__PURE__ */ React.createElement(Chip, { label: activeRound.status, color: RCOLOR[activeRound.status], xs: true }), /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontSize: 14 } }, secOpen.rounds ? "\u25B2" : "\u25BC"))), secOpen.rounds && /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 14px" } }, /* @__PURE__ */ React.createElement(SH, { label: `Rounds \xB7 ${del.rounds.length}`, action: !locked && /* @__PURE__ */ React.createElement(Btn, { small: true, onClick: addRound }, "+ Round") }), del.rounds.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "16px 0", color: "#838ba0", fontSize: 17 } }, "No review rounds yet."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5 } }, del.rounds.map((r, i) => /* @__PURE__ */ React.createElement(RoundRow, { key: r.id, round: r, idx: i, teamNames, onUpdate: (f, v) => updRound(r.id, f, v), onDelete: () => delRound(r.id), locked }))))), /* @__PURE__ */ React.createElement("div", { style: { border: "1px solid #1f2937", borderRadius: 10, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { onClick: () => toggleSec("info"), style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#0f172a", cursor: "pointer", userSelect: "none" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: "#e2e8f0", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", textTransform: "uppercase" } }, "Info & Files"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, alignItems: "center" } }, del.frameLink && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#6366f1", fontWeight: 600 } }, "\u{1F517} Frame.io"), del.framePW && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#9ca3af" } }, "\u{1F512}"), /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontSize: 14 } }, secOpen.info ? "\u25B2" : "\u25BC"))), secOpen.info && /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10, ...locked ? { pointerEvents: "none", opacity: 0.55 } : {} } }, /* @__PURE__ */ React.createElement("div", { style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 5 } }, "Deliverable Title"), /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", borderRadius: "0 0 12px 12px", overflow: "hidden" } }, locked && /* @__PURE__ */ React.createElement("div", { style: { background: "#f59e0b14", borderBottom: "1px solid #f59e0b30", padding: "10px 16px", display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 17 } }, "\u{1F512}"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#f59e0b", fontWeight: 700 } }, "This deliverable is archived and locked. Unlock to make changes.")), /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 16px", display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { border: "1px solid #1f2937", borderRadius: 10, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { onClick: () => toggleSec("rounds"), style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#0f172a", cursor: "pointer", userSelect: "none" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: "#e2e8f0", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", textTransform: "uppercase" } }, "Review Rounds (", del.rounds.length, ")"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } }, activeRound && !allApproved && /* @__PURE__ */ React.createElement(Chip, { label: activeRound.status, color: RCOLOR[activeRound.status], xs: true }), /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontSize: 14 } }, secOpen.rounds ? "\u25B2" : "\u25BC"))), secOpen.rounds && /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 14px" } }, /* @__PURE__ */ React.createElement(SH, { label: `Rounds \xB7 ${del.rounds.length}`, action: !locked && /* @__PURE__ */ React.createElement(Btn, { small: true, onClick: addRound }, "+ Round") }), del.rounds.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "16px 0", color: "#838ba0", fontSize: 17 } }, "No review rounds yet."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5 } }, del.rounds.map((r, i) => /* @__PURE__ */ React.createElement(RoundRow, { key: r.id, round: r, idx: i, teamNames, onUpdate: (f, v) => updRound(r.id, f, v), onDelete: () => delRound(r.id), locked }))))), /* @__PURE__ */ React.createElement("div", { style: { border: "1px solid #1f2937", borderRadius: 10, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { onClick: () => toggleSec("info"), style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#0f172a", cursor: "pointer", userSelect: "none" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: "#e2e8f0", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", textTransform: "uppercase" } }, "Info & Files"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, alignItems: "center" } }, del.frameLink && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#6366f1", fontWeight: 600 } }, "\u{1F517} Frame.io"), del.framePW && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#9ca3af" } }, "\u{1F512}"), /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontSize: 14 } }, secOpen.info ? "\u25B2" : "\u25BC"))), secOpen.info && /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10, ...locked ? { pointerEvents: "none", opacity: 0.55 } : {} } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "2fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 5 } }, "Deliverable Title"), /* @__PURE__ */ React.createElement(
       "input",
       {
         value: del.title || "",
@@ -3244,7 +3244,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         placeholder: "Deliverable title\u2026",
         style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "7px 10px", fontSize: 17, fontWeight: 700, outline: "none", fontFamily: "'DM Sans',sans-serif", width: "100%", boxSizing: "border-box" }
       }
-    )), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement(F, { label: "Status" }, /* @__PURE__ */ React.createElement(Sel, { value: del.status || "", onChange: (e) => upd("status", e.target.value), disabled: locked, style: { background: DCOLOR[del.status] + "18", color: DCOLOR[del.status], border: `1px solid ${DCOLOR[del.status]}40` } }, DELIVERABLE_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, style: { background: "#0d1117", color: "#e2e8f0" } }, s)))), /* @__PURE__ */ React.createElement(F, { label: "Final Deadline" }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: del.deadline || "", onChange: (v) => upd("deadline", v) }))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr auto", gap: 8, background: "#0f172a", borderRadius: 8, padding: "10px 12px", border: "1px solid #6366f120" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 5 } }, "Frame.io Link"), /* @__PURE__ */ React.createElement(StableInp, { value: del.frameLink || "", onChange: (e) => upd("frameLink", e.target.value), placeholder: "https://frame.io/\u2026", disabled: locked })), /* @__PURE__ */ React.createElement("div", { style: { flex: "0 0 160px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 5 } }, "Password"), /* @__PURE__ */ React.createElement(StableInp, { value: del.framePW || "", onChange: (e) => upd("framePW", e.target.value), placeholder: "PW\u2026", disabled: locked }))), project?.mamProjectLink && /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", borderRadius: 8, padding: "9px 12px", border: "1px solid #6366f120", display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 2 } }, "MAM Project Link ", /* @__PURE__ */ React.createElement("span", { style: { color: "#22c55e", fontSize: 13, fontWeight: 700, marginLeft: 4 } }, "AUTO")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 320 } }, project.mamProjectLink)), /* @__PURE__ */ React.createElement(
+    )), /* @__PURE__ */ React.createElement(F, { label: "Editor" }, /* @__PURE__ */ React.createElement(EditorPicker, { value: del.editorId, onChange: (v) => upd("editorId", v), deadline: del.deadline, allProjects, excludeDelId: del.id, team: editors }))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement(F, { label: "Status" }, /* @__PURE__ */ React.createElement(Sel, { value: del.status || "", onChange: (e) => upd("status", e.target.value), disabled: locked, style: { background: DCOLOR[del.status] + "18", color: DCOLOR[del.status], border: `1px solid ${DCOLOR[del.status]}40` } }, DELIVERABLE_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, style: { background: "#0d1117", color: "#e2e8f0" } }, s)))), /* @__PURE__ */ React.createElement(F, { label: "Final Deadline" }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: del.deadline || "", onChange: (v) => upd("deadline", v) }))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr auto", gap: 8, background: "#0f172a", borderRadius: 8, padding: "10px 12px", border: "1px solid #6366f120" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 5 } }, "Frame.io Link"), /* @__PURE__ */ React.createElement(StableInp, { value: del.frameLink || "", onChange: (e) => upd("frameLink", e.target.value), placeholder: "https://frame.io/\u2026", disabled: locked })), /* @__PURE__ */ React.createElement("div", { style: { flex: "0 0 160px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 5 } }, "Password"), /* @__PURE__ */ React.createElement(StableInp, { value: del.framePW || "", onChange: (e) => upd("framePW", e.target.value), placeholder: "PW\u2026", disabled: locked }))), project?.mamProjectLink && /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", borderRadius: 8, padding: "9px 12px", border: "1px solid #6366f120", display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 2 } }, "MAM Project Link ", /* @__PURE__ */ React.createElement("span", { style: { color: "#22c55e", fontSize: 13, fontWeight: 700, marginLeft: 4 } }, "AUTO")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 320 } }, project.mamProjectLink)), /* @__PURE__ */ React.createElement(
       "a",
       {
         href: project.mamProjectLink,
@@ -3275,7 +3275,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         },
         "Reset to suggested"
       )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 3 } }, isOverridden ? `Overridden \u2014 system would otherwise suggest ${suggested}h based on type and status` : `Suggested ${suggested}h, based on deliverable type and current status \u2014 used for resource planning. Enter a number to override.`));
-    })()), /* @__PURE__ */ React.createElement(F, { label: "Workstream" }, /* @__PURE__ */ React.createElement(Sel, { value: effectiveWS, onChange: (e) => upd("workstream", e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Select\u2026"), WORKSTREAMS.map((w) => /* @__PURE__ */ React.createElement("option", { key: w }, w)))), /* @__PURE__ */ React.createElement(F, { label: "Business Unit" }, /* @__PURE__ */ React.createElement(Sel, { value: effectiveBU, onChange: (e) => upd("businessUnit", e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Select\u2026"), BUSINESS_UNITS.map((b) => /* @__PURE__ */ React.createElement("option", { key: b }, b)))), /* @__PURE__ */ React.createElement(F, { label: "Editor" }, /* @__PURE__ */ React.createElement(EditorPicker, { value: del.editorId, onChange: (v) => upd("editorId", v), deadline: del.deadline, allProjects, excludeDelId: del.id, team: editors })), /* @__PURE__ */ React.createElement(F, { label: "Animator" }, /* @__PURE__ */ React.createElement(EditorPicker, { value: del.animatorId, onChange: (v) => upd("animatorId", v), deadline: del.deadline, allProjects, excludeDelId: del.id, team: animators.length ? animators : editors })), /* @__PURE__ */ React.createElement(F, { label: "Producer", span: true }, /* @__PURE__ */ React.createElement(EditorPicker, { value: effectiveProducerId, onChange: (v) => upd("producerId", v), deadline: del.deadline, allProjects, excludeDelId: del.id, team: producers })), /* @__PURE__ */ React.createElement(F, { label: "Frame Internal URL", span: true }, /* @__PURE__ */ React.createElement(StableInp, { value: del.frameInternalUrl || "", onChange: (e) => upd("frameInternalUrl", e.target.value), placeholder: "Internal Frame URL\u2026" })), /* @__PURE__ */ React.createElement(F, { label: "Video Length" }, /* @__PURE__ */ React.createElement(StableInp, { value: del.videoLength || "", onChange: (e) => upd("videoLength", e.target.value), placeholder: "e.g. 0:30, 1:22\u2026" })), /* @__PURE__ */ React.createElement(F, { label: "File Path", span: true }, /* @__PURE__ */ React.createElement(StableInp, { value: del.filePath || "", onChange: (e) => upd("filePath", e.target.value), placeholder: "/Volumes/Archive/Project/\u2026" })), /* @__PURE__ */ React.createElement(F, { label: "Distribution Platforms", span: true }, /* @__PURE__ */ React.createElement(MultiSel, { value: del.distPlatforms || [], onChange: (v) => upd("distPlatforms", v), options: DIST_PLATFORMS, placeholder: "Select platforms\u2026" })), /* @__PURE__ */ React.createElement(F, { label: "Speakers", span: true }, /* @__PURE__ */ React.createElement(SpeakersPicker, { value: del.speakers || [], onChange: (v) => upd("speakers", v), talentRoster })), /* @__PURE__ */ React.createElement(F, { label: "Use Case Limitations", span: true }, /* @__PURE__ */ React.createElement(MultiSel, { value: del.useCaseLimitations || [], onChange: (v) => upd("useCaseLimitations", v), options: USE_CASES, placeholder: "Select limitations\u2026" })), /* @__PURE__ */ React.createElement(F, { label: "Approved Uses", span: true }, /* @__PURE__ */ React.createElement(MultiSel, { value: del.approvedUses || [], onChange: (v) => upd("approvedUses", v), options: APPROVED_USES, placeholder: "Select approved uses\u2026" })), /* @__PURE__ */ React.createElement(F, { label: "Keywords", span: true }, /* @__PURE__ */ React.createElement(KeywordsEditor, { value: del.keywords || [], onChange: (v) => upd("keywords", v) })), /* @__PURE__ */ React.createElement(F, { label: "Notes", span: true }, /* @__PURE__ */ React.createElement(StableInp, { textarea: true, value: del.notes || "", onChange: (e) => upd("notes", e.target.value), placeholder: "Notes\u2026" }))), /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", borderRadius: 9, padding: "10px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement(Toggle, { label: "Contains AI", value: !!del.containsAI, onChange: (v) => upd("containsAI", v) }), /* @__PURE__ */ React.createElement(Toggle, { label: "Greenscreen", value: !!del.greenscreen, onChange: (v) => upd("greenscreen", v) }), /* @__PURE__ */ React.createElement(Toggle, { label: "Burned-In Captions", value: !!del.captionsNeeded, onChange: (v) => upd("captionsNeeded", v) }), /* @__PURE__ */ React.createElement(Toggle, { label: "SRT Delivered", value: !!del.srtDelivered, onChange: (v) => upd("srtDelivered", v) }), /* @__PURE__ */ React.createElement(Toggle, { label: "Watermark", value: !!del.watermark, onChange: (v) => upd("watermark", v) }), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14, color: del.qualitiesConfirmed ? "#10b981" : "#9ca3af", marginLeft: "auto" } }, /* @__PURE__ */ React.createElement(
+    })()), /* @__PURE__ */ React.createElement(F, { label: "Workstream" }, /* @__PURE__ */ React.createElement(Sel, { value: effectiveWS, onChange: (e) => upd("workstream", e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Select\u2026"), WORKSTREAMS.map((w) => /* @__PURE__ */ React.createElement("option", { key: w }, w)))), /* @__PURE__ */ React.createElement(F, { label: "Business Unit" }, /* @__PURE__ */ React.createElement(Sel, { value: effectiveBU, onChange: (e) => upd("businessUnit", e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Select\u2026"), BUSINESS_UNITS.map((b) => /* @__PURE__ */ React.createElement("option", { key: b }, b)))), /* @__PURE__ */ React.createElement(F, { label: "Animator" }, /* @__PURE__ */ React.createElement(EditorPicker, { value: del.animatorId, onChange: (v) => upd("animatorId", v), deadline: del.deadline, allProjects, excludeDelId: del.id, team: animators.length ? animators : editors })), /* @__PURE__ */ React.createElement(F, { label: "Producer", span: true }, /* @__PURE__ */ React.createElement(EditorPicker, { value: effectiveProducerId, onChange: (v) => upd("producerId", v), deadline: del.deadline, allProjects, excludeDelId: del.id, team: producers })), /* @__PURE__ */ React.createElement(F, { label: "Frame Internal URL", span: true }, /* @__PURE__ */ React.createElement(StableInp, { value: del.frameInternalUrl || "", onChange: (e) => upd("frameInternalUrl", e.target.value), placeholder: "Internal Frame URL\u2026" })), /* @__PURE__ */ React.createElement(F, { label: "Video Length" }, /* @__PURE__ */ React.createElement(StableInp, { value: del.videoLength || "", onChange: (e) => upd("videoLength", e.target.value), placeholder: "e.g. 0:30, 1:22\u2026" })), /* @__PURE__ */ React.createElement(F, { label: "File Path", span: true }, /* @__PURE__ */ React.createElement(StableInp, { value: del.filePath || "", onChange: (e) => upd("filePath", e.target.value), placeholder: "/Volumes/Archive/Project/\u2026" })), /* @__PURE__ */ React.createElement(F, { label: "Distribution Platforms", span: true }, /* @__PURE__ */ React.createElement(MultiSel, { value: del.distPlatforms || [], onChange: (v) => upd("distPlatforms", v), options: DIST_PLATFORMS, placeholder: "Select platforms\u2026" })), /* @__PURE__ */ React.createElement(F, { label: "Speakers", span: true }, /* @__PURE__ */ React.createElement(SpeakersPicker, { value: del.speakers || [], onChange: (v) => upd("speakers", v), talentRoster })), /* @__PURE__ */ React.createElement(F, { label: "Use Case Limitations", span: true }, /* @__PURE__ */ React.createElement(MultiSel, { value: del.useCaseLimitations || [], onChange: (v) => upd("useCaseLimitations", v), options: USE_CASES, placeholder: "Select limitations\u2026" })), /* @__PURE__ */ React.createElement(F, { label: "Approved Uses", span: true }, /* @__PURE__ */ React.createElement(MultiSel, { value: del.approvedUses || [], onChange: (v) => upd("approvedUses", v), options: APPROVED_USES, placeholder: "Select approved uses\u2026" })), /* @__PURE__ */ React.createElement(F, { label: "Keywords", span: true }, /* @__PURE__ */ React.createElement(KeywordsEditor, { value: del.keywords || [], onChange: (v) => upd("keywords", v) })), /* @__PURE__ */ React.createElement(F, { label: "Notes", span: true }, /* @__PURE__ */ React.createElement(StableInp, { textarea: true, value: del.notes || "", onChange: (e) => upd("notes", e.target.value), placeholder: "Notes\u2026" }))), /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", borderRadius: 9, padding: "10px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement(Toggle, { label: "Contains AI", value: !!del.containsAI, onChange: (v) => upd("containsAI", v) }), /* @__PURE__ */ React.createElement(Toggle, { label: "Greenscreen", value: !!del.greenscreen, onChange: (v) => upd("greenscreen", v) }), /* @__PURE__ */ React.createElement(Toggle, { label: "Burned-In Captions", value: !!del.captionsNeeded, onChange: (v) => upd("captionsNeeded", v) }), /* @__PURE__ */ React.createElement(Toggle, { label: "SRT Delivered", value: !!del.srtDelivered, onChange: (v) => upd("srtDelivered", v) }), /* @__PURE__ */ React.createElement(Toggle, { label: "Watermark", value: !!del.watermark, onChange: (v) => upd("watermark", v) }), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14, color: del.qualitiesConfirmed ? "#10b981" : "#9ca3af", marginLeft: "auto" } }, /* @__PURE__ */ React.createElement(
       "input",
       {
         type: "checkbox",
@@ -6630,6 +6630,10 @@ Brief content: ${content}`;
     const ms = roleNames(project, team, role);
     return ms.length ? ms.map((m) => m.name).join(", ") : "\u2014";
   };
+  var getDefaultPPMId = (team) => {
+    const ppms = (team || []).filter((m) => (m.roles || []).includes("Post Production Manager"));
+    return (ppms.find((m) => m.available !== false) || ppms[0])?.id || null;
+  };
   var getEffectiveProjectEditors = (project, team) => {
     const assigned = roleNames(project, team, "Editor");
     if (assigned.length) return assigned;
@@ -6907,7 +6911,6 @@ Brief content: ${content}`;
     const editor = roleNameStr(project, team, "Editor");
     const pm = roleNameStr(project, team, "Project Manager");
     const ppm = roleNameStr(project, team, "Post Production Manager");
-    const showPPMRole = stage === "Post" || stage === "On Hold";
     const setRole = (role, memberId) => {
       const next = { ...project.assignees || {} };
       next[role] = memberId ? [memberId] : [];
@@ -6972,7 +6975,7 @@ Brief content: ${content}`;
           style: { background: project.inPipeline ? "#6366f120" : "transparent", border: `1px solid ${project.inPipeline ? "#6366f160" : "#374151"}`, borderRadius: 5, color: project.inPipeline ? "#818cf8" : "#6b7280", padding: "3px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.07em", whiteSpace: "nowrap" }
         },
         project.inPipeline ? "\u25CF Pipeline" : "+ Pipeline"
-      ))), showNote && /* @__PURE__ */ React.createElement(QuickNoteModal, { project, team, onClose: () => setShowNote(false), onUpdateProject }), showBrief && /* @__PURE__ */ React.createElement(BriefPreviewModal, { project, onClose: () => setShowBrief(false) }), /* @__PURE__ */ React.createElement("div", { style: { overflowY: "scroll", WebkitOverflowScrolling: "touch", padding: "16px 20px 40px", display: "flex", flexDirection: "column", gap: 10, minHeight: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 7, background: "#0f172a", border: "1px solid #1f2937", borderRadius: 10, padding: "12px 14px", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Producer", role: "Producer", currentId: producerId, filterRoles: ["Producer"] }), /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Editor", role: "Editor", currentId: editorId, filterRoles: ["Editor", "Animator", "Designer"] }), showPPMRole ? /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Post Production Mgr", role: "Post Production Manager", currentId: ppmId, filterRoles: ["Post Production Manager"] }) : /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Project Manager", role: "Project Manager", currentId: pmId, filterRoles: ["Project Manager", "Producer"] }), /* @__PURE__ */ React.createElement("div", { style: { paddingTop: 6, borderTop: "1px solid #1a2035" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: project._segments?.length > 1 ? 6 : 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600 } }, "Project-level assignment"), project._segments?.length > 1 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 800, color: "#f59e0b", background: "#f59e0b15", border: "1px solid #f59e0b30", borderRadius: 3, padding: "1px 4px", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", textTransform: "uppercase" } }, "\u21C4 Active")), /* @__PURE__ */ React.createElement(
+      ))), showNote && /* @__PURE__ */ React.createElement(QuickNoteModal, { project, team, onClose: () => setShowNote(false), onUpdateProject }), showBrief && /* @__PURE__ */ React.createElement(BriefPreviewModal, { project, onClose: () => setShowBrief(false) }), /* @__PURE__ */ React.createElement("div", { style: { overflowY: "scroll", WebkitOverflowScrolling: "touch", padding: "16px 20px 40px", display: "flex", flexDirection: "column", gap: 10, minHeight: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 7, background: "#0f172a", border: "1px solid #1f2937", borderRadius: 10, padding: "12px 14px", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Producer", role: "Producer", currentId: producerId, filterRoles: ["Producer"] }), /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Editor", role: "Editor", currentId: editorId, filterRoles: ["Editor", "Animator", "Designer"] }), /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Project Manager", role: "Project Manager", currentId: pmId, filterRoles: ["Project Manager", "Producer"] }), /* @__PURE__ */ React.createElement(SidebarRoleRow, { team, onSetRole: setRole, label: "Post Production Mgr", role: "Post Production Manager", currentId: ppmId, filterRoles: ["Post Production Manager"] }), /* @__PURE__ */ React.createElement("div", { style: { paddingTop: 6, borderTop: "1px solid #1a2035" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: project._segments?.length > 1 ? 6 : 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600 } }, "Project-level assignment"), project._segments?.length > 1 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 800, color: "#f59e0b", background: "#f59e0b15", border: "1px solid #f59e0b30", borderRadius: 3, padding: "1px 4px", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", textTransform: "uppercase" } }, "\u21C4 Active")), /* @__PURE__ */ React.createElement(
         "button",
         {
           onClick: () => setShowProjectHandoff(true),
@@ -7570,6 +7573,23 @@ Brief content: ${content}`;
       DELIVERABLE_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, value: s, style: { background: "#0d1117", color: "#e2e8f0" } }, s))
     );
   };
+  var DelEditorSel = ({ editorId, editors, onChange, xs }) => {
+    const unassigned = !editors.some((m) => m.id === editorId);
+    return /* @__PURE__ */ React.createElement(
+      "select",
+      {
+        value: editorId || "",
+        onClick: (e) => e.stopPropagation(),
+        onChange: (e) => {
+          e.stopPropagation();
+          onChange(e.target.value ? +e.target.value : null);
+        },
+        style: { background: unassigned ? "#ef444418" : "#1f2937", color: unassigned ? "#ef4444" : "#e2e8f0", border: `1px solid ${unassigned ? "#ef444460" : "#374151"}`, borderRadius: 4, padding: xs ? "1px 6px" : "3px 8px", fontSize: xs ? 12 : 14, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", outline: "none", cursor: "pointer", flexShrink: 0, colorScheme: "dark", maxWidth: 130 }
+      },
+      /* @__PURE__ */ React.createElement("option", { value: "", style: { background: "#0d1117", color: "#ef4444" } }, "Unassigned"),
+      editors.map((ed) => /* @__PURE__ */ React.createElement("option", { key: ed.id, value: ed.id, style: { background: "#0d1117", color: "#e2e8f0" } }, ed.name))
+    );
+  };
   var DelFrameInfo = ({ frameLink, framePW, small }) => {
     const [copied, setCopied] = (0, import_react.useState)(false);
     if (!frameLink) return /* @__PURE__ */ React.createElement("span", { style: { fontSize: small ? 13 : 14, color: "#838ba0", fontStyle: "italic", flexShrink: 0 } }, "(No Frame link)");
@@ -7685,6 +7705,7 @@ Brief content: ${content}`;
         /* @__PURE__ */ React.createElement("div", { style: { width: 8, height: 8, borderRadius: "50%", background: c, flexShrink: 0 } }),
         /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, d.title), showProject && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af" } }, d.projectName)),
         d._fromProduction ? /* @__PURE__ */ React.createElement(Chip, { label: d.status, color: c, xs: true }) : /* @__PURE__ */ React.createElement(DelStatusSel, { status: d.status, onChange: (v) => onUpdateDel(d.projectId, d.id, "status", v), xs: true }),
+        !d._fromProduction && /* @__PURE__ */ React.createElement(DelEditorSel, { editorId: d.editorId, editors, onChange: (v) => onUpdateDel(d.projectId, d.id, "editorId", v), xs: true }),
         d.aspectRatio && /* @__PURE__ */ React.createElement(Chip, { label: d.aspectRatio, color: "#374151", xs: true }),
         activeR && !changes && /* @__PURE__ */ React.createElement(Chip, { label: activeR.label, color: RCOLOR[activeR.status], xs: true }),
         changes && /* @__PURE__ */ React.createElement(Chip, { label: "\u21A9 Changes", color: "#ef4444", xs: true }),
@@ -9535,7 +9556,15 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     shoots: row.shoots || [],
     notes: row.notes || [],
     ingestDates: row.ingest_dates || [],
-    closedAt: row.closed_at
+    closedAt: row.closed_at,
+    // BXTV cross-references (which episode a deliverable is linked to, and an
+    // episode project's own season/episode/air-date/title) — previously
+    // missing from both this and projectToRow below, so bxtvRefs/bxtvMeta only
+    // ever lived in local React state: they looked linked for the rest of that
+    // session, then silently reverted on the next reload since nothing had
+    // actually been saved.
+    bxtvRefs: row.bxtv_refs || [],
+    bxtvMeta: row.bxtv_meta || null
   });
   var projectToRow = (p) => ({
     id: p.id,
@@ -9555,7 +9584,9 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     shoots: p.shoots || [],
     notes: p.notes || [],
     ingest_dates: p.ingestDates || [],
-    closed_at: p.closedAt || null
+    closed_at: p.closedAt || null,
+    bxtv_refs: p.bxtvRefs || [],
+    bxtv_meta: p.bxtvMeta || null
   });
   var BOOKING_KNOWN_FIELDS = ["id", "title", "projectId", "parentBookingId", "bookingStatus", "productionType", "location", "startTime", "endTime", "crewCallTime", "notes", "equipmentIds", "confirmations", "crewInternal", "crewExternal"];
   var rowToBooking = (row) => ({
@@ -15069,6 +15100,11 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const newRefs = (episodeProject.bxtvRefs || []).filter((r) => !(String(r.sourceProjectId) === String(sourceProject.id) && String(r.delId) === String(del.id)));
     onUpdateProject(episodeProject.id, "bxtvRefs", newRefs);
   };
+  var moveBXTVDel = (sourceProject, del, oldEpisode, newEpisode, bxtvEditorId, onUpdateProject) => {
+    const oldRefs = (oldEpisode.bxtvRefs || []).filter((r) => !(r.sourceProjectId === sourceProject.id && r.delId === del.id));
+    onUpdateProject(oldEpisode.id, "bxtvRefs", oldRefs);
+    linkDelToBXTV(sourceProject, del, newEpisode, bxtvEditorId, onUpdateProject);
+  };
   var BXTVMetaPanel = ({ project, onUpdateProject }) => {
     const m = project.bxtvMeta || {};
     const upd = (f, v) => onUpdateProject(project.id, "bxtvMeta", { ...m, [f]: v });
@@ -15077,58 +15113,30 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     return /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #6366f140", borderRadius: 10, padding: "14px 16px", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#818cf8", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.08em", marginBottom: 12 } }, "\u{1F4FA} BXTV Episode"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 2fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Season"), /* @__PURE__ */ React.createElement("input", { style: inp, type: "number", min: "1", value: m.season || "", onChange: (e) => upd("season", +e.target.value), placeholder: "26" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Episode"), /* @__PURE__ */ React.createElement("input", { style: inp, type: "number", min: "1", value: m.episode || "", onChange: (e) => upd("episode", +e.target.value), placeholder: "04" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Air Date"), /* @__PURE__ */ React.createElement("input", { style: { ...inp, colorScheme: "dark" }, type: "date", value: m.airDate || "", onChange: (e) => upd("airDate", e.target.value) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Episode Title"), /* @__PURE__ */ React.createElement("input", { style: inp, value: m.title || "", onChange: (e) => upd("title", e.target.value), placeholder: "e.g. The Big Game Recap" }))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6, fontSize: 14, color: "#6366f1", fontWeight: 600 } }, getBXTVEpisodeName(project)));
   };
   var BXTVLinkSection = ({ del, sourceProject, allProjects, team, onUpdateProject }) => {
-    const [expanded, setExpanded] = (0, import_react.useState)(false);
-    const [selEpId, setSelEpId] = (0, import_react.useState)(del.bxtvLink?.episodeProjectId || "");
-    const [selEdId, setSelEdId] = (0, import_react.useState)(del.bxtvLink?.bxtvEditorId || "");
     const bxtvEps = getBXTVProjects(allProjects);
     const currentEpId = del.bxtvLink?.episodeProjectId;
     const currentEp = currentEpId ? allProjects.find((p) => p.id === currentEpId) : null;
     const editors = team.filter((m) => m.roles?.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
     const isBXTV = !!currentEpId;
     const sel = { background: "#0a0f1a", border: "1px solid #374151", borderRadius: 6, color: "#e2e8f0", padding: "6px 8px", fontSize: 14, outline: "none", width: "100%", colorScheme: "dark" };
-    const handleOpen = () => {
-      setSelEpId(currentEpId || "");
-      setSelEdId(del.bxtvLink?.bxtvEditorId || "");
-      setExpanded(true);
-    };
-    const handleSave = () => {
-      if (!selEpId) return;
-      const newEp = allProjects.find((p) => String(p.id) === String(selEpId));
-      if (!newEp) return;
-      if (currentEp && String(currentEp.id) !== String(selEpId)) {
-        const oldRefs = (currentEp.bxtvRefs || []).filter((r) => !(String(r.sourceProjectId) === String(sourceProject.id) && r.delId === del.id));
-        onUpdateProject(currentEp.id, "bxtvRefs", oldRefs);
+    const handlePickEpisode = (epId) => {
+      if (!epId) {
+        if (currentEp) unlinkDelFromBXTV(sourceProject, del, currentEp, onUpdateProject);
+        return;
       }
-      linkDelToBXTV(sourceProject, del, newEp, +selEdId || null, onUpdateProject);
-      setExpanded(false);
+      const newEp = allProjects.find((p) => String(p.id) === String(epId));
+      if (!newEp) return;
+      if (currentEp && String(currentEp.id) !== String(epId)) {
+        moveBXTVDel(sourceProject, del, currentEp, newEp, del.bxtvLink?.bxtvEditorId || null, onUpdateProject);
+      } else {
+        linkDelToBXTV(sourceProject, del, newEp, del.bxtvLink?.bxtvEditorId || null, onUpdateProject);
+      }
     };
-    const handleUnlink = () => {
-      if (currentEp) unlinkDelFromBXTV(sourceProject, del, currentEp, onUpdateProject);
-      setExpanded(false);
+    const handlePickEditor = (edId) => {
+      if (!currentEp) return;
+      linkDelToBXTV(sourceProject, del, currentEp, edId || null, onUpdateProject);
     };
-    return /* @__PURE__ */ React.createElement("div", { style: { paddingTop: 6, borderTop: "1px solid #1a2035" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, justifyContent: "space-between", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, minWidth: 0 } }, isBXTV ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: "#818cf8", background: "#6366f115", border: "1px solid #6366f140", borderRadius: 4, padding: "1px 7px", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 } }, "\u{1F4FA} ", getBXTVEpisodeName(currentEp) || currentEp?.name) : /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#374151" } }, "Not linked to BXTV")), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        onClick: expanded ? () => setExpanded(false) : handleOpen,
-        style: { fontSize: 12, fontWeight: 700, color: isBXTV ? "#f59e0b" : "#818cf8", background: isBXTV ? "#f59e0b15" : "#6366f115", border: `1px solid ${isBXTV ? "#f59e0b40" : "#6366f140"}`, cursor: "pointer", padding: "2px 8px", borderRadius: 4, flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" }
-      },
-      expanded ? "\u2715" : isBXTV ? "\u21C4 Change" : "+ BXTV"
-    )), isBXTV && !expanded && del.bxtvLink?.bxtvEditorId && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", marginTop: 3 } }, "BXTV Editor: ", /* @__PURE__ */ React.createElement("span", { style: { color: "#34d399", fontWeight: 600 } }, team.find((m) => m.id === del.bxtvLink.bxtvEditorId)?.name || "\u2014")), expanded && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, display: "flex", flexDirection: "column", gap: 8, background: "#0a0f1a", borderRadius: 8, padding: "10px 12px", border: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#6366f1", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.06em", marginBottom: 4 } }, "Episode"), /* @__PURE__ */ React.createElement("select", { style: sel, value: selEpId, onChange: (e) => setSelEpId(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 Select episode \u2014"), bxtvEps.map((ep) => /* @__PURE__ */ React.createElement("option", { key: ep.id, value: ep.id }, getBXTVEpisodeName(ep) || ep.name))), bxtvEps.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#374151", fontStyle: "italic", marginTop: 4 } }, 'No BXTV projects found. Add a project with workstream "BXTV".')), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#6366f1", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.06em", marginBottom: 4 } }, "BXTV Editor"), /* @__PURE__ */ React.createElement("select", { style: sel, value: selEdId, onChange: (e) => setSelEdId(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 Same as source \u2014"), editors.map((m) => /* @__PURE__ */ React.createElement("option", { key: m.id, value: m.id }, m.name)))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        onClick: handleSave,
-        disabled: !selEpId,
-        style: { flex: 1, background: selEpId ? "#6366f1" : "#1f2937", border: "none", borderRadius: 6, color: selEpId ? "#fff" : "#4b5563", padding: "7px 0", fontSize: 13, fontWeight: 800, cursor: selEpId ? "pointer" : "not-allowed", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" }
-      },
-      isBXTV ? "Update Link" : "Link to Episode"
-    ), isBXTV && /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        onClick: handleUnlink,
-        style: { background: "#ef444415", border: "1px solid #ef444440", borderRadius: 6, color: "#ef4444", padding: "7px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }
-      },
-      "Remove"
-    ))));
+    return /* @__PURE__ */ React.createElement("div", { style: { paddingTop: 6, borderTop: "1px solid #1a2035", display: "flex", flexDirection: "column", gap: 6 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#6366f1", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.06em", marginBottom: 4 } }, "\u{1F4FA} BXTV Episode"), /* @__PURE__ */ React.createElement("select", { style: sel, value: currentEpId || "", onChange: (e) => handlePickEpisode(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 Select episode \u2014"), bxtvEps.map((ep) => /* @__PURE__ */ React.createElement("option", { key: ep.id, value: ep.id }, getBXTVEpisodeName(ep) || ep.name))), bxtvEps.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#374151", fontStyle: "italic", marginTop: 4 } }, 'No BXTV projects found. Add a project with workstream "BXTV".')), isBXTV && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#6366f1", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.06em", marginBottom: 4 } }, "BXTV Editor"), /* @__PURE__ */ React.createElement("select", { style: sel, value: del.bxtvLink?.bxtvEditorId || "", onChange: (e) => handlePickEditor(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 Same as source \u2014"), editors.map((m) => /* @__PURE__ */ React.createElement("option", { key: m.id, value: m.id }, m.name)))));
   };
   var AudioCaptureModal = ({ audio = {}, productionLocation = "", onUpdate, onClose }) => {
     const updAC = (f, v) => onUpdate({ ...audio, [f]: v });
@@ -17140,7 +17148,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const batchTimersRef = (0, import_react.useRef)(/* @__PURE__ */ new Map());
     const BATCH_WINDOW_MS = 5 * 60 * 1e3;
     const logFieldChangeBatched = ({ entityType, entityId, entityLabel, projectId, fieldLabel }) => {
-      const key = `${entityType}:${entityId}`;
+      const key = `${entityType}:${entityId}:${projectId}`;
       const existing = batchTimersRef.current.get(key);
       if (existing) clearTimeout(existing.timer);
       const fields = existing?.fields || /* @__PURE__ */ new Set();
@@ -17429,6 +17437,29 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         bookingsLoadedRef.current = true;
       });
     }, [authed]);
+    (0, import_react.useEffect)(() => {
+      if (!authed || !sb) return;
+      const mergeUpsert = (setter, mapRow) => (payload) => {
+        const incoming = mapRow(payload.new);
+        setter((prev) => {
+          const idx = prev.findIndex((x) => x.id === incoming.id);
+          if (idx === -1) return [...prev, incoming];
+          if (JSON.stringify(prev[idx]) === JSON.stringify(incoming)) return prev;
+          const next = prev.slice();
+          next[idx] = incoming;
+          return next;
+        });
+      };
+      const mergeDelete = (setter) => (payload) => {
+        const id = payload.old?.id;
+        if (id == null) return;
+        setter((prev) => prev.some((x) => x.id === id) ? prev.filter((x) => x.id !== id) : prev);
+      };
+      const channel = sb.channel("posttrack-realtime").on("postgres_changes", { event: "INSERT", schema: "public", table: "projects" }, mergeUpsert(setProjects, rowToProject)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "projects" }, mergeUpsert(setProjects, rowToProject)).on("postgres_changes", { event: "DELETE", schema: "public", table: "projects" }, mergeDelete(setProjects)).on("postgres_changes", { event: "INSERT", schema: "public", table: "team_members" }, mergeUpsert(setTeamRoster, rowToTeamMember)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "team_members" }, mergeUpsert(setTeamRoster, rowToTeamMember)).on("postgres_changes", { event: "DELETE", schema: "public", table: "team_members" }, mergeDelete(setTeamRoster)).on("postgres_changes", { event: "INSERT", schema: "public", table: "studio_bookings" }, mergeUpsert(setStudioBookings, rowToBooking)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "studio_bookings" }, mergeUpsert(setStudioBookings, rowToBooking)).on("postgres_changes", { event: "DELETE", schema: "public", table: "studio_bookings" }, mergeDelete(setStudioBookings)).subscribe();
+      return () => {
+        sb.removeChannel(channel);
+      };
+    }, [authed]);
     const [authUser, setAuthUser] = (0, import_react.useState)(null);
     (0, import_react.useEffect)(() => {
       if (!authed || !sb) {
@@ -17629,25 +17660,34 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         });
       }
       const label = prevDel?.title || "Deliverable";
+      const bxtvEpisodeId = prevDel?.bxtvLink?.episodeProjectId || null;
+      const logDel = (args) => {
+        logActivity(args);
+        if (bxtvEpisodeId) logActivity({ ...args, projectId: bxtvEpisodeId });
+      };
+      const logDelBatched = (args) => {
+        logFieldChangeBatched(args);
+        if (bxtvEpisodeId) logFieldChangeBatched({ ...args, projectId: bxtvEpisodeId });
+      };
       if (field === "status") {
-        logActivity({ entityType: "deliverable", entityLabel: label, projectId, action: "status_changed", detail: `status \u2192 ${value}` });
+        logDel({ entityType: "deliverable", entityLabel: label, projectId, action: "status_changed", detail: `status \u2192 ${value}` });
       } else if (field === "deadline") {
-        logActivity({ entityType: "deliverable", entityLabel: label, projectId, action: "updated", detail: `final deadline \u2192 ${value}` });
+        logDel({ entityType: "deliverable", entityLabel: label, projectId, action: "updated", detail: `final deadline \u2192 ${value}` });
       } else if (field === "frameLink" || field === "framePW") {
-        logActivity({ entityType: "deliverable", entityLabel: label, projectId, action: "updated", detail: "frame link/password updated" });
+        logDel({ entityType: "deliverable", entityLabel: label, projectId, action: "updated", detail: "frame link/password updated" });
       } else if (field === "editorId") {
         const editorName = teamRosterRef.current.find((m) => m.id === value)?.name || "Unassigned";
-        logActivity({ entityType: "deliverable", entityLabel: label, projectId, action: "updated", detail: `editor assigned \u2192 ${editorName}` });
+        logDel({ entityType: "deliverable", entityLabel: label, projectId, action: "updated", detail: `editor assigned \u2192 ${editorName}` });
       } else if (field === "rounds") {
         const prevRounds = prevDel?.rounds || [];
         (value || []).forEach((r) => {
           const prevRound = prevRounds.find((pr) => pr.id === r.id);
           if (prevRound && prevRound.status !== r.status) {
-            logActivity({ entityType: "deliverable", entityLabel: label, projectId, action: "updated", detail: `${r.label || "Review round"} \u2192 ${r.status}` });
+            logDel({ entityType: "deliverable", entityLabel: label, projectId, action: "updated", detail: `${r.label || "Review round"} \u2192 ${r.status}` });
           }
         });
       } else {
-        logFieldChangeBatched({ entityType: "deliverable", entityId: delId, entityLabel: label, projectId, fieldLabel: field });
+        logDelBatched({ entityType: "deliverable", entityId: delId, entityLabel: label, projectId, fieldLabel: field });
       }
     }, []);
     const addDel = (0, import_react.useCallback)((projectId, newDel) => {
@@ -17755,6 +17795,27 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         (value || []).filter((ig) => !prevIngests.some((pi) => pi.id === ig.id)).forEach(() => {
           logActivity({ entityType: "ingest", entityLabel: label, projectId, action: "created", detail: `media ingest created ${(/* @__PURE__ */ new Date()).toLocaleString()}` });
         });
+      } else if (field === "deliverables") {
+        const prevDels = prevProj?.deliverables || [];
+        (value || []).forEach((d) => {
+          const pd = prevDels.find((x) => x.id === d.id);
+          if (!pd) return;
+          const prevEp = pd.bxtvLink?.episodeProjectId || null;
+          const newEp = d.bxtvLink?.episodeProjectId || null;
+          if (prevEp === newEp) return;
+          const delLabel = d.title || "Deliverable";
+          const epLabelOf = (epId) => {
+            const ep = projectsRef.current.find((p) => p.id === epId);
+            return ep ? getBXTVEpisodeName(ep) || ep.name : "BXTV episode";
+          };
+          if (newEp) {
+            logActivity({ entityType: "deliverable", entityLabel: delLabel, projectId, action: "updated", detail: `linked to BXTV episode \u2192 ${epLabelOf(newEp)}` });
+            logActivity({ entityType: "deliverable", entityLabel: delLabel, projectId: newEp, action: "updated", detail: `"${delLabel}" linked from ${label}` });
+          } else if (prevEp) {
+            logActivity({ entityType: "deliverable", entityLabel: delLabel, projectId, action: "updated", detail: `unlinked from BXTV episode ${epLabelOf(prevEp)}` });
+            logActivity({ entityType: "deliverable", entityLabel: delLabel, projectId: prevEp, action: "updated", detail: `"${delLabel}" unlinked from ${label}` });
+          }
+        });
       }
     }, []);
     const handleAssignIntake = (0, import_react.useCallback)((intakeId, newProjectId, oldProjectId) => {
@@ -17785,12 +17846,29 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       saveIntakes(intakes.map((i) => String(i.id) === sid ? { ...i, status: "Assigned", assignedProjectId: newProjectId } : i));
     }, [intakes, allProjects, updateProject, saveIntakes]);
     const addProject = (0, import_react.useCallback)((proj) => {
+      const assignees = { ...proj.assignees || {} };
+      if (!assignees["Post Production Manager"]?.length) {
+        const ppmId = getDefaultPPMId(teamRosterRef.current);
+        if (ppmId) assignees["Post Production Manager"] = [ppmId];
+      }
       setProjects((prev) => {
         const projectCode = generateNextProjectCode(prev);
-        return [{ ...proj, projectCode }, ...prev];
+        return [{ ...proj, assignees, projectCode }, ...prev];
       });
       logActivity({ entityType: "project", entityLabel: proj.name || "Untitled Project", projectId: proj.id, action: "created" });
     }, []);
+    const ppmBackfillDoneRef = (0, import_react.useRef)(false);
+    (0, import_react.useEffect)(() => {
+      if (ppmBackfillDoneRef.current || !teamRosterLoaded || !projectsLoaded) return;
+      ppmBackfillDoneRef.current = true;
+      const ppmId = getDefaultPPMId(teamRosterRef.current);
+      if (!ppmId) return;
+      const ppmName = teamRosterRef.current.find((m) => m.id === ppmId)?.name || "the Post Production Manager";
+      projectsRef.current.filter((p) => !p._isSeedData && !p.assignees?.["Post Production Manager"]?.length).forEach((p) => {
+        updateProject(p.id, "assignees", { ...p.assignees || {}, "Post Production Manager": [ppmId] });
+        logActivity({ entityType: "project", entityLabel: p.name || `Project #${p.id}`, projectId: p.id, action: "updated", detail: `Post Production Manager auto-assigned \u2192 ${ppmName}` });
+      });
+    }, [teamRosterLoaded, projectsLoaded, updateProject]);
     const buildBECLocationBundle = (resStart, resEnd, eventStart, eventEnd, existing = []) => {
       const keepId = (type) => (existing.find((l) => l.type === type) || {}).id || uid();
       return [

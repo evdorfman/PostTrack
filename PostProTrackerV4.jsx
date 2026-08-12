@@ -4244,11 +4244,18 @@ const DeliverableDetailModal = React.memo(({del,projectId,team,allProjects,onUpd
           </div>
           {secOpen.info&&(
             <div style={{padding:"12px 14px",display:"flex",flexDirection:"column",gap:10,...(locked?{pointerEvents:"none",opacity:0.55}:{})}}>
-              {/* Title — first field, NOT wrapped in F to avoid remount-on-rerender */}
-              <div style={{gridColumn:"1/-1"}}>
-                <div style={{fontSize:13,fontWeight:800,color:"#8e97a6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:5}}>Deliverable Title</div>
-                <input value={del.title||""} onChange={e=>upd("title",e.target.value)} placeholder="Deliverable title…"
-                  style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"7px 10px",fontSize:17,fontWeight:700,outline:"none",fontFamily:"'DM Sans',sans-serif",width:"100%",boxSizing:"border-box"}}/>
+              {/* Title + Editor — first row. Editor moved up here (next to
+                  the title, not wrapped in F to avoid remount-on-rerender)
+                  from further down in the field grid — who's cutting it is
+                  one of the first things anyone opening a deliverable wants
+                  to see or change. */}
+              <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:10}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:800,color:"#8e97a6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:5}}>Deliverable Title</div>
+                  <input value={del.title||""} onChange={e=>upd("title",e.target.value)} placeholder="Deliverable title…"
+                    style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"7px 10px",fontSize:17,fontWeight:700,outline:"none",fontFamily:"'DM Sans',sans-serif",width:"100%",boxSizing:"border-box"}}/>
+                </div>
+                <F label="Editor"><EditorPicker value={del.editorId} onChange={v=>upd("editorId",v)} deadline={del.deadline} allProjects={allProjects} excludeDelId={del.id} team={editors}/></F>
               </div>
               {/* Status + Deadline + Frame inline at top */}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -4355,7 +4362,6 @@ const DeliverableDetailModal = React.memo(({del,projectId,team,allProjects,onUpd
                     <option value="">Select…</option>{BUSINESS_UNITS.map(b=><option key={b}>{b}</option>)}
                   </Sel>
                 </F>
-                <F label="Editor"><EditorPicker value={del.editorId} onChange={v=>upd("editorId",v)} deadline={del.deadline} allProjects={allProjects} excludeDelId={del.id} team={editors}/></F>
                 <F label="Animator"><EditorPicker value={del.animatorId} onChange={v=>upd("animatorId",v)} deadline={del.deadline} allProjects={allProjects} excludeDelId={del.id} team={animators.length?animators:editors}/></F>
                 <F label="Producer" span><EditorPicker value={effectiveProducerId} onChange={v=>upd("producerId",v)} deadline={del.deadline} allProjects={allProjects} excludeDelId={del.id} team={producers}/></F>
                 <F label="Frame Internal URL" span><StableInp value={del.frameInternalUrl||""} onChange={e=>upd("frameInternalUrl",e.target.value)} placeholder="Internal Frame URL…"/></F>
@@ -9927,6 +9933,18 @@ const QuickNoteModal = ({project, team, onClose, onUpdateProject}) => {
 const roleNames = (project, team, role) => (project.assignees?.[role]||[]).map(id=>team.find(m=>m.id===id)).filter(Boolean);
 const roleNameStr = (project, team, role) => { const ms=roleNames(project,team,role); return ms.length?ms.map(m=>m.name).join(", "):"—"; };
 
+// Every project should default to whoever holds the Post Production Manager
+// role — prefer someone marked available; if their availability changes an
+// admin reassigns manually (see the Project sidebar's own PPM row), rather
+// than this silently reshuffling every project the moment someone's status
+// flips. Falls back to any PPM (even unavailable) rather than leaving new
+// projects unassigned, since there being no PPM at all is worse than a
+// slightly-stale one.
+const getDefaultPPMId = team => {
+  const ppms = (team||[]).filter(m=>(m.roles||[]).includes("Post Production Manager"));
+  return (ppms.find(m=>m.available!==false) || ppms[0])?.id || null;
+};
+
 // The project's "effective" editor(s), for display purposes only (never for
 // writes — writes always go through project.assignees["Editor"]). If a
 // project-level editor is assigned, that's the answer. Otherwise, fall back
@@ -10387,7 +10405,6 @@ const ProjectSidebar = ({project, team, allProjects=[], onUpdateProject, onUpdat
   const editor   = roleNameStr(project,team,"Editor");
   const pm       = roleNameStr(project,team,"Project Manager");
   const ppm      = roleNameStr(project,team,"Post Production Manager");
-  const showPPMRole = stage==="Post"||stage==="On Hold";
 
   // Reassign a single-person role (Producer / Editor / Project Manager / Post Production Manager)
   const setRole = (role, memberId) => {
@@ -10482,9 +10499,8 @@ const ProjectSidebar = ({project, team, allProjects=[], onUpdateProject, onUpdat
           <div style={{display:"flex",flexDirection:"column",gap:7,background:"#0f172a",border:"1px solid #1f2937",borderRadius:10,padding:"12px 14px",flexShrink:0}}>
             <SidebarRoleRow team={team} onSetRole={setRole} label="Producer" role="Producer" currentId={producerId} filterRoles={["Producer"]}/>
             <SidebarRoleRow team={team} onSetRole={setRole} label="Editor" role="Editor" currentId={editorId} filterRoles={["Editor","Animator","Designer"]}/>
-            {showPPMRole
-              ? <SidebarRoleRow team={team} onSetRole={setRole} label="Post Production Mgr" role="Post Production Manager" currentId={ppmId} filterRoles={["Post Production Manager"]}/>
-              : <SidebarRoleRow team={team} onSetRole={setRole} label="Project Manager" role="Project Manager" currentId={pmId} filterRoles={["Project Manager","Producer"]}/>}
+            <SidebarRoleRow team={team} onSetRole={setRole} label="Project Manager" role="Project Manager" currentId={pmId} filterRoles={["Project Manager","Producer"]}/>
+            <SidebarRoleRow team={team} onSetRole={setRole} label="Post Production Mgr" role="Post Production Manager" currentId={ppmId} filterRoles={["Post Production Manager"]}/>
 
             {/* Project-level editor handoff — applies to all deliverables without their own override */}
             <div style={{paddingTop:6,borderTop:"1px solid #1a2035"}}>
@@ -11478,6 +11494,20 @@ const DelStatusSel = ({status, onChange, xs}) => {
   );
 };
 
+// Inline quick-reassign — same compact select-in-a-row pattern as
+// DelStatusSel, but calling out the unassigned state (red) since that's the
+// case someone scanning this list most needs to spot and fix.
+const DelEditorSel = ({editorId, editors, onChange, xs}) => {
+  const unassigned = !editors.some(m=>m.id===editorId);
+  return (
+    <select value={editorId||""} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();onChange(e.target.value?+e.target.value:null);}}
+      style={{background:unassigned?"#ef444418":"#1f2937",color:unassigned?"#ef4444":"#e2e8f0",border:`1px solid ${unassigned?"#ef444460":"#374151"}`,borderRadius:4,padding:xs?"1px 6px":"3px 8px",fontSize:xs?12:14,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",outline:"none",cursor:"pointer",flexShrink:0,colorScheme:"dark",maxWidth:130}}>
+      <option value="" style={{background:"#0d1117",color:"#ef4444"}}>Unassigned</option>
+      {editors.map(ed=><option key={ed.id} value={ed.id} style={{background:"#0d1117",color:"#e2e8f0"}}>{ed.name}</option>)}
+    </select>
+  );
+};
+
 // ─── Shared: Frame.io link + PW copy button for collapsed views, with fallback ──
 const DelFrameInfo = ({frameLink, framePW, small}) => {
   const [copied,setCopied]=useState(false);
@@ -11682,6 +11712,7 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
         {d._fromProduction
           ? <Chip label={d.status} color={c} xs/>
           : <DelStatusSel status={d.status} onChange={v=>onUpdateDel(d.projectId,d.id,"status",v)} xs/>}
+        {!d._fromProduction&&<DelEditorSel editorId={d.editorId} editors={editors} onChange={v=>onUpdateDel(d.projectId,d.id,"editorId",v)} xs/>}
         {d.aspectRatio&&<Chip label={d.aspectRatio} color="#374151" xs/>}
         {activeR&&!changes&&<Chip label={activeR.label} color={RCOLOR[activeR.status]} xs/>}
         {changes&&<Chip label="↩ Changes" color="#ef4444" xs/>}
@@ -14440,6 +14471,13 @@ const rowToProject = row => ({
   assignees: row.assignees||{}, deliverables: row.deliverables||[], productions: row.productions||[],
   shoots: row.shoots||[], notes: row.notes||[], ingestDates: row.ingest_dates||[],
   closedAt: row.closed_at,
+  // BXTV cross-references (which episode a deliverable is linked to, and an
+  // episode project's own season/episode/air-date/title) — previously
+  // missing from both this and projectToRow below, so bxtvRefs/bxtvMeta only
+  // ever lived in local React state: they looked linked for the rest of that
+  // session, then silently reverted on the next reload since nothing had
+  // actually been saved.
+  bxtvRefs: row.bxtv_refs||[], bxtvMeta: row.bxtv_meta||null,
 });
 const projectToRow = p => ({
   id: p.id, project_code: p.projectCode||null, name: p.name, requester: p.requester||null,
@@ -14448,6 +14486,7 @@ const projectToRow = p => ({
   assignees: p.assignees||{}, deliverables: p.deliverables||[], productions: p.productions||[],
   shoots: p.shoots||[], notes: p.notes||[], ingest_dates: p.ingestDates||[],
   closed_at: p.closedAt||null,
+  bxtv_refs: p.bxtvRefs||[], bxtv_meta: p.bxtvMeta||null,
 });
 
 // Explicit fields get their own columns; anything else on a booking object
@@ -22345,10 +22384,12 @@ const BXTVMetaPanel = ({project, onUpdateProject}) => {
   );
 };
 // ─── BXTV Link Section (inside deliverable cards / sidebar) ───────────────────
+// The episode picker is always visible (not gated behind an expand/"+ BXTV"
+// step) as soon as a deliverable's type is BXTV — picking an episode from the
+// dropdown links it immediately on change, no separate confirm button. The
+// BXTV Editor picker (a secondary refinement, defaults to "same as source")
+// stays available once linked, but doesn't block linking itself.
 const BXTVLinkSection = ({del, sourceProject, allProjects, team, onUpdateProject}) => {
-  const [expanded, setExpanded] = useState(false);
-  const [selEpId,  setSelEpId]  = useState(del.bxtvLink?.episodeProjectId||"");
-  const [selEdId,  setSelEdId]  = useState(del.bxtvLink?.bxtvEditorId||"");
   const bxtvEps  = getBXTVProjects(allProjects);
   const currentEpId = del.bxtvLink?.episodeProjectId;
   const currentEp   = currentEpId ? allProjects.find(p=>p.id===currentEpId) : null;
@@ -22356,74 +22397,39 @@ const BXTVLinkSection = ({del, sourceProject, allProjects, team, onUpdateProject
   const isBXTV   = !!currentEpId;
   const sel = {background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:14,outline:"none",width:"100%",colorScheme:"dark"};
 
-  const handleOpen = () => { setSelEpId(currentEpId||""); setSelEdId(del.bxtvLink?.bxtvEditorId||""); setExpanded(true); };
-
-  const handleSave = () => {
-    if(!selEpId) return;
-    const newEp = allProjects.find(p=>String(p.id)===String(selEpId));
+  const handlePickEpisode = epId => {
+    if(!epId){ if(currentEp) unlinkDelFromBXTV(sourceProject, del, currentEp, onUpdateProject); return; }
+    const newEp = allProjects.find(p=>String(p.id)===String(epId));
     if(!newEp) return;
-    if(currentEp && String(currentEp.id)!==String(selEpId)) {
-      const oldRefs=(currentEp.bxtvRefs||[]).filter(r=>!(String(r.sourceProjectId)===String(sourceProject.id)&&r.delId===del.id));
-      onUpdateProject(currentEp.id,"bxtvRefs",oldRefs);
+    if(currentEp && String(currentEp.id)!==String(epId)) {
+      moveBXTVDel(sourceProject, del, currentEp, newEp, del.bxtvLink?.bxtvEditorId||null, onUpdateProject);
+    } else {
+      linkDelToBXTV(sourceProject, del, newEp, del.bxtvLink?.bxtvEditorId||null, onUpdateProject);
     }
-    linkDelToBXTV(sourceProject, del, newEp, +selEdId||null, onUpdateProject);
-    setExpanded(false);
   };
 
-  const handleUnlink = () => {
-    if(currentEp) unlinkDelFromBXTV(sourceProject, del, currentEp, onUpdateProject);
-    setExpanded(false);
+  const handlePickEditor = edId => {
+    if(!currentEp) return;
+    linkDelToBXTV(sourceProject, del, currentEp, edId||null, onUpdateProject);
   };
 
   return (
-    <div style={{paddingTop:6,borderTop:"1px solid #1a2035"}}>
-      <div style={{display:"flex",alignItems:"center",gap:6,justifyContent:"space-between",flexWrap:"wrap"}}>
-        <div style={{display:"flex",alignItems:"center",gap:5,minWidth:0}}>
-          {isBXTV
-            ? <span style={{fontSize:12,fontWeight:800,color:"#818cf8",background:"#6366f115",border:"1px solid #6366f140",borderRadius:4,padding:"1px 7px",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:160}}>
-                📺 {getBXTVEpisodeName(currentEp)||currentEp?.name}
-              </span>
-            : <span style={{fontSize:13,color:"#374151"}}>Not linked to BXTV</span>}
-        </div>
-        <button onClick={expanded?()=>setExpanded(false):handleOpen}
-          style={{fontSize:12,fontWeight:700,color:isBXTV?"#f59e0b":"#818cf8",background:isBXTV?"#f59e0b15":"#6366f115",border:`1px solid ${isBXTV?"#f59e0b40":"#6366f140"}`,cursor:"pointer",padding:"2px 8px",borderRadius:4,flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>
-          {expanded?"✕":isBXTV?"⇄ Change":"+ BXTV"}
-        </button>
+    <div style={{paddingTop:6,borderTop:"1px solid #1a2035",display:"flex",flexDirection:"column",gap:6}}>
+      <div>
+        <div style={{fontSize:12,fontWeight:700,color:"#6366f1",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.06em",marginBottom:4}}>📺 BXTV Episode</div>
+        <select style={sel} value={currentEpId||""} onChange={e=>handlePickEpisode(e.target.value)}>
+          <option value="">— Select episode —</option>
+          {bxtvEps.map(ep=><option key={ep.id} value={ep.id}>{getBXTVEpisodeName(ep)||ep.name}</option>)}
+        </select>
+        {bxtvEps.length===0&&<div style={{fontSize:13,color:"#374151",fontStyle:"italic",marginTop:4}}>No BXTV projects found. Add a project with workstream "BXTV".</div>}
       </div>
-
-      {isBXTV&&!expanded&&del.bxtvLink?.bxtvEditorId&&(
-        <div style={{fontSize:13,color:"#838ba0",marginTop:3}}>
-          BXTV Editor: <span style={{color:"#34d399",fontWeight:600}}>{team.find(m=>m.id===del.bxtvLink.bxtvEditorId)?.name||"—"}</span>
-        </div>
-      )}
-
-      {expanded&&(
-        <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:8,background:"#0a0f1a",borderRadius:8,padding:"10px 12px",border:"1px solid #1f2937"}}>
-          <div>
-            <div style={{fontSize:12,fontWeight:700,color:"#6366f1",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.06em",marginBottom:4}}>Episode</div>
-            <select style={sel} value={selEpId} onChange={e=>setSelEpId(e.target.value)}>
-              <option value="">— Select episode —</option>
-              {bxtvEps.map(ep=><option key={ep.id} value={ep.id}>{getBXTVEpisodeName(ep)||ep.name}</option>)}
-            </select>
-            {bxtvEps.length===0&&<div style={{fontSize:13,color:"#374151",fontStyle:"italic",marginTop:4}}>No BXTV projects found. Add a project with workstream "BXTV".</div>}
-          </div>
-          <div>
-            <div style={{fontSize:12,fontWeight:700,color:"#6366f1",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.06em",marginBottom:4}}>BXTV Editor</div>
-            <select style={sel} value={selEdId} onChange={e=>setSelEdId(e.target.value)}>
-              <option value="">— Same as source —</option>
-              {editors.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-          </div>
-          <div style={{display:"flex",gap:6}}>
-            <button onClick={handleSave} disabled={!selEpId}
-              style={{flex:1,background:selEpId?"#6366f1":"#1f2937",border:"none",borderRadius:6,color:selEpId?"#fff":"#4b5563",padding:"7px 0",fontSize:13,fontWeight:800,cursor:selEpId?"pointer":"not-allowed",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>
-              {isBXTV?"Update Link":"Link to Episode"}
-            </button>
-            {isBXTV&&<button onClick={handleUnlink}
-              style={{background:"#ef444415",border:"1px solid #ef444440",borderRadius:6,color:"#ef4444",padding:"7px 12px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
-              Remove
-            </button>}
-          </div>
+      {isBXTV&&(
+        <div>
+          <div style={{fontSize:12,fontWeight:700,color:"#6366f1",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.06em",marginBottom:4}}>BXTV Editor</div>
+          <select style={sel} value={del.bxtvLink?.bxtvEditorId||""} onChange={e=>handlePickEditor(e.target.value)}>
+            <option value="">— Same as source —</option>
+            {editors.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
         </div>
       )}
     </div>
@@ -25650,7 +25656,12 @@ export default function App() {
   const batchTimersRef = useRef(new Map());
   const BATCH_WINDOW_MS = 5*60*1000;
   const logFieldChangeBatched = ({entityType, entityId, entityLabel, projectId, fieldLabel}) => {
-    const key = `${entityType}:${entityId}`;
+    // Keyed by projectId too (not just entityType:entityId) — a BXTV-linked
+    // deliverable's edits get mirrored into the episode project via a second
+    // call for the same entityId but a different projectId; without projectId
+    // in the key, that second call would share one timer/field-set with the
+    // first and only ever flush to whichever project's call happened last.
+    const key = `${entityType}:${entityId}:${projectId}`;
     const existing = batchTimersRef.current.get(key);
     if(existing) clearTimeout(existing.timer);
     const fields = existing?.fields || new Set();
@@ -25840,6 +25851,51 @@ export default function App() {
     });
   },[authed]);
 
+  // Realtime: with multiple people signed in at once, another session's edit
+  // used to only ever show up here after a manual reload (see the one-
+  // directional note on the projects auto-save effect below). Mirrors every
+  // INSERT/UPDATE/DELETE on the three Supabase-backed tables into local state
+  // as it happens, using the same row<->object mappers as the initial fetch.
+  // Merges by id rather than a blind setState so:
+  //  - it can't clobber an update this same tab has in flight but hasn't
+  //    round-tripped yet (last message per row still wins, same as the
+  //    initial fetch would if it ran again)
+  //  - if the incoming row is byte-for-byte what's already local (most
+  //    commonly this tab's own write echoing back to it), the state setter
+  //    bails out and returns the same array reference instead of a new one —
+  //    without that, every local write would cause a second, pointless
+  //    "change" that re-triggers the *-auto-save effects and re-upserts the
+  //    exact same data, which broadcasts another no-op change, and so on.
+  useEffect(()=>{
+    if(!authed || !sb) return;
+    const mergeUpsert = (setter, mapRow) => payload => {
+      const incoming = mapRow(payload.new);
+      setter(prev=>{
+        const idx = prev.findIndex(x=>x.id===incoming.id);
+        if(idx===-1) return [...prev, incoming];
+        if(JSON.stringify(prev[idx])===JSON.stringify(incoming)) return prev;
+        const next = prev.slice(); next[idx] = incoming; return next;
+      });
+    };
+    const mergeDelete = setter => payload => {
+      const id = payload.old?.id;
+      if(id==null) return;
+      setter(prev=>prev.some(x=>x.id===id) ? prev.filter(x=>x.id!==id) : prev);
+    };
+    const channel = sb.channel("posttrack-realtime")
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"projects"}, mergeUpsert(setProjects, rowToProject))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"projects"}, mergeUpsert(setProjects, rowToProject))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"projects"}, mergeDelete(setProjects))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"team_members"}, mergeUpsert(setTeamRoster, rowToTeamMember))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"team_members"}, mergeUpsert(setTeamRoster, rowToTeamMember))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"team_members"}, mergeDelete(setTeamRoster))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"studio_bookings"}, mergeUpsert(setStudioBookings, rowToBooking))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"studio_bookings"}, mergeUpsert(setStudioBookings, rowToBooking))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"studio_bookings"}, mergeDelete(setStudioBookings))
+      .subscribe();
+    return ()=>{ sb.removeChannel(channel); };
+  },[authed]);
+
   // The signed-in Supabase Auth user, looked up once per sign-in and shared
   // by both the email-match auto-linker below and the onboarding gate
   // further down — avoids every consumer calling sb.auth.getUser() itself.
@@ -25948,10 +26004,11 @@ export default function App() {
   // discarded real work. This effect saves to Supabase via a watcher instead
   // of a per-callsite save* wrapper, since setProjects is called from many
   // places (updateDel/addDel/deleteDel/updateProject/addProject/etc.) and a
-  // single effect guarantees none of them can be missed. There's no realtime
-  // subscription mirroring this yet (deliberately — see conversation), so
-  // this is one-directional: local changes push to Supabase, but this
-  // session won't see another signed-in user's edits until it reloads.
+  // single effect guarantees none of them can be missed. The realtime
+  // subscription above mirrors this same table back into local state, so a
+  // write from this effect broadcasts to every other signed-in session
+  // (and — filtered out as a no-op — back to this one) instead of only
+  // taking effect here until someone else happens to reload.
   useEffect(()=>{
     if(!projectsLoadedRef.current || !sb) return;
     // Only the user's real projects need saving — seed/demo projects live in
@@ -25964,8 +26021,7 @@ export default function App() {
 
   // Studio bookings previously had zero persistence of any kind (not even
   // window.storage) — they reset to empty on every refresh, for everyone.
-  // Same watcher pattern as projects, same one-directional caveat (no
-  // realtime yet).
+  // Same watcher pattern as projects, and same realtime mirror covering it.
   useEffect(()=>{
     if(!bookingsLoadedRef.current || !sb) return;
     if(!studioBookings.length) return;
@@ -26090,15 +26146,22 @@ export default function App() {
       });
     }
     const label = prevDel?.title || "Deliverable";
+    // A BXTV-linked deliverable belongs to two projects at once — every edit
+    // below (not just the link/unlink event itself, handled separately in
+    // updateProject) should show up in both projects' history, not just the
+    // source project's.
+    const bxtvEpisodeId = prevDel?.bxtvLink?.episodeProjectId || null;
+    const logDel = args => { logActivity(args); if(bxtvEpisodeId) logActivity({...args, projectId:bxtvEpisodeId}); };
+    const logDelBatched = args => { logFieldChangeBatched(args); if(bxtvEpisodeId) logFieldChangeBatched({...args, projectId:bxtvEpisodeId}); };
     if(field==="status"){
-      logActivity({entityType:"deliverable", entityLabel:label, projectId, action:"status_changed", detail:`status → ${value}`});
+      logDel({entityType:"deliverable", entityLabel:label, projectId, action:"status_changed", detail:`status → ${value}`});
     } else if(field==="deadline"){
-      logActivity({entityType:"deliverable", entityLabel:label, projectId, action:"updated", detail:`final deadline → ${value}`});
+      logDel({entityType:"deliverable", entityLabel:label, projectId, action:"updated", detail:`final deadline → ${value}`});
     } else if(field==="frameLink"||field==="framePW"){
-      logActivity({entityType:"deliverable", entityLabel:label, projectId, action:"updated", detail:"frame link/password updated"});
+      logDel({entityType:"deliverable", entityLabel:label, projectId, action:"updated", detail:"frame link/password updated"});
     } else if(field==="editorId"){
       const editorName = teamRosterRef.current.find(m=>m.id===value)?.name || "Unassigned";
-      logActivity({entityType:"deliverable", entityLabel:label, projectId, action:"updated", detail:`editor assigned → ${editorName}`});
+      logDel({entityType:"deliverable", entityLabel:label, projectId, action:"updated", detail:`editor assigned → ${editorName}`});
     } else if(field==="rounds"){
       // Only call out an actual status change on an existing round — adding/
       // removing/reordering rounds isn't itself a status update.
@@ -26106,11 +26169,11 @@ export default function App() {
       (value||[]).forEach(r=>{
         const prevRound = prevRounds.find(pr=>pr.id===r.id);
         if(prevRound && prevRound.status!==r.status){
-          logActivity({entityType:"deliverable", entityLabel:label, projectId, action:"updated", detail:`${r.label||"Review round"} → ${r.status}`});
+          logDel({entityType:"deliverable", entityLabel:label, projectId, action:"updated", detail:`${r.label||"Review round"} → ${r.status}`});
         }
       });
     } else {
-      logFieldChangeBatched({entityType:"deliverable", entityId:delId, entityLabel:label, projectId, fieldLabel:field});
+      logDelBatched({entityType:"deliverable", entityId:delId, entityLabel:label, projectId, fieldLabel:field});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
@@ -26233,6 +26296,33 @@ export default function App() {
       (value||[]).filter(ig=>!prevIngests.some(pi=>pi.id===ig.id)).forEach(()=>{
         logActivity({entityType:"ingest", entityLabel:label, projectId, action:"created", detail:`media ingest created ${new Date().toLocaleString()}`});
       });
+    } else if(field==="deliverables"){
+      // Every BXTV link/unlink (linkDelToBXTV, unlinkDelFromBXTV, moveBXTVDel)
+      // funnels through onUpdateProject(sourceProjectId,"deliverables",...) —
+      // same single-funnel pattern as "productions" above — so this is the
+      // one place that can catch a bxtvLink change regardless of which call
+      // site made it, and log it to BOTH the source project (projectId here)
+      // and the BXTV episode project, which is otherwise never told about it
+      // at all. Every other single-field deliverable edit already logs via
+      // updateDel and isn't touched here (this only fires on an actual
+      // bxtvLink transition).
+      const prevDels = prevProj?.deliverables || [];
+      (value||[]).forEach(d=>{
+        const pd = prevDels.find(x=>x.id===d.id);
+        if(!pd) return; // creation is logged by addDel
+        const prevEp = pd.bxtvLink?.episodeProjectId || null;
+        const newEp  = d.bxtvLink?.episodeProjectId || null;
+        if(prevEp===newEp) return;
+        const delLabel = d.title || "Deliverable";
+        const epLabelOf = epId => { const ep = projectsRef.current.find(p=>p.id===epId); return ep ? (getBXTVEpisodeName(ep)||ep.name) : "BXTV episode"; };
+        if(newEp){
+          logActivity({entityType:"deliverable", entityLabel:delLabel, projectId, action:"updated", detail:`linked to BXTV episode → ${epLabelOf(newEp)}`});
+          logActivity({entityType:"deliverable", entityLabel:delLabel, projectId:newEp, action:"updated", detail:`"${delLabel}" linked from ${label}`});
+        } else if(prevEp){
+          logActivity({entityType:"deliverable", entityLabel:delLabel, projectId, action:"updated", detail:`unlinked from BXTV episode ${epLabelOf(prevEp)}`});
+          logActivity({entityType:"deliverable", entityLabel:delLabel, projectId:prevEp, action:"updated", detail:`"${delLabel}" unlinked from ${label}`});
+        }
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
@@ -26268,13 +26358,40 @@ export default function App() {
   },[intakes,allProjects,updateProject,saveIntakes]);
 
   const addProject=useCallback(proj=>{
+    // Default the Post Production Manager slot to whoever holds that role
+    // (see getDefaultPPMId) unless this project's creation flow already set
+    // one — never overrides an explicit pick.
+    const assignees = {...(proj.assignees||{})};
+    if(!assignees["Post Production Manager"]?.length){
+      const ppmId = getDefaultPPMId(teamRosterRef.current);
+      if(ppmId) assignees["Post Production Manager"] = [ppmId];
+    }
     setProjects(prev=>{
       const projectCode = generateNextProjectCode(prev);
-      return [{...proj, projectCode}, ...prev];
+      return [{...proj, assignees, projectCode}, ...prev];
     });
     logActivity({entityType:"project", entityLabel:proj.name||"Untitled Project", projectId:proj.id, action:"created"});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
+
+  // One-time backfill: any already-existing real project that predates the
+  // default-PPM rule above (or was created before the team had anyone in
+  // that role) gets the same default applied once both projects and the
+  // team roster have loaded. Guarded by the ref, not just the loaded flags,
+  // so it can't re-fire and re-touch every project again on every
+  // subsequent roster/project change for the rest of the session.
+  const ppmBackfillDoneRef = useRef(false);
+  useEffect(()=>{
+    if(ppmBackfillDoneRef.current || !teamRosterLoaded || !projectsLoaded) return;
+    ppmBackfillDoneRef.current = true;
+    const ppmId = getDefaultPPMId(teamRosterRef.current);
+    if(!ppmId) return;
+    const ppmName = teamRosterRef.current.find(m=>m.id===ppmId)?.name || "the Post Production Manager";
+    projectsRef.current.filter(p=>!p._isSeedData && !(p.assignees?.["Post Production Manager"]?.length)).forEach(p=>{
+      updateProject(p.id, "assignees", {...(p.assignees||{}), "Post Production Manager":[ppmId]});
+      logActivity({entityType:"project", entityLabel:p.name||`Project #${p.id}`, projectId:p.id, action:"updated", detail:`Post Production Manager auto-assigned → ${ppmName}`});
+    });
+  },[teamRosterLoaded, projectsLoaded, updateProject]);
 
   // GCS BEC booking → create-or-update. Reservation ID is the join key: if it
   // already exists on a Production anywhere, only the fields that changed are
