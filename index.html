@@ -4638,23 +4638,63 @@ Brief content: ${content}`;
         /* @__PURE__ */ React.createElement(Dl, { date: d.deadline }),
         /* @__PURE__ */ React.createElement("span", { style: { fontSize: 17, color: "#8e97a6" } }, "\u203A")
       );
-    }))))), activeTab === "calendar" && /* @__PURE__ */ React.createElement(ProjectCalendar, { project: lp }), activeTab === "deliverables" && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ React.createElement(RequestedDeliverablesInfo, { project: lp, intakes: intakes || [] }), isBXTVProject(lp) && (() => {
+    }))))), activeTab === "calendar" && /* @__PURE__ */ React.createElement(ProjectCalendar, { project: lp }), activeTab === "deliverables" && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ React.createElement(RequestedDeliverablesInfo, { project: lp, intakes: intakes || [] }), /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 12, padding: "14px 16px" } }, (() => {
+      const suggested = getEarliestProjectIngestReadyDate(lp);
+      const hasOverride = !!lp.postStartDate;
+      const noFootageNeeded = lp.basedOnExistingMaterial && !suggested && !hasOverride;
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" } }, "Post Start Date"), hasOverride && /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => onUpdateProject(project.id, "postStartDate", null),
+          style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 6, color: "#9ca3af", padding: "4px 10px", fontSize: 13, cursor: "pointer" }
+        },
+        "Reset to suggested"
+      )), noFootageNeeded ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af" } }, "Marked as based on previous material \u2014 no footage dependency, deliverables can start anytime ahead of their own deadlines.") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+        DateTimePicker,
+        {
+          value: lp.postStartDate || (suggested ? suggested.toISOString().slice(0, 16) : ""),
+          onChange: (v) => onUpdateProject(project.id, "postStartDate", v || null),
+          label: "When can post realistically begin?"
+        }
+      ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 5 } }, hasOverride ? `Overridden \u2014 based on ingest data, the system would otherwise suggest ${suggested ? fmtDT(suggested.toISOString()) : "no constraint"}.` : suggested ? `Suggested from the earliest ingest not yet fully received. Resource planning assumes none of this project's deliverables start before this date.` : `No ingest data found yet to suggest from. If this project doesn't depend on new footage, check "based entirely on previous material" in Project Info \u2014 otherwise, set a date manually once a shoot is scheduled.`)));
+    })()), isBXTVProject(lp) && (() => {
       const linked = getBXTVLinkedDels(lp, allProjects);
       if (!linked.length) return null;
-      return /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #6366f140", borderRadius: 10, padding: "14px 16px", marginBottom: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#818cf8", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.08em", marginBottom: 10 } }, "\u{1F4FA} Sourced from Other Projects (", linked.length, ")"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, linked.map(({ del, sourceProject }) => /* @__PURE__ */ React.createElement("div", { key: del.id, style: { background: "#111827", border: "1px solid #6366f130", borderLeft: "3px solid #6366f1", borderRadius: 8, padding: "10px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, del.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6366f1", marginTop: 2 } }, "\u2197 ", sourceProject.name)), /* @__PURE__ */ React.createElement(
-        "select",
-        {
-          value: del.status,
-          onChange: (e) => onUpdateDel(sourceProject.id, del.id, "status", e.target.value),
-          style: { background: del.status === "Not Started" ? "#1f2937" : DCOLOR[del.status] + "20", border: `1px solid ${DCOLOR[del.status]}40`, borderRadius: 5, color: DCOLOR[del.status], padding: "3px 7px", fontSize: 13, fontWeight: 700, outline: "none", cursor: "pointer", colorScheme: "dark", flexShrink: 0 }
-        },
-        DELIVERABLE_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s }, s))
-      )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } }, del.deadline && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#838ba0" } }, "Due ", fmtDate(del.deadline)), del.bxtvLink?.bxtvEditorId && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#34d399" } }, "BXTV Editor: ", team.find((m) => m.id === del.bxtvLink.bxtvEditorId)?.name || "\u2014"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
-        const newRefs = (lp.bxtvRefs || []).filter((r) => !(r.sourceProjectId === sourceProject.id && r.delId === del.id));
-        onUpdateProject(lp.id, "bxtvRefs", newRefs);
-        const newDels = (sourceProject.deliverables || []).map((d) => d.id === del.id ? { ...d, bxtvLink: null } : d);
-        onUpdateProject(sourceProject.id, "deliverables", newDels);
-      }, style: { background: "#ef444415", border: "1px solid #ef444440", borderRadius: 5, color: "#ef4444", padding: "2px 8px", fontSize: 12, fontWeight: 700, cursor: "pointer", marginLeft: "auto", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "Remove"))))));
+      return /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #6366f140", borderRadius: 10, padding: "14px 16px", marginBottom: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#818cf8", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.08em", marginBottom: 10 } }, "\u{1F4FA} Sourced from Other Projects (", linked.length, ")"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, linked.map(({ del, sourceProject }) => {
+        const isExp = activeDelModal === del.id;
+        return /* @__PURE__ */ React.createElement("div", { key: del.id, style: { borderRadius: isExp ? "10px 10px 0 0" : 10, overflow: isExp ? "visible" : "hidden", borderLeft: "3px solid #6366f1" } }, /* @__PURE__ */ React.createElement(
+          DeliverableRow,
+          {
+            d: del,
+            projectId: sourceProject.id,
+            projectName: sourceProject.name,
+            showProject: true,
+            team,
+            onUpdateDel,
+            isExpanded: isExp,
+            onClick: () => setActiveDelModal(isExp ? null : del.id)
+          }
+        ), isExp && /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { borderTop: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement(
+          DeliverableDetailModal,
+          {
+            del,
+            projectId: sourceProject.id,
+            team,
+            allProjects,
+            onUpdateDel,
+            onDeleteDel,
+            onUpdateProject,
+            project: sourceProject,
+            talentRoster
+          }
+        ), /* @__PURE__ */ React.createElement("div", { style: { padding: "0 14px 14px", background: "#0d1117" } }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
+          const newRefs = (lp.bxtvRefs || []).filter((r) => !(r.sourceProjectId === sourceProject.id && r.delId === del.id));
+          onUpdateProject(lp.id, "bxtvRefs", newRefs);
+          const newDels = (sourceProject.deliverables || []).map((d) => d.id === del.id ? { ...d, bxtvLink: null } : d);
+          onUpdateProject(sourceProject.id, "deliverables", newDels);
+          setActiveDelModal(null);
+        }, style: { background: "#ef444415", border: "1px solid #ef444440", borderRadius: 5, color: "#ef4444", padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "Remove BXTV Link"))));
+      })));
     })(), handoffDelId && (() => {
       const del = lp.deliverables?.find((d) => d.id === handoffDelId);
       if (!del) return null;
@@ -4675,26 +4715,7 @@ Brief content: ${content}`;
           onClose: () => setHandoffDelId(null)
         }
       );
-    })(), /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 12, padding: "14px 16px" } }, (() => {
-      const suggested = getEarliestProjectIngestReadyDate(lp);
-      const hasOverride = !!lp.postStartDate;
-      const noFootageNeeded = lp.basedOnExistingMaterial && !suggested && !hasOverride;
-      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" } }, "Post Start Date"), hasOverride && /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          onClick: () => onUpdateProject(project.id, "postStartDate", null),
-          style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 6, color: "#9ca3af", padding: "4px 10px", fontSize: 13, cursor: "pointer" }
-        },
-        "Reset to suggested"
-      )), noFootageNeeded ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af" } }, "Marked as based on previous material \u2014 no footage dependency, deliverables can start anytime ahead of their own deadlines.") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
-        DateTimePicker,
-        {
-          value: lp.postStartDate || (suggested ? suggested.toISOString().slice(0, 16) : ""),
-          onChange: (v) => onUpdateProject(project.id, "postStartDate", v || null),
-          label: "When can post realistically begin?"
-        }
-      ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 5 } }, hasOverride ? `Overridden \u2014 based on ingest data, the system would otherwise suggest ${suggested ? fmtDT(suggested.toISOString()) : "no constraint"}.` : suggested ? `Suggested from the earliest ingest not yet fully received. Resource planning assumes none of this project's deliverables start before this date.` : `No ingest data found yet to suggest from. If this project doesn't depend on new footage, check "based entirely on previous material" in Project Info \u2014 otherwise, set a date manually once a shoot is scheduled.`)));
-    })()), showAddDel && /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #374151", borderRadius: 12, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, "New Deliverable"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-end" } }, /* @__PURE__ */ React.createElement(LW, { label: "Title", style: { flex: 1 } }, /* @__PURE__ */ React.createElement(Inp, { value: newDelTitle, onChange: (e) => setNewDelTitle(e.target.value), placeholder: "Deliverable title\u2026", onKeyDown: (e) => e.key === "Enter" && newDelTitle.trim() && addDel() })), /* @__PURE__ */ React.createElement(Btn, { onClick: addDel, disabled: !newDelTitle.trim(), style: { flexShrink: 0, marginBottom: 1 } }, "+ Add")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement(LW, { label: "Aspect Ratio" }, /* @__PURE__ */ React.createElement(Sel, { value: newDelAR, onChange: (e) => setNewDelAR(e.target.value) }, ASPECT_RATIOS.map((r) => /* @__PURE__ */ React.createElement("option", { key: r }, r)))), /* @__PURE__ */ React.createElement(LW, { label: "Final Deadline", style: { gridColumn: "2/4" } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: newDelDeadline, onChange: (v) => setNewDelDeadline(v), label: "Set deadline" })), /* @__PURE__ */ React.createElement(LW, { label: "Editor / Animator", style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement(EditorPicker, { value: newDelEditor, onChange: (v) => setNewDelEditor(v), deadline: newDelDeadline, allProjects, team })))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 0, background: "#111827", border: "1px solid #1f2937", borderRadius: 8, overflow: "hidden", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(
+    })(), showAddDel && /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #374151", borderRadius: 12, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, "New Deliverable"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-end" } }, /* @__PURE__ */ React.createElement(LW, { label: "Title", style: { flex: 1 } }, /* @__PURE__ */ React.createElement(Inp, { value: newDelTitle, onChange: (e) => setNewDelTitle(e.target.value), placeholder: "Deliverable title\u2026", onKeyDown: (e) => e.key === "Enter" && newDelTitle.trim() && addDel() })), /* @__PURE__ */ React.createElement(Btn, { onClick: addDel, disabled: !newDelTitle.trim(), style: { flexShrink: 0, marginBottom: 1 } }, "+ Add")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement(LW, { label: "Aspect Ratio" }, /* @__PURE__ */ React.createElement(Sel, { value: newDelAR, onChange: (e) => setNewDelAR(e.target.value) }, ASPECT_RATIOS.map((r) => /* @__PURE__ */ React.createElement("option", { key: r }, r)))), /* @__PURE__ */ React.createElement(LW, { label: "Final Deadline", style: { gridColumn: "2/4" } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: newDelDeadline, onChange: (v) => setNewDelDeadline(v), label: "Set deadline" })), /* @__PURE__ */ React.createElement(LW, { label: "Editor / Animator", style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement(EditorPicker, { value: newDelEditor, onChange: (v) => setNewDelEditor(v), deadline: newDelDeadline, allProjects, team })))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 0, background: "#111827", border: "1px solid #1f2937", borderRadius: 8, overflow: "hidden", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => {
@@ -7590,6 +7611,27 @@ Brief content: ${content}`;
       editors.map((ed) => /* @__PURE__ */ React.createElement("option", { key: ed.id, value: ed.id, style: { background: "#0d1117", color: "#e2e8f0" } }, ed.name))
     );
   };
+  var DeliverableRow = ({ d, projectId, projectName, showProject = false, team, onUpdateDel, onClick, isExpanded = false, editors, editorEditable = false, readOnly = false }) => {
+    const changes = (d.rounds || []).some((r) => r.status === "Changes Requested");
+    const allAppr = (d.rounds || []).length > 0 && (d.rounds || []).every((r) => r.status === "Approved");
+    const ed = team?.find((m) => m.id === d.editorId);
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick,
+        style: { display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", background: isExpanded ? "#1f2937" : "#111827", border: `1px solid ${isExpanded ? "#6366f1" : changes ? "#ef444430" : "#1f2937"}`, borderRadius: isExpanded ? "10px 10px 0 0" : 10, cursor: onClick ? "pointer" : "default" },
+        onMouseEnter: (e) => {
+          if (!isExpanded) e.currentTarget.style.borderColor = changes ? "#ef4444" : "#374151";
+        },
+        onMouseLeave: (e) => {
+          if (!isExpanded) e.currentTarget.style.borderColor = changes ? "#ef444430" : "#1f2937";
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { width: 9, height: 9, borderRadius: "50%", background: DCOLOR[d.status], flexShrink: 0 } }),
+      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 2, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, fontSize: 20, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, d.title || "Untitled"), readOnly ? /* @__PURE__ */ React.createElement(Chip, { label: d.status, color: DCOLOR[d.status], xs: true }) : /* @__PURE__ */ React.createElement(DelStatusSel, { status: d.status, onChange: (v) => onUpdateDel(projectId, d.id, "status", v), xs: true }), !readOnly && editorEditable && /* @__PURE__ */ React.createElement(DelEditorSel, { editorId: d.editorId, editors: editors || [], onChange: (v) => onUpdateDel(projectId, d.id, "editorId", v), xs: true }), d.aspectRatio && /* @__PURE__ */ React.createElement(Chip, { label: d.aspectRatio, color: "#374151", xs: true }), d.srtNeeded && /* @__PURE__ */ React.createElement(Chip, { label: "SRT", color: "#06b6d4", xs: true }), allAppr && /* @__PURE__ */ React.createElement(Chip, { label: "\u2713 Approved", color: "#10b981", xs: true }), changes && /* @__PURE__ */ React.createElement(Chip, { label: "\u21A9 Changes", color: "#ef4444", xs: true })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 1, fontSize: 14, color: "#9ca3af" } }, !editorEditable && ed && /* @__PURE__ */ React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(Av, { name: ed.name, size: 14 }), ed.name), showProject && /* @__PURE__ */ React.createElement("span", { style: { color: "#6366f1" } }, projectName))),
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 3 } }, (d.rounds || []).map((r, i) => /* @__PURE__ */ React.createElement("div", { key: i, title: `${r.label}: ${r.status}`, style: { width: 20, height: 20, borderRadius: "50%", background: RCOLOR[r.status] + "30", border: `2px solid ${RCOLOR[r.status]}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: RCOLOR[r.status] } }, i + 1))), /* @__PURE__ */ React.createElement(Dl, { date: d.deadline }))
+    );
+  };
   var DelFrameInfo = ({ frameLink, framePW, small }) => {
     const [copied, setCopied] = (0, import_react.useState)(false);
     if (!frameLink) return /* @__PURE__ */ React.createElement("span", { style: { fontSize: small ? 13 : 14, color: "#838ba0", fontStyle: "italic", flexShrink: 0 } }, "(No Frame link)");
@@ -7689,31 +7731,21 @@ Brief content: ${content}`;
       setUnlocked(true);
       setSidebarSel({ delId: d.id, projectId: d.projectId });
     };
-    const DelRow = ({ d, showProject = true }) => {
-      const changes = d.rounds.some((r) => r.status === "Changes Requested");
-      const inRev = d.rounds.some((r) => ["In Review", "Sent"].includes(r.status));
-      const activeR = d.rounds.find((r) => !["Approved"].includes(r.status));
-      const c = changes ? "#ef4444" : inRev ? "#f59e0b" : DCOLOR[d.status];
-      return /* @__PURE__ */ React.createElement(
-        "div",
-        {
-          onClick: (e) => openDel(d, e),
-          style: { display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", background: "#111827", border: `1px solid ${changes ? "#ef444430" : "#1f2937"}`, borderRadius: 9, cursor: "pointer" },
-          onMouseEnter: (e) => e.currentTarget.style.borderColor = changes ? "#ef4444" : "#374151",
-          onMouseLeave: (e) => e.currentTarget.style.borderColor = changes ? "#ef444430" : "#1f2937"
-        },
-        /* @__PURE__ */ React.createElement("div", { style: { width: 8, height: 8, borderRadius: "50%", background: c, flexShrink: 0 } }),
-        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, d.title), showProject && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af" } }, d.projectName)),
-        d._fromProduction ? /* @__PURE__ */ React.createElement(Chip, { label: d.status, color: c, xs: true }) : /* @__PURE__ */ React.createElement(DelStatusSel, { status: d.status, onChange: (v) => onUpdateDel(d.projectId, d.id, "status", v), xs: true }),
-        !d._fromProduction && /* @__PURE__ */ React.createElement(DelEditorSel, { editorId: d.editorId, editors, onChange: (v) => onUpdateDel(d.projectId, d.id, "editorId", v), xs: true }),
-        d.aspectRatio && /* @__PURE__ */ React.createElement(Chip, { label: d.aspectRatio, color: "#374151", xs: true }),
-        activeR && !changes && /* @__PURE__ */ React.createElement(Chip, { label: activeR.label, color: RCOLOR[activeR.status], xs: true }),
-        changes && /* @__PURE__ */ React.createElement(Chip, { label: "\u21A9 Changes", color: "#ef4444", xs: true }),
-        /* @__PURE__ */ React.createElement(DelFrameInfo, { frameLink: d.frameLink, framePW: d.framePW, small: true }),
-        /* @__PURE__ */ React.createElement(Dl, { date: d.deadline }),
-        /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#8e97a6" } }, "\u203A")
-      );
-    };
+    const DelRow = ({ d, showProject = true }) => /* @__PURE__ */ React.createElement(
+      DeliverableRow,
+      {
+        d,
+        projectId: d.projectId,
+        projectName: d.projectName,
+        showProject,
+        team,
+        editors,
+        onUpdateDel,
+        onClick: (e) => openDel(d, e),
+        editorEditable: true,
+        readOnly: !!d._fromProduction
+      }
+    );
     return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { onClick: () => {
       if (sidebarSel) {
         setSidebarSel(null);
@@ -8841,8 +8873,19 @@ Brief content: ${content}`;
       }
     ))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 28 } }, sectionHeader("\u{1F4C1}", "My Projects", myActiveProjects.length, projectsOpen, () => setProjectsOpen((o) => !o)), projectsOpen && /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, padding: 16 } }, myActiveProjects.length ? /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(285px,1fr))", gap: 12 } }, myActiveProjects.map((p) => /* @__PURE__ */ React.createElement(ProjectCard, { key: p.id, project: p, team, onClick: () => onOpenProject(p), onUpdateProject }))) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#374151", fontStyle: "italic" } }, "No active projects assigned right now."))), /* @__PURE__ */ React.createElement("div", null, sectionHeader("\u{1F3AC}", "My Active Deliverables", myActiveDeliverables.length, delsOpen, () => setDelsOpen((o) => !o)), delsOpen && (myActiveDeliverables.length ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, myActiveDeliverables.map((d) => {
       const isExp = expandedDelId === d.id;
-      const statusColor = DCOLOR[d.status] || "#6b7280";
-      return /* @__PURE__ */ React.createElement("div", { key: d.id, style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 9, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { onClick: () => setExpandedDelId(isExp ? null : d.id), style: { display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", cursor: "pointer" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, d.title || "Untitled"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 2 } }, d._project.name)), /* @__PURE__ */ React.createElement("span", { style: { background: statusColor + "20", color: statusColor, borderRadius: 99, padding: "2px 9px", fontSize: 12, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", flexShrink: 0 } }, d.status), /* @__PURE__ */ React.createElement(Dl, { date: d.deadline }), /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontSize: 14, flexShrink: 0 } }, isExp ? "\u25B2" : "\u25BC")), isExp && /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { borderTop: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement(
+      return /* @__PURE__ */ React.createElement("div", { key: d.id, style: { borderRadius: isExp ? "10px 10px 0 0" : 10, overflow: isExp ? "visible" : "hidden" } }, /* @__PURE__ */ React.createElement(
+        DeliverableRow,
+        {
+          d,
+          projectId: d._project.id,
+          projectName: d._project.name,
+          showProject: true,
+          team,
+          onUpdateDel,
+          isExpanded: isExp,
+          onClick: () => setExpandedDelId(isExp ? null : d.id)
+        }
+      ), isExp && /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { borderTop: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement(
         DeliverableDetailModal,
         {
           del: d,
@@ -8958,11 +9001,16 @@ Brief content: ${content}`;
       const nextProd = (p.productions || []).filter((pr) => pr.startTime && new Date(pr.startTime) >= now2).sort((a, b) => new Date(a.startTime) - new Date(b.startTime))[0];
       return { ...p, _nextDate: nextProd?.startTime || p.deadline || null };
     }).filter((p) => p._nextDate).sort((a, b) => new Date(a._nextDate) - new Date(b._nextDate))[0] || null;
-    const nextBigEvent = [...projects].filter((p) => !p.closedAt && p.isBigEvent).map((p) => {
+    const upcomingBigEvents = [...projects].filter((p) => !p.closedAt && p.isBigEvent).map((p) => {
       const nextProd = (p.productions || []).filter((pr) => pr.startTime && new Date(pr.startTime) >= now2).sort((a, b) => new Date(a.startTime) - new Date(b.startTime))[0];
       return { ...p, _nextDate: nextProd?.startTime || p.deadline || null };
-    }).filter((p) => p._nextDate).sort((a, b) => new Date(a._nextDate) - new Date(b._nextDate))[0] || null;
+    }).filter((p) => p._nextDate && new Date(p._nextDate) >= now2).sort((a, b) => new Date(a._nextDate) - new Date(b._nextDate));
     const fmtDate2 = (iso) => iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+    const bxtvCode = (p) => {
+      const m = p?.bxtvMeta;
+      if (!m || !m.season && !m.episode) return "\u2014";
+      return `S${String(m.season || 0).padStart(2, "0")}E${String(m.episode || 0).padStart(2, "0")}`;
+    };
     const tiles = [
       {
         value: contentStudioProjsThisWeek.length,
@@ -8992,6 +9040,13 @@ Brief content: ${content}`;
         onClick: () => setView("workReview")
       },
       {
+        value: nextBXTV ? bxtvCode(nextBXTV) : "\u2014",
+        label: "Next BXTV",
+        sub: nextBXTV ? fmtDate2(nextBXTV._nextDate) || "No date" : "No upcoming",
+        color: "#f59e0b",
+        onClick: nextBXTV ? () => onOpenProject(nextBXTV) : null
+      },
+      {
         value: projectsDueThisWeek.length,
         label: "Projects Due",
         sub: "this week",
@@ -9002,20 +9057,14 @@ Brief content: ${content}`;
         }
       },
       {
-        value: nextBXTV ? nextBXTV.name : "\u2014",
-        isText: true,
-        label: "Next BXTV",
-        sub: nextBXTV ? fmtDate2(nextBXTV._nextDate) || "No date" : "No upcoming",
-        color: "#f59e0b",
-        onClick: nextBXTV ? () => onOpenProject(nextBXTV) : null
-      },
-      {
-        value: nextBigEvent ? nextBigEvent.name : "\u2014",
-        isText: true,
-        label: "Big Event",
-        sub: nextBigEvent ? fmtDate2(nextBigEvent._nextDate) || "No date" : "None tagged",
+        value: upcomingBigEvents.length,
+        label: "Upcoming Events",
+        sub: upcomingBigEvents[0] ? `next: ${fmtDate2(upcomingBigEvents[0]._nextDate)}` : "None tagged",
         color: "#ec4899",
-        onClick: nextBigEvent ? () => onOpenProject(nextBigEvent) : null
+        onClick: upcomingBigEvents.length ? () => {
+          onSetStatsFilter({ label: "Upcoming Events", ids: new Set(upcomingBigEvents.map((p) => p.id)) });
+          setView("projects");
+        } : null
       }
     ];
     return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 10, marginBottom: 20 } }, tiles.map((t, i) => /* @__PURE__ */ React.createElement(
@@ -9035,7 +9084,7 @@ Brief content: ${content}`;
           e.currentTarget.style.background = "#111827";
         }
       },
-      /* @__PURE__ */ React.createElement("div", { style: { fontSize: t.isText ? 16 : 35, fontWeight: 900, color: t.color, fontFamily: "'Barlow Condensed',sans-serif", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 3 } }, t.value),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 35, fontWeight: 900, color: t.color, fontFamily: "'Barlow Condensed',sans-serif", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 3 } }, t.value),
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#f1f5f9", fontWeight: 700, marginBottom: 1 } }, t.label),
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#4b5563" } }, t.sub)
     ))));

@@ -6716,65 +6716,6 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               <RequestedDeliverablesInfo project={lp} intakes={intakes||[]}/>
 
-              {/* BXTV cross-referenced deliverables — sourced from other projects */}
-              {isBXTVProject(lp)&&(()=>{
-                const linked = getBXTVLinkedDels(lp, allProjects);
-                if(!linked.length) return null;
-                return (
-                  <div style={{background:"#0d1117",border:"1px solid #6366f140",borderRadius:10,padding:"14px 16px",marginBottom:4}}>
-                    <div style={{fontSize:13,fontWeight:800,color:"#818cf8",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.08em",marginBottom:10}}>
-                      📺 Sourced from Other Projects ({linked.length})
-                    </div>
-                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                      {linked.map(({del,sourceProject})=>(
-                        <div key={del.id} style={{background:"#111827",border:"1px solid #6366f130",borderLeft:"3px solid #6366f1",borderRadius:8,padding:"10px 12px"}}>
-                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:6}}>
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontSize:16,fontWeight:700,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{del.title}</div>
-                              <div style={{fontSize:13,color:"#6366f1",marginTop:2}}>↗ {sourceProject.name}</div>
-                            </div>
-                            <select value={del.status} onChange={e=>onUpdateDel(sourceProject.id,del.id,"status",e.target.value)}
-                              style={{background:del.status==="Not Started"?"#1f2937":DCOLOR[del.status]+"20",border:`1px solid ${DCOLOR[del.status]}40`,borderRadius:5,color:DCOLOR[del.status],padding:"3px 7px",fontSize:13,fontWeight:700,outline:"none",cursor:"pointer",colorScheme:"dark",flexShrink:0}}>
-                              {DELIVERABLE_STATUSES.map(s=><option key={s}>{s}</option>)}
-                            </select>
-                          </div>
-                          <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-                            {del.deadline&&<span style={{fontSize:13,color:"#838ba0"}}>Due {fmtDate(del.deadline)}</span>}
-                            {del.bxtvLink?.bxtvEditorId&&<span style={{fontSize:13,color:"#34d399"}}>BXTV Editor: {team.find(m=>m.id===del.bxtvLink.bxtvEditorId)?.name||"—"}</span>}
-                            <button onClick={()=>{
-                              const newRefs=(lp.bxtvRefs||[]).filter(r=>!(r.sourceProjectId===sourceProject.id&&r.delId===del.id));
-                              onUpdateProject(lp.id,"bxtvRefs",newRefs);
-                              const newDels=(sourceProject.deliverables||[]).map(d=>d.id===del.id?{...d,bxtvLink:null}:d);
-                              onUpdateProject(sourceProject.id,"deliverables",newDels);
-                            }} style={{background:"#ef444415",border:"1px solid #ef444440",borderRadius:5,color:"#ef4444",padding:"2px 8px",fontSize:12,fontWeight:700,cursor:"pointer",marginLeft:"auto",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Handoff modal — editor assignment for a specific deliverable */}
-              {handoffDelId&&(()=>{
-                const del=lp.deliverables?.find(d=>d.id===handoffDelId);
-                if(!del) return null;
-                return (
-                  <HandoffCalendarModal
-                    del={del} project={lp} editors={editors} team={team}
-                    onSave={newSegments=>{
-                      const newDels=(lp.deliverables||[]).map(d=>
-                        d.id===handoffDelId?{...d,_segments:newSegments,_editorId:undefined}:d
-                      );
-                      onUpdateProject(project.id,"deliverables",newDels);
-                      setHandoffDelId(null);
-                    }}
-                    onClose={()=>setHandoffDelId(null)}
-                  />
-                );
-              })()}
               {/* ── Post Start Date — governs when Resource planning assumes all of this project's deliverables can begin ── */}
               <div style={{background:"#0f172a",border:"1px solid #1f2937",borderRadius:12,padding:"14px 16px"}}>
                 {(()=>{
@@ -6811,6 +6752,77 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                   );
                 })()}
               </div>
+
+              {/* BXTV cross-referenced deliverables — sourced from other projects.
+                  Same row + expand-to-DeliverableDetailModal pattern as this
+                  project's own list below, sharing activeDelModal so only one
+                  row (from either list) is ever open at once. Since onUpdateDel
+                  here writes to the SOURCE project's own deliverables array
+                  (sourceProject.id, not this episode's id), edits made from
+                  here are the same data a source-project session would see —
+                  there's nothing separate to "sync back," and updateDel's own
+                  bxtvLink-aware logging (see App) already mirrors history to
+                  both projects. */}
+              {isBXTVProject(lp)&&(()=>{
+                const linked = getBXTVLinkedDels(lp, allProjects);
+                if(!linked.length) return null;
+                return (
+                  <div style={{background:"#0d1117",border:"1px solid #6366f140",borderRadius:10,padding:"14px 16px",marginBottom:4}}>
+                    <div style={{fontSize:13,fontWeight:800,color:"#818cf8",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.08em",marginBottom:10}}>
+                      📺 Sourced from Other Projects ({linked.length})
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                      {linked.map(({del,sourceProject})=>{
+                        const isExp = activeDelModal===del.id;
+                        return (
+                          <div key={del.id} style={{borderRadius:isExp?"10px 10px 0 0":10,overflow:isExp?"visible":"hidden",borderLeft:"3px solid #6366f1"}}>
+                            <DeliverableRow d={del} projectId={sourceProject.id} projectName={sourceProject.name} showProject
+                              team={team} onUpdateDel={onUpdateDel} isExpanded={isExp}
+                              onClick={()=>setActiveDelModal(isExp?null:del.id)}/>
+                            {isExp&&(
+                              <div onClick={e=>e.stopPropagation()} style={{borderTop:"1px solid #1f2937"}}>
+                                <DeliverableDetailModal del={del} projectId={sourceProject.id} team={team} allProjects={allProjects}
+                                  onUpdateDel={onUpdateDel} onDeleteDel={onDeleteDel} onUpdateProject={onUpdateProject}
+                                  project={sourceProject} talentRoster={talentRoster}/>
+                                <div style={{padding:"0 14px 14px",background:"#0d1117"}}>
+                                  <button onClick={()=>{
+                                    const newRefs=(lp.bxtvRefs||[]).filter(r=>!(r.sourceProjectId===sourceProject.id&&r.delId===del.id));
+                                    onUpdateProject(lp.id,"bxtvRefs",newRefs);
+                                    const newDels=(sourceProject.deliverables||[]).map(d=>d.id===del.id?{...d,bxtvLink:null}:d);
+                                    onUpdateProject(sourceProject.id,"deliverables",newDels);
+                                    setActiveDelModal(null);
+                                  }} style={{background:"#ef444415",border:"1px solid #ef444440",borderRadius:5,color:"#ef4444",padding:"5px 12px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
+                                    Remove BXTV Link
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Handoff modal — editor assignment for a specific deliverable */}
+              {handoffDelId&&(()=>{
+                const del=lp.deliverables?.find(d=>d.id===handoffDelId);
+                if(!del) return null;
+                return (
+                  <HandoffCalendarModal
+                    del={del} project={lp} editors={editors} team={team}
+                    onSave={newSegments=>{
+                      const newDels=(lp.deliverables||[]).map(d=>
+                        d.id===handoffDelId?{...d,_segments:newSegments,_editorId:undefined}:d
+                      );
+                      onUpdateProject(project.id,"deliverables",newDels);
+                      setHandoffDelId(null);
+                    }}
+                    onClose={()=>setHandoffDelId(null)}
+                  />
+                );
+              })()}
               {/* ── Add New Deliverable — hidden by default ── */}
               {showAddDel&&<div style={{background:"#0f172a",border:"1px solid #374151",borderRadius:12,padding:"14px 16px"}}>
                 <div style={{fontSize:16,fontWeight:800,color: "#8e97a6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:10}}>New Deliverable</div>
@@ -11508,6 +11520,53 @@ const DelEditorSel = ({editorId, editors, onChange, xs}) => {
   );
 };
 
+// ─── Shared: collapsed deliverable row ───────────────────────────────────────
+// The reference look is Project Overview's own Deliverables tab row (status
+// dot, title, DelStatusSel pill, chips, editor avatar, round dots, due-date
+// badge, hover border, and a highlighted "open" state) — this is that same
+// visual, factored out so Overall Deliverables, My View, and the BXTV
+// cross-referenced list can all match it instead of each having their own
+// slightly different row. Doesn't try to replicate every editing affordance
+// (inline title edit, delete, handoff, type toggle) since those are specific
+// to editing a project's own list in place — editorEditable/showProject/
+// isExpanded cover what the other three contexts actually need.
+const DeliverableRow = ({d, projectId, projectName, showProject=false, team, onUpdateDel, onClick, isExpanded=false, editors, editorEditable=false, readOnly=false}) => {
+  const changes = (d.rounds||[]).some(r=>r.status==="Changes Requested");
+  const allAppr = (d.rounds||[]).length>0 && (d.rounds||[]).every(r=>r.status==="Approved");
+  const ed = team?.find(m=>m.id===d.editorId);
+  return (
+    <div onClick={onClick}
+      style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",background:isExpanded?"#1f2937":"#111827",border:`1px solid ${isExpanded?"#6366f1":changes?"#ef444430":"#1f2937"}`,borderRadius:isExpanded?"10px 10px 0 0":10,cursor:onClick?"pointer":"default"}}
+      onMouseEnter={e=>{if(!isExpanded)e.currentTarget.style.borderColor=changes?"#ef4444":"#374151";}}
+      onMouseLeave={e=>{if(!isExpanded)e.currentTarget.style.borderColor=changes?"#ef444430":"#1f2937";}}>
+      <div style={{width:9,height:9,borderRadius:"50%",background:DCOLOR[d.status],flexShrink:0}}/>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:2,flexWrap:"wrap"}}>
+          <span style={{fontWeight:700,fontSize:20,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title||"Untitled"}</span>
+          {readOnly ? <Chip label={d.status} color={DCOLOR[d.status]} xs/> : <DelStatusSel status={d.status} onChange={v=>onUpdateDel(projectId,d.id,"status",v)} xs/>}
+          {!readOnly&&editorEditable&&<DelEditorSel editorId={d.editorId} editors={editors||[]} onChange={v=>onUpdateDel(projectId,d.id,"editorId",v)} xs/>}
+          {d.aspectRatio&&<Chip label={d.aspectRatio} color="#374151" xs/>}
+          {d.srtNeeded&&<Chip label="SRT" color="#06b6d4" xs/>}
+          {allAppr&&<Chip label="✓ Approved" color="#10b981" xs/>}
+          {changes&&<Chip label="↩ Changes" color="#ef4444" xs/>}
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginTop:1,fontSize:14,color:"#9ca3af"}}>
+          {!editorEditable&&ed&&<span style={{display:"flex",alignItems:"center",gap:4}}><Av name={ed.name} size={14}/>{ed.name}</span>}
+          {showProject&&<span style={{color:"#6366f1"}}>{projectName}</span>}
+        </div>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5,flexShrink:0}}>
+        <div style={{display:"flex",gap:3}}>
+          {(d.rounds||[]).map((r,i)=>(
+            <div key={i} title={`${r.label}: ${r.status}`} style={{width:20,height:20,borderRadius:"50%",background:RCOLOR[r.status]+"30",border:`2px solid ${RCOLOR[r.status]}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:RCOLOR[r.status]}}>{i+1}</div>
+          ))}
+        </div>
+        <Dl date={d.deadline}/>
+      </div>
+    </div>
+  );
+};
+
 // ─── Shared: Frame.io link + PW copy button for collapsed views, with fallback ──
 const DelFrameInfo = ({frameLink, framePW, small}) => {
   const [copied,setCopied]=useState(false);
@@ -11694,34 +11753,14 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
     setSidebarSel({delId:d.id, projectId:d.projectId});
   };
 
-  const DelRow = ({d, showProject=true}) => {
-    const changes=d.rounds.some(r=>r.status==="Changes Requested");
-    const inRev=d.rounds.some(r=>["In Review","Sent"].includes(r.status));
-    const activeR=d.rounds.find(r=>!["Approved"].includes(r.status));
-    const c=changes?"#ef4444":inRev?"#f59e0b":DCOLOR[d.status];
-    return (
-      <div onClick={e=>openDel(d,e)}
-        style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",background:"#111827",border:`1px solid ${changes?"#ef444430":"#1f2937"}`,borderRadius:9,cursor:"pointer"}}
-        onMouseEnter={e=>e.currentTarget.style.borderColor=changes?"#ef4444":"#374151"}
-        onMouseLeave={e=>e.currentTarget.style.borderColor=changes?"#ef444430":"#1f2937"}>
-        <div style={{width:8,height:8,borderRadius:"50%",background:c,flexShrink:0}}/>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:17,fontWeight:700,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title}</div>
-          {showProject&&<div style={{fontSize:14,color: "#9ca3af"}}>{d.projectName}</div>}
-        </div>
-        {d._fromProduction
-          ? <Chip label={d.status} color={c} xs/>
-          : <DelStatusSel status={d.status} onChange={v=>onUpdateDel(d.projectId,d.id,"status",v)} xs/>}
-        {!d._fromProduction&&<DelEditorSel editorId={d.editorId} editors={editors} onChange={v=>onUpdateDel(d.projectId,d.id,"editorId",v)} xs/>}
-        {d.aspectRatio&&<Chip label={d.aspectRatio} color="#374151" xs/>}
-        {activeR&&!changes&&<Chip label={activeR.label} color={RCOLOR[activeR.status]} xs/>}
-        {changes&&<Chip label="↩ Changes" color="#ef4444" xs/>}
-        <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW} small/>
-        <Dl date={d.deadline}/>
-        <span style={{fontSize:14,color: "#8e97a6"}}>›</span>
-      </div>
-    );
-  };
+  // Same collapsed-row look as Project Overview's own Deliverables tab (see
+  // DeliverableRow) — with the editor slot swapped for the quick-reassign
+  // dropdown this tab specifically needed (task: quick editor reassign).
+  const DelRow = ({d, showProject=true}) => (
+    <DeliverableRow d={d} projectId={d.projectId} projectName={d.projectName} showProject={showProject}
+      team={team} editors={editors} onUpdateDel={onUpdateDel} onClick={e=>openDel(d,e)}
+      editorEditable readOnly={!!d._fromProduction}/>
+  );
 
   return (
     <>
@@ -13290,18 +13329,11 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {myActiveDeliverables.map(d=>{
               const isExp = expandedDelId===d.id;
-              const statusColor = DCOLOR[d.status]||"#6b7280";
               return (
-                <div key={d.id} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:9,overflow:"hidden"}}>
-                  <div onClick={()=>setExpandedDelId(isExp?null:d.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",cursor:"pointer"}}>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:16,fontWeight:700,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title||"Untitled"}</div>
-                      <div style={{fontSize:13,color:"#8e97a6",marginTop:2}}>{d._project.name}</div>
-                    </div>
-                    <span style={{background:statusColor+"20",color:statusColor,borderRadius:99,padding:"2px 9px",fontSize:12,fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",flexShrink:0}}>{d.status}</span>
-                    <Dl date={d.deadline}/>
-                    <span style={{color:"#8e97a6",fontSize:14,flexShrink:0}}>{isExp?"▲":"▼"}</span>
-                  </div>
+                <div key={d.id} style={{borderRadius:isExp?"10px 10px 0 0":10,overflow:isExp?"visible":"hidden"}}>
+                  <DeliverableRow d={d} projectId={d._project.id} projectName={d._project.name} showProject
+                    team={team} onUpdateDel={onUpdateDel} isExpanded={isExp}
+                    onClick={()=>setExpandedDelId(isExp?null:d.id)}/>
                   {isExp&&(
                     <div onClick={e=>e.stopPropagation()} style={{borderTop:"1px solid #1f2937"}}>
                       <DeliverableDetailModal del={d} projectId={d._project.id} team={team} allProjects={projects}
@@ -13519,18 +13551,31 @@ const StatsBar = ({projects, team, setView, onOpenProject, onSetStatsFilter}) =>
     .filter(p=>p._nextDate)
     .sort((a,b)=>new Date(a._nextDate)-new Date(b._nextDate))[0]||null;
 
-  // 6. Next big event (projects tagged isBigEvent)
-  const nextBigEvent = [...projects]
+  // 6. Upcoming big events (projects tagged isBigEvent, next date in the future)
+  const upcomingBigEvents = [...projects]
     .filter(p=>!p.closedAt&&p.isBigEvent)
     .map(p=>{
       const nextProd=(p.productions||[]).filter(pr=>pr.startTime&&new Date(pr.startTime)>=now).sort((a,b)=>new Date(a.startTime)-new Date(b.startTime))[0];
       return {...p,_nextDate:nextProd?.startTime||p.deadline||null};
     })
-    .filter(p=>p._nextDate)
-    .sort((a,b)=>new Date(a._nextDate)-new Date(b._nextDate))[0]||null;
+    .filter(p=>p._nextDate&&new Date(p._nextDate)>=now)
+    .sort((a,b)=>new Date(a._nextDate)-new Date(b._nextDate));
 
   const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-US",{month:"short",day:"numeric"}) : null;
+  // Compact season/episode code (e.g. "S26E04") for the Next BXTV tile's big
+  // number — the full episode name (getBXTVEpisodeName) is a sentence, which
+  // is why this tile used to render as small text instead of matching the
+  // other big-number tiles.
+  const bxtvCode = p => {
+    const m = p?.bxtvMeta;
+    if(!m||(!m.season&&!m.episode)) return "—";
+    return `S${String(m.season||0).padStart(2,"0")}E${String(m.episode||0).padStart(2,"0")}`;
+  };
 
+  // Every tile now renders the same way (big number + label + sub), so
+  // there's nothing left that looks structurally different from the rest —
+  // Next BXTV shows its episode code instead of the full project name, and
+  // Upcoming Events shows a count instead of a single event's name.
   const tiles = [
     {
       value: contentStudioProjsThisWeek.length,
@@ -13554,6 +13599,13 @@ const StatsBar = ({projects, team, setView, onOpenProject, onSetStatsFilter}) =>
       onClick: ()=>setView("workReview"),
     },
     {
+      value: nextBXTV ? bxtvCode(nextBXTV) : "—",
+      label: "Next BXTV",
+      sub: nextBXTV ? fmtDate(nextBXTV._nextDate)||"No date" : "No upcoming",
+      color: "#f59e0b",
+      onClick: nextBXTV ? ()=>onOpenProject(nextBXTV) : null,
+    },
+    {
       value: projectsDueThisWeek.length,
       label: "Projects Due",
       sub: "this week",
@@ -13561,20 +13613,11 @@ const StatsBar = ({projects, team, setView, onOpenProject, onSetStatsFilter}) =>
       onClick: ()=>{ onSetStatsFilter({label:"Projects Due — This Week", ids:new Set(projectsDueThisWeek.map(p=>p.id))}); setView("projects"); },
     },
     {
-      value: nextBXTV ? nextBXTV.name : "—",
-      isText: true,
-      label: "Next BXTV",
-      sub: nextBXTV ? fmtDate(nextBXTV._nextDate)||"No date" : "No upcoming",
-      color: "#f59e0b",
-      onClick: nextBXTV ? ()=>onOpenProject(nextBXTV) : null,
-    },
-    {
-      value: nextBigEvent ? nextBigEvent.name : "—",
-      isText: true,
-      label: "Big Event",
-      sub: nextBigEvent ? fmtDate(nextBigEvent._nextDate)||"No date" : "None tagged",
+      value: upcomingBigEvents.length,
+      label: "Upcoming Events",
+      sub: upcomingBigEvents[0] ? `next: ${fmtDate(upcomingBigEvents[0]._nextDate)}` : "None tagged",
       color: "#ec4899",
-      onClick: nextBigEvent ? ()=>onOpenProject(nextBigEvent) : null,
+      onClick: upcomingBigEvents.length ? ()=>{ onSetStatsFilter({label:"Upcoming Events", ids:new Set(upcomingBigEvents.map(p=>p.id))}); setView("projects"); } : null,
     },
   ];
 
@@ -13587,7 +13630,7 @@ const StatsBar = ({projects, team, setView, onOpenProject, onSetStatsFilter}) =>
             style={{background:"#111827",border:`1px solid ${t.onClick?"#1f2937":"#1a2035"}`,borderRadius:10,padding:"12px 14px",cursor:t.onClick?"pointer":"default",transition:"border-color 0.15s,background 0.15s"}}
             onMouseEnter={e=>{if(t.onClick){e.currentTarget.style.borderColor=t.color+"50";e.currentTarget.style.background="#161e2e";}}}
             onMouseLeave={e=>{e.currentTarget.style.borderColor=t.onClick?"#1f2937":"#1a2035";e.currentTarget.style.background="#111827";}}>
-            <div style={{fontSize:t.isText?16:35,fontWeight:900,color:t.color,fontFamily:"'Barlow Condensed',sans-serif",lineHeight:1.1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:3}}>
+            <div style={{fontSize:35,fontWeight:900,color:t.color,fontFamily:"'Barlow Condensed',sans-serif",lineHeight:1.1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:3}}>
               {t.value}
             </div>
             <div style={{fontSize:13,color:"#f1f5f9",fontWeight:700,marginBottom:1}}>{t.label}</div>
