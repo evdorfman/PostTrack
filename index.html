@@ -371,7 +371,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     throw Error('Dynamic require of "' + x + '" is not supported');
   });
 
-  // build_src.jsx
+  // PostProTrackerV4.jsx
   var import_react = __require("react");
   var import_recharts = __require("recharts");
   var NAV_HEADER_HEIGHT = 53;
@@ -2565,11 +2565,17 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       onDragStart(e, locIdx, "end", b);
     }, style: { position: "absolute", right: 0, top: 0, bottom: 0, width: 10, cursor: "e-resize", background: color + "30", borderLeft: `1px solid ${color}50`, zIndex: 3 } }));
   };
-  var OtherBookings = ({ otherBookings, filterLoc, hToPercent }) => /* @__PURE__ */ React.createElement(React.Fragment, null, (otherBookings || []).filter((ob) => !filterLoc || ob.location === filterLoc).map((ob, i) => {
+  var OtherBookings = ({ otherBookings, filterLoc, hToPercent, hideText }) => /* @__PURE__ */ React.createElement(React.Fragment, null, (otherBookings || []).filter((ob) => !filterLoc || ob.location === filterLoc).map((ob, i) => {
     if (ob.startH == null || ob.endH == null) return null;
     const left = hToPercent(ob.startH), width = hToPercent(ob.endH) - left;
-    return /* @__PURE__ */ React.createElement("div", { key: i, title: ob.name, style: { position: "absolute", left: `${left}%`, width: `${width}%`, top: 0, bottom: 0, background: "#ef444418", border: "1px solid #ef444435", borderRadius: 4, zIndex: 0, pointerEvents: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ef444499", padding: "1px 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, ob.name));
+    return /* @__PURE__ */ React.createElement("div", { key: i, title: ob.name, style: { position: "absolute", left: `${left}%`, width: `${width}%`, top: 0, bottom: 0, background: "#ef444418", border: "1px solid #ef444435", borderRadius: 4, zIndex: 0, pointerEvents: "none" } }, !hideText && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ef444499", padding: "1px 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, ob.name));
   }));
+  var OverallWindowBackdrop = ({ startTime, endTime, hToPercent }) => {
+    const sh = isoToHours(startTime), eh = isoToHours(endTime);
+    if (sh === null || eh === null) return null;
+    const left = hToPercent(sh), width = hToPercent(eh) - left;
+    return /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", left: `${left}%`, width: `${Math.max(width, 0.5)}%`, top: 0, bottom: 0, background: "#ef444410", border: "1px dashed #ef444422", borderRadius: 4, zIndex: 0, pointerEvents: "none" } });
+  };
   var _TimeOnlyPicker = ({ startTime, endTime, onChange }) => {
     const pad = (n) => String(n).padStart(2, "0");
     const TIME_SLOTS = [];
@@ -2849,7 +2855,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           onMouseLeave: (e) => e.currentTarget.style.color = "#374151"
         },
         "\xD7"
-      ))), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", left: 0, right: 0, height: LANE_H, background: "#111827", borderRadius: 4, overflow: "visible" } }, /* @__PURE__ */ React.createElement(OtherBookings, { otherBookings, filterLoc: b.location, hToPercent }), isoToHours(b.startTime) !== null && /* @__PURE__ */ React.createElement(BookingBlock, { b, locIdx: li, expanded: true, draggingLocIdx: dragging?.locIdx, otherBookings, hToPercent, onDragStart: startDrag })));
+      ))), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", left: 0, right: 0, height: LANE_H, background: "#111827", borderRadius: 4, overflow: "visible" } }, !b.isOverall && /* @__PURE__ */ React.createElement(OverallWindowBackdrop, { startTime: production.startTime, endTime: production.endTime, hToPercent }), /* @__PURE__ */ React.createElement(OtherBookings, { otherBookings, filterLoc: b.location, hToPercent, hideText: b.isOverall }), isoToHours(b.startTime) !== null && /* @__PURE__ */ React.createElement(BookingBlock, { b, locIdx: li, expanded: true, draggingLocIdx: dragging?.locIdx, otherBookings, hToPercent, onDragStart: startDrag })));
     })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8, borderTop: "1px solid #111827", paddingTop: 6 } }, allBookings.map((b) => {
       const color = LOC_BOOKING_COLORS[b.type] || "#6366f1";
       return /* @__PURE__ */ React.createElement("div", { key: b.id || "_p", style: { display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#9ca3af" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 } }), /* @__PURE__ */ React.createElement("span", { style: { color } }, b.isOverall ? "Overall Production" : b._isPrimaryShoot ? "Primary Shoot" : b.type), locStr(b.location) && /* @__PURE__ */ React.createElement("span", { style: { color: "#838ba0" } }, "\xB7 ", locStr(b.location)), b.startTime && /* @__PURE__ */ React.createElement("span", null, fmtH(isoToHours(b.startTime)), "\u2013", fmtH(isoToHours(b.endTime))));
@@ -3843,7 +3849,7 @@ Brief content: ${content}`;
           { id: "location_fee", label: "Location Fee & Permits" },
           { id: "props", label: "Props" },
           { id: "parking", label: "Parking Allowance", defaultRate: 100 },
-          { id: "crew_meals", label: "Crew Meals", defaultRate: 250 }
+          { id: "crew_meals", label: "Crew Meals", defaultRate: 20 }
         ] }
       ]
     },
@@ -4420,7 +4426,6 @@ Brief content: ${content}`;
     const [newDelAR, setNewDelAR] = (0, import_react.useState)("16:9");
     const [delSort, setDelSort] = (0, import_react.useState)("default");
     const [bulkDelCount, setBulkDelCount] = (0, import_react.useState)(1);
-    const [confirmDelDelete, setConfirmDelDelete] = (0, import_react.useState)(null);
     const [activeTab, setActiveTab] = (0, import_react.useState)(initialTab === "budget" && !canAccessBudget ? "overview" : initialTab || "overview");
     (0, import_react.useEffect)(() => {
       if (activeTab === "budget" && !canAccessBudget) setActiveTab("overview");
@@ -4509,7 +4514,7 @@ Brief content: ${content}`;
     })()), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 2, flexWrap: "wrap" } }, [["overview", "Overview"], ["calendar", "\u{1F4C5} Project Cal"], ["production", "Production"], ["ingest", "Media Ingest"], ["animation", "\u2728 Animation"], ["deliverables", "Deliverables"], ["budget", "Budget"], ["closeout", "Close Out"]].filter(([id]) => id !== "budget" || canAccessBudget).map(([id, label]) => /* @__PURE__ */ React.createElement("button", { key: id, style: tabS(activeTab === id), onClick: () => {
       setActiveTab(id);
       setActiveDelModal(null);
-    } }, label))))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minHeight: 0, overflowY: activeTab === "budget" ? "hidden" : "auto", padding: activeTab === "budget" ? 0 : "20px 28px 32px" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: activeTab === "budget" ? "100%" : 1600, margin: "0 auto", height: activeTab === "budget" ? "100%" : "auto" } }, activeTab === "overview" && /* @__PURE__ */ React.createElement(React.Fragment, null, isBXTVProject(lp) && /* @__PURE__ */ React.createElement(BXTVMetaPanel, { project: lp, onUpdateProject }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement(ProjectTeamPanel, { project, lp, team, onUpdateProject }), (lp.notes || []).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { ...card } }, /* @__PURE__ */ React.createElement(SH, { label: `Status Notes \xB7 ${(lp.notes || []).length}` }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, maxHeight: 220, overflowY: "auto" } }, [...lp.notes || []].reverse().slice(0, 8).map((note) => {
+    } }, label))))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minHeight: 0, overflowY: activeTab === "budget" ? "hidden" : "auto", padding: activeTab === "budget" ? 0 : "20px 28px 32px" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: activeTab === "budget" ? "100%" : 1600, margin: "0 auto", height: activeTab === "budget" ? "100%" : "auto" } }, activeTab === "overview" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement(ProjectTeamPanel, { project, lp, team, onUpdateProject }), (lp.notes || []).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { ...card } }, /* @__PURE__ */ React.createElement(SH, { label: `Status Notes \xB7 ${(lp.notes || []).length}` }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, maxHeight: 220, overflowY: "auto" } }, [...lp.notes || []].reverse().slice(0, 8).map((note) => {
       const noteAuthor = team.find((m) => m.id === note.authorId);
       return /* @__PURE__ */ React.createElement("div", { key: note.id, style: { display: "flex", gap: 8, padding: "7px 9px", background: "#0f172a", borderRadius: 8 } }, noteAuthor && /* @__PURE__ */ React.createElement(Av, { name: noteAuthor.name, size: 18 }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af", marginBottom: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#9ca3af", fontWeight: 600 } }, note.authorName), " \xB7 ", fmtDT(note.createdAt)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#d1d5db", lineHeight: 1.4 } }, note.text.split(/(@\w+)/g).map((p, i) => p.startsWith("@") ? /* @__PURE__ */ React.createElement("span", { key: i, style: { color: "#6366f1", fontWeight: 700 } }, p) : p))));
     }))), /* @__PURE__ */ React.createElement(
@@ -4638,7 +4643,7 @@ Brief content: ${content}`;
         /* @__PURE__ */ React.createElement(Dl, { date: d.deadline }),
         /* @__PURE__ */ React.createElement("span", { style: { fontSize: 17, color: "#8e97a6" } }, "\u203A")
       );
-    }))))), activeTab === "calendar" && /* @__PURE__ */ React.createElement(ProjectCalendar, { project: lp }), activeTab === "deliverables" && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ React.createElement(RequestedDeliverablesInfo, { project: lp, intakes: intakes || [] }), /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 12, padding: "14px 16px" } }, (() => {
+    }))))), activeTab === "calendar" && /* @__PURE__ */ React.createElement(ProjectCalendar, { project: lp, onUpdateProject, onUpdateDel }), activeTab === "deliverables" && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ React.createElement(RequestedDeliverablesInfo, { project: lp, intakes: intakes || [] }), /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 12, padding: "14px 16px" } }, (() => {
       const suggested = getEarliestProjectIngestReadyDate(lp);
       const hasOverride = !!lp.postStartDate;
       const noFootageNeeded = lp.basedOnExistingMaterial && !suggested && !hasOverride;
@@ -4670,6 +4675,7 @@ Brief content: ${content}`;
             projectName: sourceProject.name,
             showProject: true,
             team,
+            allProjects,
             onUpdateDel,
             isExpanded: isExp,
             onClick: () => setActiveDelModal(isExp ? null : del.id)
@@ -4778,107 +4784,20 @@ Brief content: ${content}`;
       });
       else if (delSort === "status") dels.sort((a, b) => DELIVERABLE_STATUSES.indexOf(a.status) - DELIVERABLE_STATUSES.indexOf(b.status));
       return dels.map((d) => {
-        const ed = team.find((m) => m.id === d.editorId);
-        const changes = d.rounds.some((r) => r.status === "Changes Requested");
-        const allAppr = d.rounds.length > 0 && d.rounds.every((r) => r.status === "Approved");
         const isExpanded = activeDelModal === d.id;
         return /* @__PURE__ */ React.createElement("div", { key: d.id }, /* @__PURE__ */ React.createElement(
-          "div",
+          DeliverableRow,
           {
-            onClick: () => setActiveDelModal(isExpanded ? null : d.id),
-            style: { display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", background: isExpanded ? "#1f2937" : "#111827", border: `1px solid ${isExpanded ? "#6366f1" : changes ? "#ef444430" : "#1f2937"}`, borderRadius: isExpanded ? "10px 10px 0 0" : 10, cursor: "pointer" },
-            onMouseEnter: (e) => {
-              if (!isExpanded) e.currentTarget.style.borderColor = changes ? "#ef4444" : "#374151";
-            },
-            onMouseLeave: (e) => {
-              if (!isExpanded) e.currentTarget.style.borderColor = changes ? "#ef444430" : "#1f2937";
-            }
-          },
-          /* @__PURE__ */ React.createElement("div", { style: { width: 9, height: 9, borderRadius: "50%", background: DCOLOR[d.status], flexShrink: 0 } }),
-          /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 2, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("input", { value: d.title || "", onChange: (e) => {
-            e.stopPropagation();
-            onUpdateDel(project.id, d.id, "title", e.target.value);
-          }, onClick: (e) => e.stopPropagation(), onFocus: (e) => e.stopPropagation(), placeholder: "Deliverable title\u2026", style: { fontWeight: 700, fontSize: 20, color: "#f1f5f9", background: "transparent", border: "none", outline: "none", padding: 0, cursor: "text", fontFamily: "'DM Sans',sans-serif", flex: "0 1 auto", minWidth: 60 } }), /* @__PURE__ */ React.createElement(DelStatusSel, { status: d.status, onChange: (v) => onUpdateDel(project.id, d.id, "status", v), xs: true }), d._fromPreset && /* @__PURE__ */ React.createElement(Chip, { label: "Internal Planning", color: "#8b5cf6", xs: true }), d.aspectRatio && /* @__PURE__ */ React.createElement(Chip, { label: d.aspectRatio, color: "#374151", xs: true }), d.srtNeeded && /* @__PURE__ */ React.createElement(Chip, { label: "SRT", color: "#06b6d4", xs: true }), d.captionsNeeded && /* @__PURE__ */ React.createElement(Chip, { label: "Captions", color: "#a855f7", xs: true }), allAppr && /* @__PURE__ */ React.createElement(Chip, { label: "\u2713 Approved", color: "#10b981", xs: true }), changes && /* @__PURE__ */ React.createElement(Chip, { label: "\u21A9 Changes", color: "#ef4444", xs: true })), (() => {
-            const activeR = d.rounds.find((r) => r.status !== "Approved");
-            if (!activeR || !activeR.deadline) return null;
-            return /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: RCOLOR[activeR.status], marginBottom: 2 } }, activeR.label, " due ", fmtDT(activeR.deadline), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 6 } }, /* @__PURE__ */ React.createElement(Dl, { date: activeR.deadline, inline: true })));
-          })(), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 1 } }, ed && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(Av, { name: ed.name, size: 14 }), ed.name), d._segments?.length > 1 && d._segments.map((seg, i) => {
-            const segEd = team.find((m) => m.id === seg.editorId);
-            const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-            const isCurrent = (!seg.from || seg.from <= todayStr) && (!seg.to || seg.to >= todayStr);
-            return /* @__PURE__ */ React.createElement("span", { key: i, style: { fontSize: 13, color: isCurrent ? "#d1d5db" : "#838ba0", background: "#1f293780", borderRadius: 4, padding: "1px 6px", display: "flex", alignItems: "center", gap: 3 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 5, height: 5, borderRadius: "50%", background: isCurrent ? "#10b981" : "#374151", flexShrink: 0 } }), segEd?.name || "?", ": ", fmtSegRange(seg.from, seg.to));
-          }), (d.deliverableType || "Standard") === "BXTV" && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "#818cf8", background: "#6366f115", border: "1px solid #6366f140", borderRadius: 4, padding: "1px 7px", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "\u{1F4FA} BXTV", d.bxtvLink?.episodeProjectId && (() => {
-            const ep = allProjects.find((p) => p.id === d.bxtvLink.episodeProjectId);
-            return ep ? ` \xB7 ${getBXTVEpisodeName(ep) || ep.name}` : "";
-          })()), /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              onClick: (e) => {
-                e.stopPropagation();
-                setHandoffDelId(d.id);
-              },
-              style: { fontSize: 12, fontWeight: 700, color: "#818cf8", background: "#6366f115", border: "1px solid #6366f140", cursor: "pointer", padding: "2px 9px", borderRadius: 4, flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" },
-              onMouseEnter: (e) => {
-                e.currentTarget.style.background = "#6366f125";
-                e.currentTarget.style.borderColor = "#6366f170";
-              },
-              onMouseLeave: (e) => {
-                e.currentTarget.style.background = "#6366f115";
-                e.currentTarget.style.borderColor = "#6366f140";
-              }
-            },
-            "\u2194 Assign Editors"
-          )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginTop: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#374151" } }, "Type:"), ["Standard", "BXTV"].map((t) => {
-            const active = (d.deliverableType || "Standard") === t;
-            return /* @__PURE__ */ React.createElement(
-              "button",
-              {
-                key: t,
-                onClick: (e) => {
-                  e.stopPropagation();
-                  onUpdateDel(project.id, d.id, "deliverableType", t);
-                },
-                style: { padding: "1px 8px", borderRadius: 4, border: `1px solid ${active && t === "BXTV" ? "#6366f1" : active ? "#374151" : "#1f2937"}`, background: active && t === "BXTV" ? "#6366f115" : active ? "#1f2937" : "transparent", color: active && t === "BXTV" ? "#818cf8" : active ? "#e2e8f0" : "#374151", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" }
-              },
-              t
-            );
-          }))),
-          /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 3 } }, d.rounds.map((r, i) => /* @__PURE__ */ React.createElement("div", { key: i, title: `${r.label}: ${r.status}`, style: { width: 20, height: 20, borderRadius: "50%", background: RCOLOR[r.status] + "30", border: `2px solid ${RCOLOR[r.status]}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: RCOLOR[r.status] } }, i + 1))), /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 } }, /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, fontWeight: 700, color: "#6b7280", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.07em" } }, "Final Due"), /* @__PURE__ */ React.createElement(
-            "input",
-            {
-              type: "date",
-              value: d.deadline || "",
-              onChange: (e) => onUpdateDel(project.id, d.id, "deadline", e.target.value),
-              style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 5, color: d.deadline ? "#e2e8f0" : "#4b5563", padding: "3px 6px", fontSize: 14, outline: "none", cursor: "pointer", colorScheme: "dark", fontFamily: "inherit" }
-            }
-          ), d.deadline && /* @__PURE__ */ React.createElement(Dl, { date: d.deadline })), /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation() }, confirmDelDelete === d.id ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#f59e0b", fontWeight: 700 } }, "Delete?"), /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              onClick: () => {
-                onDeleteDel(project.id, d.id);
-                setConfirmDelDelete(null);
-              },
-              style: { background: "#ef444420", border: "1px solid #ef444450", borderRadius: 4, color: "#ef4444", padding: "2px 8px", fontSize: 12, fontWeight: 700, cursor: "pointer" }
-            },
-            "Yes"
-          ), /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              onClick: () => setConfirmDelDelete(null),
-              style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 4, color: "#9ca3af", padding: "2px 8px", fontSize: 12, fontWeight: 700, cursor: "pointer" }
-            },
-            "No"
-          )) : /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              onClick: () => setConfirmDelDelete(d.id),
-              style: { background: "none", border: "none", color: "#374151", cursor: "pointer", fontSize: 17, padding: "2px 4px", lineHeight: 1 },
-              title: "Delete deliverable"
-            },
-            "\u{1F5D1}"
-          ))),
-          /* @__PURE__ */ React.createElement(DelFrameInfo, { frameLink: d.frameLink, framePW: d.framePW }),
-          /* @__PURE__ */ React.createElement("span", { style: { fontSize: 17, color: isExpanded ? "#6366f1" : "#4b5563" } }, isExpanded ? "\u25B2" : "\u203A")
+            d,
+            projectId: project.id,
+            team,
+            allProjects,
+            onUpdateDel,
+            onDeleteDel,
+            onHandoff: setHandoffDelId,
+            isExpanded,
+            onClick: () => setActiveDelModal(isExpanded ? null : d.id)
+          }
         ), isExpanded && currentDelData && currentDelData.id === d.id && /* @__PURE__ */ React.createElement("div", { style: { border: "1px solid #6366f1", borderTop: "none", borderRadius: "0 0 10px 10px", overflow: "hidden" } }, /* @__PURE__ */ React.createElement(
           DeliverableDetailModal,
           {
@@ -5140,7 +5059,7 @@ Brief content: ${content}`;
         if (!fields.length) return null;
         return /* @__PURE__ */ React.createElement("div", { key: group.title }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 900, color: "#4b5563", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 6, borderBottom: "1px solid #1a2035", paddingBottom: 3 } }, group.title), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } }, fields.map(({ k, label, val }) => /* @__PURE__ */ React.createElement("div", { key: k }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 1 } }, label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#e2e8f0", whiteSpace: "pre-wrap", lineHeight: 1.4 } }, val)))));
       })));
-    })(), /* @__PURE__ */ React.createElement("h2", { style: { fontSize: 31, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", margin: 0 } }, "New Project"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Project Name *"), /* @__PURE__ */ React.createElement("input", { style: { ...sel, fontSize: 18, padding: "10px 12px" }, value: name, onChange: (e) => setName(e.target.value), placeholder: "e.g. Nike Spring '26 Campaign" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Project ID ", /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 400, textTransform: "none", letterSpacing: 0, fontFamily: "'DM Sans',sans-serif" } }, "(auto-generated)")), /* @__PURE__ */ React.createElement("div", { style: { ...sel, padding: "10px 12px", fontSize: 18, color: "#6366f1", fontWeight: 800, letterSpacing: "0.1em", background: "#6366f108", border: "1px solid #6366f130", cursor: "default", fontFamily: "'Barlow Condensed',sans-serif" } }, previewCode)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Status"), /* @__PURE__ */ React.createElement("div", { style: { ...sel, padding: "10px 12px", color: "#ec4899", fontWeight: 800, background: "#ec489910", border: "1px solid #ec489940", cursor: "default", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", fontSize: 14 } }, "New Request")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Final Deadline *"), /* @__PURE__ */ React.createElement("input", { type: "date", style: sel, value: deadline, onChange: (e) => setDeadline(e.target.value) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Workstream"), /* @__PURE__ */ React.createElement("select", { style: sel, value: workstream, onChange: (e) => setWorkstream(e.target.value) }, WORKSTREAMS.map((w) => /* @__PURE__ */ React.createElement("option", { key: w }, w)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Business Unit"), /* @__PURE__ */ React.createElement("select", { style: sel, value: bizUnit, onChange: (e) => setBizUnit(e.target.value) }, bizUnit && !BUSINESS_UNITS.includes(bizUnit) && /* @__PURE__ */ React.createElement("option", { value: bizUnit, style: { color: "#f59e0b" } }, bizUnit), BUSINESS_UNITS.map((b) => /* @__PURE__ */ React.createElement("option", { key: b }, b))), bizUnit?.startsWith("Undefined") && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#f59e0b", marginTop: 3 } }, "\u26A0 BU from intake not in standard list \u2014 update if needed")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Requester / Client"), /* @__PURE__ */ React.createElement("input", { style: sel, value: requester, onChange: (e) => setRequester(e.target.value), placeholder: "Who requested this?" })), /* @__PURE__ */ React.createElement("div", null), /* @__PURE__ */ React.createElement("div", { style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Brief Notes"), /* @__PURE__ */ React.createElement("textarea", { style: { ...sel, minHeight: 60, resize: "vertical" }, value: briefNotes, onChange: (e) => setBriefNotes(e.target.value), placeholder: "Summary, context, or links..." })), /* @__PURE__ */ React.createElement("div", { style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Keywords ", /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 400, textTransform: "none", letterSpacing: 0 } }, "(comma separated)")), /* @__PURE__ */ React.createElement("input", { style: sel, value: keywords, onChange: (e) => setKeywords(e.target.value), placeholder: "e.g. Brand, Launch, Social" }))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: { ...LBL, marginBottom: 8 } }, "Team"), /* @__PURE__ */ React.createElement("div", { style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 8, padding: "8px 12px", display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ React.createElement(RoleRow, { label: "Producer", value: producer, onChange: setProducer, options: byRole("Producer") }), /* @__PURE__ */ React.createElement(RoleRow, { label: "Project Manager", value: pm, onChange: setPM, options: byRole("Project Manager") }), /* @__PURE__ */ React.createElement(RoleRow, { label: "Editor", value: editor, onChange: setEditor, options: byRole("Editor") }), /* @__PURE__ */ React.createElement(RoleRow, { label: "Animator", value: animator, onChange: setAnimator, options: byRole("Animator") }), /* @__PURE__ */ React.createElement(RoleRow, { label: "Post Production Mgr", value: ppm, onChange: setPPM, options: byRole("Post Production Manager") }))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Quick Add Deliverables"), /* @__PURE__ */ React.createElement("div", { style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, color: "#9ca3af" } }, "Add"), /* @__PURE__ */ React.createElement("select", { value: delCount, onChange: (e) => setDelCount(+e.target.value), style: { ...sel, width: 70, padding: "5px 8px" } }, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => /* @__PURE__ */ React.createElement("option", { key: n, value: n }, n === 0 ? "None" : n))), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, color: "#9ca3af" } }, "deliverable", delCount !== 1 ? "s" : "")), delCount > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, color: "#9ca3af" } }, "due"), /* @__PURE__ */ React.createElement("input", { type: "date", value: delDeadline, onChange: (e) => setDelDeadline(e.target.value), style: { ...sel, width: 160, padding: "5px 8px" } }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#374151" } }, "(blank = project deadline)")), delCount > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6366f1", marginLeft: "auto" } }, Array.from({ length: delCount }, (_, i) => `Deliverable ${i + 1}`).join(", ")))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Production Placeholder ", /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "#4b5563" } }, "(optional \u2014 leave Day blank to skip)")), /* @__PURE__ */ React.createElement("div", { style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 8, padding: "10px 14px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Type"), /* @__PURE__ */ React.createElement("select", { style: sel, value: prodType, onChange: (e) => setProdType(e.target.value) }, PRODUCTION_TYPES.map((t) => /* @__PURE__ */ React.createElement("option", { key: t }, t)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Tentative Location"), /* @__PURE__ */ React.createElement("select", { style: sel, value: prodLoc, onChange: (e) => setProdLoc(e.target.value) }, ALL_STUDIO_LOCATIONS.map((l) => /* @__PURE__ */ React.createElement("option", { key: l }, l)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Day"), /* @__PURE__ */ React.createElement("input", { type: "date", style: sel, value: prodStart, onChange: (e) => setProdStart(e.target.value), placeholder: "Optional" })), prodStart && /* @__PURE__ */ React.createElement("div", { style: { gridColumn: "1/-1", fontSize: 13, color: "#4b5563", marginTop: 2 } }, "\u{1F4CC} Saved as internal/unpublished \xB7 Full day blocked in Studio calendar"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, paddingTop: 4, borderTop: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement(
+    })(), /* @__PURE__ */ React.createElement("h2", { style: { fontSize: 31, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", margin: 0 } }, "New Project"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Project Name *"), /* @__PURE__ */ React.createElement("input", { style: { ...sel, fontSize: 18, padding: "10px 12px" }, value: name, onChange: (e) => setName(e.target.value), placeholder: "e.g. Nike Spring '26 Campaign" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Project ID ", /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 400, textTransform: "none", letterSpacing: 0, fontFamily: "'DM Sans',sans-serif" } }, "(auto-generated)")), /* @__PURE__ */ React.createElement("div", { style: { ...sel, padding: "10px 12px", fontSize: 18, color: "#6366f1", fontWeight: 800, letterSpacing: "0.1em", background: "#6366f108", border: "1px solid #6366f130", cursor: "default", fontFamily: "'Barlow Condensed',sans-serif" } }, previewCode)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Status"), /* @__PURE__ */ React.createElement("div", { style: { ...sel, padding: "10px 12px", color: "#ec4899", fontWeight: 800, background: "#ec489910", border: "1px solid #ec489940", cursor: "default", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", fontSize: 14 } }, "New Request")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Final Deadline *"), /* @__PURE__ */ React.createElement("input", { type: "date", style: sel, value: deadline, onChange: (e) => setDeadline(e.target.value) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Workstream"), /* @__PURE__ */ React.createElement("select", { style: sel, value: workstream, onChange: (e) => setWorkstream(e.target.value) }, WORKSTREAMS.map((w) => /* @__PURE__ */ React.createElement("option", { key: w }, w)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Business Unit"), /* @__PURE__ */ React.createElement("select", { style: sel, value: bizUnit, onChange: (e) => setBizUnit(e.target.value) }, bizUnit && !BUSINESS_UNITS.includes(bizUnit) && /* @__PURE__ */ React.createElement("option", { value: bizUnit, style: { color: "#f59e0b" } }, bizUnit), BUSINESS_UNITS.map((b) => /* @__PURE__ */ React.createElement("option", { key: b }, b))), bizUnit?.startsWith("Undefined") && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#f59e0b", marginTop: 3 } }, "\u26A0 BU from intake not in standard list \u2014 update if needed")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Requester / Client"), /* @__PURE__ */ React.createElement("input", { style: sel, value: requester, onChange: (e) => setRequester(e.target.value), placeholder: "Who requested this?" })), /* @__PURE__ */ React.createElement("div", null), /* @__PURE__ */ React.createElement("div", { style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Brief Notes"), /* @__PURE__ */ React.createElement("textarea", { style: { ...sel, minHeight: 60, resize: "vertical" }, value: briefNotes, onChange: (e) => setBriefNotes(e.target.value), placeholder: "Summary, context, or links..." })), /* @__PURE__ */ React.createElement("div", { style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Keywords ", /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 400, textTransform: "none", letterSpacing: 0 } }, "(comma separated)")), /* @__PURE__ */ React.createElement("input", { style: sel, value: keywords, onChange: (e) => setKeywords(e.target.value), placeholder: "e.g. Brand, Launch, Social" }))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: { ...LBL, marginBottom: 8 } }, "Team"), /* @__PURE__ */ React.createElement("div", { style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 8, padding: "8px 12px", display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ React.createElement(RoleRow, { label: "Producer", value: producer, onChange: setProducer, options: byRole("Producer") }), /* @__PURE__ */ React.createElement(RoleRow, { label: "Project Manager", value: pm, onChange: setPM, options: byRole("Project Manager") }), /* @__PURE__ */ React.createElement(RoleRow, { label: "Editor", value: editor, onChange: setEditor, options: byRole("Editor") }), /* @__PURE__ */ React.createElement(RoleRow, { label: "Animator", value: animator, onChange: setAnimator, options: byRole("Animator") }), /* @__PURE__ */ React.createElement(RoleRow, { label: "Post Production Mgr", value: ppm, onChange: setPPM, options: byRole("Post Production Manager") }))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Quick Add Deliverables"), /* @__PURE__ */ React.createElement("div", { style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, color: "#9ca3af" } }, "Add"), /* @__PURE__ */ React.createElement("select", { value: delCount, onChange: (e) => setDelCount(+e.target.value), style: { ...sel, width: 92, padding: "5px 8px" } }, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => /* @__PURE__ */ React.createElement("option", { key: n, value: n }, n === 0 ? "None" : n))), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, color: "#9ca3af" } }, "deliverable", delCount !== 1 ? "s" : "")), delCount > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, color: "#9ca3af" } }, "due"), /* @__PURE__ */ React.createElement("input", { type: "date", value: delDeadline, onChange: (e) => setDelDeadline(e.target.value), style: { ...sel, width: 160, padding: "5px 8px" } }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#374151" } }, "(blank = project deadline)")), delCount > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6366f1", marginLeft: "auto" } }, Array.from({ length: delCount }, (_, i) => `Deliverable ${i + 1}`).join(", ")))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Production Placeholder ", /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "#4b5563" } }, "(optional \u2014 leave Day blank to skip)")), /* @__PURE__ */ React.createElement("div", { style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 8, padding: "10px 14px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Type"), /* @__PURE__ */ React.createElement("select", { style: sel, value: prodType, onChange: (e) => setProdType(e.target.value) }, PRODUCTION_TYPES.map((t) => /* @__PURE__ */ React.createElement("option", { key: t }, t)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Tentative Location"), /* @__PURE__ */ React.createElement("select", { style: sel, value: prodLoc, onChange: (e) => setProdLoc(e.target.value) }, ALL_STUDIO_LOCATIONS.map((l) => /* @__PURE__ */ React.createElement("option", { key: l }, l)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: LBL }, "Day"), /* @__PURE__ */ React.createElement("input", { type: "date", style: sel, value: prodStart, onChange: (e) => setProdStart(e.target.value), placeholder: "Optional" })), prodStart && /* @__PURE__ */ React.createElement("div", { style: { gridColumn: "1/-1", fontSize: 13, color: "#4b5563", marginTop: 2 } }, "\u{1F4CC} Saved as internal/unpublished \xB7 Full day blocked in Studio calendar"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, paddingTop: 4, borderTop: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: handleCreate,
@@ -7241,7 +7160,7 @@ Brief content: ${content}`;
     }, [projects, editors]);
     return /* @__PURE__ */ React.createElement("div", { style: { overflowX: "auto", paddingBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, alignItems: "flex-start", minWidth: "max-content" } }, allEditors.map((ed) => /* @__PURE__ */ React.createElement(KanbanEditorCol, { key: ed.id, ed, dels: grouped[ed.id] || [], editors, onUpdateDel }))));
   };
-  var CalendarView = ({ projects, team, onOpenProject, onUpdateProject, sidebarSlotNode, onSidebarWidthChange }) => {
+  var CalendarView = ({ projects, team, onOpenProject, onUpdateProject, unavailability = [], sidebarSlotNode, onSidebarWidthChange }) => {
     const [calDrawerItem, setCalDrawerItem] = (0, import_react.useState)(null);
     const sidebarWidth = calDrawerItem ? 400 : 0;
     const [year, setYear] = (0, import_react.useState)(now.getFullYear());
@@ -7249,8 +7168,8 @@ Brief content: ${content}`;
     const [calView, setCalView] = (0, import_react.useState)("month");
     const [filterEditor, setFilterEditor] = (0, import_react.useState)("all");
     const [filterProject, setFilterProject] = (0, import_react.useState)("all");
-    const [calFilters, setCalFilters] = (0, import_react.useState)({ showDeadlines: true, showReviews: true, showShoots: true, showIngest: true });
-    const calTypeColors = { deadline: "#ef4444", review: "#f59e0b", shoot: "#3b82f6", ingest: "#06b6d4" };
+    const [calFilters, setCalFilters] = (0, import_react.useState)({ showDeadlines: true, showReviews: true, showShoots: true, showIngest: true, showUnavailability: true });
+    const calTypeColors = { deadline: "#ef4444", review: "#f59e0b", shoot: "#3b82f6", ingest: "#06b6d4", unavailability: "#eab308" };
     const [tooltip, setTooltip] = (0, import_react.useState)(null);
     const [selDate, setSelDate] = (0, import_react.useState)(null);
     const editors = team.filter((m) => m.roles.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
@@ -7284,8 +7203,33 @@ Brief content: ${content}`;
             items.push({ id: `ingest-prod-${prod.id}`, title: `\u{1F4E5} ${prod.title || prod.type || "Media"}`, deadline: prodIngestDt, projectName: p.name, projectId: p.id, isRound: false, isIngest: true, isShoot: false, calType: "ingest", status: "Ingest" });
         });
       });
+      if (calFilters.showUnavailability) {
+        (unavailability || []).forEach((u) => {
+          if (filterEditor !== "all" && u.memberId !== Number(filterEditor)) return;
+          const member = team.find((m) => m.id === u.memberId);
+          const start = /* @__PURE__ */ new Date(u.startDate + "T12:00");
+          const end = /* @__PURE__ */ new Date(u.endDate + "T12:00");
+          if (isNaN(start) || isNaN(end)) return;
+          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            items.push({
+              id: `unavail-${u.id}-${d.toISOString().slice(0, 10)}`,
+              title: u.label || u.type || "Time Off",
+              deadline: d.toISOString(),
+              projectName: member?.name || "Unavailable",
+              projectId: null,
+              isRound: false,
+              isIngest: false,
+              isShoot: false,
+              isUnavailability: true,
+              calType: "unavailability",
+              status: u.type || "Time Off",
+              memberName: member?.name || "Unavailable"
+            });
+          }
+        });
+      }
       return items;
-    }, [projects, filterEditor, filterProject, calFilters, team]);
+    }, [projects, filterEditor, filterProject, calFilters, team, unavailability]);
     const byDay = (0, import_react.useMemo)(() => {
       const m = {};
       allItems.forEach((item) => {
@@ -7343,10 +7287,13 @@ Brief content: ${content}`;
       // review round deadline
       shoot: "#3b82f6",
       // shoot times
-      ingest: "#06b6d4"
+      ingest: "#06b6d4",
       // ingest times
+      unavailability: "#eab308"
+      // team time off
     };
     const getCalColor = (item) => {
+      if (item.isUnavailability) return CAL_COLORS.unavailability;
       if (item.isIngest) return CAL_COLORS.ingest;
       if (item.isShoot) return CAL_COLORS.shoot;
       if (item.isRound) return CAL_COLORS.review;
@@ -7354,7 +7301,7 @@ Brief content: ${content}`;
     };
     const ItemPill = ({ item, compact }) => {
       const color = getCalColor(item);
-      const typeLabel = item.isIngest ? "\u{1F4E5} Ingest" : item.isShoot ? "\u{1F3AC} Production" : item.isRound ? "\u21BA Review" : "\u{1F534} Final Due";
+      const typeLabel = item.isUnavailability ? "\u{1F334} Time Off" : item.isIngest ? "\u{1F4E5} Ingest" : item.isShoot ? "\u{1F3AC} Production" : item.isRound ? "\u21BA Review" : "\u{1F534} Final Due";
       return /* @__PURE__ */ React.createElement(
         "div",
         {
@@ -7367,7 +7314,7 @@ Brief content: ${content}`;
             if (rt && rt.closest && rt.closest("[data-tooltip]")) return;
             setTooltip(null);
           },
-          onClick: (e) => {
+          onClick: item.isUnavailability ? void 0 : (e) => {
             e.stopPropagation();
             setTooltip(null);
             setCalDrawerItem({ ...item, projectId: item.projectId });
@@ -7377,7 +7324,7 @@ Brief content: ${content}`;
             borderLeft: `2px solid ${color}`,
             borderRadius: "0 4px 4px 0",
             padding: compact ? "3px 5px" : "4px 7px",
-            cursor: "pointer",
+            cursor: item.isUnavailability ? "default" : "pointer",
             overflow: "hidden",
             lineHeight: 1.25,
             minWidth: 0,
@@ -7406,7 +7353,7 @@ Brief content: ${content}`;
       setYear(now.getFullYear());
       setMonth(now.getMonth());
       setSelDate(null);
-    }, style: { background: "#1f2937", border: "none", borderRadius: 7, color: "#9ca3af", padding: "0 10px", height: 30, cursor: "pointer", fontSize: 16, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.06em", textTransform: "uppercase" } }, "Today"), /* @__PURE__ */ React.createElement(ViewToggle, null), /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("select", { value: filterEditor, onChange: (e) => setFilterEditor(e.target.value), style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "5px 10px", fontSize: 16, outline: "none", colorScheme: "dark" } }, /* @__PURE__ */ React.createElement("option", { value: "all" }, "All Editors"), editors.map((e) => /* @__PURE__ */ React.createElement("option", { key: e.id, value: e.id }, e.name))), /* @__PURE__ */ React.createElement("select", { value: filterProject, onChange: (e) => setFilterProject(e.target.value), style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "5px 10px", fontSize: 16, outline: "none", colorScheme: "dark" } }, /* @__PURE__ */ React.createElement("option", { value: "all" }, "All Projects"), projects.map((p) => /* @__PURE__ */ React.createElement("option", { key: p.id, value: p.id }, p.name)))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5, flexWrap: "nowrap" } }, [["showDeadlines", "\u{1F534} Final Due", "deadline"], ["showReviews", "\u{1F7E1} Reviews", "review"], ["showShoots", "\u{1F535} Productions", "shoot"], ["showIngest", "\u{1FA75} Ingest", "ingest"]].map(([key, label, type]) => /* @__PURE__ */ React.createElement(
+    }, style: { background: "#1f2937", border: "none", borderRadius: 7, color: "#9ca3af", padding: "0 10px", height: 30, cursor: "pointer", fontSize: 16, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.06em", textTransform: "uppercase" } }, "Today"), /* @__PURE__ */ React.createElement(ViewToggle, null), /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("select", { value: filterEditor, onChange: (e) => setFilterEditor(e.target.value), style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "5px 10px", fontSize: 16, outline: "none", colorScheme: "dark" } }, /* @__PURE__ */ React.createElement("option", { value: "all" }, "All Editors"), editors.map((e) => /* @__PURE__ */ React.createElement("option", { key: e.id, value: e.id }, e.name))), /* @__PURE__ */ React.createElement("select", { value: filterProject, onChange: (e) => setFilterProject(e.target.value), style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "5px 10px", fontSize: 16, outline: "none", colorScheme: "dark" } }, /* @__PURE__ */ React.createElement("option", { value: "all" }, "All Projects"), projects.map((p) => /* @__PURE__ */ React.createElement("option", { key: p.id, value: p.id }, p.name)))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5, flexWrap: "nowrap" } }, [["showDeadlines", "\u{1F534} Final Due", "deadline"], ["showReviews", "\u{1F7E1} Reviews", "review"], ["showShoots", "\u{1F535} Productions", "shoot"], ["showIngest", "\u{1FA75} Ingest", "ingest"], ["showUnavailability", "\u{1F334} Time Off", "unavailability"]].map(([key, label, type]) => /* @__PURE__ */ React.createElement(
       "button",
       {
         key,
@@ -7551,7 +7498,7 @@ Brief content: ${content}`;
           top: Math.max(8, Math.min(tooltip.y, window.innerHeight - 400)),
           zIndex: 500,
           background: "#1a2235",
-          border: `1px solid ${tooltip.item.isShoot ? "#3b82f6" : tooltip.item.isIngest ? "#06b6d4" : tooltip.item.isRound ? "#f59e0b" : "#ef4444"}50`,
+          border: `1px solid ${tooltip.item.isUnavailability ? "#eab308" : tooltip.item.isShoot ? "#3b82f6" : tooltip.item.isIngest ? "#06b6d4" : tooltip.item.isRound ? "#f59e0b" : "#ef4444"}50`,
           borderRadius: 12,
           padding: "13px 15px",
           width: 280,
@@ -7561,10 +7508,10 @@ Brief content: ${content}`;
       },
       (() => {
         const item = tooltip.item;
-        const typeColor = item.isShoot ? "#3b82f6" : item.isIngest ? "#06b6d4" : item.isRound ? "#f59e0b" : "#ef4444";
-        const typeLabel = item.isShoot ? "\u{1F3AC} Production" : item.isIngest ? "\u{1F4E5} Ingest" : item.isRound ? "\u21BA Review Round" : "\u{1F534} Final Due";
+        const typeColor = item.isUnavailability ? "#eab308" : item.isShoot ? "#3b82f6" : item.isIngest ? "#06b6d4" : item.isRound ? "#f59e0b" : "#ef4444";
+        const typeLabel = item.isUnavailability ? "\u{1F334} Time Off" : item.isShoot ? "\u{1F3AC} Production" : item.isIngest ? "\u{1F4E5} Ingest" : item.isRound ? "\u21BA Review Round" : "\u{1F534} Final Due";
         const idLabel = item.id ? String(item.id).slice(-4) : item.isRound ? String(item.id).slice(-4) : "\u2014";
-        return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: typeColor, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.08em", textTransform: "uppercase" } }, typeLabel), /* @__PURE__ */ React.createElement("div", { style: { background: typeColor + "22", color: typeColor, borderRadius: 4, padding: "1px 7px", fontSize: 13, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif" } }, "#", idLabel)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#818cf8", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif" } }, item.projectName), item.isRound && !item.isShoot && !item.isIngest && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#f1f5f9", marginBottom: 2 } }, item.label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#9ca3af", marginBottom: 6 } }, item.delTitle), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 } }, /* @__PURE__ */ React.createElement(Chip, { label: item.status, color: RCOLOR[item.status] || "#6b7280", xs: true }), item.delStatus && /* @__PURE__ */ React.createElement(Chip, { label: item.delStatus, color: DCOLOR[item.delStatus] || "#6b7280", xs: true })), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 3 } }, "\u{1F4C5} Due: ", fmtDT(item.deadline)), item.reviewers?.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 3 } }, "\u{1F465} ", item.reviewers.slice(0, 3).join(", "), item.reviewers.length > 3 ? ` +${item.reviewers.length - 3}` : "")), !item.isRound && !item.isShoot && !item.isIngest && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#f1f5f9", marginBottom: 2 } }, item.title), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 } }, /* @__PURE__ */ React.createElement(Chip, { label: item.status || "\u2014", color: DCOLOR[item.status] || "#6b7280", xs: true }), item.aspectRatio && /* @__PURE__ */ React.createElement(Chip, { label: item.aspectRatio, color: "#4b5563", xs: true })), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 3 } }, "\u{1F4C5} Due: ", fmtDT(item.deadline)), item.editorName && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 3 } }, "\u270F\uFE0F ", item.editorName)), item.isShoot && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 } }, item.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 2 } }, "\u{1F550} ", fmtDT(item.deadline), item.endTime ? " \u2192 " + fmtTime(item.endTime) : ""), locStr(item.location) && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 2 } }, "\u{1F4CD} ", locStr(item.location)), item.crew && (() => {
+        return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: typeColor, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.08em", textTransform: "uppercase" } }, typeLabel), /* @__PURE__ */ React.createElement("div", { style: { background: typeColor + "22", color: typeColor, borderRadius: 4, padding: "1px 7px", fontSize: 13, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif" } }, "#", idLabel)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#818cf8", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif" } }, item.projectName), item.isRound && !item.isShoot && !item.isIngest && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#f1f5f9", marginBottom: 2 } }, item.label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#9ca3af", marginBottom: 6 } }, item.delTitle), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 } }, /* @__PURE__ */ React.createElement(Chip, { label: item.status, color: RCOLOR[item.status] || "#6b7280", xs: true }), item.delStatus && /* @__PURE__ */ React.createElement(Chip, { label: item.delStatus, color: DCOLOR[item.delStatus] || "#6b7280", xs: true })), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 3 } }, "\u{1F4C5} Due: ", fmtDT(item.deadline)), item.reviewers?.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 3 } }, "\u{1F465} ", item.reviewers.slice(0, 3).join(", "), item.reviewers.length > 3 ? ` +${item.reviewers.length - 3}` : "")), item.isUnavailability && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#f1f5f9", marginBottom: 2 } }, item.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 3 } }, "\u{1F4C5} ", fmtDT(item.deadline))), !item.isUnavailability && !item.isRound && !item.isShoot && !item.isIngest && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#f1f5f9", marginBottom: 2 } }, item.title), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 } }, /* @__PURE__ */ React.createElement(Chip, { label: item.status || "\u2014", color: DCOLOR[item.status] || "#6b7280", xs: true }), item.aspectRatio && /* @__PURE__ */ React.createElement(Chip, { label: item.aspectRatio, color: "#4b5563", xs: true })), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 3 } }, "\u{1F4C5} Due: ", fmtDT(item.deadline)), item.editorName && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 3 } }, "\u270F\uFE0F ", item.editorName)), item.isShoot && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 } }, item.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 2 } }, "\u{1F550} ", fmtDT(item.deadline), item.endTime ? " \u2192 " + fmtTime(item.endTime) : ""), locStr(item.location) && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 2 } }, "\u{1F4CD} ", locStr(item.location)), item.crew && (() => {
           const crewItems = [
             ...(item.crew.crewInternal || []).map((c) => {
               const m = team.find((t) => t.id === c.memberId);
@@ -7573,7 +7520,7 @@ Brief content: ${content}`;
             ...(item.crew.crewExternal || []).map((c) => c.name ? `${c.name} (${c.role || "Crew"})` : null).filter(Boolean)
           ];
           return crewItems.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 2 } }, "\u{1F465} ", crewItems.slice(0, 3).join(", "), crewItems.length > 3 ? ` +${crewItems.length - 3}` : "");
-        })()), item.isIngest && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 } }, item.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 2 } }, "\u{1F550} ", fmtDT(item.deadline)), item.notes && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 2 } }, "\u{1F4CB} ", item.notes.slice(0, 60), item.notes.length > 60 ? "\u2026" : "")), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid #1f293760", marginTop: 8, paddingTop: 7, fontSize: 13, color: typeColor, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em" } }, "Click to open project \u2192"));
+        })()), item.isIngest && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 } }, item.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 2 } }, "\u{1F550} ", fmtDT(item.deadline)), item.notes && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 2 } }, "\u{1F4CB} ", item.notes.slice(0, 60), item.notes.length > 60 ? "\u2026" : "")), !item.isUnavailability && /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid #1f293760", marginTop: 8, paddingTop: 7, fontSize: 13, color: typeColor, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em" } }, "Click to open project \u2192"));
       })()
     )), /* @__PURE__ */ React.createElement(SidebarPortal, { width: sidebarWidth, slotNode: sidebarSlotNode, onWidthChange: onSidebarWidthChange }, calDrawerItem && /* @__PURE__ */ React.createElement(CalEventDrawer, { item: calDrawerItem, projects, team, onClose: () => setCalDrawerItem(null), onUpdateProject, onOpenProject })));
   };
@@ -7611,10 +7558,28 @@ Brief content: ${content}`;
       editors.map((ed) => /* @__PURE__ */ React.createElement("option", { key: ed.id, value: ed.id, style: { background: "#0d1117", color: "#e2e8f0" } }, ed.name))
     );
   };
-  var DeliverableRow = ({ d, projectId, projectName, showProject = false, team, onUpdateDel, onClick, isExpanded = false, editors, editorEditable = false, readOnly = false }) => {
+  var DeliverableRow = ({
+    d,
+    projectId,
+    projectName,
+    showProject = false,
+    team,
+    allProjects = [],
+    onUpdateDel,
+    onDeleteDel,
+    onHandoff,
+    onClick,
+    isExpanded = false,
+    editors,
+    editorEditable = false,
+    readOnly = false
+  }) => {
+    const [confirmDelete, setConfirmDelete] = (0, import_react.useState)(false);
     const changes = (d.rounds || []).some((r) => r.status === "Changes Requested");
     const allAppr = (d.rounds || []).length > 0 && (d.rounds || []).every((r) => r.status === "Approved");
     const ed = team?.find((m) => m.id === d.editorId);
+    const editable = !readOnly && !!onUpdateDel;
+    const activeR = (d.rounds || []).find((r) => r.status !== "Approved");
     return /* @__PURE__ */ React.createElement(
       "div",
       {
@@ -7628,8 +7593,86 @@ Brief content: ${content}`;
         }
       },
       /* @__PURE__ */ React.createElement("div", { style: { width: 9, height: 9, borderRadius: "50%", background: DCOLOR[d.status], flexShrink: 0 } }),
-      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 2, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, fontSize: 20, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, d.title || "Untitled"), readOnly ? /* @__PURE__ */ React.createElement(Chip, { label: d.status, color: DCOLOR[d.status], xs: true }) : /* @__PURE__ */ React.createElement(DelStatusSel, { status: d.status, onChange: (v) => onUpdateDel(projectId, d.id, "status", v), xs: true }), !readOnly && editorEditable && /* @__PURE__ */ React.createElement(DelEditorSel, { editorId: d.editorId, editors: editors || [], onChange: (v) => onUpdateDel(projectId, d.id, "editorId", v), xs: true }), d.aspectRatio && /* @__PURE__ */ React.createElement(Chip, { label: d.aspectRatio, color: "#374151", xs: true }), d.srtNeeded && /* @__PURE__ */ React.createElement(Chip, { label: "SRT", color: "#06b6d4", xs: true }), allAppr && /* @__PURE__ */ React.createElement(Chip, { label: "\u2713 Approved", color: "#10b981", xs: true }), changes && /* @__PURE__ */ React.createElement(Chip, { label: "\u21A9 Changes", color: "#ef4444", xs: true })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 1, fontSize: 14, color: "#9ca3af" } }, !editorEditable && ed && /* @__PURE__ */ React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(Av, { name: ed.name, size: 14 }), ed.name), showProject && /* @__PURE__ */ React.createElement("span", { style: { color: "#6366f1" } }, projectName))),
-      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 3 } }, (d.rounds || []).map((r, i) => /* @__PURE__ */ React.createElement("div", { key: i, title: `${r.label}: ${r.status}`, style: { width: 20, height: 20, borderRadius: "50%", background: RCOLOR[r.status] + "30", border: `2px solid ${RCOLOR[r.status]}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: RCOLOR[r.status] } }, i + 1))), /* @__PURE__ */ React.createElement(Dl, { date: d.deadline }))
+      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 2, flexWrap: "wrap" } }, editable ? /* @__PURE__ */ React.createElement("input", { value: d.title || "", onChange: (e) => {
+        e.stopPropagation();
+        onUpdateDel(projectId, d.id, "title", e.target.value);
+      }, onClick: (e) => e.stopPropagation(), onFocus: (e) => e.stopPropagation(), placeholder: "Deliverable title\u2026", style: { fontWeight: 700, fontSize: 20, color: "#f1f5f9", background: "transparent", border: "none", outline: "none", padding: 0, cursor: "text", fontFamily: "'DM Sans',sans-serif", flex: "0 1 auto", minWidth: 60 } }) : /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, fontSize: 20, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, d.title || "Untitled"), readOnly ? /* @__PURE__ */ React.createElement(Chip, { label: d.status, color: DCOLOR[d.status], xs: true }) : /* @__PURE__ */ React.createElement(DelStatusSel, { status: d.status, onChange: (v) => onUpdateDel(projectId, d.id, "status", v), xs: true }), !readOnly && editorEditable && /* @__PURE__ */ React.createElement(DelEditorSel, { editorId: d.editorId, editors: editors || [], onChange: (v) => onUpdateDel(projectId, d.id, "editorId", v), xs: true }), d._fromPreset && /* @__PURE__ */ React.createElement(Chip, { label: "Internal Planning", color: "#8b5cf6", xs: true }), d.aspectRatio && /* @__PURE__ */ React.createElement(Chip, { label: d.aspectRatio, color: "#374151", xs: true }), d.srtNeeded && /* @__PURE__ */ React.createElement(Chip, { label: "SRT", color: "#06b6d4", xs: true }), d.captionsNeeded && /* @__PURE__ */ React.createElement(Chip, { label: "Captions", color: "#a855f7", xs: true }), allAppr && /* @__PURE__ */ React.createElement(Chip, { label: "\u2713 Approved", color: "#10b981", xs: true }), changes && /* @__PURE__ */ React.createElement(Chip, { label: "\u21A9 Changes", color: "#ef4444", xs: true })), activeR && activeR.deadline && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: RCOLOR[activeR.status], marginBottom: 2 } }, activeR.label, " due ", fmtDT(activeR.deadline), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 6 } }, /* @__PURE__ */ React.createElement(Dl, { date: activeR.deadline, inline: true }))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 1, fontSize: 14, color: "#9ca3af" } }, !editorEditable && ed && /* @__PURE__ */ React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(Av, { name: ed.name, size: 14 }), ed.name), showProject && /* @__PURE__ */ React.createElement("span", { style: { color: "#6366f1" } }, projectName), d._segments?.length > 1 && d._segments.map((seg, i) => {
+        const segEd = team?.find((m) => m.id === seg.editorId);
+        const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+        const isCurrent = (!seg.from || seg.from <= todayStr) && (!seg.to || seg.to >= todayStr);
+        return /* @__PURE__ */ React.createElement("span", { key: i, style: { fontSize: 13, color: isCurrent ? "#d1d5db" : "#838ba0", background: "#1f293780", borderRadius: 4, padding: "1px 6px", display: "flex", alignItems: "center", gap: 3 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 5, height: 5, borderRadius: "50%", background: isCurrent ? "#10b981" : "#374151", flexShrink: 0 } }), segEd?.name || "?", ": ", fmtSegRange(seg.from, seg.to));
+      }), (d.deliverableType || "Standard") === "BXTV" && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "#818cf8", background: "#6366f115", border: "1px solid #6366f140", borderRadius: 4, padding: "1px 7px", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "\u{1F4FA} BXTV", d.bxtvLink?.episodeProjectId && (() => {
+        const ep = allProjects.find((p) => p.id === d.bxtvLink.episodeProjectId);
+        return ep ? ` \xB7 ${getBXTVEpisodeName(ep) || ep.name}` : "";
+      })()), onHandoff && /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: (e) => {
+            e.stopPropagation();
+            onHandoff(d.id);
+          },
+          style: { fontSize: 12, fontWeight: 700, color: "#818cf8", background: "#6366f115", border: "1px solid #6366f140", cursor: "pointer", padding: "2px 9px", borderRadius: 4, flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" },
+          onMouseEnter: (e) => {
+            e.currentTarget.style.background = "#6366f125";
+            e.currentTarget.style.borderColor = "#6366f170";
+          },
+          onMouseLeave: (e) => {
+            e.currentTarget.style.background = "#6366f115";
+            e.currentTarget.style.borderColor = "#6366f140";
+          }
+        },
+        "\u2194 Assign Editors"
+      )), editable && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginTop: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#374151" } }, "Type:"), ["Standard", "BXTV"].map((t) => {
+        const active = (d.deliverableType || "Standard") === t;
+        return /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            key: t,
+            onClick: (e) => {
+              e.stopPropagation();
+              onUpdateDel(projectId, d.id, "deliverableType", t);
+            },
+            style: { padding: "1px 8px", borderRadius: 4, border: `1px solid ${active && t === "BXTV" ? "#6366f1" : active ? "#374151" : "#1f2937"}`, background: active && t === "BXTV" ? "#6366f115" : active ? "#1f2937" : "transparent", color: active && t === "BXTV" ? "#818cf8" : active ? "#e2e8f0" : "#374151", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" }
+          },
+          t
+        );
+      }))),
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 3 } }, (d.rounds || []).map((r, i) => /* @__PURE__ */ React.createElement("div", { key: i, title: `${r.label}: ${r.status}`, style: { width: 20, height: 20, borderRadius: "50%", background: RCOLOR[r.status] + "30", border: `2px solid ${RCOLOR[r.status]}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: RCOLOR[r.status] } }, i + 1))), editable ? /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 } }, /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, fontWeight: 700, color: "#6b7280", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.07em" } }, "Final Due"), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "date",
+          value: d.deadline || "",
+          onChange: (e) => onUpdateDel(projectId, d.id, "deadline", e.target.value),
+          style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 5, color: d.deadline ? "#e2e8f0" : "#4b5563", padding: "3px 6px", fontSize: 14, outline: "none", cursor: "pointer", colorScheme: "dark", fontFamily: "inherit" }
+        }
+      ), d.deadline && /* @__PURE__ */ React.createElement(Dl, { date: d.deadline })) : /* @__PURE__ */ React.createElement(Dl, { date: d.deadline }), editable && onDeleteDel && /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation() }, confirmDelete ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#f59e0b", fontWeight: 700 } }, "Delete?"), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => {
+            onDeleteDel(projectId, d.id);
+            setConfirmDelete(false);
+          },
+          style: { background: "#ef444420", border: "1px solid #ef444450", borderRadius: 4, color: "#ef4444", padding: "2px 8px", fontSize: 12, fontWeight: 700, cursor: "pointer" }
+        },
+        "Yes"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => setConfirmDelete(false),
+          style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 4, color: "#9ca3af", padding: "2px 8px", fontSize: 12, fontWeight: 700, cursor: "pointer" }
+        },
+        "No"
+      )) : /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => setConfirmDelete(true),
+          style: { background: "none", border: "none", color: "#374151", cursor: "pointer", fontSize: 17, padding: "2px 4px", lineHeight: 1 },
+          title: "Delete deliverable"
+        },
+        "\u{1F5D1}"
+      ))),
+      /* @__PURE__ */ React.createElement(DelFrameInfo, { frameLink: d.frameLink, framePW: d.framePW }),
+      onClick && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 17, color: isExpanded ? "#6366f1" : "#4b5563" } }, isExpanded ? "\u25B2" : "\u203A")
     );
   };
   var DelFrameInfo = ({ frameLink, framePW, small }) => {
@@ -7739,8 +7782,10 @@ Brief content: ${content}`;
         projectName: d.projectName,
         showProject,
         team,
+        allProjects: projects,
         editors,
         onUpdateDel,
+        onDeleteDel,
         onClick: (e) => openDel(d, e),
         editorEditable: true,
         readOnly: !!d._fromProduction
@@ -8881,7 +8926,9 @@ Brief content: ${content}`;
           projectName: d._project.name,
           showProject: true,
           team,
+          allProjects: projects,
           onUpdateDel,
+          onDeleteDel,
           isExpanded: isExp,
           onClick: () => setExpandedDelId(isExp ? null : d.id)
         }
@@ -9006,11 +9053,6 @@ Brief content: ${content}`;
       return { ...p, _nextDate: nextProd?.startTime || p.deadline || null };
     }).filter((p) => p._nextDate && new Date(p._nextDate) >= now2).sort((a, b) => new Date(a._nextDate) - new Date(b._nextDate));
     const fmtDate2 = (iso) => iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
-    const bxtvCode = (p) => {
-      const m = p?.bxtvMeta;
-      if (!m || !m.season && !m.episode) return "\u2014";
-      return `S${String(m.season || 0).padStart(2, "0")}E${String(m.episode || 0).padStart(2, "0")}`;
-    };
     const tiles = [
       {
         value: contentStudioProjsThisWeek.length,
@@ -9040,13 +9082,6 @@ Brief content: ${content}`;
         onClick: () => setView("workReview")
       },
       {
-        value: nextBXTV ? bxtvCode(nextBXTV) : "\u2014",
-        label: "Next BXTV",
-        sub: nextBXTV ? fmtDate2(nextBXTV._nextDate) || "No date" : "No upcoming",
-        color: "#f59e0b",
-        onClick: nextBXTV ? () => onOpenProject(nextBXTV) : null
-      },
-      {
         value: projectsDueThisWeek.length,
         label: "Projects Due",
         sub: "this week",
@@ -9055,6 +9090,13 @@ Brief content: ${content}`;
           onSetStatsFilter({ label: "Projects Due \u2014 This Week", ids: new Set(projectsDueThisWeek.map((p) => p.id)) });
           setView("projects");
         }
+      },
+      {
+        value: nextBXTV ? parseBXTVCode(nextBXTV.name) || "\u2014" : "\u2014",
+        label: "Next BXTV",
+        sub: nextBXTV ? fmtDate2(nextBXTV._nextDate) || "No date" : "No upcoming",
+        color: "#f59e0b",
+        onClick: nextBXTV ? () => onOpenProject(nextBXTV) : null
       },
       {
         value: upcomingBigEvents.length,
@@ -9089,30 +9131,12 @@ Brief content: ${content}`;
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#4b5563" } }, t.sub)
     ))));
   };
-  var calcHMUWindow = (st) => {
-    if (!st) return null;
-    return { start: calcCrewCall(st), end: st };
-  };
   var fmtCrewCall = (iso) => {
     if (!iso) return "";
     return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
   };
   var locStr = (loc) => typeof loc === "string" ? loc : "";
   var screenContentStr = (v) => Array.isArray(v) ? v.join(", ") : typeof v === "string" ? v : "";
-  var makeHMUBooking = (parent, station) => {
-    const w = calcHMUWindow(parent.startTime);
-    if (!w) return null;
-    return { id: uid(), title: `${parent.title} \u2014 HMU Prep`, projectId: parent.projectId || null, parentBookingId: parent.id, bookingStatus: "Tentative", productionType: parent.productionType || "Content Filming", location: station, startTime: w.start, endTime: w.end, crewCallTime: null, notes: `Auto-created: HMU prep for "${parent.title}".`, equipmentIds: [], confirmations: [], crewInternal: [], crewExternal: [{ id: uid(), role: "Hair & Makeup Artist", name: "", company: "", callTime: fmtCrewCall(w.start) }] };
-  };
-  var detectConflicts = (location, startTime, endTime, allBookings, excludeId = null) => {
-    if (!location || !startTime || !endTime) return [];
-    const st = new Date(startTime).getTime(), et = new Date(endTime).getTime();
-    return allBookings.filter((b) => {
-      if (b.id === excludeId || b.location !== location || ["Cancelled", "Completed"].includes(b.bookingStatus) || !b.startTime || !b.endTime) return false;
-      const bst = new Date(b.startTime).getTime(), bet = new Date(b.endTime).getTime();
-      return !(bet <= st || bst >= et);
-    });
-  };
   var STUDIO_BOOKINGS_SEED = [
     { id: 9001, title: "Podcast Recording \u2014 Leadership Series", projectId: null, parentBookingId: null, bookingStatus: "Confirmed", productionType: "Podcast", location: "Studio A", startTime: "2026-06-09T09:00", endTime: "2026-06-09T13:00", crewCallTime: "2026-06-09T08:00", notes: "4-episode block. Remote guests via Zoom.", equipmentIds: ["eq-015", "eq-017", "eq-019", "eq-021"], confirmations: [{ crewId: 1, crewName: "Jay Gillespie", role: "Producer", status: "Confirmed", respondedAt: "2026-06-06T10:00" }, { crewId: 22, crewName: "Samuel Stonefield", role: "Camera Op", status: "Pending", respondedAt: null }], crewInternal: [{ id: 9002, role: "Producer", memberId: 1, callTime: "8:00 AM" }], crewExternal: [{ id: 9003, role: "Camera Op", name: "Samuel Stonefield", company: "Freelance", callTime: "8:00 AM" }] },
     { id: 9004, title: "Internal All-Hands Livestream", projectId: null, parentBookingId: null, bookingStatus: "Tentative", productionType: "Live Broadcast", location: "BEC", startTime: "2026-06-12T10:00", endTime: "2026-06-12T12:00", crewCallTime: "2026-06-12T09:00", notes: "Multi-camera. Simulive to Zoom.", equipmentIds: ["eq-026", "eq-027", "eq-016"], confirmations: [{ crewId: 26, crewName: "Alex Chen", role: "Live Director", status: "Pending", respondedAt: null }], crewInternal: [{ id: 9005, role: "Live Director", memberId: 26, callTime: "9:00 AM" }, { id: 9005.2, role: "Technical Director", memberId: 28, callTime: "9:00 AM" }], crewExternal: [] },
@@ -11773,7 +11797,6 @@ ${parsed.conditions}` : weather;
     const [newDelTitle, setNewDelTitle] = (0, import_react.useState)("");
     const [gearOpen, setGearOpen] = (0, import_react.useState)(false);
     const [gearSearch, setGearSearch] = (0, import_react.useState)("");
-    const [hmuPrompt, setHmuPrompt] = (0, import_react.useState)({ s1: false, s2: false, dismissed: false });
     const [confirmDialog, setConfirmDialog] = (0, import_react.useState)(null);
     const [showSavePreset, setShowSavePreset] = (0, import_react.useState)(false);
     const [showCallSheet, setShowCallSheet] = (0, import_react.useState)(false);
@@ -11858,13 +11881,6 @@ ${parsed.conditions}` : weather;
       }
       return { call: fmtIsoT(production.startTime), wrap: fmtIsoT(production.endTime) };
     };
-    const hmuWindow = hasShoot && production.startTime ? calcHMUWindow(production.startTime) : null;
-    const allBookings = studioBookings || [];
-    const s1Conflicts = hmuWindow ? detectConflicts("HMU Station 1", hmuWindow.start, hmuWindow.end, allBookings) : [];
-    const s2Conflicts = hmuWindow ? detectConflicts("HMU Station 2", hmuWindow.start, hmuWindow.end, allBookings) : [];
-    const showHMUSuggest = hasShoot && hmuWindow && LOCATION_META[production.location]?.suggestHMU && !hmuPrompt.dismissed;
-    const alreadyHMU1 = allBookings.some((b) => b.parentBookingId === production.id && b.location === "HMU Station 1");
-    const alreadyHMU2 = allBookings.some((b) => b.parentBookingId === production.id && b.location === "HMU Station 2");
     const crewCallDisplay = production.startTime ? fmtCrewCall(production.startTime) : "\u2014";
     const internalEq = (production.equipmentIds || []).map((id) => EQUIPMENT.find((e) => e.id === id)).filter(Boolean);
     const addExtGear = () => upd("externalGear", [...production.externalGear || [], { id: uid(), name: "", quantity: 1, vendor: "", status: "Requested", isExternal: true }]);
@@ -13893,7 +13909,6 @@ ${parsed.conditions}` : weather;
     const [typeFilter, setTypeFilter] = (0, import_react.useState)("All");
     const [statFilter, setStatFilter] = (0, import_react.useState)("All");
     const [expanded, setExpanded] = (0, import_react.useState)(null);
-    const [hmuPrompt, setHmuPrompt] = (0, import_react.useState)({});
     const [requestNotes, setRequestNotes] = (0, import_react.useState)({});
     const [denyOpen, setDenyOpen] = (0, import_react.useState)(null);
     const now2 = /* @__PURE__ */ new Date();
@@ -13927,13 +13942,6 @@ ${parsed.conditions}` : weather;
     const applyF = (list) => list.filter((b) => (locFilter === "All" || b.location === locFilter) && (typeFilter === "All" || b.productionType === typeFilter) && (statFilter === "All" || b.bookingStatus === statFilter));
     const upcoming = applyF(allBookings.filter((b) => !b.parentBookingId || true).filter((b) => new Date(b.endTime || b.startTime) >= now2 && b.bookingStatus !== "Tentative"));
     const past = applyF(allBookings.filter((b) => new Date(b.endTime || b.startTime) < now2));
-    const handleHMUAccept = (parent, station) => {
-      if (!allBookings.some((b) => b.parentBookingId === parent.id && b.location === station)) {
-        const hb = makeHMUBooking(parent, station);
-        if (hb) onUpdateStudioBookings((prev) => [...prev, hb]);
-      }
-      setHmuPrompt((p) => ({ ...p, [parent.id]: { ...p[parent.id], [station]: true } }));
-    };
     const selS = { background: "#111827", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "6px 10px", fontSize: 16, outline: "none" };
     const BookingRow = ({ b }) => {
       const isExp = expanded === b.id;
@@ -13950,9 +13958,10 @@ ${parsed.conditions}` : weather;
       const hmuUnassigned = isHMU && (b.crewExternal || []).some((c) => c.role === "Hair & Makeup Artist" && !c.name);
       const pendingConf = (b.confirmations || []).filter((c) => c.status === "Pending").length;
       const eqList = (b.equipmentIds || []).map((id) => EQUIPMENT.find((e) => e.id === id)?.name || id).filter(Boolean);
+      const isChildBooking = !!b.parentBookingId;
       const linkedChildren = allBookings.filter((x) => x.parentBookingId === b.id);
-      const isParentHMU = !isHMU && LOCATION_META[b.location]?.suggestHMU && b.startTime && !hmuPrompt[b.id]?.dismissed;
-      return /* @__PURE__ */ React.createElement("div", { style: { border: `1px solid ${isExp ? "#6366f1" : isHMU ? "#8b5cf630" : "#1f2937"}`, borderRadius: 10, overflow: "hidden", marginBottom: 6, marginLeft: isHMU ? 24 : 0 } }, /* @__PURE__ */ React.createElement("div", { onClick: () => setExpanded(isExp ? null : b.id), style: { display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", background: isExp ? "#1a2035" : isHMU ? "#120d1f" : "#111827", cursor: "pointer" } }, isHMU && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, flexShrink: 0 } }, "\u{1F484}"), /* @__PURE__ */ React.createElement("div", { style: { width: 84, flexShrink: 0, textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, fmtDate(b.startTime)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af" } }, fmtTime(b.startTime), b.endTime ? " \u2192 " + fmtTime(b.endTime) : "")), /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0, background: "#1f2937", borderRadius: 6, padding: "3px 8px", fontSize: 13, fontWeight: 700, color: "#9ca3af", fontFamily: "'Barlow Condensed',sans-serif" } }, "\u{1F4CD} ", b.location || "TBD"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, b.title), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, fontSize: 13, color: "#9ca3af", marginTop: 1, flexWrap: "wrap" } }, b.crewCallTime && !isHMU && /* @__PURE__ */ React.createElement("span", null, "\u{1F4DE} ", fmtCrewCall(b.crewCallTime)), linkedProj && /* @__PURE__ */ React.createElement("span", { style: { color: "#6366f1" } }, "\u2197 ", linkedProj.name), linkedChildren.length > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "#8b5cf6" } }, "\u{1F484} ", linkedChildren.length, " HMU"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, flexShrink: 0, alignItems: "center" } }, /* @__PURE__ */ React.createElement(Chip, { label: b.bookingStatus, color: bkC, xs: true }), !isHMU && /* @__PURE__ */ React.createElement(Chip, { label: b.productionType, color: tyC, xs: true }), hmuUnassigned && /* @__PURE__ */ React.createElement(Chip, { label: "\u{1F484} Unassigned", color: "#ef4444", xs: true }), pendingConf > 0 && /* @__PURE__ */ React.createElement(Chip, { label: `${pendingConf} pending`, color: "#f59e0b", xs: true }), linkedProj && onOpenProject && /* @__PURE__ */ React.createElement(
+      const auxLocations = [...new Set(linkedChildren.map((c) => c.location).filter(Boolean))];
+      return /* @__PURE__ */ React.createElement("div", { style: { border: `1px solid ${isExp ? "#6366f1" : isChildBooking ? "#8b5cf630" : "#1f2937"}`, borderRadius: 10, overflow: "hidden", marginBottom: 6, marginLeft: isChildBooking ? 24 : 0 } }, /* @__PURE__ */ React.createElement("div", { onClick: () => setExpanded(isExp ? null : b.id), style: { display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", background: isExp ? "#1a2035" : isChildBooking ? "#120d1f" : "#111827", cursor: "pointer" } }, isHMU && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, flexShrink: 0 } }, "\u{1F484}"), /* @__PURE__ */ React.createElement("div", { style: { width: 84, flexShrink: 0, textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, fmtDate(b.startTime)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af" } }, fmtTime(b.startTime), b.endTime ? " \u2192 " + fmtTime(b.endTime) : "")), /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0, background: "#1f2937", borderRadius: 6, padding: "3px 8px", fontSize: 13, fontWeight: 700, color: "#9ca3af", fontFamily: "'Barlow Condensed',sans-serif" } }, "\u{1F4CD} ", b.location || "TBD"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, b.title), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, fontSize: 13, color: "#9ca3af", marginTop: 1, flexWrap: "wrap" } }, b.crewCallTime && !isChildBooking && /* @__PURE__ */ React.createElement("span", null, "\u{1F4DE} ", fmtCrewCall(b.crewCallTime)), linkedProj && /* @__PURE__ */ React.createElement("span", { style: { color: "#6366f1" } }, "\u2197 ", linkedProj.name), auxLocations.length > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "#8b5cf6" } }, "+ ", auxLocations.join(", ")))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, flexShrink: 0, alignItems: "center" } }, /* @__PURE__ */ React.createElement(Chip, { label: b.bookingStatus, color: bkC, xs: true }), !isChildBooking && /* @__PURE__ */ React.createElement(Chip, { label: b.productionType, color: tyC, xs: true }), hmuUnassigned && /* @__PURE__ */ React.createElement(Chip, { label: "\u{1F484} Unassigned", color: "#ef4444", xs: true }), pendingConf > 0 && /* @__PURE__ */ React.createElement(Chip, { label: `${pendingConf} pending`, color: "#f59e0b", xs: true }), linkedProj && onOpenProject && /* @__PURE__ */ React.createElement(
         "button",
         {
           onClick: (e) => {
@@ -14010,19 +14019,7 @@ ${parsed.conditions}` : weather;
           onClick: (ev) => ev.stopPropagation(),
           style: { background: "#0a0f1a", border: "1px solid #06b6d430", borderRadius: 6, color: "#06b6d4", padding: "5px 10px", fontSize: 14, outline: "none", colorScheme: "dark" }
         }
-      ), !(liveProd?.ingest?.datetime || b.ingest?.datetime) && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#374151" } }, "Not set \u2014 defaults to wrap time"))), b.notes && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", background: "#111827", borderRadius: 7, padding: "8px 12px" } }, "\u{1F4DD} ", b.notes), hmuUnassigned && /* @__PURE__ */ React.createElement("div", { style: { background: "#ef444410", border: "1px solid #ef444430", borderRadius: 8, padding: "8px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#ef4444" } }, "\u26A0 Hair & Makeup Artist not yet assigned")), isParentHMU && (() => {
-        const w = calcHMUWindow(b.startTime);
-        if (!w) return null;
-        const s1F = detectConflicts("HMU Station 1", w.start, w.end, allBookings, b.id).length === 0;
-        const s2F = detectConflicts("HMU Station 2", w.start, w.end, allBookings, b.id).length === 0;
-        const alreadyS1 = allBookings.some((x) => x.parentBookingId === b.id && x.location === "HMU Station 1");
-        const alreadyS2 = allBookings.some((x) => x.parentBookingId === b.id && x.location === "HMU Station 2");
-        if (!s1F && !s2F || alreadyS1 && alreadyS2) return null;
-        return /* @__PURE__ */ React.createElement("div", { style: { background: "#8b5cf610", border: "1px solid #8b5cf630", borderRadius: 9, padding: "12px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 22 } }, "\u{1F484}"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 16, color: "#a78bfa", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" } }, "Reserve Hair & Makeup?"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af" } }, "HMU: ", /* @__PURE__ */ React.createElement("b", { style: { color: "#e2e8f0" } }, fmtCrewCall(w.start), " \u2192 ", fmtCrewCall(w.end))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } }, s1F && !alreadyS1 && /* @__PURE__ */ React.createElement("button", { onClick: () => handleHMUAccept(b, "HMU Station 1"), style: { background: "#10b98120", border: "1px solid #10b98140", borderRadius: 7, color: "#10b981", padding: "5px 12px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "\u2713 Station 1"), s2F && !alreadyS2 && /* @__PURE__ */ React.createElement("button", { onClick: () => handleHMUAccept(b, "HMU Station 2"), style: { background: "#10b98120", border: "1px solid #10b98140", borderRadius: 7, color: "#10b981", padding: "5px 12px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "\u2713 Station 2"), s1F && s2F && !alreadyS1 && !alreadyS2 && /* @__PURE__ */ React.createElement("button", { onClick: () => {
-          handleHMUAccept(b, "HMU Station 1");
-          handleHMUAccept(b, "HMU Station 2");
-        }, style: { background: "#6366f120", border: "1px solid #6366f140", borderRadius: 7, color: "#818cf8", padding: "5px 12px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "\u2713 Both"), /* @__PURE__ */ React.createElement("button", { onClick: () => setHmuPrompt((p) => ({ ...p, [b.id]: { ...p[b.id], dismissed: true } })), style: { background: "transparent", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "5px 12px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", marginLeft: "auto" } }, "Skip")));
-      })(), linkedProj && onOpenProject && /* @__PURE__ */ React.createElement(
+      ), !(liveProd?.ingest?.datetime || b.ingest?.datetime) && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#374151" } }, "Not set \u2014 defaults to wrap time"))), b.notes && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", background: "#111827", borderRadius: 7, padding: "8px 12px" } }, "\u{1F4DD} ", b.notes), hmuUnassigned && /* @__PURE__ */ React.createElement("div", { style: { background: "#ef444410", border: "1px solid #ef444430", borderRadius: 8, padding: "8px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#ef4444" } }, "\u26A0 Hair & Makeup Artist not yet assigned")), linkedProj && onOpenProject && /* @__PURE__ */ React.createElement(
         "button",
         {
           onClick: () => onOpenProject(linkedProj, "production"),
@@ -15045,36 +15042,143 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       }
     )));
   };
-  var ProjectCalendar = ({ project }) => {
+  var PROJ_CAL_TYPE_META = {
+    production: { icon: "\u{1F3AC}", label: "Productions", color: "#6366f1" },
+    poststart: { icon: "\u{1F680}", label: "Post Start", color: "#a855f7" },
+    round: { icon: "\u21BA", label: "Review Rounds", color: "#eab308" },
+    deliverable: { icon: "\u{1F4CB}", label: "Final Delivery", color: "#f59e0b" },
+    ingest: { icon: "\u{1F4BE}", label: "Ingest", color: "#06b6d4" }
+  };
+  var ProjectCalendar = ({ project, onUpdateProject, onUpdateDel }) => {
     const today = /* @__PURE__ */ new Date();
     const [calY, setCalY] = (0, import_react.useState)(today.getFullYear());
     const [calM, setCalM] = (0, import_react.useState)(today.getMonth());
     const todayStr = today.toISOString().slice(0, 10);
     const pad = (n) => String(n).padStart(2, "0");
+    const [filters, setFilters] = (0, import_react.useState)({ production: true, poststart: true, round: true, deliverable: true, ingest: true });
+    const [dragId, setDragId] = (0, import_react.useState)(null);
+    const [editEvent, setEditEvent] = (0, import_react.useState)(null);
+    const canEdit = !!(onUpdateProject && onUpdateDel);
     const allEvents = (0, import_react.useMemo)(() => {
       const evs = [];
+      if (project.postStartDate) {
+        evs.push({
+          id: "poststart",
+          type: "poststart",
+          date: project.postStartDate.slice(0, 10),
+          time: project.postStartDate.slice(11, 16) || "",
+          hasTime: true,
+          label: "Post Start Date",
+          status: "",
+          color: PROJ_CAL_TYPE_META.poststart.color
+        });
+      }
       (project.productions || []).forEach((p) => {
-        if (p.startTime) evs.push({ date: p.startTime.slice(0, 10), type: "production", label: p.title || p.type || "Production", status: p.status, color: PCOLOR[p.status] || "#6366f1" });
+        if (!p.startTime) return;
+        evs.push({
+          id: `prod-${p.id}`,
+          type: "production",
+          date: p.startTime.slice(0, 10),
+          time: p.startTime.slice(11, 16) || "",
+          hasTime: true,
+          label: p.title || p.type || "Production",
+          status: p.status,
+          color: PCOLOR[p.status] || PROJ_CAL_TYPE_META.production.color,
+          ref: { kind: "production", id: p.id }
+        });
       });
       (project.deliverables || []).forEach((d) => {
-        if (d.deadline) evs.push({ date: d.deadline, type: "deliverable", label: d.title, status: d.status, color: DCOLOR[d.status] || "#6b7280" });
+        if (d.deadline) evs.push({
+          id: `del-${d.id}`,
+          type: "deliverable",
+          date: d.deadline.slice(0, 10),
+          hasTime: false,
+          label: d.title,
+          status: d.status,
+          color: DCOLOR[d.status] || PROJ_CAL_TYPE_META.deliverable.color,
+          ref: { kind: "deliverable", id: d.id }
+        });
+        (d.rounds || []).forEach((r, ri) => {
+          if (!r.deadline) return;
+          evs.push({
+            id: `round-${d.id}-${ri}`,
+            type: "round",
+            date: r.deadline.slice(0, 10),
+            hasTime: false,
+            label: `${d.title} \xB7 ${r.label}`,
+            status: r.status,
+            color: RCOLOR[r.status] || PROJ_CAL_TYPE_META.round.color,
+            ref: { kind: "round", delId: d.id, roundIdx: ri }
+          });
+        });
       });
       (project.ingestDates || []).forEach((ing) => {
-        if (ing.date) evs.push({ date: ing.date, type: "ingest", label: ing.label || "Media Ingest", status: "Ingest", color: "#06b6d4" });
+        if (!ing.datetime) return;
+        evs.push({
+          id: `ingest-${ing.id}`,
+          type: "ingest",
+          date: ing.datetime.slice(0, 10),
+          time: ing.datetime.slice(11, 16) || "",
+          hasTime: true,
+          label: ing.notes || "Media Ingest",
+          status: "Ingest",
+          color: PROJ_CAL_TYPE_META.ingest.color,
+          ref: { kind: "ingest", id: ing.id }
+        });
       });
       return evs;
     }, [project]);
+    const visibleEvents = (0, import_react.useMemo)(() => allEvents.filter((ev) => filters[ev.type]), [allEvents, filters]);
     const byDay = (0, import_react.useMemo)(() => {
       const m = {};
-      allEvents.forEach((ev) => {
+      visibleEvents.forEach((ev) => {
         if (!m[ev.date]) m[ev.date] = [];
         m[ev.date].push(ev);
       });
       return m;
-    }, [allEvents]);
+    }, [visibleEvents]);
     const daysInMonth = new Date(calY, calM + 1, 0).getDate();
     const firstDow = new Date(calY, calM, 1).getDay();
-    const typeIcon = { production: "\u{1F3AC}", deliverable: "\u{1F4CB}", ingest: "\u{1F4BE}" };
+    const applyDateChange = (ev, newDate, newTime) => {
+      if (!canEdit || !ev || !newDate) return;
+      if (ev.type === "poststart") {
+        const time = newTime || ev.time || "09:00";
+        onUpdateProject(project.id, "postStartDate", `${newDate}T${time}`);
+        return;
+      }
+      const ref = ev.ref;
+      if (!ref) return;
+      if (ref.kind === "production") {
+        const prod = (project.productions || []).find((p) => p.id === ref.id);
+        if (!prod) return;
+        const durMin = prod.endTime ? (new Date(prod.endTime) - new Date(prod.startTime)) / 6e4 : null;
+        const time = newTime || (prod.startTime || "").slice(11, 16) || "09:00";
+        const newStart = `${newDate}T${time}`;
+        const newEnd = durMin != null ? new Date(new Date(newStart).getTime() + durMin * 6e4).toISOString().slice(0, 16) : prod.endTime;
+        const newProds = (project.productions || []).map((p) => p.id === ref.id ? { ...p, startTime: newStart, endTime: newEnd } : p);
+        onUpdateProject(project.id, "productions", newProds);
+      } else if (ref.kind === "deliverable") {
+        onUpdateDel(project.id, ref.id, "deadline", newDate);
+      } else if (ref.kind === "round") {
+        const del = (project.deliverables || []).find((d) => d.id === ref.delId);
+        if (!del) return;
+        const newRounds = (del.rounds || []).map((r, i) => i === ref.roundIdx ? { ...r, deadline: newDate } : r);
+        onUpdateDel(project.id, del.id, "rounds", newRounds);
+      } else if (ref.kind === "ingest") {
+        const ing = (project.ingestDates || []).find((i) => i.id === ref.id);
+        if (!ing) return;
+        const time = newTime || (ing.datetime || "").slice(11, 16) || "09:00";
+        const newIngests = (project.ingestDates || []).map((i) => i.id === ref.id ? { ...i, datetime: `${newDate}T${time}` } : i);
+        onUpdateProject(project.id, "ingestDates", newIngests);
+      }
+    };
+    const handleDrop = (e, ds) => {
+      e.preventDefault();
+      const ev = allEvents.find((x) => x.id === dragId);
+      setDragId(null);
+      if (!ev || ev.date === ds) return;
+      applyDateChange(ev, ds);
+    };
     return /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 20px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -15099,33 +15203,113 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         style: { background: "#1f2937", border: "none", borderRadius: 6, color: "#e2e8f0", width: 30, height: 30, cursor: "pointer", fontSize: 19 }
       },
       "\u203A"
-    )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 14, marginBottom: 14, flexWrap: "wrap" } }, [{ type: "production", label: "Productions", color: "#6366f1" }, { type: "deliverable", label: "Deliverables", color: "#f59e0b" }, { type: "ingest", label: "Ingest Dates", color: "#06b6d4" }].map((l) => /* @__PURE__ */ React.createElement("div", { key: l.type, style: { display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "#9ca3af" } }, /* @__PURE__ */ React.createElement("span", { style: { width: 10, height: 10, borderRadius: 3, background: l.color, flexShrink: 0 } }), l.label))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gap: 2, marginBottom: 2 } }, ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => /* @__PURE__ */ React.createElement("div", { key: d, style: { textAlign: "center", fontSize: 13, fontWeight: 700, color: "#838ba0", padding: "3px 0", fontFamily: "'Barlow Condensed',sans-serif" } }, d))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gap: 2 } }, Array.from({ length: firstDow }).map((_, i) => /* @__PURE__ */ React.createElement("div", { key: `e${i}` })), Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
+    )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" } }, Object.entries(PROJ_CAL_TYPE_META).map(([type, meta]) => {
+      const on = filters[type];
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: type,
+          onClick: () => setFilters((f) => ({ ...f, [type]: !f[type] })),
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+            fontSize: 13,
+            fontWeight: 700,
+            color: on ? meta.color : "#4b5563",
+            background: on ? meta.color + "15" : "#111827",
+            border: `1px solid ${on ? meta.color + "50" : "#1f2937"}`,
+            borderRadius: 20,
+            padding: "4px 10px",
+            cursor: "pointer",
+            fontFamily: "'Barlow Condensed',sans-serif",
+            textTransform: "uppercase",
+            letterSpacing: "0.04em"
+          }
+        },
+        /* @__PURE__ */ React.createElement("span", { style: { width: 9, height: 9, borderRadius: 3, background: on ? meta.color : "#374151", flexShrink: 0 } }),
+        meta.icon,
+        " ",
+        meta.label
+      );
+    }), canEdit && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#4b5563", marginLeft: "auto", alignSelf: "center" } }, "Drag a date to reschedule \xB7 click to edit time")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gap: 2, marginBottom: 2 } }, ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => /* @__PURE__ */ React.createElement("div", { key: d, style: { textAlign: "center", fontSize: 13, fontWeight: 700, color: "#838ba0", padding: "3px 0", fontFamily: "'Barlow Condensed',sans-serif" } }, d))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gap: 2 } }, Array.from({ length: firstDow }).map((_, i) => /* @__PURE__ */ React.createElement("div", { key: `e${i}` })), Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
       const ds = `${calY}-${pad(calM + 1)}-${pad(day)}`;
       const evs = byDay[ds] || [];
       const isToday = ds === todayStr;
-      return /* @__PURE__ */ React.createElement("div", { key: day, style: { background: isToday ? "#6366f115" : "#111827", border: `1px solid ${isToday ? "#6366f1" : "#1f2937"}`, borderRadius: 6, padding: "4px 4px 6px", minHeight: 64, display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: isToday ? 800 : 400, color: isToday ? "#818cf8" : "#6b7280", textAlign: "right", lineHeight: 1.2, marginBottom: 2 } }, day), evs.slice(0, 3).map((ev, i) => /* @__PURE__ */ React.createElement(
+      return /* @__PURE__ */ React.createElement(
         "div",
         {
-          key: i,
-          title: `${ev.label} \u2014 ${ev.status}`,
-          style: { background: ev.color + "25", borderLeft: `2px solid ${ev.color}`, borderRadius: "0 3px 3px 0", padding: "1px 4px", fontSize: 11, color: ev.color, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Barlow Condensed',sans-serif" }
+          key: day,
+          onDragOver: canEdit ? (e) => e.preventDefault() : void 0,
+          onDrop: canEdit ? (e) => handleDrop(e, ds) : void 0,
+          style: { background: isToday ? "#6366f115" : "#111827", border: `1px solid ${isToday ? "#6366f1" : "#1f2937"}`, borderRadius: 6, padding: "4px 4px 6px", minHeight: 72, display: "flex", flexDirection: "column", gap: 2 }
         },
-        typeIcon[ev.type],
-        " ",
-        ev.label
-      )), evs.length > 3 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#838ba0", textAlign: "center" } }, "+", evs.length - 3, " more"));
-    })));
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: isToday ? 800 : 400, color: isToday ? "#818cf8" : "#6b7280", textAlign: "right", lineHeight: 1.2, marginBottom: 2 } }, day),
+        evs.slice(0, 4).map((ev) => {
+          const meta = PROJ_CAL_TYPE_META[ev.type];
+          return /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              key: ev.id,
+              draggable: canEdit && !!ev.ref || ev.type === "poststart",
+              onDragStart: canEdit ? (e) => {
+                setDragId(ev.id);
+                e.dataTransfer.effectAllowed = "move";
+              } : void 0,
+              onDragEnd: () => setDragId(null),
+              onClick: canEdit ? () => setEditEvent({ id: ev.id, label: ev.label, date: ev.date, time: ev.time || "", hasTime: ev.hasTime }) : void 0,
+              title: `${ev.label}${ev.status ? " \u2014 " + ev.status : ""}${ev.time ? " \xB7 " + ev.time : ""}`,
+              style: { background: ev.color + "25", borderLeft: `2px solid ${ev.color}`, borderRadius: "0 3px 3px 0", padding: "1px 4px", fontSize: 11, color: ev.color, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Barlow Condensed',sans-serif", cursor: canEdit ? "grab" : "default", opacity: dragId === ev.id ? 0.4 : 1 }
+            },
+            meta.icon,
+            " ",
+            ev.label
+          );
+        }),
+        evs.length > 4 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#838ba0", textAlign: "center" } }, "+", evs.length - 4, " more")
+      );
+    })), editEvent && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 900, display: "flex", alignItems: "center", justifyContent: "center" }, onClick: () => setEditEvent(null) }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 10, padding: 20, width: 280 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#f1f5f9", marginBottom: 14, fontFamily: "'Barlow Condensed',sans-serif" } }, editEvent.label), /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, color: "#8e97a6", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 } }, "Date"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "date",
+        value: editEvent.date,
+        onChange: (e) => setEditEvent({ ...editEvent, date: e.target.value }),
+        style: { width: "100%", background: "#0a0f1a", border: "1px solid #374151", borderRadius: 6, color: "#e2e8f0", padding: "7px 10px", fontSize: 14, marginBottom: 12, colorScheme: "dark" }
+      }
+    ), editEvent.hasTime && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, color: "#8e97a6", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 } }, "Time"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "time",
+        value: editEvent.time,
+        onChange: (e) => setEditEvent({ ...editEvent, time: e.target.value }),
+        style: { width: "100%", background: "#0a0f1a", border: "1px solid #374151", borderRadius: 6, color: "#e2e8f0", padding: "7px 10px", fontSize: 14, marginBottom: 12, colorScheme: "dark" }
+      }
+    )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => {
+          const ev = allEvents.find((x) => x.id === editEvent.id);
+          applyDateChange(ev, editEvent.date, editEvent.time);
+          setEditEvent(null);
+        },
+        style: { flex: 1, background: "#6366f1", border: "none", borderRadius: 6, color: "#fff", padding: "8px 0", fontSize: 14, fontWeight: 700, cursor: "pointer" }
+      },
+      "Save"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setEditEvent(null),
+        style: { flex: 1, background: "#1f2937", border: "none", borderRadius: 6, color: "#9ca3af", padding: "8px 0", fontSize: 14, fontWeight: 700, cursor: "pointer" }
+      },
+      "Cancel"
+    )))));
   };
   var isBXTVProject = (p) => (p?.workstream || "").toUpperCase() === "BXTV";
-  var getBXTVEpisodeName = (p) => {
-    if (!p) return "";
-    const m = p.bxtvMeta;
-    if (!m) return p.name || "";
-    const s = String(m.season || "").padStart(2, "0");
-    const e = String(m.episode || "").padStart(2, "0");
-    const code = `S${s}E${e}`;
-    return m.title ? `${code}: ${m.title}` : p.name || code;
+  var parseBXTVCode = (name) => {
+    const m = /S(\d{1,2})E(\d{1,2})/i.exec(name || "");
+    return m ? `S${m[1].padStart(2, "0")}E${m[2].padStart(2, "0")}` : null;
   };
+  var getBXTVEpisodeName = (p) => p ? parseBXTVCode(p.name) || p.name || "" : "";
   var getBXTVProjects = (projects) => projects.filter(isBXTVProject);
   var getBXTVLinkedDels = (episodeProject, allProjects) => (episodeProject.bxtvRefs || []).reduce((acc, ref) => {
     const src = allProjects.find((p) => String(p.id) === String(ref.sourceProjectId));
@@ -15153,13 +15337,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const oldRefs = (oldEpisode.bxtvRefs || []).filter((r) => !(r.sourceProjectId === sourceProject.id && r.delId === del.id));
     onUpdateProject(oldEpisode.id, "bxtvRefs", oldRefs);
     linkDelToBXTV(sourceProject, del, newEpisode, bxtvEditorId, onUpdateProject);
-  };
-  var BXTVMetaPanel = ({ project, onUpdateProject }) => {
-    const m = project.bxtvMeta || {};
-    const upd = (f, v) => onUpdateProject(project.id, "bxtvMeta", { ...m, [f]: v });
-    const inp = { background: "#0a0f1a", border: "1px solid #374151", borderRadius: 7, color: "#e2e8f0", padding: "8px 10px", fontSize: 16, outline: "none", width: "100%", fontFamily: "'DM Sans',sans-serif", colorScheme: "dark" };
-    const lbl = { fontSize: 13, fontWeight: 700, color: "#838ba0", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 4, display: "block" };
-    return /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #6366f140", borderRadius: 10, padding: "14px 16px", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#818cf8", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.08em", marginBottom: 12 } }, "\u{1F4FA} BXTV Episode"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 2fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Season"), /* @__PURE__ */ React.createElement("input", { style: inp, type: "number", min: "1", value: m.season || "", onChange: (e) => upd("season", +e.target.value), placeholder: "26" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Episode"), /* @__PURE__ */ React.createElement("input", { style: inp, type: "number", min: "1", value: m.episode || "", onChange: (e) => upd("episode", +e.target.value), placeholder: "04" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Air Date"), /* @__PURE__ */ React.createElement("input", { style: { ...inp, colorScheme: "dark" }, type: "date", value: m.airDate || "", onChange: (e) => upd("airDate", e.target.value) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Episode Title"), /* @__PURE__ */ React.createElement("input", { style: inp, value: m.title || "", onChange: (e) => upd("title", e.target.value), placeholder: "e.g. The Big Game Recap" }))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6, fontSize: 14, color: "#6366f1", fontWeight: 600 } }, getBXTVEpisodeName(project)));
   };
   var BXTVLinkSection = ({ del, sourceProject, allProjects, team, onUpdateProject }) => {
     const bxtvEps = getBXTVProjects(allProjects);
@@ -18179,7 +18356,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           });
         }
       }
-    ), view === "projects" && /* @__PURE__ */ React.createElement(ProjectsView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, statsFilter, onClearStatsFilter: () => setStatsFilter(null), navSidebarWidth, navSidebarHandle, projectsLoaded }), view === "studio" && /* @__PURE__ */ React.createElement(StudioTab, { projects: allProjects, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, team: allTeam, onOpenProject: openProject, talentRoster, onUpdateProject: updateProject, mediaCards, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "kanban" && kanbanMode === "status" && /* @__PURE__ */ React.createElement(KanbanStatus, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "kanban" && kanbanMode === "editor" && /* @__PURE__ */ React.createElement(KanbanEditor, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "calendar" && /* @__PURE__ */ React.createElement(CalendarView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "deliverables" && /* @__PURE__ */ React.createElement(DeliverablesTab, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "ingest" && /* @__PURE__ */ React.createElement(IngestView, { projects: allProjects, team: allTeam, onUpdateProject: updateProject, onAddDel: addDel, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "resources" && /* @__PURE__ */ React.createElement(ResourceView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, resourceConfig, onUpdateProject: updateProject, unavailability, onUpdateDel: updateDel }), view === "myview" && /* @__PURE__ */ React.createElement(MyView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, showToast, nudges, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, unavailability, onAddUnavailability: addUnavailability, onDeleteUnavailability: deleteUnavailability, currentMember, isAdmin, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "admin" && /* @__PURE__ */ React.createElement(
+    ), view === "projects" && /* @__PURE__ */ React.createElement(ProjectsView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, statsFilter, onClearStatsFilter: () => setStatsFilter(null), navSidebarWidth, navSidebarHandle, projectsLoaded }), view === "studio" && /* @__PURE__ */ React.createElement(StudioTab, { projects: allProjects, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, team: allTeam, onOpenProject: openProject, talentRoster, onUpdateProject: updateProject, mediaCards, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "kanban" && kanbanMode === "status" && /* @__PURE__ */ React.createElement(KanbanStatus, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "kanban" && kanbanMode === "editor" && /* @__PURE__ */ React.createElement(KanbanEditor, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "calendar" && /* @__PURE__ */ React.createElement(CalendarView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, unavailability, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "deliverables" && /* @__PURE__ */ React.createElement(DeliverablesTab, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "ingest" && /* @__PURE__ */ React.createElement(IngestView, { projects: allProjects, team: allTeam, onUpdateProject: updateProject, onAddDel: addDel, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "resources" && /* @__PURE__ */ React.createElement(ResourceView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, resourceConfig, onUpdateProject: updateProject, unavailability, onUpdateDel: updateDel }), view === "myview" && /* @__PURE__ */ React.createElement(MyView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, showToast, nudges, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, unavailability, onAddUnavailability: addUnavailability, onDeleteUnavailability: deleteUnavailability, currentMember, isAdmin, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "admin" && /* @__PURE__ */ React.createElement(
       AdminView,
       {
         team: teamRoster,

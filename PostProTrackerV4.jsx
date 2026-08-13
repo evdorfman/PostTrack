@@ -2931,19 +2931,31 @@ const BookingBlock = ({b, locIdx, expanded, draggingLocIdx, otherBookings, hToPe
   );
 };
 
-const OtherBookings = ({otherBookings, filterLoc, hToPercent}) => (
+const OtherBookings = ({otherBookings, filterLoc, hToPercent, hideText}) => (
   <>
     {(otherBookings||[]).filter(ob=>!filterLoc||ob.location===filterLoc).map((ob,i)=>{
       if(ob.startH==null||ob.endH==null) return null;
       const left=hToPercent(ob.startH), width=hToPercent(ob.endH)-left;
       return (
         <div key={i} title={ob.name} style={{position:"absolute",left:`${left}%`,width:`${width}%`,top:0,bottom:0,background:"#ef444418",border:"1px solid #ef444435",borderRadius:4,zIndex:0,pointerEvents:"none"}}>
-          <div style={{fontSize:13,color:"#ef444499",padding:"1px 4px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ob.name}</div>
+          {!hideText&&<div style={{fontSize:13,color:"#ef444499",padding:"1px 4px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ob.name}</div>}
         </div>
       );
     })}
   </>
 );
+
+// Faded reference band showing the overall production's envelope behind a
+// specific space's own row, so the room's actual booking (drawn on top)
+// reads clearly while still showing where it sits within the full day.
+const OverallWindowBackdrop = ({startTime, endTime, hToPercent}) => {
+  const sh = isoToHours(startTime), eh = isoToHours(endTime);
+  if(sh===null||eh===null) return null;
+  const left = hToPercent(sh), width = hToPercent(eh)-left;
+  return (
+    <div style={{position:"absolute",left:`${left}%`,width:`${Math.max(width,0.5)}%`,top:0,bottom:0,background:"#ef444410",border:"1px dashed #ef444422",borderRadius:4,zIndex:0,pointerEvents:"none"}}/>
+  );
+};
 
 // Time-only picker — no date calendar, just start/end time dropdowns
 // Used within LocationBookingPanel where date is set separately
@@ -3302,7 +3314,8 @@ const LocationBookingPanel = ({production, allProjects=[], onUpdate}) => {
                   </div>
                   {/* Track */}
                   <div style={{position:"relative",left:0,right:0,height:LANE_H,background:"#111827",borderRadius:4,overflow:"visible"}}>
-                    <OtherBookings otherBookings={otherBookings} filterLoc={b.location} hToPercent={hToPercent}/>
+                    {!b.isOverall&&<OverallWindowBackdrop startTime={production.startTime} endTime={production.endTime} hToPercent={hToPercent}/>}
+                    <OtherBookings otherBookings={otherBookings} filterLoc={b.location} hToPercent={hToPercent} hideText={b.isOverall}/>
                     {isoToHours(b.startTime)!==null&&<BookingBlock b={b} locIdx={li} expanded={true} draggingLocIdx={dragging?.locIdx} otherBookings={otherBookings} hToPercent={hToPercent} onDragStart={startDrag}/>}
                   </div>
                 </div>
@@ -5448,7 +5461,7 @@ const BUDGET_SECTIONS = [
         {id:"location_fee",  label:"Location Fee & Permits"},
         {id:"props",         label:"Props"},
         {id:"parking",       label:"Parking Allowance",         defaultRate:100},
-        {id:"crew_meals",    label:"Crew Meals",                defaultRate:250},
+        {id:"crew_meals",    label:"Crew Meals",                defaultRate:20},
       ]},
     ]
   },
@@ -6259,7 +6272,6 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
   const [newDelAR,setNewDelAR]=useState("16:9");
   const [delSort, setDelSort] = useState("default");
   const [bulkDelCount, setBulkDelCount] = useState(1);
-  const [confirmDelDelete, setConfirmDelDelete] = useState(null); // deliverable id pending delete confirm
   const [activeTab,setActiveTab]=useState(initialTab==="budget"&&!canAccessBudget?"overview":(initialTab||"overview"));
   useEffect(()=>{ if(activeTab==="budget" && !canAccessBudget) setActiveTab("overview"); },[activeTab,canAccessBudget]);
   const [expandedShoot,setExpandedShoot]=useState(initialShootId||null);
@@ -6437,7 +6449,6 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
           {/* ── OVERVIEW TAB ── */}
           {activeTab==="overview"&&(
             <>
-            {isBXTVProject(lp)&&<BXTVMetaPanel project={lp} onUpdateProject={onUpdateProject}/>}
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,alignItems:"start"}}>
                 {/* LEFT COLUMN: Team + Status Notes stacked */}
@@ -6709,7 +6720,7 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
           )}
 
           {/* ── PROJECT CALENDAR TAB ── */}
-          {activeTab==="calendar"&&<ProjectCalendar project={lp}/>}
+          {activeTab==="calendar"&&<ProjectCalendar project={lp} onUpdateProject={onUpdateProject} onUpdateDel={onUpdateDel}/>}
 
           {/* ── DELIVERABLES TAB ── */}
           {activeTab==="deliverables"&&(
@@ -6777,7 +6788,7 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                         return (
                           <div key={del.id} style={{borderRadius:isExp?"10px 10px 0 0":10,overflow:isExp?"visible":"hidden",borderLeft:"3px solid #6366f1"}}>
                             <DeliverableRow d={del} projectId={sourceProject.id} projectName={sourceProject.name} showProject
-                              team={team} onUpdateDel={onUpdateDel} isExpanded={isExp}
+                              team={team} allProjects={allProjects} onUpdateDel={onUpdateDel} isExpanded={isExp}
                               onClick={()=>setActiveDelModal(isExp?null:del.id)}/>
                             {isExp&&(
                               <div onClick={e=>e.stopPropagation()} style={{borderTop:"1px solid #1f2937"}}>
@@ -6911,111 +6922,12 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                   else if(delSort==="editor") dels.sort((a,b)=>{const ea=team.find(m=>m.id===a.editorId)?.name||"";const eb=team.find(m=>m.id===b.editorId)?.name||"";return ea.localeCompare(eb);});
                   else if(delSort==="status") dels.sort((a,b)=>DELIVERABLE_STATUSES.indexOf(a.status)-DELIVERABLE_STATUSES.indexOf(b.status));
                   return dels.map(d=>{
-                  const ed=team.find(m=>m.id===d.editorId);
-                  const changes=d.rounds.some(r=>r.status==="Changes Requested");
-                  const allAppr=d.rounds.length>0&&d.rounds.every(r=>r.status==="Approved");
                   const isExpanded = activeDelModal===d.id;
                   return (
                     <div key={d.id}>
-                    <div onClick={()=>setActiveDelModal(isExpanded?null:d.id)}
-                      style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",background:isExpanded?"#1f2937":"#111827",border:`1px solid ${isExpanded?"#6366f1":changes?"#ef444430":"#1f2937"}`,borderRadius:isExpanded?"10px 10px 0 0":10,cursor:"pointer"}}
-                      onMouseEnter={e=>{if(!isExpanded)e.currentTarget.style.borderColor=changes?"#ef4444":"#374151";}}
-                      onMouseLeave={e=>{if(!isExpanded)e.currentTarget.style.borderColor=changes?"#ef444430":"#1f2937";}}>
-                      <div style={{width:9,height:9,borderRadius:"50%",background:DCOLOR[d.status],flexShrink:0}}/>
-                      <div style={{flex:1,minWidth:0}}>
-                        {/* Row 1: title + status dropdown + chips */}
-                        <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:2,flexWrap:"wrap"}}>
-                          <input value={d.title||""} onChange={e=>{e.stopPropagation();onUpdateDel(project.id,d.id,"title",e.target.value);}} onClick={e=>e.stopPropagation()} onFocus={e=>e.stopPropagation()} placeholder="Deliverable title…" style={{fontWeight:700,fontSize:20,color:"#f1f5f9",background:"transparent",border:"none",outline:"none",padding:0,cursor:"text",fontFamily:"'DM Sans',sans-serif",flex:"0 1 auto",minWidth:60}}/>
-                          <DelStatusSel status={d.status} onChange={v=>onUpdateDel(project.id,d.id,"status",v)} xs/>
-                          {d._fromPreset&&<Chip label="Internal Planning" color="#8b5cf6" xs/>}
-                          {d.aspectRatio&&<Chip label={d.aspectRatio} color="#374151" xs/>}
-                          {d.srtNeeded&&<Chip label="SRT" color="#06b6d4" xs/>}
-                          {d.captionsNeeded&&<Chip label="Captions" color="#a855f7" xs/>}
-                          {allAppr&&<Chip label="✓ Approved" color="#10b981" xs/>}
-                          {changes&&<Chip label="↩ Changes" color="#ef4444" xs/>}
-                        </div>
-                        {/* Row 2: active round due date — directly under title */}
-                        {(()=>{
-                          const activeR=d.rounds.find(r=>r.status!=="Approved");
-                          if(!activeR||!activeR.deadline) return null;
-                          return (
-                            <div style={{fontSize:14,fontWeight:600,color:RCOLOR[activeR.status],marginBottom:2}}>
-                              {activeR.label} due {fmtDT(activeR.deadline)}
-                              <span style={{marginLeft:6}}><Dl date={activeR.deadline} inline/></span>
-                            </div>
-                          );
-                        })()}
-                        {/* Row 3: editor + handoff schedule */}
-                        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:1}}>
-                          {ed&&<div style={{fontSize:14,color:"#9ca3af",display:"flex",alignItems:"center",gap:4}}><Av name={ed.name} size={14}/>{ed.name}</div>}
-                          {/* Only break out the per-segment schedule when there's an actual handoff (2+ segments) — a single all-duration segment is already covered by the name above. */}
-                          {d._segments?.length>1&&d._segments.map((seg,i)=>{
-                            const segEd=team.find(m=>m.id===seg.editorId);
-                            const todayStr=new Date().toISOString().slice(0,10);
-                            const isCurrent=(!seg.from||seg.from<=todayStr)&&(!seg.to||seg.to>=todayStr);
-                            return (
-                              <span key={i} style={{fontSize:13,color:isCurrent?"#d1d5db":"#838ba0",background:"#1f293780",borderRadius:4,padding:"1px 6px",display:"flex",alignItems:"center",gap:3}}>
-                                <span style={{width:5,height:5,borderRadius:"50%",background:isCurrent?"#10b981":"#374151",flexShrink:0}}/>
-                                {segEd?.name||"?"}: {fmtSegRange(seg.from,seg.to)}
-                              </span>
-                            );
-                          })}
-                          {(d.deliverableType||"Standard")==="BXTV"&&(
-                            <span style={{fontSize:12,fontWeight:700,color:"#818cf8",background:"#6366f115",border:"1px solid #6366f140",borderRadius:4,padding:"1px 7px",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
-                              📺 BXTV
-                              {d.bxtvLink?.episodeProjectId&&(()=>{const ep=allProjects.find(p=>p.id===d.bxtvLink.episodeProjectId);return ep?` · ${getBXTVEpisodeName(ep)||ep.name}`:""})()}
-                            </span>
-                          )}
-                          <button onClick={e=>{e.stopPropagation();setHandoffDelId(d.id);}}
-                            style={{fontSize:12,fontWeight:700,color:"#818cf8",background:"#6366f115",border:"1px solid #6366f140",cursor:"pointer",padding:"2px 9px",borderRadius:4,flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}
-                            onMouseEnter={e=>{e.currentTarget.style.background="#6366f125";e.currentTarget.style.borderColor="#6366f170";}}
-                            onMouseLeave={e=>{e.currentTarget.style.background="#6366f115";e.currentTarget.style.borderColor="#6366f140";}}>
-                            ↔ Assign Editors
-                          </button>
-                        </div>
-                        {/* Deliverable Type toggle */}
-                        <div style={{display:"flex",alignItems:"center",gap:5,marginTop:2}}>
-                          <span style={{fontSize:12,color:"#374151"}}>Type:</span>
-                          {["Standard","BXTV"].map(t=>{
-                            const active=(d.deliverableType||"Standard")===t;
-                            return <button key={t} onClick={e=>{e.stopPropagation();onUpdateDel(project.id,d.id,"deliverableType",t);}}
-                              style={{padding:"1px 8px",borderRadius:4,border:`1px solid ${active&&t==="BXTV"?"#6366f1":active?"#374151":"#1f2937"}`,background:active&&t==="BXTV"?"#6366f115":active?"#1f2937":"transparent",color:active&&t==="BXTV"?"#818cf8":active?"#e2e8f0":"#374151",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>{t}</button>;
-                          })}
-                        </div>
-                      </div>
-                      {/* Right side: round circles + editable due date + delete */}
-                      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5,flexShrink:0}}>
-                        {/* Review round dots */}
-                        <div style={{display:"flex",gap:3}}>
-                          {d.rounds.map((r,i)=>(
-                            <div key={i} title={`${r.label}: ${r.status}`} style={{width:20,height:20,borderRadius:"50%",background:RCOLOR[r.status]+"30",border:`2px solid ${RCOLOR[r.status]}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:RCOLOR[r.status]}}>{i+1}</div>
-                          ))}
-                        </div>
-                        {/* Editable due date */}
-                        <div onClick={e=>e.stopPropagation()} style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>
-                          <label style={{fontSize:12,fontWeight:700,color:"#6b7280",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.07em"}}>Final Due</label>
-                          <input type="date" value={d.deadline||""} onChange={e=>onUpdateDel(project.id,d.id,"deadline",e.target.value)}
-                            style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:5,color:d.deadline?"#e2e8f0":"#4b5563",padding:"3px 6px",fontSize:14,outline:"none",cursor:"pointer",colorScheme:"dark",fontFamily:"inherit"}}/>
-                          {d.deadline&&<Dl date={d.deadline}/>}
-                        </div>
-                        {/* Two-step delete */}
-                        <div onClick={e=>e.stopPropagation()}>
-                          {confirmDelDelete===d.id
-                            ? <div style={{display:"flex",alignItems:"center",gap:5}}>
-                                <span style={{fontSize:12,color:"#f59e0b",fontWeight:700}}>Delete?</span>
-                                <button onClick={()=>{onDeleteDel(project.id,d.id);setConfirmDelDelete(null);}}
-                                  style={{background:"#ef444420",border:"1px solid #ef444450",borderRadius:4,color:"#ef4444",padding:"2px 8px",fontSize:12,fontWeight:700,cursor:"pointer"}}>Yes</button>
-                                <button onClick={()=>setConfirmDelDelete(null)}
-                                  style={{background:"#1f2937",border:"1px solid #374151",borderRadius:4,color:"#9ca3af",padding:"2px 8px",fontSize:12,fontWeight:700,cursor:"pointer"}}>No</button>
-                              </div>
-                            : <button onClick={()=>setConfirmDelDelete(d.id)}
-                                style={{background:"none",border:"none",color:"#374151",cursor:"pointer",fontSize:17,padding:"2px 4px",lineHeight:1}} title="Delete deliverable">🗑</button>}
-                        </div>
-                      </div>
-                      {/* Frame.io quick access */}
-                      <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW}/>
-                      <span style={{fontSize:17,color:isExpanded?"#6366f1":"#4b5563"}}>{isExpanded?"▲":"›"}</span>
-                    </div>
+                    <DeliverableRow d={d} projectId={project.id} team={team} allProjects={allProjects}
+                      onUpdateDel={onUpdateDel} onDeleteDel={onDeleteDel} onHandoff={setHandoffDelId}
+                      isExpanded={isExpanded} onClick={()=>setActiveDelModal(isExpanded?null:d.id)}/>
                     {isExpanded&&currentDelData&&currentDelData.id===d.id&&(
                       <div style={{border:"1px solid #6366f1",borderTop:"none",borderRadius:"0 0 10px 10px",overflow:"hidden"}}>
                         <DeliverableDetailModal
@@ -7440,7 +7352,7 @@ const AddProjectModal = ({team, onClose, onAdd, existingProjects=[], initialData
           <div style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:8,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <span style={{fontSize:16,color:"#9ca3af"}}>Add</span>
-              <select value={delCount} onChange={e=>setDelCount(+e.target.value)} style={{...sel,width:70,padding:"5px 8px"}}>
+              <select value={delCount} onChange={e=>setDelCount(+e.target.value)} style={{...sel,width:92,padding:"5px 8px"}}>
                 {[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n===0?"None":n}</option>)}
               </select>
               <span style={{fontSize:16,color:"#9ca3af"}}>deliverable{delCount!==1?"s":""}</span>
@@ -10848,7 +10760,7 @@ const KanbanEditor = ({projects,team,onUpdateDel}) => {
 };
 
 // ─── Calendar ─────────────────────────────────────────────────────────────────
-const CalendarView = ({projects,team,onOpenProject,onUpdateProject,sidebarSlotNode,onSidebarWidthChange}) => {
+const CalendarView = ({projects,team,onOpenProject,onUpdateProject,unavailability=[],sidebarSlotNode,onSidebarWidthChange}) => {
   const [calDrawerItem,setCalDrawerItem]=useState(null);
   const sidebarWidth = calDrawerItem ? 400 : 0;
   const [year,setYear]=useState(now.getFullYear());
@@ -10856,8 +10768,8 @@ const CalendarView = ({projects,team,onOpenProject,onUpdateProject,sidebarSlotNo
   const [calView,setCalView]=useState("month"); // month | week | day
   const [filterEditor,setFilterEditor]=useState("all");
   const [filterProject,setFilterProject]=useState("all");
-  const [calFilters,setCalFilters]=useState({showDeadlines:true,showReviews:true,showShoots:true,showIngest:true});
-  const calTypeColors={deadline:"#ef4444",review:"#f59e0b",shoot:"#3b82f6",ingest:"#06b6d4"};
+  const [calFilters,setCalFilters]=useState({showDeadlines:true,showReviews:true,showShoots:true,showIngest:true,showUnavailability:true});
+  const calTypeColors={deadline:"#ef4444",review:"#f59e0b",shoot:"#3b82f6",ingest:"#06b6d4",unavailability:"#eab308"};
   const [tooltip,setTooltip]=useState(null);
   const [selDate,setSelDate]=useState(null);
 
@@ -10897,8 +10809,32 @@ const CalendarView = ({projects,team,onOpenProject,onUpdateProject,sidebarSlotNo
           items.push({id:`ingest-prod-${prod.id}`,title:`📥 ${prod.title||prod.type||"Media"}`,deadline:prodIngestDt,projectName:p.name,projectId:p.id,isRound:false,isIngest:true,isShoot:false,calType:"ingest",status:"Ingest"});
       });
     });
+    // Team time off (added from My View's calendar) — not tied to any
+    // project, so it lives outside the per-project loop above. One item per
+    // day in the entry's range, matching how every other item here is keyed
+    // to a single day.
+    if(calFilters.showUnavailability){
+      (unavailability||[]).forEach(u=>{
+        if(filterEditor!=="all"&&u.memberId!==Number(filterEditor)) return;
+        const member=team.find(m=>m.id===u.memberId);
+        const start=new Date(u.startDate+"T12:00");
+        const end=new Date(u.endDate+"T12:00");
+        if(isNaN(start)||isNaN(end)) return;
+        for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
+          items.push({
+            id:`unavail-${u.id}-${d.toISOString().slice(0,10)}`,
+            title:u.label||u.type||"Time Off",
+            deadline:d.toISOString(),
+            projectName:member?.name||"Unavailable",projectId:null,
+            isRound:false,isIngest:false,isShoot:false,isUnavailability:true,
+            calType:"unavailability",status:u.type||"Time Off",
+            memberName:member?.name||"Unavailable",
+          });
+        }
+      });
+    }
     return items;
-  },[projects,filterEditor,filterProject,calFilters,team]);
+  },[projects,filterEditor,filterProject,calFilters,team,unavailability]);
 
   const byDay=useMemo(()=>{
     const m={};
@@ -10948,8 +10884,10 @@ const CalendarView = ({projects,team,onOpenProject,onUpdateProject,sidebarSlotNo
     review:"#f59e0b",     // review round deadline
     shoot:"#3b82f6",      // shoot times
     ingest:"#06b6d4",     // ingest times
+    unavailability:"#eab308", // team time off
   };
   const getCalColor = item => {
+    if(item.isUnavailability) return CAL_COLORS.unavailability;
     if(item.isIngest)  return CAL_COLORS.ingest;
     if(item.isShoot)   return CAL_COLORS.shoot;
     if(item.isRound)   return CAL_COLORS.review;
@@ -10957,17 +10895,17 @@ const CalendarView = ({projects,team,onOpenProject,onUpdateProject,sidebarSlotNo
   };
   const ItemPill=({item,compact})=>{
     const color=getCalColor(item);
-    const typeLabel = item.isIngest?"📥 Ingest":item.isShoot?"🎬 Production":item.isRound?"↺ Review":"🔴 Final Due";
+    const typeLabel = item.isUnavailability?"🌴 Time Off":item.isIngest?"📥 Ingest":item.isShoot?"🎬 Production":item.isRound?"↺ Review":"🔴 Final Due";
     return (
       <div
         onMouseEnter={e=>{const r=e.currentTarget.getBoundingClientRect();setTooltip({item,x:Math.min(r.right+4,window.innerWidth-290),y:Math.max(8,r.top-8)});}}
         onMouseLeave={e=>{const rt=e.relatedTarget;if(rt&&rt.closest&&rt.closest('[data-tooltip]'))return;setTooltip(null);}}
-        onClick={e=>{e.stopPropagation();
+        onClick={item.isUnavailability?undefined:e=>{e.stopPropagation();
           setTooltip(null);
           setCalDrawerItem({...item, projectId: item.projectId});
         }}
         style={{background:color+"28",borderLeft:`2px solid ${color}`,borderRadius:"0 4px 4px 0",
-          padding:compact?"3px 5px":"4px 7px",cursor:"pointer",
+          padding:compact?"3px 5px":"4px 7px",cursor:item.isUnavailability?"default":"pointer",
           overflow:"hidden",lineHeight:1.25,minWidth:0,
           border:item.isTentative?`1px dashed ${color}90`:"none",
           borderLeftWidth:2,borderLeftColor:color,borderLeftStyle:"solid"}}>
@@ -11010,7 +10948,7 @@ const CalendarView = ({projects,team,onOpenProject,onUpdateProject,sidebarSlotNo
             </select>
           </div>
           <div style={{display:"flex",gap:5,flexWrap:"nowrap"}}>
-            {[["showDeadlines","🔴 Final Due","deadline"],["showReviews","🟡 Reviews","review"],["showShoots","🔵 Productions","shoot"],["showIngest","🩵 Ingest","ingest"]].map(([key,label,type])=>(
+            {[["showDeadlines","🔴 Final Due","deadline"],["showReviews","🟡 Reviews","review"],["showShoots","🔵 Productions","shoot"],["showIngest","🩵 Ingest","ingest"],["showUnavailability","🌴 Time Off","unavailability"]].map(([key,label,type])=>(
               <button key={key} onClick={()=>setCalFilters(f=>({...f,[key]:!f[key]}))}
                 style={{padding:"4px 11px",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",
                   border:`1px solid ${calFilters[key]?calTypeColors[type]+"80":"#374151"}`,
@@ -11176,12 +11114,12 @@ const CalendarView = ({projects,team,onOpenProject,onUpdateProject,sidebarSlotNo
             left:tooltip.x+290<window.innerWidth ? tooltip.x : tooltip.x-300,
             top:Math.max(8,Math.min(tooltip.y, window.innerHeight-400)),
             zIndex:500,
-          background:"#1a2235",border:`1px solid ${tooltip.item.isShoot?"#3b82f6":tooltip.item.isIngest?"#06b6d4":tooltip.item.isRound?"#f59e0b":"#ef4444"}50`,
+          background:"#1a2235",border:`1px solid ${tooltip.item.isUnavailability?"#eab308":tooltip.item.isShoot?"#3b82f6":tooltip.item.isIngest?"#06b6d4":tooltip.item.isRound?"#f59e0b":"#ef4444"}50`,
           borderRadius:12,padding:"13px 15px",width:280,boxShadow:"0 12px 40px #000c",pointerEvents:"auto"}}>
           {(() => {
             const item = tooltip.item;
-            const typeColor = item.isShoot?"#3b82f6":item.isIngest?"#06b6d4":item.isRound?"#f59e0b":"#ef4444";
-            const typeLabel = item.isShoot?"🎬 Production":item.isIngest?"📥 Ingest":item.isRound?"↺ Review Round":"🔴 Final Due";
+            const typeColor = item.isUnavailability?"#eab308":item.isShoot?"#3b82f6":item.isIngest?"#06b6d4":item.isRound?"#f59e0b":"#ef4444";
+            const typeLabel = item.isUnavailability?"🌴 Time Off":item.isShoot?"🎬 Production":item.isIngest?"📥 Ingest":item.isRound?"↺ Review Round":"🔴 Final Due";
             const idLabel = item.id?String(item.id).slice(-4):item.isRound?String(item.id).slice(-4):"—";
 
             return (
@@ -11209,8 +11147,16 @@ const CalendarView = ({projects,team,onOpenProject,onUpdateProject,sidebarSlotNo
                   </>
                 )}
 
+                {/* Time off */}
+                {item.isUnavailability&&(
+                  <>
+                    <div style={{fontSize:18,fontWeight:700,color:"#f1f5f9",marginBottom:2}}>{item.title}</div>
+                    <div style={{fontSize:14,color: "#9ca3af",marginBottom:3}}>📅 {fmtDT(item.deadline)}</div>
+                  </>
+                )}
+
                 {/* Final Deliverable Deadline */}
-                {!item.isRound&&!item.isShoot&&!item.isIngest&&(
+                {!item.isUnavailability&&!item.isRound&&!item.isShoot&&!item.isIngest&&(
                   <>
                     <div style={{fontSize:18,fontWeight:700,color:"#f1f5f9",marginBottom:2}}>{item.title}</div>
                     <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
@@ -11247,9 +11193,11 @@ const CalendarView = ({projects,team,onOpenProject,onUpdateProject,sidebarSlotNo
                   </>
                 )}
 
-                <div style={{borderTop:"1px solid #1f293760",marginTop:8,paddingTop:7,fontSize:13,color:typeColor,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em"}}>
-                  Click to open project →
-                </div>
+                {!item.isUnavailability&&(
+                  <div style={{borderTop:"1px solid #1f293760",marginTop:8,paddingTop:7,fontSize:13,color:typeColor,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em"}}>
+                    Click to open project →
+                  </div>
+                )}
               </>
             );
           })()}
@@ -11521,19 +11469,25 @@ const DelEditorSel = ({editorId, editors, onChange, xs}) => {
 };
 
 // ─── Shared: collapsed deliverable row ───────────────────────────────────────
-// The reference look is Project Overview's own Deliverables tab row (status
-// dot, title, DelStatusSel pill, chips, editor avatar, round dots, due-date
-// badge, hover border, and a highlighted "open" state) — this is that same
-// visual, factored out so Overall Deliverables, My View, and the BXTV
-// cross-referenced list can all match it instead of each having their own
-// slightly different row. Doesn't try to replicate every editing affordance
-// (inline title edit, delete, handoff, type toggle) since those are specific
-// to editing a project's own list in place — editorEditable/showProject/
-// isExpanded cover what the other three contexts actually need.
-const DeliverableRow = ({d, projectId, projectName, showProject=false, team, onUpdateDel, onClick, isExpanded=false, editors, editorEditable=false, readOnly=false}) => {
+// The one row look used everywhere a deliverable appears collapsed: Project
+// Overview's own Deliverables tab, the BXTV cross-referenced list, Overall
+// Deliverables, and My View. Every editing affordance the reference row had
+// (inline title edit, round dots, editable due date, delete, type toggle,
+// handoff/segments, Frame.io quick access) is included here too — each is
+// simply a no-op display when its controlling callback isn't passed in, so
+// a caller that can't sensibly support one (e.g. My View has no handoff
+// flow) just omits that prop rather than the row looking different.
+const DeliverableRow = ({
+  d, projectId, projectName, showProject=false, team, allProjects=[],
+  onUpdateDel, onDeleteDel, onHandoff, onClick, isExpanded=false,
+  editors, editorEditable=false, readOnly=false,
+}) => {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const changes = (d.rounds||[]).some(r=>r.status==="Changes Requested");
   const allAppr = (d.rounds||[]).length>0 && (d.rounds||[]).every(r=>r.status==="Approved");
   const ed = team?.find(m=>m.id===d.editorId);
+  const editable = !readOnly && !!onUpdateDel;
+  const activeR = (d.rounds||[]).find(r=>r.status!=="Approved");
   return (
     <div onClick={onClick}
       style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",background:isExpanded?"#1f2937":"#111827",border:`1px solid ${isExpanded?"#6366f1":changes?"#ef444430":"#1f2937"}`,borderRadius:isExpanded?"10px 10px 0 0":10,cursor:onClick?"pointer":"default"}}
@@ -11541,28 +11495,99 @@ const DeliverableRow = ({d, projectId, projectName, showProject=false, team, onU
       onMouseLeave={e=>{if(!isExpanded)e.currentTarget.style.borderColor=changes?"#ef444430":"#1f2937";}}>
       <div style={{width:9,height:9,borderRadius:"50%",background:DCOLOR[d.status],flexShrink:0}}/>
       <div style={{flex:1,minWidth:0}}>
+        {/* Row 1: title + status + chips */}
         <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:2,flexWrap:"wrap"}}>
-          <span style={{fontWeight:700,fontSize:20,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title||"Untitled"}</span>
+          {editable
+            ? <input value={d.title||""} onChange={e=>{e.stopPropagation();onUpdateDel(projectId,d.id,"title",e.target.value);}} onClick={e=>e.stopPropagation()} onFocus={e=>e.stopPropagation()} placeholder="Deliverable title…" style={{fontWeight:700,fontSize:20,color:"#f1f5f9",background:"transparent",border:"none",outline:"none",padding:0,cursor:"text",fontFamily:"'DM Sans',sans-serif",flex:"0 1 auto",minWidth:60}}/>
+            : <span style={{fontWeight:700,fontSize:20,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title||"Untitled"}</span>}
           {readOnly ? <Chip label={d.status} color={DCOLOR[d.status]} xs/> : <DelStatusSel status={d.status} onChange={v=>onUpdateDel(projectId,d.id,"status",v)} xs/>}
           {!readOnly&&editorEditable&&<DelEditorSel editorId={d.editorId} editors={editors||[]} onChange={v=>onUpdateDel(projectId,d.id,"editorId",v)} xs/>}
+          {d._fromPreset&&<Chip label="Internal Planning" color="#8b5cf6" xs/>}
           {d.aspectRatio&&<Chip label={d.aspectRatio} color="#374151" xs/>}
           {d.srtNeeded&&<Chip label="SRT" color="#06b6d4" xs/>}
+          {d.captionsNeeded&&<Chip label="Captions" color="#a855f7" xs/>}
           {allAppr&&<Chip label="✓ Approved" color="#10b981" xs/>}
           {changes&&<Chip label="↩ Changes" color="#ef4444" xs/>}
         </div>
+        {/* Row 2: active round due date */}
+        {activeR&&activeR.deadline&&(
+          <div style={{fontSize:14,fontWeight:600,color:RCOLOR[activeR.status],marginBottom:2}}>
+            {activeR.label} due {fmtDT(activeR.deadline)}
+            <span style={{marginLeft:6}}><Dl date={activeR.deadline} inline/></span>
+          </div>
+        )}
+        {/* Row 3: editor + project (if shown) + handoff schedule + BXTV badge */}
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginTop:1,fontSize:14,color:"#9ca3af"}}>
           {!editorEditable&&ed&&<span style={{display:"flex",alignItems:"center",gap:4}}><Av name={ed.name} size={14}/>{ed.name}</span>}
           {showProject&&<span style={{color:"#6366f1"}}>{projectName}</span>}
+          {d._segments?.length>1&&d._segments.map((seg,i)=>{
+            const segEd=team?.find(m=>m.id===seg.editorId);
+            const todayStr=new Date().toISOString().slice(0,10);
+            const isCurrent=(!seg.from||seg.from<=todayStr)&&(!seg.to||seg.to>=todayStr);
+            return (
+              <span key={i} style={{fontSize:13,color:isCurrent?"#d1d5db":"#838ba0",background:"#1f293780",borderRadius:4,padding:"1px 6px",display:"flex",alignItems:"center",gap:3}}>
+                <span style={{width:5,height:5,borderRadius:"50%",background:isCurrent?"#10b981":"#374151",flexShrink:0}}/>
+                {segEd?.name||"?"}: {fmtSegRange(seg.from,seg.to)}
+              </span>
+            );
+          })}
+          {(d.deliverableType||"Standard")==="BXTV"&&(
+            <span style={{fontSize:12,fontWeight:700,color:"#818cf8",background:"#6366f115",border:"1px solid #6366f140",borderRadius:4,padding:"1px 7px",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
+              📺 BXTV
+              {d.bxtvLink?.episodeProjectId&&(()=>{const ep=allProjects.find(p=>p.id===d.bxtvLink.episodeProjectId);return ep?` · ${getBXTVEpisodeName(ep)||ep.name}`:""})()}
+            </span>
+          )}
+          {onHandoff&&<button onClick={e=>{e.stopPropagation();onHandoff(d.id);}}
+            style={{fontSize:12,fontWeight:700,color:"#818cf8",background:"#6366f115",border:"1px solid #6366f140",cursor:"pointer",padding:"2px 9px",borderRadius:4,flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}
+            onMouseEnter={e=>{e.currentTarget.style.background="#6366f125";e.currentTarget.style.borderColor="#6366f170";}}
+            onMouseLeave={e=>{e.currentTarget.style.background="#6366f115";e.currentTarget.style.borderColor="#6366f140";}}>
+            ↔ Assign Editors
+          </button>}
         </div>
+        {/* Row 4: type toggle */}
+        {editable&&(
+          <div style={{display:"flex",alignItems:"center",gap:5,marginTop:2}}>
+            <span style={{fontSize:12,color:"#374151"}}>Type:</span>
+            {["Standard","BXTV"].map(t=>{
+              const active=(d.deliverableType||"Standard")===t;
+              return <button key={t} onClick={e=>{e.stopPropagation();onUpdateDel(projectId,d.id,"deliverableType",t);}}
+                style={{padding:"1px 8px",borderRadius:4,border:`1px solid ${active&&t==="BXTV"?"#6366f1":active?"#374151":"#1f2937"}`,background:active&&t==="BXTV"?"#6366f115":active?"#1f2937":"transparent",color:active&&t==="BXTV"?"#818cf8":active?"#e2e8f0":"#374151",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>{t}</button>;
+            })}
+          </div>
+        )}
       </div>
+      {/* Right side: round circles + editable due date + delete */}
       <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5,flexShrink:0}}>
         <div style={{display:"flex",gap:3}}>
           {(d.rounds||[]).map((r,i)=>(
             <div key={i} title={`${r.label}: ${r.status}`} style={{width:20,height:20,borderRadius:"50%",background:RCOLOR[r.status]+"30",border:`2px solid ${RCOLOR[r.status]}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:RCOLOR[r.status]}}>{i+1}</div>
           ))}
         </div>
-        <Dl date={d.deadline}/>
+        {editable ? (
+          <div onClick={e=>e.stopPropagation()} style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>
+            <label style={{fontSize:12,fontWeight:700,color:"#6b7280",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.07em"}}>Final Due</label>
+            <input type="date" value={d.deadline||""} onChange={e=>onUpdateDel(projectId,d.id,"deadline",e.target.value)}
+              style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:5,color:d.deadline?"#e2e8f0":"#4b5563",padding:"3px 6px",fontSize:14,outline:"none",cursor:"pointer",colorScheme:"dark",fontFamily:"inherit"}}/>
+            {d.deadline&&<Dl date={d.deadline}/>}
+          </div>
+        ) : <Dl date={d.deadline}/>}
+        {editable&&onDeleteDel&&(
+          <div onClick={e=>e.stopPropagation()}>
+            {confirmDelete
+              ? <div style={{display:"flex",alignItems:"center",gap:5}}>
+                  <span style={{fontSize:12,color:"#f59e0b",fontWeight:700}}>Delete?</span>
+                  <button onClick={()=>{onDeleteDel(projectId,d.id);setConfirmDelete(false);}}
+                    style={{background:"#ef444420",border:"1px solid #ef444450",borderRadius:4,color:"#ef4444",padding:"2px 8px",fontSize:12,fontWeight:700,cursor:"pointer"}}>Yes</button>
+                  <button onClick={()=>setConfirmDelete(false)}
+                    style={{background:"#1f2937",border:"1px solid #374151",borderRadius:4,color:"#9ca3af",padding:"2px 8px",fontSize:12,fontWeight:700,cursor:"pointer"}}>No</button>
+                </div>
+              : <button onClick={()=>setConfirmDelete(true)}
+                  style={{background:"none",border:"none",color:"#374151",cursor:"pointer",fontSize:17,padding:"2px 4px",lineHeight:1}} title="Delete deliverable">🗑</button>}
+          </div>
+        )}
       </div>
+      <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW}/>
+      {onClick&&<span style={{fontSize:17,color:isExpanded?"#6366f1":"#4b5563"}}>{isExpanded?"▲":"›"}</span>}
     </div>
   );
 };
@@ -11758,8 +11783,8 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
   // dropdown this tab specifically needed (task: quick editor reassign).
   const DelRow = ({d, showProject=true}) => (
     <DeliverableRow d={d} projectId={d.projectId} projectName={d.projectName} showProject={showProject}
-      team={team} editors={editors} onUpdateDel={onUpdateDel} onClick={e=>openDel(d,e)}
-      editorEditable readOnly={!!d._fromProduction}/>
+      team={team} allProjects={projects} editors={editors} onUpdateDel={onUpdateDel} onDeleteDel={onDeleteDel}
+      onClick={e=>openDel(d,e)} editorEditable readOnly={!!d._fromProduction}/>
   );
 
   return (
@@ -13332,7 +13357,7 @@ const MyView = ({projects, team, studioBookings=[], onUpdateStudioBookings, onOp
               return (
                 <div key={d.id} style={{borderRadius:isExp?"10px 10px 0 0":10,overflow:isExp?"visible":"hidden"}}>
                   <DeliverableRow d={d} projectId={d._project.id} projectName={d._project.name} showProject
-                    team={team} onUpdateDel={onUpdateDel} isExpanded={isExp}
+                    team={team} allProjects={projects} onUpdateDel={onUpdateDel} onDeleteDel={onDeleteDel} isExpanded={isExp}
                     onClick={()=>setExpandedDelId(isExp?null:d.id)}/>
                   {isExp&&(
                     <div onClick={e=>e.stopPropagation()} style={{borderTop:"1px solid #1f2937"}}>
@@ -13562,15 +13587,6 @@ const StatsBar = ({projects, team, setView, onOpenProject, onSetStatsFilter}) =>
     .sort((a,b)=>new Date(a._nextDate)-new Date(b._nextDate));
 
   const fmtDate = iso => iso ? new Date(iso).toLocaleDateString("en-US",{month:"short",day:"numeric"}) : null;
-  // Compact season/episode code (e.g. "S26E04") for the Next BXTV tile's big
-  // number — the full episode name (getBXTVEpisodeName) is a sentence, which
-  // is why this tile used to render as small text instead of matching the
-  // other big-number tiles.
-  const bxtvCode = p => {
-    const m = p?.bxtvMeta;
-    if(!m||(!m.season&&!m.episode)) return "—";
-    return `S${String(m.season||0).padStart(2,"0")}E${String(m.episode||0).padStart(2,"0")}`;
-  };
 
   // Every tile now renders the same way (big number + label + sub), so
   // there's nothing left that looks structurally different from the rest —
@@ -13599,18 +13615,18 @@ const StatsBar = ({projects, team, setView, onOpenProject, onSetStatsFilter}) =>
       onClick: ()=>setView("workReview"),
     },
     {
-      value: nextBXTV ? bxtvCode(nextBXTV) : "—",
-      label: "Next BXTV",
-      sub: nextBXTV ? fmtDate(nextBXTV._nextDate)||"No date" : "No upcoming",
-      color: "#f59e0b",
-      onClick: nextBXTV ? ()=>onOpenProject(nextBXTV) : null,
-    },
-    {
       value: projectsDueThisWeek.length,
       label: "Projects Due",
       sub: "this week",
       color: "#10b981",
       onClick: ()=>{ onSetStatsFilter({label:"Projects Due — This Week", ids:new Set(projectsDueThisWeek.map(p=>p.id))}); setView("projects"); },
+    },
+    {
+      value: nextBXTV ? (parseBXTVCode(nextBXTV.name) || "—") : "—",
+      label: "Next BXTV",
+      sub: nextBXTV ? fmtDate(nextBXTV._nextDate)||"No date" : "No upcoming",
+      color: "#f59e0b",
+      onClick: nextBXTV ? ()=>onOpenProject(nextBXTV) : null,
     },
     {
       value: upcomingBigEvents.length,
@@ -13658,8 +13674,6 @@ const locStr = loc => typeof loc === "string" ? loc : "";
 // non-string value (e.g. an old empty-object shape) rendered bare crashes
 // exactly the same way.
 const screenContentStr = v => Array.isArray(v) ? v.join(", ") : (typeof v === "string" ? v : "");
-const makeHMUBooking = (parent, station) => { const w=calcHMUWindow(parent.startTime); if(!w)return null; return {id:uid(),title:`${parent.title} — HMU Prep`,projectId:parent.projectId||null,parentBookingId:parent.id,bookingStatus:"Tentative",productionType:parent.productionType||"Content Filming",location:station,startTime:w.start,endTime:w.end,crewCallTime:null,notes:`Auto-created: HMU prep for "${parent.title}".`,equipmentIds:[],confirmations:[],crewInternal:[],crewExternal:[{id:uid(),role:"Hair & Makeup Artist",name:"",company:"",callTime:fmtCrewCall(w.start)}]}; };
-const detectConflicts = (location,startTime,endTime,allBookings,excludeId=null) => { if(!location||!startTime||!endTime)return []; const st=new Date(startTime).getTime(),et=new Date(endTime).getTime(); return allBookings.filter(b=>{if(b.id===excludeId||b.location!==location||["Cancelled","Completed"].includes(b.bookingStatus)||!b.startTime||!b.endTime)return false; const bst=new Date(b.startTime).getTime(),bet=new Date(b.endTime).getTime(); return !(bet<=st||bst>=et);}); };
 
 // ─── Studio Bookings Seed ─────────────────────────────────────────────────────
 const STUDIO_BOOKINGS_SEED = [
@@ -17583,7 +17597,6 @@ const ProductionCard = ({production, idx, projectId, allProductions, allProjectD
   const [newDelTitle, setNewDelTitle] = useState("");
   const [gearOpen, setGearOpen] = useState(false);
   const [gearSearch, setGearSearch] = useState("");
-  const [hmuPrompt, setHmuPrompt] = useState({s1:false,s2:false,dismissed:false});
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [showSavePreset, setShowSavePreset] = useState(false);
   const [showCallSheet, setShowCallSheet] = useState(false);
@@ -17687,14 +17700,6 @@ const ProductionCard = ({production, idx, projectId, allProductions, allProjectD
     return {call:fmtIsoT(production.startTime), wrap:fmtIsoT(production.endTime)};
   };
 
-  // HMU suggestion
-  const hmuWindow = hasShoot && production.startTime ? calcHMUWindow(production.startTime) : null;
-  const allBookings = studioBookings || [];
-  const s1Conflicts = hmuWindow ? detectConflicts("HMU Station 1", hmuWindow.start, hmuWindow.end, allBookings) : [];
-  const s2Conflicts = hmuWindow ? detectConflicts("HMU Station 2", hmuWindow.start, hmuWindow.end, allBookings) : [];
-  const showHMUSuggest = hasShoot && hmuWindow && LOCATION_META[production.location]?.suggestHMU && !hmuPrompt.dismissed;
-  const alreadyHMU1 = allBookings.some(b=>b.parentBookingId===production.id&&b.location==="HMU Station 1");
-  const alreadyHMU2 = allBookings.some(b=>b.parentBookingId===production.id&&b.location==="HMU Station 2");
 
   // Crew call display for the SetupInstanceCard dropdown default label.
   // Always use the shoot startTime directly — crewCallTime is auto-calculated
@@ -20566,7 +20571,6 @@ const StudioBookingsList = ({allBookings, projects, team, studioBookings, onUpda
   const [typeFilter,setTypeFilter]=useState("All");
   const [statFilter,setStatFilter]=useState("All");
   const [expanded,setExpanded]=useState(null);
-  const [hmuPrompt,setHmuPrompt]=useState({});
   const [requestNotes,setRequestNotes]=useState({}); // denyNote per booking id
   const [denyOpen,setDenyOpen]=useState(null);
   const now=new Date();
@@ -20609,7 +20613,6 @@ const StudioBookingsList = ({allBookings, projects, team, studioBookings, onUpda
   const applyF=list=>list.filter(b=>(locFilter==="All"||b.location===locFilter)&&(typeFilter==="All"||b.productionType===typeFilter)&&(statFilter==="All"||b.bookingStatus===statFilter));
   const upcoming=applyF(allBookings.filter(b=>!b.parentBookingId||true).filter(b=>new Date(b.endTime||b.startTime)>=now&&b.bookingStatus!=="Tentative"));
   const past=applyF(allBookings.filter(b=>new Date(b.endTime||b.startTime)<now));
-  const handleHMUAccept=(parent,station)=>{if(!allBookings.some(b=>b.parentBookingId===parent.id&&b.location===station)){const hb=makeHMUBooking(parent,station);if(hb)onUpdateStudioBookings(prev=>[...prev,hb]);}setHmuPrompt(p=>({...p,[parent.id]:{...p[parent.id],[station]:true}}));};
   const selS={background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"6px 10px",fontSize:16,outline:"none"};
   const BookingRow=({b})=>{
     const isExp=expanded===b.id;
@@ -20628,11 +20631,18 @@ const StudioBookingsList = ({allBookings, projects, team, studioBookings, onUpda
     const hmuUnassigned=isHMU&&(b.crewExternal||[]).some(c=>c.role==="Hair & Makeup Artist"&&!c.name);
     const pendingConf=(b.confirmations||[]).filter(c=>c.status==="Pending").length;
     const eqList=(b.equipmentIds||[]).map(id=>EQUIPMENT.find(e=>e.id===id)?.name||id).filter(Boolean);
+    // Any booking with a parentBookingId is a secondary/aux location for that
+    // production (Green Room, PCR, HMU, etc. — not just HMU, even though HMU
+    // gets its own extra treatment below since it has HMU-specific fields
+    // like an assigned artist). Indenting/grouping all of them the same way
+    // (not just isHMU ones) is what actually shows every aux location a
+    // production has booked, instead of only ever surfacing HMU.
+    const isChildBooking=!!b.parentBookingId;
     const linkedChildren=allBookings.filter(x=>x.parentBookingId===b.id);
-    const isParentHMU=!isHMU&&LOCATION_META[b.location]?.suggestHMU&&b.startTime&&!hmuPrompt[b.id]?.dismissed;
+    const auxLocations=[...new Set(linkedChildren.map(c=>c.location).filter(Boolean))];
     return (
-      <div style={{border:`1px solid ${isExp?"#6366f1":isHMU?"#8b5cf630":"#1f2937"}`,borderRadius:10,overflow:"hidden",marginBottom:6,marginLeft:isHMU?24:0}}>
-        <div onClick={()=>setExpanded(isExp?null:b.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 16px",background:isExp?"#1a2035":isHMU?"#120d1f":"#111827",cursor:"pointer"}}>
+      <div style={{border:`1px solid ${isExp?"#6366f1":isChildBooking?"#8b5cf630":"#1f2937"}`,borderRadius:10,overflow:"hidden",marginBottom:6,marginLeft:isChildBooking?24:0}}>
+        <div onClick={()=>setExpanded(isExp?null:b.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 16px",background:isExp?"#1a2035":isChildBooking?"#120d1f":"#111827",cursor:"pointer"}}>
           {isHMU&&<span style={{fontSize:16,flexShrink:0}}>💄</span>}
           <div style={{width:84,flexShrink:0,textAlign:"center"}}>
             <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>{fmtDate(b.startTime)}</div>
@@ -20642,14 +20652,14 @@ const StudioBookingsList = ({allBookings, projects, team, studioBookings, onUpda
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:17,fontWeight:700,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.title}</div>
             <div style={{display:"flex",gap:8,fontSize:13,color: "#9ca3af",marginTop:1,flexWrap:"wrap"}}>
-              {b.crewCallTime&&!isHMU&&<span>📞 {fmtCrewCall(b.crewCallTime)}</span>}
+              {b.crewCallTime&&!isChildBooking&&<span>📞 {fmtCrewCall(b.crewCallTime)}</span>}
               {linkedProj&&<span style={{color:"#6366f1"}}>↗ {linkedProj.name}</span>}
-              {linkedChildren.length>0&&<span style={{color:"#8b5cf6"}}>💄 {linkedChildren.length} HMU</span>}
+              {auxLocations.length>0&&<span style={{color:"#8b5cf6"}}>+ {auxLocations.join(", ")}</span>}
             </div>
           </div>
           <div style={{display:"flex",gap:4,flexShrink:0,alignItems:"center"}}>
             <Chip label={b.bookingStatus} color={bkC} xs/>
-            {!isHMU&&<Chip label={b.productionType} color={tyC} xs/>}
+            {!isChildBooking&&<Chip label={b.productionType} color={tyC} xs/>}
             {hmuUnassigned&&<Chip label="💄 Unassigned" color="#ef4444" xs/>}
             {pendingConf>0&&<Chip label={`${pendingConf} pending`} color="#f59e0b" xs/>}
             {linkedProj&&onOpenProject&&(
@@ -20809,26 +20819,6 @@ const StudioBookingsList = ({allBookings, projects, team, studioBookings, onUpda
             {/* ── Notes + actions ── */}
             {b.notes&&<div style={{fontSize:14,color:"#9ca3af",background:"#111827",borderRadius:7,padding:"8px 12px"}}>📝 {b.notes}</div>}
             {hmuUnassigned&&<div style={{background:"#ef444410",border:"1px solid #ef444430",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:14,fontWeight:700,color:"#ef4444"}}>⚠ Hair & Makeup Artist not yet assigned</div></div>}
-            {isParentHMU&&(()=>{
-              const w=calcHMUWindow(b.startTime);
-              if(!w) return null;
-              const s1F=detectConflicts("HMU Station 1",w.start,w.end,allBookings,b.id).length===0;
-              const s2F=detectConflicts("HMU Station 2",w.start,w.end,allBookings,b.id).length===0;
-              const alreadyS1=allBookings.some(x=>x.parentBookingId===b.id&&x.location==="HMU Station 1");
-              const alreadyS2=allBookings.some(x=>x.parentBookingId===b.id&&x.location==="HMU Station 2");
-              if((!s1F&&!s2F)||(alreadyS1&&alreadyS2)) return null;
-              return(
-                <div style={{background:"#8b5cf610",border:"1px solid #8b5cf630",borderRadius:9,padding:"12px 14px"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><span style={{fontSize:22}}>💄</span><div><div style={{fontWeight:800,fontSize:16,color:"#a78bfa",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>Reserve Hair & Makeup?</div><div style={{fontSize:13,color:"#9ca3af"}}>HMU: <b style={{color:"#e2e8f0"}}>{fmtCrewCall(w.start)} → {fmtCrewCall(w.end)}</b></div></div></div>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                    {s1F&&!alreadyS1&&<button onClick={()=>handleHMUAccept(b,"HMU Station 1")} style={{background:"#10b98120",border:"1px solid #10b98140",borderRadius:7,color:"#10b981",padding:"5px 12px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>✓ Station 1</button>}
-                    {s2F&&!alreadyS2&&<button onClick={()=>handleHMUAccept(b,"HMU Station 2")} style={{background:"#10b98120",border:"1px solid #10b98140",borderRadius:7,color:"#10b981",padding:"5px 12px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>✓ Station 2</button>}
-                    {s1F&&s2F&&!alreadyS1&&!alreadyS2&&<button onClick={()=>{handleHMUAccept(b,"HMU Station 1");handleHMUAccept(b,"HMU Station 2");}} style={{background:"#6366f120",border:"1px solid #6366f140",borderRadius:7,color:"#818cf8",padding:"5px 12px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>✓ Both</button>}
-                    <button onClick={()=>setHmuPrompt(p=>({...p,[b.id]:{...p[b.id],dismissed:true}}))} style={{background:"transparent",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"5px 12px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",marginLeft:"auto"}}>Skip</button>
-                  </div>
-                </div>
-              );
-            })()}
 
             {/* Open Production button */}
             {linkedProj&&onOpenProject&&(
@@ -22262,36 +22252,113 @@ const AdminPropsFurnitureTab = ({furniture=[], onUpdateFurniture, props_=[], onU
 
 // ─── Project Calendar (for the Project Overview 📅 tab) ──────────────────────
 // Must be a real component — useState cannot be called inside an IIFE
-const ProjectCalendar = ({project}) => {
+const PROJ_CAL_TYPE_META = {
+  production:  {icon:"🎬",label:"Productions",   color:"#6366f1"},
+  poststart:   {icon:"🚀",label:"Post Start",    color:"#a855f7"},
+  round:       {icon:"↺", label:"Review Rounds", color:"#eab308"},
+  deliverable: {icon:"📋",label:"Final Delivery",color:"#f59e0b"},
+  ingest:      {icon:"💾",label:"Ingest",         color:"#06b6d4"},
+};
+
+const ProjectCalendar = ({project, onUpdateProject, onUpdateDel}) => {
   const today = new Date();
   const [calY, setCalY] = useState(today.getFullYear());
   const [calM, setCalM] = useState(today.getMonth());
   const todayStr = today.toISOString().slice(0,10);
   const pad = n => String(n).padStart(2,"0");
+  const [filters, setFilters] = useState({production:true, poststart:true, round:true, deliverable:true, ingest:true});
+  const [dragId, setDragId] = useState(null);
+  const [editEvent, setEditEvent] = useState(null);
+  const canEdit = !!(onUpdateProject && onUpdateDel);
 
   const allEvents = useMemo(()=>{
     const evs = [];
+    if(project.postStartDate) {
+      evs.push({id:"poststart", type:"poststart", date:project.postStartDate.slice(0,10), time:project.postStartDate.slice(11,16)||"", hasTime:true,
+        label:"Post Start Date", status:"", color:PROJ_CAL_TYPE_META.poststart.color});
+    }
     (project.productions||[]).forEach(p=>{
-      if(p.startTime) evs.push({date:p.startTime.slice(0,10),type:"production",label:p.title||p.type||"Production",status:p.status,color:PCOLOR[p.status]||"#6366f1"});
+      if(!p.startTime) return;
+      evs.push({id:`prod-${p.id}`, type:"production", date:p.startTime.slice(0,10), time:p.startTime.slice(11,16)||"", hasTime:true,
+        label:p.title||p.type||"Production", status:p.status, color:PCOLOR[p.status]||PROJ_CAL_TYPE_META.production.color,
+        ref:{kind:"production", id:p.id}});
     });
     (project.deliverables||[]).forEach(d=>{
-      if(d.deadline) evs.push({date:d.deadline,type:"deliverable",label:d.title,status:d.status,color:DCOLOR[d.status]||"#6b7280"});
+      if(d.deadline) evs.push({id:`del-${d.id}`, type:"deliverable", date:d.deadline.slice(0,10), hasTime:false,
+        label:d.title, status:d.status, color:DCOLOR[d.status]||PROJ_CAL_TYPE_META.deliverable.color,
+        ref:{kind:"deliverable", id:d.id}});
+      (d.rounds||[]).forEach((r,ri)=>{
+        if(!r.deadline) return;
+        evs.push({id:`round-${d.id}-${ri}`, type:"round", date:r.deadline.slice(0,10), hasTime:false,
+          label:`${d.title} · ${r.label}`, status:r.status, color:RCOLOR[r.status]||PROJ_CAL_TYPE_META.round.color,
+          ref:{kind:"round", delId:d.id, roundIdx:ri}});
+      });
     });
     (project.ingestDates||[]).forEach(ing=>{
-      if(ing.date) evs.push({date:ing.date,type:"ingest",label:ing.label||"Media Ingest",status:"Ingest",color:"#06b6d4"});
+      if(!ing.datetime) return;
+      evs.push({id:`ingest-${ing.id}`, type:"ingest", date:ing.datetime.slice(0,10), time:ing.datetime.slice(11,16)||"", hasTime:true,
+        label:ing.notes||"Media Ingest", status:"Ingest", color:PROJ_CAL_TYPE_META.ingest.color,
+        ref:{kind:"ingest", id:ing.id}});
     });
     return evs;
   },[project]);
 
+  const visibleEvents = useMemo(()=>allEvents.filter(ev=>filters[ev.type]),[allEvents,filters]);
+
   const byDay = useMemo(()=>{
     const m = {};
-    allEvents.forEach(ev=>{ if(!m[ev.date]) m[ev.date]=[]; m[ev.date].push(ev); });
+    visibleEvents.forEach(ev=>{ if(!m[ev.date]) m[ev.date]=[]; m[ev.date].push(ev); });
     return m;
-  },[allEvents]);
+  },[visibleEvents]);
 
   const daysInMonth = new Date(calY,calM+1,0).getDate();
   const firstDow    = new Date(calY,calM,1).getDay();
-  const typeIcon    = {production:"🎬",deliverable:"📋",ingest:"💾"};
+
+  // Applies a new date (and, for time-bearing events, an optional new time)
+  // back to whatever this event was sourced from — dragging a chip to a new
+  // day, or editing it via the popover, both funnel through here so the
+  // change reflects immediately in Deliverables / Production / etc.
+  const applyDateChange = (ev, newDate, newTime) => {
+    if(!canEdit || !ev || !newDate) return;
+    if(ev.type==="poststart") {
+      const time = newTime || ev.time || "09:00";
+      onUpdateProject(project.id, "postStartDate", `${newDate}T${time}`);
+      return;
+    }
+    const ref = ev.ref;
+    if(!ref) return;
+    if(ref.kind==="production") {
+      const prod = (project.productions||[]).find(p=>p.id===ref.id);
+      if(!prod) return;
+      const durMin = prod.endTime ? (new Date(prod.endTime)-new Date(prod.startTime))/60000 : null;
+      const time = newTime || (prod.startTime||"").slice(11,16) || "09:00";
+      const newStart = `${newDate}T${time}`;
+      const newEnd = durMin!=null ? new Date(new Date(newStart).getTime()+durMin*60000).toISOString().slice(0,16) : prod.endTime;
+      const newProds = (project.productions||[]).map(p=>p.id===ref.id?{...p,startTime:newStart,endTime:newEnd}:p);
+      onUpdateProject(project.id,"productions",newProds);
+    } else if(ref.kind==="deliverable") {
+      onUpdateDel(project.id, ref.id, "deadline", newDate);
+    } else if(ref.kind==="round") {
+      const del = (project.deliverables||[]).find(d=>d.id===ref.delId);
+      if(!del) return;
+      const newRounds = (del.rounds||[]).map((r,i)=>i===ref.roundIdx?{...r,deadline:newDate}:r);
+      onUpdateDel(project.id, del.id, "rounds", newRounds);
+    } else if(ref.kind==="ingest") {
+      const ing = (project.ingestDates||[]).find(i=>i.id===ref.id);
+      if(!ing) return;
+      const time = newTime || (ing.datetime||"").slice(11,16) || "09:00";
+      const newIngests = (project.ingestDates||[]).map(i=>i.id===ref.id?{...i,datetime:`${newDate}T${time}`}:i);
+      onUpdateProject(project.id,"ingestDates",newIngests);
+    }
+  };
+
+  const handleDrop = (e, ds) => {
+    e.preventDefault();
+    const ev = allEvents.find(x=>x.id===dragId);
+    setDragId(null);
+    if(!ev || ev.date===ds) return;
+    applyDateChange(ev, ds);
+  };
 
   return (
     <div style={{background:"#0f172a",border:"1px solid #1f2937",borderRadius:12,padding:"16px 20px"}}>
@@ -22304,13 +22371,20 @@ const ProjectCalendar = ({project}) => {
           style={{background:"#1f2937",border:"none",borderRadius:6,color:"#e2e8f0",width:30,height:30,cursor:"pointer",fontSize:19}}>›</button>
       </div>
 
-      {/* Legend */}
-      <div style={{display:"flex",gap:14,marginBottom:14,flexWrap:"wrap"}}>
-        {[{type:"production",label:"Productions",color:"#6366f1"},{type:"deliverable",label:"Deliverables",color:"#f59e0b"},{type:"ingest",label:"Ingest Dates",color:"#06b6d4"}].map(l=>(
-          <div key={l.type} style={{display:"flex",alignItems:"center",gap:5,fontSize:13,color:"#9ca3af"}}>
-            <span style={{width:10,height:10,borderRadius:3,background:l.color,flexShrink:0}}/>{l.label}
-          </div>
-        ))}
+      {/* Filter / legend toggles */}
+      <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+        {Object.entries(PROJ_CAL_TYPE_META).map(([type,meta])=>{
+          const on = filters[type];
+          return (
+            <button key={type} onClick={()=>setFilters(f=>({...f,[type]:!f[type]}))}
+              style={{display:"flex",alignItems:"center",gap:5,fontSize:13,fontWeight:700,color:on?meta.color:"#4b5563",
+                background:on?meta.color+"15":"#111827",border:`1px solid ${on?meta.color+"50":"#1f2937"}`,borderRadius:20,
+                padding:"4px 10px",cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>
+              <span style={{width:9,height:9,borderRadius:3,background:on?meta.color:"#374151",flexShrink:0}}/>{meta.icon} {meta.label}
+            </button>
+          );
+        })}
+        {canEdit&&<div style={{fontSize:12,color:"#4b5563",marginLeft:"auto",alignSelf:"center"}}>Drag a date to reschedule · click to edit time</div>}
       </div>
 
       {/* Day headers */}
@@ -22328,33 +22402,73 @@ const ProjectCalendar = ({project}) => {
           const evs = byDay[ds]||[];
           const isToday = ds===todayStr;
           return (
-            <div key={day} style={{background:isToday?"#6366f115":"#111827",border:`1px solid ${isToday?"#6366f1":"#1f2937"}`,borderRadius:6,padding:"4px 4px 6px",minHeight:64,display:"flex",flexDirection:"column",gap:2}}>
+            <div key={day}
+              onDragOver={canEdit?e=>e.preventDefault():undefined}
+              onDrop={canEdit?e=>handleDrop(e,ds):undefined}
+              style={{background:isToday?"#6366f115":"#111827",border:`1px solid ${isToday?"#6366f1":"#1f2937"}`,borderRadius:6,padding:"4px 4px 6px",minHeight:72,display:"flex",flexDirection:"column",gap:2}}>
               <div style={{fontSize:14,fontWeight:isToday?800:400,color:isToday?"#818cf8":"#6b7280",textAlign:"right",lineHeight:1.2,marginBottom:2}}>{day}</div>
-              {evs.slice(0,3).map((ev,i)=>(
-                <div key={i} title={`${ev.label} — ${ev.status}`}
-                  style={{background:ev.color+"25",borderLeft:`2px solid ${ev.color}`,borderRadius:"0 3px 3px 0",padding:"1px 4px",fontSize:11,color:ev.color,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Barlow Condensed',sans-serif"}}>
-                  {typeIcon[ev.type]} {ev.label}
-                </div>
-              ))}
-              {evs.length>3&&<div style={{fontSize:11,color:"#838ba0",textAlign:"center"}}>+{evs.length-3} more</div>}
+              {evs.slice(0,4).map(ev=>{
+                const meta = PROJ_CAL_TYPE_META[ev.type];
+                return (
+                  <div key={ev.id}
+                    draggable={canEdit&&!!ev.ref||ev.type==="poststart"}
+                    onDragStart={canEdit?e=>{setDragId(ev.id); e.dataTransfer.effectAllowed="move";}:undefined}
+                    onDragEnd={()=>setDragId(null)}
+                    onClick={canEdit?()=>setEditEvent({id:ev.id,label:ev.label,date:ev.date,time:ev.time||"",hasTime:ev.hasTime}):undefined}
+                    title={`${ev.label}${ev.status?" — "+ev.status:""}${ev.time?" · "+ev.time:""}`}
+                    style={{background:ev.color+"25",borderLeft:`2px solid ${ev.color}`,borderRadius:"0 3px 3px 0",padding:"1px 4px",fontSize:11,color:ev.color,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Barlow Condensed',sans-serif",cursor:canEdit?"grab":"default",opacity:dragId===ev.id?0.4:1}}>
+                    {meta.icon} {ev.label}
+                  </div>
+                );
+              })}
+              {evs.length>4&&<div style={{fontSize:11,color:"#838ba0",textAlign:"center"}}>+{evs.length-4} more</div>}
             </div>
           );
         })}
       </div>
+
+      {/* Edit-time popover */}
+      {editEvent&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setEditEvent(null)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#0f172a",border:"1px solid #1f2937",borderRadius:10,padding:20,width:280}}>
+            <div style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:14,fontFamily:"'Barlow Condensed',sans-serif"}}>{editEvent.label}</div>
+            <label style={{fontSize:12,color:"#8e97a6",textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:4}}>Date</label>
+            <input type="date" value={editEvent.date} onChange={e=>setEditEvent({...editEvent,date:e.target.value})}
+              style={{width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"7px 10px",fontSize:14,marginBottom:12,colorScheme:"dark"}}/>
+            {editEvent.hasTime&&(
+              <>
+                <label style={{fontSize:12,color:"#8e97a6",textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:4}}>Time</label>
+                <input type="time" value={editEvent.time} onChange={e=>setEditEvent({...editEvent,time:e.target.value})}
+                  style={{width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"7px 10px",fontSize:14,marginBottom:12,colorScheme:"dark"}}/>
+              </>
+            )}
+            <div style={{display:"flex",gap:8,marginTop:6}}>
+              <button onClick={()=>{
+                  const ev = allEvents.find(x=>x.id===editEvent.id);
+                  applyDateChange(ev, editEvent.date, editEvent.time);
+                  setEditEvent(null);
+                }}
+                style={{flex:1,background:"#6366f1",border:"none",borderRadius:6,color:"#fff",padding:"8px 0",fontSize:14,fontWeight:700,cursor:"pointer"}}>Save</button>
+              <button onClick={()=>setEditEvent(null)}
+                style={{flex:1,background:"#1f2937",border:"none",borderRadius:6,color:"#9ca3af",padding:"8px 0",fontSize:14,fontWeight:700,cursor:"pointer"}}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 // ─── BXTV Workflow Helpers ────────────────────────────────────────────────────
 const isBXTVProject   = p => (p?.workstream||"").toUpperCase()==="BXTV";
-const getBXTVEpisodeName = p => {
-  if(!p) return "";
-  const m = p.bxtvMeta;
-  if(!m) return p.name||"";
-  const s = String(m.season||"").padStart(2,"0");
-  const e = String(m.episode||"").padStart(2,"0");
-  const code = `S${s}E${e}`;
-  return m.title ? `${code}: ${m.title}` : (p.name||code);
+// Season/episode lives directly in this team's project-naming convention
+// (e.g. "26_BXTV_S06E15_TEST_260817") rather than a separate metadata field
+// someone has to remember to fill in — parsing it out of the name keeps it
+// automatically in sync with however the project is actually named.
+const parseBXTVCode = name => {
+  const m = /S(\d{1,2})E(\d{1,2})/i.exec(name||"");
+  return m ? `S${m[1].padStart(2,"0")}E${m[2].padStart(2,"0")}` : null;
 };
+const getBXTVEpisodeName = p => p ? (parseBXTVCode(p.name) || p.name || "") : "";
 const getBXTVProjects = projects => projects.filter(isBXTVProject);
 
 // Get cross-referenced deliverables for a BXTV episode (from other projects)
@@ -22393,39 +22507,6 @@ const moveBXTVDel = (sourceProject, del, oldEpisode, newEpisode, bxtvEditorId, o
   linkDelToBXTV(sourceProject, del, newEpisode, bxtvEditorId, onUpdateProject);
 };
 
-// ─── BXTV Metadata Editor Panel ───────────────────────────────────────────────
-const BXTVMetaPanel = ({project, onUpdateProject}) => {
-  const m = project.bxtvMeta||{};
-  const upd = (f,v) => onUpdateProject(project.id,"bxtvMeta",{...m,[f]:v});
-  const inp = {background:"#0a0f1a",border:"1px solid #374151",borderRadius:7,color:"#e2e8f0",padding:"8px 10px",fontSize:16,outline:"none",width:"100%",fontFamily:"'DM Sans',sans-serif",colorScheme:"dark"};
-  const lbl = {fontSize:13,fontWeight:700,color:"#838ba0",textTransform:"uppercase",letterSpacing:"0.07em",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:4,display:"block"};
-  return (
-    <div style={{background:"#0d1117",border:"1px solid #6366f140",borderRadius:10,padding:"14px 16px",marginBottom:14}}>
-      <div style={{fontSize:14,fontWeight:800,color:"#818cf8",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.08em",marginBottom:12}}>📺 BXTV Episode</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 2fr",gap:10}}>
-        <div>
-          <label style={lbl}>Season</label>
-          <input style={inp} type="number" min="1" value={m.season||""} onChange={e=>upd("season",+e.target.value)} placeholder="26"/>
-        </div>
-        <div>
-          <label style={lbl}>Episode</label>
-          <input style={inp} type="number" min="1" value={m.episode||""} onChange={e=>upd("episode",+e.target.value)} placeholder="04"/>
-        </div>
-        <div>
-          <label style={lbl}>Air Date</label>
-          <input style={{...inp,colorScheme:"dark"}} type="date" value={m.airDate||""} onChange={e=>upd("airDate",e.target.value)}/>
-        </div>
-        <div>
-          <label style={lbl}>Episode Title</label>
-          <input style={inp} value={m.title||""} onChange={e=>upd("title",e.target.value)} placeholder="e.g. The Big Game Recap"/>
-        </div>
-      </div>
-      <div style={{marginTop:6,fontSize:14,color:"#6366f1",fontWeight:600}}>
-        {getBXTVEpisodeName(project)}
-      </div>
-    </div>
-  );
-};
 // ─── BXTV Link Section (inside deliverable cards / sidebar) ───────────────────
 // The episode picker is always visible (not gated behind an expand/"+ BXTV"
 // step) as soon as a deliverable's type is BXTV — picking an episode from the
@@ -25573,7 +25654,7 @@ const HistoryFeedContent = ({title, buildQuery, onClose}) => {
   );
 };
 
-export default function App() {
+function App() {
   // Real per-person auth via Supabase, replacing the old shared-password gate.
   // authChecked stays false only for the brief moment while we ask Supabase
   // whether an existing session is already active, so we don't flash the
@@ -26752,7 +26833,7 @@ export default function App() {
           {view==="studio"&&<StudioTab projects={allProjects} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} team={allTeam} onOpenProject={openProject} talentRoster={talentRoster} onUpdateProject={updateProject} mediaCards={mediaCards} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="kanban"&&kanbanMode==="status"&&<KanbanStatus projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="kanban"&&kanbanMode==="editor"&&<KanbanEditor projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
-          {view==="calendar"&&<CalendarView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
+          {view==="calendar"&&<CalendarView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} unavailability={unavailability} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="deliverables"&&<DeliverablesTab projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="ingest"&&<IngestView projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="resources"&&<ResourceView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
@@ -26887,3 +26968,4 @@ export default function App() {
     </>
   );
 }
+window.App = App;
