@@ -3336,8 +3336,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     return prev.del.id === next.del.id && JSON.stringify(prev.del) === JSON.stringify(next.del) && prev.project?.id === next.project?.id && prev.locked === next.locked;
   });
   var FLabel = ({ children }) => /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 5 } }, children);
-  var AddReviewRoundModal = ({ project, onUpdateDel, reviewerNames = [], addReviewerName, onClose }) => {
-    const [datetime, setDatetime] = (0, import_react.useState)("");
+  var AddReviewRoundModal = ({ project, onUpdateDel, reviewerNames = [], addReviewerName, initialDate, onClose }) => {
+    const [datetime, setDatetime] = (0, import_react.useState)(initialDate ? `${initialDate}T10:00` : "");
     const [reviewers, setReviewers] = (0, import_react.useState)([]);
     const [notes, setNotes] = (0, import_react.useState)("");
     const [selectedIds, setSelectedIds] = (0, import_react.useState)([]);
@@ -3365,10 +3365,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     };
     return /* @__PURE__ */ React.createElement(Modal, { onClose, maxWidth: 520 }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.02em", marginBottom: 16 } }, "Add a Review Round"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(FLabel, null, "Date & Time of Review"), /* @__PURE__ */ React.createElement(DateTimePicker, { value: datetime, onChange: setDatetime, label: "Review date/time" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(FLabel, null, "Reviewers"), /* @__PURE__ */ React.createElement(ReviewerTagInput, { value: reviewers, onChange: setReviewers, suggestions: reviewerNames, onAddSuggestion: addReviewerName, listId: "add-review-round-reviewers" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(FLabel, null, "Notes"), /* @__PURE__ */ React.createElement(Inp, { textarea: true, value: notes, onChange: (e) => setNotes(e.target.value), placeholder: "Notes for reviewers..." })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(FLabel, null, "Deliverables to Review (", selectedIds.length, " selected)"), /* @__PURE__ */ React.createElement(DeliverableCheckList, { deliverables, selectedIds, onChange: setSelectedIds })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 } }, /* @__PURE__ */ React.createElement(Btn, { variant: "ghost", onClick: onClose }, "Cancel"), /* @__PURE__ */ React.createElement(Btn, { onClick: submit, disabled: !canSubmit }, "Add Review Round"))));
   };
-  var AddWorkReviewRoundModal = ({ project, allProjects = [], onUpdateDel, workReviewSessions = [], addWorkReviewSession, updateWorkReviewSession, reviewerNames = [], addReviewerName, onClose }) => {
+  var AddWorkReviewRoundModal = ({ project, allProjects = [], onUpdateDel, workReviewSessions = [], addWorkReviewSession, updateWorkReviewSession, reviewerNames = [], addReviewerName, initialDate, onClose }) => {
     const [sessionId, setSessionId] = (0, import_react.useState)("");
-    const [creatingNew, setCreatingNew] = (0, import_react.useState)(false);
-    const [newDatetime, setNewDatetime] = (0, import_react.useState)("");
+    const [creatingNew, setCreatingNew] = (0, import_react.useState)(!!initialDate);
+    const [newDatetime, setNewDatetime] = (0, import_react.useState)(initialDate ? `${initialDate}T14:00` : "");
     const [newLocation, setNewLocation] = (0, import_react.useState)("");
     const [selectedIds, setSelectedIds] = (0, import_react.useState)([]);
     const nowISO = (/* @__PURE__ */ new Date()).toISOString().slice(0, 16);
@@ -3436,6 +3436,58 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         disabledLabel: "Already screening"
       }
     ))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 } }, /* @__PURE__ */ React.createElement(Btn, { variant: "ghost", onClick: onClose }, "Cancel"), /* @__PURE__ */ React.createElement(Btn, { onClick: submit, disabled: !canSubmit }, "Add to Work Review"))));
+  };
+  var ProjectReviewRoundsList = ({ project, onUpdateDel, reviewerNames = [], addReviewerName }) => {
+    const [expandedKey, setExpandedKey] = (0, import_react.useState)(null);
+    const groups = (0, import_react.useMemo)(() => {
+      const byKey = {};
+      (project.deliverables || []).forEach((d) => {
+        (d.rounds || []).forEach((r, ri) => {
+          const gid = r.isWorkReview ? r.workReviewSessionId : r.reviewRoundId;
+          const key = gid ? `${r.isWorkReview ? "wr" : "rr"}-${gid}` : `single-${d.id}-${r.id}`;
+          (byKey[key] = byKey[key] || []).push({ del: d, round: r, roundIdx: ri });
+        });
+      });
+      return Object.entries(byKey).map(([key, members]) => ({ key, members })).sort((a, b) => (a.members[0].round.deadline || "").localeCompare(b.members[0].round.deadline || ""));
+    }, [project]);
+    const updateGroupField = (members, field, value) => {
+      members.forEach(({ del, roundIdx }) => {
+        const newRounds = (del.rounds || []).map((r, i) => i === roundIdx ? { ...r, [field]: value } : r);
+        onUpdateDel(project.id, del.id, "rounds", newRounds);
+      });
+    };
+    const updateOneStatus = (delId, roundIdx, status) => {
+      const del = (project.deliverables || []).find((d) => d.id === delId);
+      if (!del) return;
+      const newRounds = (del.rounds || []).map((r, i) => i === roundIdx ? { ...r, status } : r);
+      onUpdateDel(project.id, delId, "rounds", newRounds);
+    };
+    const removeGroup = (members) => {
+      members.forEach(({ del, roundIdx }) => {
+        const newRounds = (del.rounds || []).filter((_, i) => i !== roundIdx);
+        onUpdateDel(project.id, del.id, "rounds", newRounds);
+      });
+    };
+    if (groups.length === 0) return /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#4b5563", padding: "8px 2px" } }, "No review rounds yet \u2014 use the buttons above to schedule one.");
+    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, groups.map(({ key, members }) => {
+      const first = members[0].round;
+      const isWR = !!first.isWorkReview;
+      const isExp = expandedKey === key;
+      const color = isWR ? "#ec4899" : RCOLOR[first.status] || "#eab308";
+      return /* @__PURE__ */ React.createElement("div", { key, style: { background: "#0a0f1a", border: `1px solid ${color}30`, borderRadius: 8, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { onClick: () => setExpandedKey(isExp ? null : key), style: { display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", cursor: "pointer" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15 } }, isWR ? "\u{1F3A5}" : "\u21BA"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: "#e2e8f0" } }, isWR ? "Work Review" : "Review Round", " \u2014 ", fmtDT(first.deadline)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, members.map((m) => m.del.title || "Untitled").join(", "))), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#4b5563", flexShrink: 0 } }, members.length, " deliverable", members.length !== 1 ? "s" : ""), /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontSize: 13, flexShrink: 0 } }, isExp ? "\u25B2" : "\u25BC")), isExp && /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { padding: "10px 12px", borderTop: "1px solid #1f2937", display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: first.deadline, onChange: (v) => updateGroupField(members, "deadline", v), label: "Round date/time" }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", fontWeight: 700, marginBottom: 5, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.08em", textTransform: "uppercase" } }, "Reviewers"), /* @__PURE__ */ React.createElement(
+        ReviewerTagInput,
+        {
+          value: first.reviewers || [],
+          onChange: (list) => updateGroupField(members, "reviewers", list),
+          suggestions: reviewerNames,
+          onAddSuggestion: addReviewerName,
+          listId: `proj-rr-${key}`
+        }
+      )), /* @__PURE__ */ React.createElement(Inp, { textarea: true, value: first.notes || "", onChange: (e) => updateGroupField(members, "notes", e.target.value), placeholder: "Notes..." }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", fontWeight: 700, marginBottom: 5, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.08em", textTransform: "uppercase" } }, "Status per Deliverable"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5 } }, members.map(({ del, round, roundIdx }) => /* @__PURE__ */ React.createElement("div", { key: del.id, style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#e2e8f0", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, del.title || "Untitled"), /* @__PURE__ */ React.createElement(Sel, { value: round.status, onChange: (e) => updateOneStatus(del.id, roundIdx, e.target.value), style: { width: "auto", background: RCOLOR[round.status] + "18", color: RCOLOR[round.status], border: `1px solid ${RCOLOR[round.status]}40` } }, ROUND_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, value: s, style: { background: "#0d1117", color: "#e2e8f0" } }, s))))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement(Btn, { variant: "danger", small: true, onClick: () => {
+        removeGroup(members);
+        setExpandedKey(null);
+      } }, "Remove Round"))));
+    }));
   };
   var MediaCardQuantityPicker = ({ selectedIds = [], onUpdateSelected }) => {
     const [adding, setAdding] = (0, import_react.useState)(false);
@@ -4818,7 +4870,20 @@ Brief content: ${content}`;
           label: "When can post realistically begin?"
         }
       ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 5 } }, hasOverride ? `Overridden \u2014 based on ingest data, the system would otherwise suggest ${suggested ? fmtDT(suggested.toISOString()) : "no constraint"}.` : suggested ? `Suggested from the earliest ingest not yet fully received. Resource planning assumes none of this project's deliverables start before this date.` : `No ingest data found yet to suggest from. If this project doesn't depend on new footage, check "based entirely on previous material" in Project Info \u2014 otherwise, set a date manually once a shoot is scheduled.`)));
-    })()), isBXTVProject(lp) && (() => {
+    })()), /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 12, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" } }, "Review Rounds"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(Btn, { small: true, variant: "ghost", onClick: () => setShowAddReviewRound(true) }, "+ Add a Review Round"), /* @__PURE__ */ React.createElement(Btn, { small: true, variant: "ghost", onClick: () => setShowAddWorkReview(true) }, "+ Add a Work Review Round"))), /* @__PURE__ */ React.createElement(ProjectReviewRoundsList, { project: lp, onUpdateDel, reviewerNames, addReviewerName })), showAddReviewRound && /* @__PURE__ */ React.createElement(AddReviewRoundModal, { project: lp, onUpdateDel, reviewerNames, addReviewerName, onClose: () => setShowAddReviewRound(false) }), showAddWorkReview && /* @__PURE__ */ React.createElement(
+      AddWorkReviewRoundModal,
+      {
+        project: lp,
+        allProjects,
+        onUpdateDel,
+        workReviewSessions,
+        addWorkReviewSession,
+        updateWorkReviewSession,
+        reviewerNames,
+        addReviewerName,
+        onClose: () => setShowAddWorkReview(false)
+      }
+    ), isBXTVProject(lp) && (() => {
       const linked = getBXTVLinkedDels(lp, allProjects);
       if (!linked.length) return null;
       return /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #6366f140", borderRadius: 10, padding: "14px 16px", marginBottom: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#818cf8", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.08em", marginBottom: 10 } }, "\u{1F4FA} Sourced from Other Projects (", linked.length, ")"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, linked.map(({ del, sourceProject }) => {
@@ -4921,20 +4986,7 @@ Brief content: ${content}`;
       /* @__PURE__ */ React.createElement("option", { value: "type" }, "Deliverable Type"),
       /* @__PURE__ */ React.createElement("option", { value: "editor" }, "Editor"),
       /* @__PURE__ */ React.createElement("option", { value: "status" }, "Status")
-    )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#8e97a6" } }, lp.deliverables.length, " deliverable", lp.deliverables.length !== 1 ? "s" : "")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(Btn, { small: true, variant: "ghost", onClick: () => setShowAddReviewRound(true) }, "+ Add a Review Round"), /* @__PURE__ */ React.createElement(Btn, { small: true, variant: "ghost", onClick: () => setShowAddWorkReview(true) }, "+ Add a Work Review Round")), showAddReviewRound && /* @__PURE__ */ React.createElement(AddReviewRoundModal, { project: lp, onUpdateDel, reviewerNames, addReviewerName, onClose: () => setShowAddReviewRound(false) }), showAddWorkReview && /* @__PURE__ */ React.createElement(
-      AddWorkReviewRoundModal,
-      {
-        project: lp,
-        allProjects,
-        onUpdateDel,
-        workReviewSessions,
-        addWorkReviewSession,
-        updateWorkReviewSession,
-        reviewerNames,
-        addReviewerName,
-        onClose: () => setShowAddWorkReview(false)
-      }
-    ), lp.deliverables.length === 0 && !showAddDel && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#838ba0", padding: "24px 0", fontSize: 19 } }, "No deliverables yet."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, (() => {
+    )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#8e97a6" } }, lp.deliverables.length, " deliverable", lp.deliverables.length !== 1 ? "s" : "")), lp.deliverables.length === 0 && !showAddDel && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#838ba0", padding: "24px 0", fontSize: 19 } }, "No deliverables yet."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, (() => {
       const dels = [...lp.deliverables];
       if (delSort === "alpha") dels.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
       else if (delSort === "finalDue") dels.sort((a, b) => !a.deadline ? 1 : !b.deadline ? -1 : new Date(a.deadline) - new Date(b.deadline));
@@ -15347,19 +15399,181 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       );
     }))));
   };
+  var PROJ_CAL_MONTH_HEADER_H = 40;
+  var PROJ_CAL_MONTH_STRIP_H = 160;
+  var ProjectCalendarMonth = ({ calY, calM, events, onCommitMove, onEventClick, onDayContextMenu, canEdit }) => {
+    const stripRefs = (0, import_react.useRef)({});
+    const [drag, setDrag] = (0, import_react.useState)(null);
+    const dragRef = (0, import_react.useRef)(null);
+    const justDraggedRef = (0, import_react.useRef)(false);
+    (0, import_react.useEffect)(() => {
+      dragRef.current = drag;
+    }, [drag]);
+    const pad = (n) => String(n).padStart(2, "0");
+    const daysInMonth = new Date(calY, calM + 1, 0).getDate();
+    const firstDow = new Date(calY, calM, 1).getDay();
+    const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const timed = events.filter((e) => e.hasTime);
+    const allDay = events.filter((e) => !e.hasTime);
+    const hToY = (h) => (h - PROJ_CAL_WEEK_START_H) / (PROJ_CAL_WEEK_END_H - PROJ_CAL_WEEK_START_H) * PROJ_CAL_MONTH_STRIP_H;
+    const yToH = (y, stripH) => projCalSnapQ(Math.max(PROJ_CAL_WEEK_START_H, Math.min(PROJ_CAL_WEEK_END_H - 0.25, PROJ_CAL_WEEK_START_H + y / stripH * (PROJ_CAL_WEEK_END_H - PROJ_CAL_WEEK_START_H))));
+    const timedByDate = (0, import_react.useMemo)(() => {
+      const m = {};
+      timed.forEach((ev) => {
+        const effDate = drag && drag.ev.id === ev.id ? drag.date : ev.date;
+        (m[effDate] = m[effDate] || []).push(ev);
+      });
+      return m;
+    }, [timed, drag]);
+    const allDayByDate = (0, import_react.useMemo)(() => {
+      const m = {};
+      allDay.forEach((ev) => {
+        (m[ev.date] = m[ev.date] || []).push(ev);
+      });
+      return m;
+    }, [allDay]);
+    const startDrag = (e, ev) => {
+      if (!canEdit) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setDrag({ ev, date: ev.date, hour: projCalHhmmToH(ev.time) });
+    };
+    (0, import_react.useEffect)(() => {
+      if (!drag) return;
+      const handleMove = (e) => {
+        let hitDs = null, hitRect = null;
+        for (const ds in stripRefs.current) {
+          const el = stripRefs.current[ds];
+          if (!el) continue;
+          const r = el.getBoundingClientRect();
+          if (e.clientX >= r.left && e.clientX < r.right && e.clientY >= r.top && e.clientY < r.bottom) {
+            hitDs = ds;
+            hitRect = r;
+            break;
+          }
+        }
+        if (!hitDs) return;
+        const hour = yToH(e.clientY - hitRect.top, hitRect.height);
+        setDrag((prev) => prev ? { ...prev, date: hitDs, hour } : prev);
+      };
+      const handleUp = () => {
+        const d = dragRef.current;
+        setDrag(null);
+        if (d) {
+          justDraggedRef.current = true;
+          onCommitMove(d.ev, d.date, projCalHToHhmm(d.hour));
+        }
+      };
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp);
+      return () => {
+        window.removeEventListener("pointermove", handleMove);
+        window.removeEventListener("pointerup", handleUp);
+      };
+    }, [drag]);
+    const handleClick = (ev) => {
+      if (justDraggedRef.current) {
+        justDraggedRef.current = false;
+        return;
+      }
+      onEventClick(ev);
+    };
+    const hourMarks = [];
+    for (let h = PROJ_CAL_WEEK_START_H; h <= PROJ_CAL_WEEK_END_H; h += 3) hourMarks.push(h);
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gap: 2, marginBottom: 2 } }, ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => /* @__PURE__ */ React.createElement("div", { key: d, style: { textAlign: "center", fontSize: 13, fontWeight: 700, color: "#838ba0", padding: "3px 0", fontFamily: "'Barlow Condensed',sans-serif" } }, d))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gap: 2 } }, Array.from({ length: firstDow }).map((_, i) => /* @__PURE__ */ React.createElement("div", { key: `e${i}` })), Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
+      const ds = `${calY}-${pad(calM + 1)}-${pad(day)}`;
+      const isToday = ds === todayStr;
+      const dayAllEvs = allDayByDate[ds] || [];
+      const dayTimedEvs = timedByDate[ds] || [];
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: day,
+          onContextMenu: canEdit ? (e) => {
+            e.preventDefault();
+            onDayContextMenu(ds, e.clientX, e.clientY);
+          } : void 0,
+          style: { background: isToday ? "#6366f115" : "#111827", border: `1px solid ${isToday ? "#6366f1" : "#1f2937"}`, borderRadius: 6, overflow: "hidden", display: "flex", flexDirection: "column" }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: { padding: "3px 5px 0", display: "flex", flexDirection: "column", gap: 2, minHeight: PROJ_CAL_MONTH_HEADER_H } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: isToday ? 800 : 400, color: isToday ? "#818cf8" : "#6b7280", textAlign: "right", lineHeight: 1.2 } }, day), dayAllEvs.slice(0, 2).map((ev) => {
+          const meta = PROJ_CAL_TYPE_META[ev.type];
+          return /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              key: ev.id,
+              onClick: () => handleClick(ev),
+              title: ev._tooltip || ev.label,
+              style: { background: ev.color + "25", borderLeft: `2px solid ${ev.color}`, borderRadius: "0 3px 3px 0", padding: "0 4px", fontSize: 10, color: ev.color, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: canEdit ? "pointer" : "default" }
+            },
+            meta.icon,
+            " ",
+            ev.label
+          );
+        }), dayAllEvs.length > 2 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#838ba0" } }, "+", dayAllEvs.length - 2, " more")),
+        /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            ref: (el) => {
+              if (el) stripRefs.current[ds] = el;
+              else delete stripRefs.current[ds];
+            },
+            style: { position: "relative", flex: 1, minHeight: PROJ_CAL_MONTH_STRIP_H, borderTop: "1px solid #1f293780" }
+          },
+          hourMarks.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", left: 0, right: 0, top: hToY(h), height: 1, background: "#1f293750" } })),
+          dayTimedEvs.map((ev) => {
+            const isDragging = drag?.ev.id === ev.id;
+            const hour = isDragging ? drag.hour : projCalHhmmToH(ev.time);
+            const meta = PROJ_CAL_TYPE_META[ev.type];
+            return /* @__PURE__ */ React.createElement(
+              "div",
+              {
+                key: ev.id,
+                onPointerDown: (e) => startDrag(e, ev),
+                onClick: () => handleClick(ev),
+                title: `${ev._tooltip || ev.label}${ev.status ? " \u2014 " + ev.status : ""} \xB7 ${projCalHToHhmm(hour)}`,
+                style: {
+                  position: "absolute",
+                  left: 2,
+                  right: 2,
+                  top: hToY(hour),
+                  height: 13,
+                  background: ev.color + (isDragging ? "45" : "2a"),
+                  border: `1px solid ${ev.color}${isDragging ? "ee" : "99"}`,
+                  borderRadius: 3,
+                  padding: "0 3px",
+                  fontSize: 9,
+                  lineHeight: "11px",
+                  color: ev.color,
+                  fontWeight: 700,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  cursor: canEdit ? "grab" : "default",
+                  zIndex: isDragging ? 10 : 2,
+                  touchAction: "none"
+                }
+              },
+              meta.icon,
+              " ",
+              ev.label
+            );
+          })
+        )
+      );
+    })));
+  };
   var ProjectCalendar = ({ project, allProjects = [], onUpdateProject, onUpdateDel, reviewerNames = [], addReviewerName, workReviewSessions = [], addWorkReviewSession, updateWorkReviewSession }) => {
     const today = /* @__PURE__ */ new Date();
     const [calY, setCalY] = (0, import_react.useState)(today.getFullYear());
     const [calM, setCalM] = (0, import_react.useState)(today.getMonth());
     const [viewMode, setViewMode] = (0, import_react.useState)("month");
     const [weekStart, setWeekStart] = (0, import_react.useState)(getWeekStart(today));
-    const todayStr = today.toISOString().slice(0, 10);
-    const pad = (n) => String(n).padStart(2, "0");
     const [filters, setFilters] = (0, import_react.useState)({ production: true, poststart: true, round: true, workreview: true, deliverable: true, ingest: true });
-    const [dragId, setDragId] = (0, import_react.useState)(null);
     const [editEvent, setEditEvent] = (0, import_react.useState)(null);
     const [showAddReviewRound, setShowAddReviewRound] = (0, import_react.useState)(false);
     const [showAddWorkReview, setShowAddWorkReview] = (0, import_react.useState)(false);
+    const [modalInitialDate, setModalInitialDate] = (0, import_react.useState)(null);
+    const [contextMenu, setContextMenu] = (0, import_react.useState)(null);
     const canEdit = !!(onUpdateProject && onUpdateDel);
     const allEvents = (0, import_react.useMemo)(() => {
       const evs = [];
@@ -15463,16 +15677,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       });
       return singles;
     }, [visibleEvents]);
-    const byDay = (0, import_react.useMemo)(() => {
-      const m = {};
-      groupedEvents.forEach((ev) => {
-        if (!m[ev.date]) m[ev.date] = [];
-        m[ev.date].push(ev);
-      });
-      return m;
-    }, [groupedEvents]);
-    const daysInMonth = new Date(calY, calM + 1, 0).getDate();
-    const firstDow = new Date(calY, calM, 1).getDay();
     const applyDateChange = (ev, newDate, newTime) => {
       if (!canEdit || !ev || !newDate) return;
       const members = ev._members || [ev];
@@ -15510,19 +15714,13 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         }
       });
     };
-    const handleDrop = (e, ds) => {
-      e.preventDefault();
-      const ev = groupedEvents.find((x) => x.id === dragId);
-      setDragId(null);
-      if (!ev || ev.date === ds) return;
-      applyDateChange(ev, ds);
-    };
     const openEditEvent = (ev) => setEditEvent({ id: ev.id, label: ev.label, date: ev.date, time: ev.time || "", hasTime: ev.hasTime });
     const shiftWeek = (delta) => setWeekStart((w) => {
       const n = new Date(w);
       n.setDate(n.getDate() + delta * 7);
       return n;
     });
+    const openDayContextMenu = (ds, x, y) => setContextMenu({ date: ds, x, y });
     return /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 20px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 } }, viewMode === "month" ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -15584,7 +15782,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         " ",
         meta.label
       );
-    }), canEdit && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#4b5563", marginLeft: "auto", alignSelf: "center" } }, viewMode === "month" ? "Drag a date to reschedule \xB7 click to edit time" : "Drag an event to change its time \xB7 click to fine-tune")), viewMode === "week" ? /* @__PURE__ */ React.createElement(
+    }), canEdit && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#4b5563", marginLeft: "auto", alignSelf: "center" } }, viewMode === "month" ? "Drag an event to reschedule its date or time \xB7 right-click a day to add a round" : "Drag an event to change its time \xB7 click to fine-tune")), viewMode === "week" ? /* @__PURE__ */ React.createElement(
       ProjectCalendarWeek,
       {
         weekStart,
@@ -15593,43 +15791,18 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         onCommitMove: (ev, newDate, newTime) => applyDateChange(ev, newDate, newTime),
         onEventClick: openEditEvent
       }
-    ) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gap: 2, marginBottom: 2 } }, ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => /* @__PURE__ */ React.createElement("div", { key: d, style: { textAlign: "center", fontSize: 13, fontWeight: 700, color: "#838ba0", padding: "3px 0", fontFamily: "'Barlow Condensed',sans-serif" } }, d))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gap: 2 } }, Array.from({ length: firstDow }).map((_, i) => /* @__PURE__ */ React.createElement("div", { key: `e${i}` })), Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
-      const ds = `${calY}-${pad(calM + 1)}-${pad(day)}`;
-      const evs = byDay[ds] || [];
-      const isToday = ds === todayStr;
-      return /* @__PURE__ */ React.createElement(
-        "div",
-        {
-          key: day,
-          onDragOver: canEdit ? (e) => e.preventDefault() : void 0,
-          onDrop: canEdit ? (e) => handleDrop(e, ds) : void 0,
-          style: { background: isToday ? "#6366f115" : "#111827", border: `1px solid ${isToday ? "#6366f1" : "#1f2937"}`, borderRadius: 6, padding: "4px 4px 6px", minHeight: 72, display: "flex", flexDirection: "column", gap: 2 }
-        },
-        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: isToday ? 800 : 400, color: isToday ? "#818cf8" : "#6b7280", textAlign: "right", lineHeight: 1.2, marginBottom: 2 } }, day),
-        evs.slice(0, 4).map((ev) => {
-          const meta = PROJ_CAL_TYPE_META[ev.type];
-          return /* @__PURE__ */ React.createElement(
-            "div",
-            {
-              key: ev.id,
-              draggable: canEdit && (!!ev.ref || ev.type === "poststart" || !!ev._members),
-              onDragStart: canEdit ? (e) => {
-                setDragId(ev.id);
-                e.dataTransfer.effectAllowed = "move";
-              } : void 0,
-              onDragEnd: () => setDragId(null),
-              onClick: canEdit ? () => openEditEvent(ev) : void 0,
-              title: ev._tooltip || `${ev.label}${ev.status ? " \u2014 " + ev.status : ""}${ev.time ? " \xB7 " + ev.time : ""}`,
-              style: { background: ev.color + "25", borderLeft: `2px solid ${ev.color}`, borderRadius: "0 3px 3px 0", padding: "1px 4px", fontSize: 11, color: ev.color, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Barlow Condensed',sans-serif", cursor: canEdit ? "grab" : "default", opacity: dragId === ev.id ? 0.4 : 1 }
-            },
-            meta.icon,
-            " ",
-            ev.label
-          );
-        }),
-        evs.length > 4 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#838ba0", textAlign: "center" } }, "+", evs.length - 4, " more")
-      );
-    }))), editEvent && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 900, display: "flex", alignItems: "center", justifyContent: "center" }, onClick: () => setEditEvent(null) }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 10, padding: 20, width: 280 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#f1f5f9", marginBottom: 14, fontFamily: "'Barlow Condensed',sans-serif" } }, editEvent.label), /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, color: "#8e97a6", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 } }, "Date"), /* @__PURE__ */ React.createElement(
+    ) : /* @__PURE__ */ React.createElement(
+      ProjectCalendarMonth,
+      {
+        calY,
+        calM,
+        events: groupedEvents,
+        canEdit,
+        onCommitMove: (ev, newDate, newTime) => applyDateChange(ev, newDate, newTime),
+        onEventClick: openEditEvent,
+        onDayContextMenu: openDayContextMenu
+      }
+    ), editEvent && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 900, display: "flex", alignItems: "center", justifyContent: "center" }, onClick: () => setEditEvent(null) }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 10, padding: 20, width: 280 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#f1f5f9", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif" } }, editEvent.label), editEvent.hasTime && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 14 } }, "Currently ", editEvent.time || "\u2014", " \xB7 drag the event box to change the time"), /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, color: "#8e97a6", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4, marginTop: editEvent.hasTime ? 0 : 14 } }, "Date"), /* @__PURE__ */ React.createElement(
       "input",
       {
         type: "date",
@@ -15637,15 +15810,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         onChange: (e) => setEditEvent({ ...editEvent, date: e.target.value }),
         style: { width: "100%", background: "#0a0f1a", border: "1px solid #374151", borderRadius: 6, color: "#e2e8f0", padding: "7px 10px", fontSize: 14, marginBottom: 12, colorScheme: "dark" }
       }
-    ), editEvent.hasTime && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, color: "#8e97a6", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 } }, "Time"), /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        type: "time",
-        value: editEvent.time,
-        onChange: (e) => setEditEvent({ ...editEvent, time: e.target.value }),
-        style: { width: "100%", background: "#0a0f1a", border: "1px solid #374151", borderRadius: 6, color: "#e2e8f0", padding: "7px 10px", fontSize: 14, marginBottom: 12, colorScheme: "dark" }
-      }
-    )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement(
+    ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => {
@@ -15663,7 +15828,49 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         style: { flex: 1, background: "#1f2937", border: "none", borderRadius: 6, color: "#9ca3af", padding: "8px 0", fontSize: 14, fontWeight: 700, cursor: "pointer" }
       },
       "Cancel"
-    )))), showAddReviewRound && /* @__PURE__ */ React.createElement(AddReviewRoundModal, { project, onUpdateDel, reviewerNames, addReviewerName, onClose: () => setShowAddReviewRound(false) }), showAddWorkReview && /* @__PURE__ */ React.createElement(
+    )))), contextMenu && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 950 }, onClick: () => setContextMenu(null), onContextMenu: (e) => {
+      e.preventDefault();
+      setContextMenu(null);
+    } }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { position: "fixed", top: contextMenu.y, left: contextMenu.x, background: "#111827", border: "1px solid #1f2937", borderRadius: 8, boxShadow: "0 8px 24px #000a", overflow: "hidden", zIndex: 951, minWidth: 210 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => {
+          setModalInitialDate(contextMenu.date);
+          setShowAddReviewRound(true);
+          setContextMenu(null);
+        },
+        style: { display: "block", width: "100%", textAlign: "left", background: "none", border: "none", color: "#e2e8f0", padding: "10px 14px", fontSize: 14, cursor: "pointer" },
+        onMouseEnter: (e) => e.currentTarget.style.background = "#1f2937",
+        onMouseLeave: (e) => e.currentTarget.style.background = "none"
+      },
+      "\u21BA Add Review Round\u2026"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => {
+          setModalInitialDate(contextMenu.date);
+          setShowAddWorkReview(true);
+          setContextMenu(null);
+        },
+        style: { display: "block", width: "100%", textAlign: "left", background: "none", border: "none", color: "#e2e8f0", padding: "10px 14px", fontSize: 14, cursor: "pointer", borderTop: "1px solid #1f2937" },
+        onMouseEnter: (e) => e.currentTarget.style.background = "#1f2937",
+        onMouseLeave: (e) => e.currentTarget.style.background = "none"
+      },
+      "\u{1F3A5} Add Work Review Round\u2026"
+    ))), showAddReviewRound && /* @__PURE__ */ React.createElement(
+      AddReviewRoundModal,
+      {
+        project,
+        onUpdateDel,
+        reviewerNames,
+        addReviewerName,
+        initialDate: modalInitialDate,
+        onClose: () => {
+          setShowAddReviewRound(false);
+          setModalInitialDate(null);
+        }
+      }
+    ), showAddWorkReview && /* @__PURE__ */ React.createElement(
       AddWorkReviewRoundModal,
       {
         project,
@@ -15674,7 +15881,11 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         updateWorkReviewSession,
         reviewerNames,
         addReviewerName,
-        onClose: () => setShowAddWorkReview(false)
+        initialDate: modalInitialDate,
+        onClose: () => {
+          setShowAddWorkReview(false);
+          setModalInitialDate(null);
+        }
       }
     ));
   };

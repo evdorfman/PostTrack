@@ -4499,8 +4499,8 @@ const FLabel = ({children}) => (
   <div style={{fontSize:13,fontWeight:800,color:"#8e97a6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:5}}>{children}</div>
 );
 
-const AddReviewRoundModal = ({project, onUpdateDel, reviewerNames=[], addReviewerName, onClose}) => {
-  const [datetime,setDatetime] = useState("");
+const AddReviewRoundModal = ({project, onUpdateDel, reviewerNames=[], addReviewerName, initialDate, onClose}) => {
+  const [datetime,setDatetime] = useState(initialDate?`${initialDate}T10:00`:"");
   const [reviewers,setReviewers] = useState([]);
   const [notes,setNotes] = useState("");
   const [selectedIds,setSelectedIds] = useState([]);
@@ -4557,10 +4557,10 @@ const AddReviewRoundModal = ({project, onUpdateDel, reviewerNames=[], addReviewe
 // cross-project list (`workReviewSessions`) rather than per-project data.
 // Pick an existing upcoming session (or create one), adjust its reviewers,
 // and attach any of this project's deliverables to it.
-const AddWorkReviewRoundModal = ({project, allProjects=[], onUpdateDel, workReviewSessions=[], addWorkReviewSession, updateWorkReviewSession, reviewerNames=[], addReviewerName, onClose}) => {
+const AddWorkReviewRoundModal = ({project, allProjects=[], onUpdateDel, workReviewSessions=[], addWorkReviewSession, updateWorkReviewSession, reviewerNames=[], addReviewerName, initialDate, onClose}) => {
   const [sessionId,setSessionId] = useState("");
-  const [creatingNew,setCreatingNew] = useState(false);
-  const [newDatetime,setNewDatetime] = useState("");
+  const [creatingNew,setCreatingNew] = useState(!!initialDate);
+  const [newDatetime,setNewDatetime] = useState(initialDate?`${initialDate}T14:00`:"");
   const [newLocation,setNewLocation] = useState("");
   const [selectedIds,setSelectedIds] = useState([]);
 
@@ -4668,6 +4668,104 @@ const AddWorkReviewRoundModal = ({project, allProjects=[], onUpdateDel, workRevi
         </div>
       </div>
     </Modal>
+  );
+};
+
+// ─── Project Review Rounds List — every review/Work Review round across all of
+// a project's deliverables, aggregated project-side (grouped by
+// reviewRoundId/workReviewSessionId) instead of buried inside each
+// deliverable's own card. Date/time/reviewers/notes edit the whole group at
+// once; status stays per-deliverable since that's meant to update
+// independently.
+const ProjectReviewRoundsList = ({project, onUpdateDel, reviewerNames=[], addReviewerName}) => {
+  const [expandedKey, setExpandedKey] = useState(null);
+
+  const groups = useMemo(()=>{
+    const byKey = {};
+    (project.deliverables||[]).forEach(d=>{
+      (d.rounds||[]).forEach((r,ri)=>{
+        const gid = r.isWorkReview ? r.workReviewSessionId : r.reviewRoundId;
+        const key = gid ? `${r.isWorkReview?"wr":"rr"}-${gid}` : `single-${d.id}-${r.id}`;
+        (byKey[key] = byKey[key]||[]).push({del:d, round:r, roundIdx:ri});
+      });
+    });
+    return Object.entries(byKey)
+      .map(([key,members])=>({key, members}))
+      .sort((a,b)=>(a.members[0].round.deadline||"").localeCompare(b.members[0].round.deadline||""));
+  },[project]);
+
+  const updateGroupField = (members, field, value) => {
+    members.forEach(({del,roundIdx})=>{
+      const newRounds = (del.rounds||[]).map((r,i)=>i===roundIdx?{...r,[field]:value}:r);
+      onUpdateDel(project.id, del.id, "rounds", newRounds);
+    });
+  };
+  const updateOneStatus = (delId, roundIdx, status) => {
+    const del = (project.deliverables||[]).find(d=>d.id===delId);
+    if(!del) return;
+    const newRounds = (del.rounds||[]).map((r,i)=>i===roundIdx?{...r,status}:r);
+    onUpdateDel(project.id, delId, "rounds", newRounds);
+  };
+  const removeGroup = members => {
+    members.forEach(({del,roundIdx})=>{
+      const newRounds = (del.rounds||[]).filter((_,i)=>i!==roundIdx);
+      onUpdateDel(project.id, del.id, "rounds", newRounds);
+    });
+  };
+
+  if(groups.length===0) return (
+    <div style={{fontSize:14,color:"#4b5563",padding:"8px 2px"}}>No review rounds yet — use the buttons above to schedule one.</div>
+  );
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      {groups.map(({key,members})=>{
+        const first = members[0].round;
+        const isWR = !!first.isWorkReview;
+        const isExp = expandedKey===key;
+        const color = isWR ? "#ec4899" : (RCOLOR[first.status]||"#eab308");
+        return (
+          <div key={key} style={{background:"#0a0f1a",border:`1px solid ${color}30`,borderRadius:8,overflow:"hidden"}}>
+            <div onClick={()=>setExpandedKey(isExp?null:key)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",cursor:"pointer"}}>
+              <span style={{fontSize:15}}>{isWR?"🎥":"↺"}</span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:700,color:"#e2e8f0"}}>{isWR?"Work Review":"Review Round"} — {fmtDT(first.deadline)}</div>
+                <div style={{fontSize:13,color:"#8e97a6",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{members.map(m=>m.del.title||"Untitled").join(", ")}</div>
+              </div>
+              <span style={{fontSize:13,color:"#4b5563",flexShrink:0}}>{members.length} deliverable{members.length!==1?"s":""}</span>
+              <span style={{color:"#8e97a6",fontSize:13,flexShrink:0}}>{isExp?"▲":"▼"}</span>
+            </div>
+            {isExp&&(
+              <div onClick={e=>e.stopPropagation()} style={{padding:"10px 12px",borderTop:"1px solid #1f2937",display:"flex",flexDirection:"column",gap:10}}>
+                <DateTimePicker value={first.deadline} onChange={v=>updateGroupField(members,"deadline",v)} label="Round date/time"/>
+                <div>
+                  <div style={{fontSize:13,color:"#8e97a6",fontWeight:700,marginBottom:5,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.08em",textTransform:"uppercase"}}>Reviewers</div>
+                  <ReviewerTagInput value={first.reviewers||[]} onChange={list=>updateGroupField(members,"reviewers",list)}
+                    suggestions={reviewerNames} onAddSuggestion={addReviewerName} listId={`proj-rr-${key}`}/>
+                </div>
+                <Inp textarea value={first.notes||""} onChange={e=>updateGroupField(members,"notes",e.target.value)} placeholder="Notes..."/>
+                <div>
+                  <div style={{fontSize:13,color:"#8e97a6",fontWeight:700,marginBottom:5,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.08em",textTransform:"uppercase"}}>Status per Deliverable</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                    {members.map(({del,round,roundIdx})=>(
+                      <div key={del.id} style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:14,color:"#e2e8f0",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{del.title||"Untitled"}</span>
+                        <Sel value={round.status} onChange={e=>updateOneStatus(del.id,roundIdx,e.target.value)} style={{width:"auto",background:RCOLOR[round.status]+"18",color:RCOLOR[round.status],border:`1px solid ${RCOLOR[round.status]}40`}}>
+                          {ROUND_STATUSES.map(s=><option key={s} value={s} style={{background:"#0d1117",color:"#e2e8f0"}}>{s}</option>)}
+                        </Sel>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{display:"flex",justifyContent:"flex-end"}}>
+                  <Btn variant="danger" small onClick={()=>{removeGroup(members);setExpandedKey(null);}}>Remove Round</Btn>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 };
 
@@ -7013,6 +7111,26 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                 })()}
               </div>
 
+              {/* ── Review Rounds — every review/Work Review round across this project's deliverables, editable here ── */}
+              <div style={{background:"#0f172a",border:"1px solid #1f2937",borderRadius:12,padding:"14px 16px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                  <div style={{fontSize:14,fontWeight:800,color: "#8e97a6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif"}}>Review Rounds</div>
+                  <div style={{display:"flex",gap:8}}>
+                    <Btn small variant="ghost" onClick={()=>setShowAddReviewRound(true)}>+ Add a Review Round</Btn>
+                    <Btn small variant="ghost" onClick={()=>setShowAddWorkReview(true)}>+ Add a Work Review Round</Btn>
+                  </div>
+                </div>
+                <ProjectReviewRoundsList project={lp} onUpdateDel={onUpdateDel} reviewerNames={reviewerNames} addReviewerName={addReviewerName}/>
+              </div>
+              {showAddReviewRound&&(
+                <AddReviewRoundModal project={lp} onUpdateDel={onUpdateDel} reviewerNames={reviewerNames} addReviewerName={addReviewerName} onClose={()=>setShowAddReviewRound(false)}/>
+              )}
+              {showAddWorkReview&&(
+                <AddWorkReviewRoundModal project={lp} allProjects={allProjects} onUpdateDel={onUpdateDel}
+                  workReviewSessions={workReviewSessions} addWorkReviewSession={addWorkReviewSession} updateWorkReviewSession={updateWorkReviewSession}
+                  reviewerNames={reviewerNames} addReviewerName={addReviewerName} onClose={()=>setShowAddWorkReview(false)}/>
+              )}
+
               {/* BXTV cross-referenced deliverables — sourced from other projects.
                   Same row + expand-to-DeliverableDetailModal pattern as this
                   project's own list below, sharing activeDelModal so only one
@@ -7156,20 +7274,6 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                 </div>
                 <div style={{fontSize:16,color:"#8e97a6"}}>{lp.deliverables.length} deliverable{lp.deliverables.length!==1?"s":""}</div>
               </div>
-
-              {/* ── Review round composers — batch-add across deliverables instead of one at a time ── */}
-              <div style={{display:"flex",gap:8}}>
-                <Btn small variant="ghost" onClick={()=>setShowAddReviewRound(true)}>+ Add a Review Round</Btn>
-                <Btn small variant="ghost" onClick={()=>setShowAddWorkReview(true)}>+ Add a Work Review Round</Btn>
-              </div>
-              {showAddReviewRound&&(
-                <AddReviewRoundModal project={lp} onUpdateDel={onUpdateDel} reviewerNames={reviewerNames} addReviewerName={addReviewerName} onClose={()=>setShowAddReviewRound(false)}/>
-              )}
-              {showAddWorkReview&&(
-                <AddWorkReviewRoundModal project={lp} allProjects={allProjects} onUpdateDel={onUpdateDel}
-                  workReviewSessions={workReviewSessions} addWorkReviewSession={addWorkReviewSession} updateWorkReviewSession={updateWorkReviewSession}
-                  reviewerNames={reviewerNames} addReviewerName={addReviewerName} onClose={()=>setShowAddWorkReview(false)}/>
-              )}
 
               {lp.deliverables.length===0&&!showAddDel&&<div style={{textAlign:"center",color: "#838ba0",padding:"24px 0",fontSize:19}}>No deliverables yet.</div>}
 
@@ -22658,19 +22762,156 @@ const ProjectCalendarWeek = ({weekStart, events, onCommitMove, onEventClick, can
   );
 };
 
+const PROJ_CAL_MONTH_HEADER_H = 40, PROJ_CAL_MONTH_STRIP_H = 160;
+
+// ─── Project Calendar — Month view: taller day cells with an hour strip
+// (7am–8pm, like Week view) so timed events show roughly where in the day
+// they land, and can be dragged — across days AND to a new time of day in
+// one gesture — instead of the old day-swap-only drag. Hit-testing is done
+// against each day's own hour-strip DOM node (not grid math) so it stays
+// correct regardless of how many week-rows the month needs.
+const ProjectCalendarMonth = ({calY, calM, events, onCommitMove, onEventClick, onDayContextMenu, canEdit}) => {
+  const stripRefs = useRef({});
+  const [drag, setDrag] = useState(null); // {ev, date, hour}
+  const dragRef = useRef(null);
+  const justDraggedRef = useRef(false);
+  useEffect(()=>{ dragRef.current = drag; },[drag]);
+
+  const pad = n => String(n).padStart(2,"0");
+  const daysInMonth = new Date(calY,calM+1,0).getDate();
+  const firstDow = new Date(calY,calM,1).getDay();
+  const todayStr = new Date().toISOString().slice(0,10);
+
+  const timed = events.filter(e=>e.hasTime);
+  const allDay = events.filter(e=>!e.hasTime);
+  const hToY = h => ((h-PROJ_CAL_WEEK_START_H)/(PROJ_CAL_WEEK_END_H-PROJ_CAL_WEEK_START_H))*PROJ_CAL_MONTH_STRIP_H;
+  const yToH = (y,stripH) => projCalSnapQ(Math.max(PROJ_CAL_WEEK_START_H,Math.min(PROJ_CAL_WEEK_END_H-0.25, PROJ_CAL_WEEK_START_H+(y/stripH)*(PROJ_CAL_WEEK_END_H-PROJ_CAL_WEEK_START_H))));
+
+  const timedByDate = useMemo(()=>{
+    const m = {};
+    timed.forEach(ev=>{
+      const effDate = (drag && drag.ev.id===ev.id) ? drag.date : ev.date;
+      (m[effDate]=m[effDate]||[]).push(ev);
+    });
+    return m;
+  },[timed, drag]);
+  const allDayByDate = useMemo(()=>{
+    const m = {};
+    allDay.forEach(ev=>{ (m[ev.date]=m[ev.date]||[]).push(ev); });
+    return m;
+  },[allDay]);
+
+  const startDrag = (e, ev) => {
+    if(!canEdit) return;
+    e.preventDefault(); e.stopPropagation();
+    setDrag({ev, date:ev.date, hour:projCalHhmmToH(ev.time)});
+  };
+
+  useEffect(()=>{
+    if(!drag) return;
+    const handleMove = e => {
+      let hitDs=null, hitRect=null;
+      for(const ds in stripRefs.current){
+        const el = stripRefs.current[ds];
+        if(!el) continue;
+        const r = el.getBoundingClientRect();
+        if(e.clientX>=r.left && e.clientX<r.right && e.clientY>=r.top && e.clientY<r.bottom){ hitDs=ds; hitRect=r; break; }
+      }
+      if(!hitDs) return;
+      const hour = yToH(e.clientY-hitRect.top, hitRect.height);
+      setDrag(prev=>prev?{...prev,date:hitDs,hour}:prev);
+    };
+    const handleUp = () => {
+      const d = dragRef.current;
+      setDrag(null);
+      if(d){ justDraggedRef.current = true; onCommitMove(d.ev, d.date, projCalHToHhmm(d.hour)); }
+    };
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    return ()=>{ window.removeEventListener("pointermove",handleMove); window.removeEventListener("pointerup",handleUp); };
+  },[drag]);
+
+  const handleClick = ev => {
+    if(justDraggedRef.current){ justDraggedRef.current=false; return; }
+    onEventClick(ev);
+  };
+
+  const hourMarks = []; for(let h=PROJ_CAL_WEEK_START_H; h<=PROJ_CAL_WEEK_END_H; h+=3) hourMarks.push(h);
+
+  return (
+    <>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(0,1fr))",gap:2,marginBottom:2}}>
+        {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>(
+          <div key={d} style={{textAlign:"center",fontSize:13,fontWeight:700,color:"#838ba0",padding:"3px 0",fontFamily:"'Barlow Condensed',sans-serif"}}>{d}</div>
+        ))}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(0,1fr))",gap:2}}>
+        {Array.from({length:firstDow}).map((_,i)=><div key={`e${i}`}/>)}
+        {Array.from({length:daysInMonth},(_,i)=>i+1).map(day=>{
+          const ds = `${calY}-${pad(calM+1)}-${pad(day)}`;
+          const isToday = ds===todayStr;
+          const dayAllEvs = allDayByDate[ds]||[];
+          const dayTimedEvs = timedByDate[ds]||[];
+          return (
+            <div key={day}
+              onContextMenu={canEdit?e=>{e.preventDefault(); onDayContextMenu(ds, e.clientX, e.clientY);}:undefined}
+              style={{background:isToday?"#6366f115":"#111827",border:`1px solid ${isToday?"#6366f1":"#1f2937"}`,borderRadius:6,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+              <div style={{padding:"3px 5px 0",display:"flex",flexDirection:"column",gap:2,minHeight:PROJ_CAL_MONTH_HEADER_H}}>
+                <div style={{fontSize:13,fontWeight:isToday?800:400,color:isToday?"#818cf8":"#6b7280",textAlign:"right",lineHeight:1.2}}>{day}</div>
+                {dayAllEvs.slice(0,2).map(ev=>{
+                  const meta = PROJ_CAL_TYPE_META[ev.type];
+                  return (
+                    <div key={ev.id} onClick={()=>handleClick(ev)} title={ev._tooltip||ev.label}
+                      style={{background:ev.color+"25",borderLeft:`2px solid ${ev.color}`,borderRadius:"0 3px 3px 0",padding:"0 4px",fontSize:10,color:ev.color,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:canEdit?"pointer":"default"}}>
+                      {meta.icon} {ev.label}
+                    </div>
+                  );
+                })}
+                {dayAllEvs.length>2&&<div style={{fontSize:10,color:"#838ba0"}}>+{dayAllEvs.length-2} more</div>}
+              </div>
+              <div ref={el=>{ if(el) stripRefs.current[ds]=el; else delete stripRefs.current[ds]; }}
+                style={{position:"relative",flex:1,minHeight:PROJ_CAL_MONTH_STRIP_H,borderTop:"1px solid #1f293780"}}>
+                {hourMarks.map(h=>(
+                  <div key={h} style={{position:"absolute",left:0,right:0,top:hToY(h),height:1,background:"#1f293750"}}/>
+                ))}
+                {dayTimedEvs.map(ev=>{
+                  const isDragging = drag?.ev.id===ev.id;
+                  const hour = isDragging ? drag.hour : projCalHhmmToH(ev.time);
+                  const meta = PROJ_CAL_TYPE_META[ev.type];
+                  return (
+                    <div key={ev.id}
+                      onPointerDown={e=>startDrag(e,ev)}
+                      onClick={()=>handleClick(ev)}
+                      title={`${ev._tooltip||ev.label}${ev.status?" — "+ev.status:""} · ${projCalHToHhmm(hour)}`}
+                      style={{position:"absolute",left:2,right:2,top:hToY(hour),height:13,
+                        background:ev.color+(isDragging?"45":"2a"),border:`1px solid ${ev.color}${isDragging?"ee":"99"}`,borderRadius:3,
+                        padding:"0 3px",fontSize:9,lineHeight:"11px",color:ev.color,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+                        cursor:canEdit?"grab":"default",zIndex:isDragging?10:2,touchAction:"none"}}>
+                      {meta.icon} {ev.label}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+};
+
 const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel, reviewerNames=[], addReviewerName, workReviewSessions=[], addWorkReviewSession, updateWorkReviewSession}) => {
   const today = new Date();
   const [calY, setCalY] = useState(today.getFullYear());
   const [calM, setCalM] = useState(today.getMonth());
   const [viewMode, setViewMode] = useState("month"); // "month" | "week"
   const [weekStart, setWeekStart] = useState(getWeekStart(today));
-  const todayStr = today.toISOString().slice(0,10);
-  const pad = n => String(n).padStart(2,"0");
   const [filters, setFilters] = useState({production:true, poststart:true, round:true, workreview:true, deliverable:true, ingest:true});
-  const [dragId, setDragId] = useState(null);
   const [editEvent, setEditEvent] = useState(null);
   const [showAddReviewRound, setShowAddReviewRound] = useState(false);
   const [showAddWorkReview, setShowAddWorkReview] = useState(false);
+  const [modalInitialDate, setModalInitialDate] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null); // {date,x,y}
   const canEdit = !!(onUpdateProject && onUpdateDel);
 
   const allEvents = useMemo(()=>{
@@ -22734,15 +22975,6 @@ const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel,
     return singles;
   },[visibleEvents]);
 
-  const byDay = useMemo(()=>{
-    const m = {};
-    groupedEvents.forEach(ev=>{ if(!m[ev.date]) m[ev.date]=[]; m[ev.date].push(ev); });
-    return m;
-  },[groupedEvents]);
-
-  const daysInMonth = new Date(calY,calM+1,0).getDate();
-  const firstDow    = new Date(calY,calM,1).getDay();
-
   // Applies a new date (and, for time-bearing events, an optional new time)
   // back to whatever this event was sourced from — dragging a chip, or
   // editing it via the popover, both funnel through here so the change
@@ -22786,17 +23018,11 @@ const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel,
     });
   };
 
-  const handleDrop = (e, ds) => {
-    e.preventDefault();
-    const ev = groupedEvents.find(x=>x.id===dragId);
-    setDragId(null);
-    if(!ev || ev.date===ds) return;
-    applyDateChange(ev, ds);
-  };
-
   const openEditEvent = ev => setEditEvent({id:ev.id, label:ev.label, date:ev.date, time:ev.time||"", hasTime:ev.hasTime});
 
   const shiftWeek = delta => setWeekStart(w=>{ const n=new Date(w); n.setDate(n.getDate()+delta*7); return n; });
+
+  const openDayContextMenu = (ds, x, y) => setContextMenu({date:ds, x, y});
 
   return (
     <div style={{background:"#0f172a",border:"1px solid #1f2937",borderRadius:12,padding:"16px 20px"}}>
@@ -22849,7 +23075,7 @@ const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel,
           );
         })}
         {canEdit&&<div style={{fontSize:12,color:"#4b5563",marginLeft:"auto",alignSelf:"center"}}>
-          {viewMode==="month" ? "Drag a date to reschedule · click to edit time" : "Drag an event to change its time · click to fine-tune"}
+          {viewMode==="month" ? "Drag an event to reschedule its date or time · right-click a day to add a round" : "Drag an event to change its time · click to fine-tune"}
         </div>}
       </div>
 
@@ -22858,64 +23084,21 @@ const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel,
           onCommitMove={(ev,newDate,newTime)=>applyDateChange(ev,newDate,newTime)}
           onEventClick={openEditEvent}/>
       ):(
-        <>
-          {/* Day headers */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(0,1fr))",gap:2,marginBottom:2}}>
-            {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>(
-              <div key={d} style={{textAlign:"center",fontSize:13,fontWeight:700,color:"#838ba0",padding:"3px 0",fontFamily:"'Barlow Condensed',sans-serif"}}>{d}</div>
-            ))}
-          </div>
-
-          {/* Day grid */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(0,1fr))",gap:2}}>
-            {Array.from({length:firstDow}).map((_,i)=><div key={`e${i}`}/>)}
-            {Array.from({length:daysInMonth},(_,i)=>i+1).map(day=>{
-              const ds = `${calY}-${pad(calM+1)}-${pad(day)}`;
-              const evs = byDay[ds]||[];
-              const isToday = ds===todayStr;
-              return (
-                <div key={day}
-                  onDragOver={canEdit?e=>e.preventDefault():undefined}
-                  onDrop={canEdit?e=>handleDrop(e,ds):undefined}
-                  style={{background:isToday?"#6366f115":"#111827",border:`1px solid ${isToday?"#6366f1":"#1f2937"}`,borderRadius:6,padding:"4px 4px 6px",minHeight:72,display:"flex",flexDirection:"column",gap:2}}>
-                  <div style={{fontSize:14,fontWeight:isToday?800:400,color:isToday?"#818cf8":"#6b7280",textAlign:"right",lineHeight:1.2,marginBottom:2}}>{day}</div>
-                  {evs.slice(0,4).map(ev=>{
-                    const meta = PROJ_CAL_TYPE_META[ev.type];
-                    return (
-                      <div key={ev.id}
-                        draggable={canEdit&&(!!ev.ref||ev.type==="poststart"||!!ev._members)}
-                        onDragStart={canEdit?e=>{setDragId(ev.id); e.dataTransfer.effectAllowed="move";}:undefined}
-                        onDragEnd={()=>setDragId(null)}
-                        onClick={canEdit?()=>openEditEvent(ev):undefined}
-                        title={ev._tooltip||`${ev.label}${ev.status?" — "+ev.status:""}${ev.time?" · "+ev.time:""}`}
-                        style={{background:ev.color+"25",borderLeft:`2px solid ${ev.color}`,borderRadius:"0 3px 3px 0",padding:"1px 4px",fontSize:11,color:ev.color,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Barlow Condensed',sans-serif",cursor:canEdit?"grab":"default",opacity:dragId===ev.id?0.4:1}}>
-                        {meta.icon} {ev.label}
-                      </div>
-                    );
-                  })}
-                  {evs.length>4&&<div style={{fontSize:11,color:"#838ba0",textAlign:"center"}}>+{evs.length-4} more</div>}
-                </div>
-              );
-            })}
-          </div>
-        </>
+        <ProjectCalendarMonth calY={calY} calM={calM} events={groupedEvents} canEdit={canEdit}
+          onCommitMove={(ev,newDate,newTime)=>applyDateChange(ev,newDate,newTime)}
+          onEventClick={openEditEvent}
+          onDayContextMenu={openDayContextMenu}/>
       )}
 
-      {/* Edit-time popover */}
+      {/* Edit popover — date only; time is set by dragging the event itself */}
       {editEvent&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setEditEvent(null)}>
           <div onClick={e=>e.stopPropagation()} style={{background:"#0f172a",border:"1px solid #1f2937",borderRadius:10,padding:20,width:280}}>
-            <div style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:14,fontFamily:"'Barlow Condensed',sans-serif"}}>{editEvent.label}</div>
-            <label style={{fontSize:12,color:"#8e97a6",textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:4}}>Date</label>
+            <div style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif"}}>{editEvent.label}</div>
+            {editEvent.hasTime&&<div style={{fontSize:13,color:"#8e97a6",marginBottom:14}}>Currently {editEvent.time||"—"} · drag the event box to change the time</div>}
+            <label style={{fontSize:12,color:"#8e97a6",textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:4,marginTop:editEvent.hasTime?0:14}}>Date</label>
             <input type="date" value={editEvent.date} onChange={e=>setEditEvent({...editEvent,date:e.target.value})}
               style={{width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"7px 10px",fontSize:14,marginBottom:12,colorScheme:"dark"}}/>
-            {editEvent.hasTime&&(
-              <>
-                <label style={{fontSize:12,color:"#8e97a6",textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:4}}>Time</label>
-                <input type="time" value={editEvent.time} onChange={e=>setEditEvent({...editEvent,time:e.target.value})}
-                  style={{width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"7px 10px",fontSize:14,marginBottom:12,colorScheme:"dark"}}/>
-              </>
-            )}
             <div style={{display:"flex",gap:8,marginTop:6}}>
               <button onClick={()=>{
                   const ev = groupedEvents.find(x=>x.id===editEvent.id);
@@ -22930,13 +23113,33 @@ const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel,
         </div>
       )}
 
+      {/* Right-click day menu — quick-add a review round on a specific date */}
+      {contextMenu&&(
+        <div style={{position:"fixed",inset:0,zIndex:950}} onClick={()=>setContextMenu(null)} onContextMenu={e=>{e.preventDefault();setContextMenu(null);}}>
+          <div onClick={e=>e.stopPropagation()} style={{position:"fixed",top:contextMenu.y,left:contextMenu.x,background:"#111827",border:"1px solid #1f2937",borderRadius:8,boxShadow:"0 8px 24px #000a",overflow:"hidden",zIndex:951,minWidth:210}}>
+            <button onClick={()=>{setModalInitialDate(contextMenu.date);setShowAddReviewRound(true);setContextMenu(null);}}
+              style={{display:"block",width:"100%",textAlign:"left",background:"none",border:"none",color:"#e2e8f0",padding:"10px 14px",fontSize:14,cursor:"pointer"}}
+              onMouseEnter={e=>e.currentTarget.style.background="#1f2937"} onMouseLeave={e=>e.currentTarget.style.background="none"}>
+              ↺ Add Review Round…
+            </button>
+            <button onClick={()=>{setModalInitialDate(contextMenu.date);setShowAddWorkReview(true);setContextMenu(null);}}
+              style={{display:"block",width:"100%",textAlign:"left",background:"none",border:"none",color:"#e2e8f0",padding:"10px 14px",fontSize:14,cursor:"pointer",borderTop:"1px solid #1f2937"}}
+              onMouseEnter={e=>e.currentTarget.style.background="#1f2937"} onMouseLeave={e=>e.currentTarget.style.background="none"}>
+              🎥 Add Work Review Round…
+            </button>
+          </div>
+        </div>
+      )}
+
       {showAddReviewRound&&(
-        <AddReviewRoundModal project={project} onUpdateDel={onUpdateDel} reviewerNames={reviewerNames} addReviewerName={addReviewerName} onClose={()=>setShowAddReviewRound(false)}/>
+        <AddReviewRoundModal project={project} onUpdateDel={onUpdateDel} reviewerNames={reviewerNames} addReviewerName={addReviewerName}
+          initialDate={modalInitialDate} onClose={()=>{setShowAddReviewRound(false);setModalInitialDate(null);}}/>
       )}
       {showAddWorkReview&&(
         <AddWorkReviewRoundModal project={project} allProjects={allProjects} onUpdateDel={onUpdateDel}
           workReviewSessions={workReviewSessions} addWorkReviewSession={addWorkReviewSession} updateWorkReviewSession={updateWorkReviewSession}
-          reviewerNames={reviewerNames} addReviewerName={addReviewerName} onClose={()=>setShowAddWorkReview(false)}/>
+          reviewerNames={reviewerNames} addReviewerName={addReviewerName}
+          initialDate={modalInitialDate} onClose={()=>{setShowAddWorkReview(false);setModalInitialDate(null);}}/>
       )}
     </div>
   );
