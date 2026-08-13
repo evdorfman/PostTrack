@@ -4064,29 +4064,23 @@ const EditorPicker = ({value,onChange,deadline,allProjects,excludeDelId,team,sty
 };
 
 // ─── Round Row ────────────────────────────────────────────────────────────────
-const RoundRow = ({round,idx,onUpdate,onDelete,teamNames,locked=false}) => {
+const RoundRow = ({round,idx,onUpdate,onDelete,teamNames,locked=false,reviewerNames=[],addReviewerName}) => {
   const [exp,setExp]=useState(false);
   const [nr,setNr]=useState("");
-
-  const now = new Date();
-  const wStart = getWeekStart(now);
-  const wStartISO = wStart.toISOString().slice(0,10);
-  const isInWR = round.workReviewWeek === wStartISO;
-  const toggleWR = e => { e.stopPropagation(); onUpdate("workReviewWeek", isInWR ? null : wStartISO); };
+  const isWR = !!round.isWorkReview;
 
   return (
-    <div style={{background:"#0a0f1a",border:`1px solid ${isInWR?"#f59e0b50":RCOLOR[round.status]+"28"}`,borderRadius:10,overflow:"hidden"}}>
+    <div style={{background:"#0a0f1a",border:`1px solid ${isWR?"#ec489950":RCOLOR[round.status]+"28"}`,borderRadius:10,overflow:"hidden"}}>
       <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",cursor:"pointer"}} onClick={()=>setExp(e=>!e)}>
         <div style={{width:20,height:20,borderRadius:"50%",background:"#1f2937",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color: "#9ca3af",flexShrink:0}}>{idx+1}</div>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:17,fontWeight:700,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{round.label}</div>
           <div style={{fontSize:14,color: "#8e97a6",marginTop:1}}>{round.reviewers.length} reviewer{round.reviewers.length!==1?"s":""} · {fmtDT(round.deadline)}</div>
         </div>
-        {/* Work Review badge/button */}
-        <button onClick={toggleWR} title={isInWR?"Remove from Work Review this week":"Add to Work Review this week"}
-          style={{background:isInWR?"#f59e0b20":"transparent",border:`1px solid ${isInWR?"#f59e0b60":"#374151"}`,borderRadius:5,color:isInWR?"#f59e0b":"#4b5563",padding:"2px 8px",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.05em",whiteSpace:"nowrap",flexShrink:0}}>
-          {isInWR?"★ WR":"☆ WR"}
-        </button>
+        {isWR&&<span title="Screened during Work Review"
+          style={{background:"#ec489918",border:"1px solid #ec489950",borderRadius:5,color:"#ec4899",padding:"2px 8px",fontSize:12,fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.05em",whiteSpace:"nowrap",flexShrink:0}}>
+          🎥 Work Review
+        </span>}
         <Chip label={round.status} color={RCOLOR[round.status]} xs/>
         <Dl date={round.deadline}/>
         <span style={{color: "#838ba0",fontSize:14,marginLeft:4}}>{exp?"▲":"▼"}</span>
@@ -4119,8 +4113,11 @@ const RoundRow = ({round,idx,onUpdate,onDelete,teamNames,locked=false}) => {
                 ))}
               </div>
               <div style={{display:"flex",gap:6}}>
-                <Inp value={nr} onChange={e=>setNr(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&nr.trim()){onUpdate("reviewers",[...round.reviewers,nr.trim()]);setNr("");}}} placeholder="Add reviewer or client name..."/>
-                <Btn small onClick={()=>{if(nr.trim()){onUpdate("reviewers",[...round.reviewers,nr.trim()]);setNr("");}}}>Add</Btn>
+                <datalist id="round-row-reviewer-list">{reviewerNames.map(n=><option key={n} value={n}/>)}</datalist>
+                <Inp list="round-row-reviewer-list" value={nr} onChange={e=>setNr(e.target.value)}
+                  onKeyDown={e=>{if(e.key==="Enter"&&nr.trim()){onUpdate("reviewers",[...round.reviewers,nr.trim()]);addReviewerName?.(nr.trim());setNr("");}}}
+                  placeholder="Add reviewer or client name..."/>
+                <Btn small onClick={()=>{if(nr.trim()){onUpdate("reviewers",[...round.reviewers,nr.trim()]);addReviewerName?.(nr.trim());setNr("");}}}>Add</Btn>
               </div>
             </>}
           </div>
@@ -4128,6 +4125,74 @@ const RoundRow = ({round,idx,onUpdate,onDelete,teamNames,locked=false}) => {
           {!locked&&<div style={{display:"flex",justifyContent:"flex-end"}}><Btn variant="danger" small onClick={onDelete}>Remove Round</Btn></div>}
         </div>
       )}
+    </div>
+  );
+};
+
+// ─── Reviewer Tag Input — free-text reviewer names (not software users), with
+// autocomplete from previously-typed names. `listId` must be unique among any
+// simultaneously-mounted instances (callers are modals, so one at a time is fine).
+const ReviewerTagInput = ({value=[], onChange, suggestions=[], onAddSuggestion, listId, placeholder="Add reviewer or client name…", disabled=false}) => {
+  const [nr,setNr] = useState("");
+  const commit = () => {
+    const t = nr.trim();
+    if(!t) return;
+    if(!value.some(v=>v.toLowerCase()===t.toLowerCase())) onChange([...value,t]);
+    onAddSuggestion?.(t);
+    setNr("");
+  };
+  return (
+    <div>
+      {value.length>0&&(
+        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
+          {value.map((r,ri)=>(
+            <div key={ri} style={{display:"flex",alignItems:"center",gap:4,background:"#1f2937",borderRadius:5,padding:"3px 8px"}}>
+              <span style={{fontSize:16,color:"#e2e8f0"}}>{r}</span>
+              {!disabled&&<button onClick={()=>onChange(value.filter((_,i)=>i!==ri))} style={{background:"none",border:"none",color: "#9ca3af",cursor:"pointer",fontSize:17,lineHeight:1,padding:0}}>×</button>}
+            </div>
+          ))}
+        </div>
+      )}
+      {!disabled&&(
+        <div style={{display:"flex",gap:6}}>
+          <datalist id={listId}>{suggestions.map(s=><option key={s} value={s}/>)}</datalist>
+          <Inp list={listId} value={nr} onChange={e=>setNr(e.target.value)}
+            onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();commit();}}} onBlur={commit} placeholder={placeholder}/>
+          <Btn small onClick={commit}>Add</Btn>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Deliverable Check List — checkbox multi-select w/ Select All, used by the
+// review-round composers. `disabledIds` renders as checked-but-locked (e.g.
+// already attached to this Work Review session).
+const DeliverableCheckList = ({deliverables=[], selectedIds=[], onChange, disabledIds=[], disabledLabel="Already added"}) => {
+  const selectable = deliverables.filter(d=>!disabledIds.includes(d.id)).map(d=>d.id);
+  const allSelected = selectable.length>0 && selectable.every(id=>selectedIds.includes(id));
+  const toggleAll = () => onChange(allSelected ? selectedIds.filter(id=>!selectable.includes(id)) : [...new Set([...selectedIds,...selectable])]);
+  const toggleOne = id => onChange(selectedIds.includes(id) ? selectedIds.filter(x=>x!==id) : [...selectedIds,id]);
+  return (
+    <div style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:7,maxHeight:220,overflowY:"auto"}}>
+      {selectable.length>0&&(
+        <div onClick={toggleAll} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderBottom:"1px solid #1f2937",cursor:"pointer",background:"#111827"}}>
+          <input type="checkbox" checked={allSelected} readOnly style={{pointerEvents:"none"}}/>
+          <span style={{fontSize:14,fontWeight:700,color:"#9ca3af"}}>Select All</span>
+        </div>
+      )}
+      {deliverables.length===0&&<div style={{padding:10,fontSize:14,color:"#4b5563"}}>No deliverables on this project yet.</div>}
+      {deliverables.map(d=>{
+        const isDisabled = disabledIds.includes(d.id);
+        const checked = selectedIds.includes(d.id);
+        return (
+          <div key={d.id} onClick={()=>!isDisabled&&toggleOne(d.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderBottom:"1px solid #111827",cursor:isDisabled?"default":"pointer",opacity:isDisabled?0.45:1}}>
+            <input type="checkbox" checked={checked||isDisabled} disabled={isDisabled} readOnly style={{pointerEvents:"none"}}/>
+            <span style={{fontSize:15,color:"#e2e8f0",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title||"Untitled"}</span>
+            {isDisabled&&<span style={{fontSize:11,color:"#6b7280",flexShrink:0}}>{disabledLabel}</span>}
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -4184,12 +4249,11 @@ const SpeakersPicker = ({value=[], onChange, talentRoster=[]}) => {
 };
 
 // ─── Deliverable Detail Panel (inline expand/collapse, no modal) ───────────────
-const DeliverableDetailModal = React.memo(({del,projectId,team,allProjects,onUpdateDel,onDeleteDel,onClose,project,locked=false,onUpdateProject,talentRoster=[]}) => {
+const DeliverableDetailModal = React.memo(({del,projectId,team,allProjects,onUpdateDel,onDeleteDel,onClose,project,locked=false,onUpdateProject,talentRoster=[],reviewerNames=[],addReviewerName}) => {
   const teamNames=team.map(m=>m.name);
   const upd=(f,v)=>{ if(locked) return; onUpdateDel(projectId,del.id,f,v); };
   const updRound=(rId,f,v)=>upd("rounds",del.rounds.map(r=>r.id!==rId?r:{...r,[f]:v}));
   const delRound=rId=>upd("rounds",del.rounds.filter(r=>r.id!==rId));
-  const addRound=()=>upd("rounds",[...del.rounds,mkRound(`Round ${del.rounds.length+1}`,del.deadline||"",[])]);
   const activeRound=del.rounds.find(r=>!["Approved"].includes(r.status));
   const allApproved=del.rounds.length>0&&del.rounds.every(r=>r.status==="Approved");
 
@@ -4234,11 +4298,11 @@ const DeliverableDetailModal = React.memo(({del,projectId,team,allProjects,onUpd
           </div>
           {secOpen.rounds&&(
             <div style={{padding:"12px 14px"}}>
-              <SH label={`Rounds · ${del.rounds.length}`} action={!locked&&<Btn small onClick={addRound}>+ Round</Btn>}/>
-              {del.rounds.length===0&&<div style={{textAlign:"center",padding:"16px 0",color: "#838ba0",fontSize:17}}>No review rounds yet.</div>}
+              <SH label={`Rounds · ${del.rounds.length}`}/>
+              {del.rounds.length===0&&<div style={{textAlign:"center",padding:"16px 0",color: "#838ba0",fontSize:17}}>No review rounds yet. Use "Add a Review Round" above the deliverable list to schedule one.</div>}
               <div style={{display:"flex",flexDirection:"column",gap:5}}>
                 {del.rounds.map((r,i)=>(
-                  <RoundRow key={r.id} round={r} idx={i} teamNames={teamNames} onUpdate={(f,v)=>updRound(r.id,f,v)} onDelete={()=>delRound(r.id)} locked={locked}/>
+                  <RoundRow key={r.id} round={r} idx={i} teamNames={teamNames} onUpdate={(f,v)=>updRound(r.id,f,v)} onDelete={()=>delRound(r.id)} locked={locked} reviewerNames={reviewerNames} addReviewerName={addReviewerName}/>
                 ))}
               </div>
             </div>
@@ -4424,6 +4488,188 @@ const DeliverableDetailModal = React.memo(({del,projectId,team,allProjects,onUpd
     prev.project?.id === next.project?.id &&
     prev.locked === next.locked;
 });
+
+// ─── Add a Review Round — batch-creates a review round across any number of a
+// project's deliverables in one shot, instead of adding+configuring a round
+// deliverable-by-deliverable. Each selected deliverable gets its own decoupled
+// round entry (same reviewRoundId so Calendar views can group them as one
+// event covering multiple assets), so per-deliverable status still updates
+// independently afterward.
+const FLabel = ({children}) => (
+  <div style={{fontSize:13,fontWeight:800,color:"#8e97a6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:5}}>{children}</div>
+);
+
+const AddReviewRoundModal = ({project, onUpdateDel, reviewerNames=[], addReviewerName, onClose}) => {
+  const [datetime,setDatetime] = useState("");
+  const [reviewers,setReviewers] = useState([]);
+  const [notes,setNotes] = useState("");
+  const [selectedIds,setSelectedIds] = useState([]);
+  const deliverables = project.deliverables||[];
+  const canSubmit = !!datetime && selectedIds.length>0;
+
+  const submit = () => {
+    if(!canSubmit) return;
+    const groupId = uid();
+    selectedIds.forEach(delId=>{
+      const del = deliverables.find(d=>d.id===delId);
+      if(!del) return;
+      const newRound = {
+        id: uid(), label: `Round ${(del.rounds||[]).length+1}`,
+        deadline: datetime, reviewers:[...reviewers], status: ROUND_STATUSES[0], notes,
+        reviewRoundId: groupId, isWorkReview: false,
+      };
+      onUpdateDel(project.id, delId, "rounds", [...(del.rounds||[]), newRound]);
+    });
+    onClose();
+  };
+
+  return (
+    <Modal onClose={onClose} maxWidth={520}>
+      <div style={{fontSize:22,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.02em",marginBottom:16}}>Add a Review Round</div>
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        <div>
+          <FLabel>Date &amp; Time of Review</FLabel>
+          <DateTimePicker value={datetime} onChange={setDatetime} label="Review date/time"/>
+        </div>
+        <div>
+          <FLabel>Reviewers</FLabel>
+          <ReviewerTagInput value={reviewers} onChange={setReviewers} suggestions={reviewerNames} onAddSuggestion={addReviewerName} listId="add-review-round-reviewers"/>
+        </div>
+        <div>
+          <FLabel>Notes</FLabel>
+          <Inp textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Notes for reviewers..."/>
+        </div>
+        <div>
+          <FLabel>Deliverables to Review ({selectedIds.length} selected)</FLabel>
+          <DeliverableCheckList deliverables={deliverables} selectedIds={selectedIds} onChange={setSelectedIds}/>
+        </div>
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:4}}>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+          <Btn onClick={submit} disabled={!canSubmit}>Add Review Round</Btn>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// ─── Add a Work Review Round — Work Review is a real recurring internal
+// meeting (twice weekly, timing/location vary), so sessions are a shared,
+// cross-project list (`workReviewSessions`) rather than per-project data.
+// Pick an existing upcoming session (or create one), adjust its reviewers,
+// and attach any of this project's deliverables to it.
+const AddWorkReviewRoundModal = ({project, allProjects=[], onUpdateDel, workReviewSessions=[], addWorkReviewSession, updateWorkReviewSession, reviewerNames=[], addReviewerName, onClose}) => {
+  const [sessionId,setSessionId] = useState("");
+  const [creatingNew,setCreatingNew] = useState(false);
+  const [newDatetime,setNewDatetime] = useState("");
+  const [newLocation,setNewLocation] = useState("");
+  const [selectedIds,setSelectedIds] = useState([]);
+
+  const nowISO = new Date().toISOString().slice(0,16);
+  const upcoming = useMemo(()=>
+    (workReviewSessions||[]).filter(s=>s.datetime>=nowISO.slice(0,10)).sort((a,b)=>a.datetime.localeCompare(b.datetime))
+  ,[workReviewSessions]);
+  const session = upcoming.find(s=>s.id===sessionId) || (workReviewSessions||[]).find(s=>s.id===sessionId);
+
+  // Deliverables (from ANY project) already attached to this session
+  const attachedElsewhere = useMemo(()=>{
+    if(!session) return [];
+    const list = [];
+    allProjects.forEach(p=>(p.deliverables||[]).forEach(d=>{
+      if((d.rounds||[]).some(r=>r.workReviewSessionId===session.id)) list.push({del:d, project:p});
+    }));
+    return list;
+  },[session, allProjects]);
+
+  const deliverables = project.deliverables||[];
+  const alreadyAttachedIds = deliverables.filter(d=>(d.rounds||[]).some(r=>r.workReviewSessionId===session?.id)).map(d=>d.id);
+  const canSubmit = !!session && selectedIds.length>0;
+
+  const createSession = () => {
+    if(!newDatetime) return;
+    const s = addWorkReviewSession({datetime:newDatetime, location:newLocation.trim()});
+    setSessionId(s.id);
+    setCreatingNew(false);
+    setNewDatetime(""); setNewLocation("");
+  };
+
+  const submit = () => {
+    if(!canSubmit) return;
+    selectedIds.forEach(delId=>{
+      const del = deliverables.find(d=>d.id===delId);
+      if(!del) return;
+      const newRound = {
+        id: uid(), label: "Work Review",
+        deadline: session.datetime, reviewers:[...(session.reviewers||[])], status: ROUND_STATUSES[0], notes:"",
+        reviewRoundId: null, isWorkReview: true, workReviewSessionId: session.id, workReviewLocation: session.location||"",
+      };
+      onUpdateDel(project.id, delId, "rounds", [...(del.rounds||[]), newRound]);
+    });
+    onClose();
+  };
+
+  return (
+    <Modal onClose={onClose} maxWidth={560}>
+      <div style={{fontSize:22,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.02em",marginBottom:16}}>Add a Work Review Round</div>
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        <div>
+          <FLabel>Work Review Session</FLabel>
+          {!creatingNew?(
+            <div style={{display:"flex",gap:8}}>
+              <Sel value={sessionId} onChange={e=>setSessionId(e.target.value)} style={{flex:1}}>
+                <option value="">— select upcoming Work Review —</option>
+                {upcoming.map(s=>(
+                  <option key={s.id} value={s.id}>{fmtDT(s.datetime)}{s.location?` · ${s.location}`:""}</option>
+                ))}
+              </Sel>
+              <Btn small onClick={()=>setCreatingNew(true)}>+ New Session</Btn>
+            </div>
+          ):(
+            <div style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:8,padding:12,display:"flex",flexDirection:"column",gap:8}}>
+              <DateTimePicker value={newDatetime} onChange={setNewDatetime} label="Session date/time"/>
+              <Inp value={newLocation} onChange={e=>setNewLocation(e.target.value)} placeholder="Location (e.g. Conference Room B)"/>
+              <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+                <Btn variant="ghost" small onClick={()=>setCreatingNew(false)}>Cancel</Btn>
+                <Btn small onClick={createSession} disabled={!newDatetime}>Create Session</Btn>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {session&&(
+          <>
+            <div>
+              <FLabel>Reviewers for this Session</FLabel>
+              <ReviewerTagInput value={session.reviewers||[]} onChange={list=>updateWorkReviewSession(session.id,{reviewers:list})}
+                suggestions={reviewerNames} onAddSuggestion={addReviewerName} listId="add-work-review-reviewers"/>
+            </div>
+            {attachedElsewhere.length>0&&(
+              <div>
+                <FLabel>Already Screening at this Session</FLabel>
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  {attachedElsewhere.map(({del,project:p})=>(
+                    <div key={del.id} style={{fontSize:14,color:"#9ca3af",background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,padding:"5px 10px"}}>
+                      {del.title||"Untitled"} <span style={{color:"#4b5563"}}>· {p.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div>
+              <FLabel>Deliverables to Add from This Project ({selectedIds.length} selected)</FLabel>
+              <DeliverableCheckList deliverables={deliverables} selectedIds={selectedIds} onChange={setSelectedIds}
+                disabledIds={alreadyAttachedIds} disabledLabel="Already screening"/>
+            </div>
+          </>
+        )}
+
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:4}}>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+          <Btn onClick={submit} disabled={!canSubmit}>Add to Work Review</Btn>
+        </div>
+      </div>
+    </Modal>
+  );
+};
 
 // ─── Production Shoot Card ────────────────────────────────────────────────────
 const CREW_ROLES_PROD = ["DP","Gaffer","Assistant Camera","Sound Mixer","Hair and Makeup","Producer","Director","Production Assistant"];
@@ -6261,11 +6507,13 @@ class ProjectOverviewErrorBoundary extends React.Component {
   }
 }
 
-const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,onDeleteDel,onUpdateProject,initialDelId,initialTab,initialShootId,initialItemId,studioBookings=[],mediaCards=[],setupTypes=[],onAddSetupType,talentRoster=[],onUpdateTalentRoster,nudges=[],onAddNudge,furnitureList=[],propsList=[],screenContentOptions={},gearList=[],customTasks=[],onAddCustomTask,onUpdateCustomTask,onDeleteCustomTask,appPresets=[],onSaveAppPresets,vendorCompanies=[],addVendorCompany,intakes=[],becRequests=[],canAccessBudget=true}) => {
+const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,onDeleteDel,onUpdateProject,initialDelId,initialTab,initialShootId,initialItemId,studioBookings=[],mediaCards=[],setupTypes=[],onAddSetupType,talentRoster=[],onUpdateTalentRoster,nudges=[],onAddNudge,furnitureList=[],propsList=[],screenContentOptions={},gearList=[],customTasks=[],onAddCustomTask,onUpdateCustomTask,onDeleteCustomTask,appPresets=[],onSaveAppPresets,vendorCompanies=[],addVendorCompany,intakes=[],becRequests=[],canAccessBudget=true,reviewerNames=[],addReviewerName,workReviewSessions=[],addWorkReviewSession,updateWorkReviewSession}) => {
   const [activeDelModal,setActiveDelModal]=useState(initialDelId||((initialTab==="deliverables"||initialTab==="ingest")?initialItemId:null)||null);
   const [handoffDelId,  setHandoffDelId]  = useState(null); // for editor assignment modal in deliverables tab
   const editors = team.filter(m=>m.roles?.some(r=>["Editor","Animator","Designer"].includes(r)));
   const [showAddDel,setShowAddDel]=useState(false);
+  const [showAddReviewRound,setShowAddReviewRound]=useState(false);
+  const [showAddWorkReview,setShowAddWorkReview]=useState(false);
   const [newDelTitle,setNewDelTitle]=useState("");
   const [newDelDeadline,setNewDelDeadline]=useState("");
   const [newDelEditor,setNewDelEditor]=useState(null);
@@ -6720,7 +6968,8 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
           )}
 
           {/* ── PROJECT CALENDAR TAB ── */}
-          {activeTab==="calendar"&&<ProjectCalendar project={lp} onUpdateProject={onUpdateProject} onUpdateDel={onUpdateDel}/>}
+          {activeTab==="calendar"&&<ProjectCalendar project={lp} allProjects={allProjects} onUpdateProject={onUpdateProject} onUpdateDel={onUpdateDel}
+            reviewerNames={reviewerNames} addReviewerName={addReviewerName} workReviewSessions={workReviewSessions} addWorkReviewSession={addWorkReviewSession} updateWorkReviewSession={updateWorkReviewSession}/>}
 
           {/* ── DELIVERABLES TAB ── */}
           {activeTab==="deliverables"&&(
@@ -6907,6 +7156,21 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                 </div>
                 <div style={{fontSize:16,color:"#8e97a6"}}>{lp.deliverables.length} deliverable{lp.deliverables.length!==1?"s":""}</div>
               </div>
+
+              {/* ── Review round composers — batch-add across deliverables instead of one at a time ── */}
+              <div style={{display:"flex",gap:8}}>
+                <Btn small variant="ghost" onClick={()=>setShowAddReviewRound(true)}>+ Add a Review Round</Btn>
+                <Btn small variant="ghost" onClick={()=>setShowAddWorkReview(true)}>+ Add a Work Review Round</Btn>
+              </div>
+              {showAddReviewRound&&(
+                <AddReviewRoundModal project={lp} onUpdateDel={onUpdateDel} reviewerNames={reviewerNames} addReviewerName={addReviewerName} onClose={()=>setShowAddReviewRound(false)}/>
+              )}
+              {showAddWorkReview&&(
+                <AddWorkReviewRoundModal project={lp} allProjects={allProjects} onUpdateDel={onUpdateDel}
+                  workReviewSessions={workReviewSessions} addWorkReviewSession={addWorkReviewSession} updateWorkReviewSession={updateWorkReviewSession}
+                  reviewerNames={reviewerNames} addReviewerName={addReviewerName} onClose={()=>setShowAddWorkReview(false)}/>
+              )}
+
               {lp.deliverables.length===0&&!showAddDel&&<div style={{textAlign:"center",color: "#838ba0",padding:"24px 0",fontSize:19}}>No deliverables yet.</div>}
 
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -13398,84 +13662,91 @@ const MyViewHeader = ({member, isAdmin, setSelectedMember, projects, onUpdatePro
 
 // ─── Stats Bar ────────────────────────────────────────────────────────────────
 // ── Work Review View ──────────────────────────────────────────────────────────
-const WorkReviewView = ({projects, team=[], onOpenProject, onUpdateProject, onUpdateDel, onDeleteDel, talentRoster=[]}) => {
-  const now = new Date();
-  const wStart = getWeekStart(now);
-  const wStartISO = wStart.toISOString().slice(0,10);
-  const wEnd = new Date(wStart); wEnd.setDate(wStart.getDate()+7);
+const WorkReviewView = ({projects, team=[], onOpenProject, onUpdateProject, onUpdateDel, onDeleteDel, talentRoster=[], workReviewSessions=[]}) => {
   const [expandedIds, setExpandedIds] = useState(new Set());
   const toggleExpanded = id => setExpandedIds(prev=>{const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n;});
 
-  // Collect all deliverables flagged for work review this week, grouped by project
-  const projectGroups = useMemo(()=>{
-    const groups = [];
-    projects.forEach(p=>{
-      if(p.closedAt) return;
-      const flaggedDels = (p.deliverables||[]).filter(d=>
-        (d.rounds||[]).some(r=>r.workReviewWeek===wStartISO)
-      );
-      if(flaggedDels.length>0) groups.push({project:p, deliverables:flaggedDels});
-    });
-    return groups.sort((a,b)=>(a.project.name||"").localeCompare(b.project.name||""));
-  },[projects, wStartISO]);
+  const nowISO = new Date().toISOString().slice(0,16);
+  const upcomingSessions = useMemo(()=>
+    (workReviewSessions||[]).filter(s=>s.datetime>=nowISO).sort((a,b)=>a.datetime.localeCompare(b.datetime))
+  ,[workReviewSessions, nowISO]);
+
+  // Every deliverable (from ANY project) attached to each upcoming session —
+  // Work Review is a shared meeting, not a per-project concept, so this
+  // spans projects deliberately.
+  const sessionGroups = useMemo(()=>
+    upcomingSessions.map(session=>{
+      const items = [];
+      projects.forEach(p=>{
+        if(p.closedAt) return;
+        (p.deliverables||[]).forEach(d=>{
+          const round = (d.rounds||[]).find(r=>r.workReviewSessionId===session.id);
+          if(round) items.push({project:p, del:d, round});
+        });
+      });
+      return {session, items};
+    }).filter(g=>g.items.length>0)
+  ,[upcomingSessions, projects]);
 
   const removeFromWR = (projectId, delId, roundId) => {
     const p = projects.find(x=>x.id===projectId);
     if(!p) return;
     const newDels = (p.deliverables||[]).map(d=>d.id!==delId?d:{
       ...d,
-      rounds:(d.rounds||[]).map(r=>r.id!==roundId?r:{...r,workReviewWeek:null})
+      rounds:(d.rounds||[]).filter(r=>r.id!==roundId)
     });
     onUpdateProject(projectId,"deliverables",newDels);
   };
 
-  const weekLabel = wStart.toLocaleDateString("en-US",{month:"long",day:"numeric"});
+  const totalItems = sessionGroups.reduce((a,g)=>a+g.items.length,0);
 
   return (
     <div style={{maxWidth:900,margin:"0 auto"}}>
       <div style={{marginBottom:20}}>
         <h1 style={{fontSize:31,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",margin:0,letterSpacing:"0.02em"}}>Work Review</h1>
-        <div style={{fontSize:16,color:"#838ba0",marginTop:3}}>Week of {weekLabel} · {projectGroups.reduce((a,g)=>a+g.deliverables.length,0)} deliverable{projectGroups.reduce((a,g)=>a+g.deliverables.length,0)!==1?"s":""} across {projectGroups.length} project{projectGroups.length!==1?"s":""}</div>
+        <div style={{fontSize:16,color:"#838ba0",marginTop:3}}>{totalItems} deliverable{totalItems!==1?"s":""} across {sessionGroups.length} upcoming session{sessionGroups.length!==1?"s":""}</div>
       </div>
 
-      {projectGroups.length===0&&(
+      {sessionGroups.length===0&&(
         <div style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:12,padding:"48px 24px",textAlign:"center"}}>
           <div style={{fontSize:38,marginBottom:12}}>📋</div>
-          <div style={{fontSize:18,fontWeight:700,color:"#4b5563",marginBottom:6}}>No deliverables queued for Work Review this week</div>
-          <div style={{fontSize:16,color:"#374151"}}>Open a project's deliverables and click <b style={{color:"#818cf8"}}>Add to Work Review</b> on a review round.</div>
+          <div style={{fontSize:18,fontWeight:700,color:"#4b5563",marginBottom:6}}>No deliverables queued for an upcoming Work Review</div>
+          <div style={{fontSize:16,color:"#374151"}}>Open a project's Deliverables tab and click <b style={{color:"#818cf8"}}>+ Add a Work Review Round</b>.</div>
         </div>
       )}
 
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
-        {projectGroups.map(({project:p, deliverables})=>(
-          <div key={p.id} style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:12,overflow:"hidden"}}>
-            <div style={{padding:"12px 18px",borderBottom:"1px solid #1f2937",display:"flex",alignItems:"center",gap:10}}>
-              <button onClick={()=>onOpenProject(p)}
-                style={{background:"none",border:"none",cursor:"pointer",textAlign:"left",padding:0,color:"#f1f5f9",fontSize:18,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>
-                {p.name}
-              </button>
-              {p.workstream&&<span style={{fontSize:13,color:"#6b7280",background:"#1f2937",borderRadius:4,padding:"1px 7px"}}>{p.workstream}</span>}
-              <span style={{fontSize:14,color:"#4b5563",marginLeft:"auto"}}>{deliverables.length} deliverable{deliverables.length!==1?"s":""}</span>
+        {sessionGroups.map(({session, items})=>(
+          <div key={session.id} style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:12,overflow:"hidden"}}>
+            <div style={{padding:"12px 18px",borderBottom:"1px solid #1f2937",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <div>
+                <div style={{fontSize:18,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>🎥 {fmtDT(session.datetime)}</div>
+                {(session.location||(session.reviewers||[]).length>0)&&(
+                  <div style={{fontSize:13,color:"#6b7280",marginTop:2}}>
+                    {session.location}{session.location&&(session.reviewers||[]).length>0?" · ":""}
+                    {(session.reviewers||[]).length>0&&`Reviewers: ${session.reviewers.join(", ")}`}
+                  </div>
+                )}
+              </div>
+              <span style={{fontSize:14,color:"#4b5563",marginLeft:"auto"}}>{items.length} deliverable{items.length!==1?"s":""}</span>
             </div>
             <div style={{padding:"12px 18px",display:"flex",flexDirection:"column",gap:8}}>
-              {deliverables.map(d=>{
-                const wrRound = (d.rounds||[]).find(r=>r.workReviewWeek===wStartISO);
+              {items.map(({project:p, del:d, round})=>{
                 const statusColor = DCOLOR[d.status]||"#6b7280";
                 const isExp = expandedIds.has(d.id);
                 return (
-                  <div key={d.id} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:8,overflow:"hidden"}}>
+                  <div key={`${p.id}-${d.id}`} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:8,overflow:"hidden"}}>
                     <div onClick={()=>toggleExpanded(d.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",cursor:"pointer"}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:16,fontWeight:700,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title||"Untitled"}</div>
                         <div style={{display:"flex",gap:8,marginTop:3,alignItems:"center",flexWrap:"wrap"}}>
                           <span style={{background:statusColor+"20",color:statusColor,borderRadius:99,padding:"1px 8px",fontSize:12,fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>{d.status}</span>
+                          <button onClick={e=>{e.stopPropagation();onOpenProject(p);}} style={{background:"none",border:"none",padding:0,cursor:"pointer",fontSize:13,color:"#818cf8"}}>{p.name}</button>
                           {d.type&&<span style={{fontSize:13,color:"#6b7280"}}>{d.type}</span>}
-                          {wrRound&&<span style={{fontSize:13,color:"#818cf8"}}>Round {(d.rounds||[]).indexOf(wrRound)+1}</span>}
-                          {d.deadline&&<span style={{fontSize:13,color:"#9ca3af"}}>Due {new Date(d.deadline).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>}
                           <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW} small/>
                         </div>
                       </div>
-                      <button onClick={e=>{e.stopPropagation();removeFromWR(p.id,d.id,wrRound?.id);}}
+                      <button onClick={e=>{e.stopPropagation();removeFromWR(p.id,d.id,round.id);}}
                         title="Remove from Work Review"
                         style={{background:"#ef444415",border:"1px solid #ef444430",borderRadius:5,color:"#f87171",padding:"3px 10px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0}}>
                         Remove
@@ -13535,7 +13806,7 @@ const StatsFilterOverlay = ({title, projects, onOpenProject, onClose, emptyMsg})
 };
 
 // ── Stats Bar ──────────────────────────────────────────────────────────────────
-const StatsBar = ({projects, team, setView, onOpenProject, onSetStatsFilter}) => {
+const StatsBar = ({projects, team, setView, onOpenProject, onSetStatsFilter, workReviewSessions=[]}) => {
   const [overlay, setOverlay] = useState(null); // only used for "Projects Due This Week" now
 
   const now = new Date();
@@ -13558,9 +13829,10 @@ const StatsBar = ({projects, team, setView, onOpenProject, onSetStatsFilter}) =>
     (p.productions||[]).some(pr=>isThisWeek(pr.startTime)&&LIVE_TYPES.includes(pr.type))
   );
 
-  // 3. Work Review deliverables this week
+  // 3. Deliverables queued for an upcoming Work Review session
+  const upcomingWRSessionIds = new Set((workReviewSessions||[]).filter(s=>s.datetime>=now.toISOString().slice(0,16)).map(s=>s.id));
   const workReviewCount = projects.reduce((sum,p)=>
-    sum + (p.deliverables||[]).filter(d=>(d.rounds||[]).some(r=>r.workReviewWeek===wStartISO)).length
+    sum + (p.deliverables||[]).filter(d=>(d.rounds||[]).some(r=>r.workReviewSessionId&&upcomingWRSessionIds.has(r.workReviewSessionId))).length
   ,0);
 
   // 4. Projects due this week
@@ -13610,7 +13882,7 @@ const StatsBar = ({projects, team, setView, onOpenProject, onSetStatsFilter}) =>
     {
       value: workReviewCount,
       label: "Work Review",
-      sub: "deliverables this week",
+      sub: "queued, upcoming",
       color: "#f59e0b",
       onClick: ()=>setView("workReview"),
     },
@@ -22256,19 +22528,149 @@ const PROJ_CAL_TYPE_META = {
   production:  {icon:"🎬",label:"Productions",   color:"#6366f1"},
   poststart:   {icon:"🚀",label:"Post Start",    color:"#a855f7"},
   round:       {icon:"↺", label:"Review Rounds", color:"#eab308"},
+  workreview:  {icon:"🎥",label:"Work Review",   color:"#ec4899"},
   deliverable: {icon:"📋",label:"Final Delivery",color:"#f59e0b"},
   ingest:      {icon:"💾",label:"Ingest",         color:"#06b6d4"},
 };
 
-const ProjectCalendar = ({project, onUpdateProject, onUpdateDel}) => {
+const PROJ_CAL_WEEK_START_H = 7, PROJ_CAL_WEEK_END_H = 20, PROJ_CAL_HOUR_PX = 44;
+const projCalSnapQ = h => Math.round(h*4)/4;
+const projCalHhmmToH = t => { const p=(t||"09:00").split(":").map(Number); return p[0]+p[1]/60; };
+const projCalHToHhmm = h => { const hh=Math.max(0,Math.min(23,Math.floor(h))), mm=Math.round((h-Math.floor(h))*60)%60; return `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`; };
+
+// ─── Project Calendar — Week view: an hourly work-hours grid so events can be
+// dragged to a precise time of day (not just a day), in addition to Month
+// view's day-granularity drag. Drag position is tracked locally and only
+// committed (via onCommitMove) on release, so a drag gesture doesn't spam
+// the backend with a write per pointermove.
+const ProjectCalendarWeek = ({weekStart, events, onCommitMove, onEventClick, canEdit}) => {
+  const gridRef = useRef();
+  const [drag, setDrag] = useState(null);
+  const dragRef = useRef(null);
+  const justDraggedRef = useRef(false);
+  useEffect(()=>{ dragRef.current = drag; },[drag]);
+
+  const days = Array.from({length:7},(_,i)=>{ const d=new Date(weekStart); d.setDate(d.getDate()+i); return d; });
+  const dayStrs = days.map(d=>d.toISOString().slice(0,10));
+  const timed  = events.filter(e=>e.hasTime);
+  const allDay = events.filter(e=>!e.hasTime);
+  const hToY = h => (h-PROJ_CAL_WEEK_START_H)*PROJ_CAL_HOUR_PX;
+  const yToH = y => projCalSnapQ(Math.max(PROJ_CAL_WEEK_START_H,Math.min(PROJ_CAL_WEEK_END_H-0.25, PROJ_CAL_WEEK_START_H+y/PROJ_CAL_HOUR_PX)));
+  const gridHeight = hToY(PROJ_CAL_WEEK_END_H);
+  const hourMarks = []; for(let h=PROJ_CAL_WEEK_START_H; h<=PROJ_CAL_WEEK_END_H; h++) hourMarks.push(h);
+
+  const startDrag = (e, ev) => {
+    if(!canEdit) return;
+    e.preventDefault(); e.stopPropagation();
+    setDrag({ev, dayIdx:dayStrs.indexOf(ev.date), hour:projCalHhmmToH(ev.time)});
+  };
+
+  useEffect(()=>{
+    if(!drag) return;
+    const handleMove = e => {
+      const rect = gridRef.current?.getBoundingClientRect();
+      if(!rect) return;
+      const colW = rect.width/7;
+      const dayIdx = Math.max(0,Math.min(6,Math.floor((e.clientX-rect.left)/colW)));
+      const hour = yToH(e.clientY-rect.top);
+      setDrag(prev=>prev?{...prev,dayIdx,hour}:prev);
+    };
+    const handleUp = () => {
+      const d = dragRef.current;
+      setDrag(null);
+      if(d){ justDraggedRef.current = true; onCommitMove(d.ev, dayStrs[d.dayIdx], projCalHToHhmm(d.hour)); }
+    };
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    return ()=>{ window.removeEventListener("pointermove",handleMove); window.removeEventListener("pointerup",handleUp); };
+  },[drag]);
+
+  const handleClick = ev => {
+    if(justDraggedRef.current){ justDraggedRef.current=false; return; }
+    onEventClick(ev);
+  };
+
+  return (
+    <div>
+      {allDay.length>0&&(
+        <div style={{display:"grid",gridTemplateColumns:"46px repeat(7,1fr)",gap:2,marginBottom:6}}>
+          <div/>
+          {dayStrs.map(ds=>(
+            <div key={ds} style={{minHeight:20,display:"flex",flexDirection:"column",gap:2}}>
+              {allDay.filter(ev=>ev.date===ds).map(ev=>{
+                const meta = PROJ_CAL_TYPE_META[ev.type];
+                return (
+                  <div key={ev.id} onClick={()=>handleClick(ev)} title={ev.label}
+                    style={{background:ev.color+"25",borderLeft:`2px solid ${ev.color}`,borderRadius:"0 3px 3px 0",padding:"1px 4px",fontSize:11,color:ev.color,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:canEdit?"pointer":"default"}}>
+                    {meta.icon} {ev.label}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:"46px repeat(7,1fr)",gap:2,marginBottom:4}}>
+        <div/>
+        {days.map((d,i)=>{
+          const isToday = dayStrs[i]===new Date().toISOString().slice(0,10);
+          return (
+            <div key={i} style={{textAlign:"center",fontSize:13,fontWeight:700,color:isToday?"#818cf8":"#838ba0",padding:"3px 0",fontFamily:"'Barlow Condensed',sans-serif"}}>
+              {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][i]} {d.getDate()}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"46px 1fr"}}>
+        <div style={{position:"relative",height:gridHeight}}>
+          {hourMarks.map(h=>(
+            <div key={h} style={{position:"absolute",top:hToY(h)-6,right:6,fontSize:11,color:"#4b5563"}}>{fmtH(h)}</div>
+          ))}
+        </div>
+        <div ref={gridRef} style={{position:"relative",height:gridHeight,background:"#111827",borderRadius:6}}>
+          {hourMarks.map(h=>(
+            <div key={h} style={{position:"absolute",left:0,right:0,top:hToY(h),height:1,background:"#1f2937"}}/>
+          ))}
+          {timed.map(ev=>{
+            const isDragging = drag?.ev.id===ev.id;
+            const dayIdx = isDragging ? drag.dayIdx : dayStrs.indexOf(ev.date);
+            const hour = isDragging ? drag.hour : projCalHhmmToH(ev.time);
+            if(dayIdx<0) return null;
+            const meta = PROJ_CAL_TYPE_META[ev.type];
+            return (
+              <div key={ev.id}
+                onPointerDown={e=>startDrag(e,ev)}
+                onClick={()=>handleClick(ev)}
+                title={`${ev.label}${ev.status?" — "+ev.status:""} · ${projCalHToHhmm(hour)}`}
+                style={{position:"absolute",left:`${(dayIdx/7)*100}%`,width:`calc(${100/7}% - 3px)`,top:hToY(hour),height:22,
+                  background:ev.color+(isDragging?"40":"28"),border:`1.5px solid ${ev.color}${isDragging?"ee":"88"}`,borderRadius:4,
+                  padding:"1px 4px",fontSize:11,color:ev.color,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+                  cursor:canEdit?"grab":"default",zIndex:isDragging?10:2,boxSizing:"border-box",touchAction:"none"}}>
+                {meta.icon} {ev.label}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel, reviewerNames=[], addReviewerName, workReviewSessions=[], addWorkReviewSession, updateWorkReviewSession}) => {
   const today = new Date();
   const [calY, setCalY] = useState(today.getFullYear());
   const [calM, setCalM] = useState(today.getMonth());
+  const [viewMode, setViewMode] = useState("month"); // "month" | "week"
+  const [weekStart, setWeekStart] = useState(getWeekStart(today));
   const todayStr = today.toISOString().slice(0,10);
   const pad = n => String(n).padStart(2,"0");
-  const [filters, setFilters] = useState({production:true, poststart:true, round:true, deliverable:true, ingest:true});
+  const [filters, setFilters] = useState({production:true, poststart:true, round:true, workreview:true, deliverable:true, ingest:true});
   const [dragId, setDragId] = useState(null);
   const [editEvent, setEditEvent] = useState(null);
+  const [showAddReviewRound, setShowAddReviewRound] = useState(false);
+  const [showAddWorkReview, setShowAddWorkReview] = useState(false);
   const canEdit = !!(onUpdateProject && onUpdateDel);
 
   const allEvents = useMemo(()=>{
@@ -22289,9 +22691,13 @@ const ProjectCalendar = ({project, onUpdateProject, onUpdateDel}) => {
         ref:{kind:"deliverable", id:d.id}});
       (d.rounds||[]).forEach((r,ri)=>{
         if(!r.deadline) return;
-        evs.push({id:`round-${d.id}-${ri}`, type:"round", date:r.deadline.slice(0,10), hasTime:false,
-          label:`${d.title} · ${r.label}`, status:r.status, color:RCOLOR[r.status]||PROJ_CAL_TYPE_META.round.color,
-          ref:{kind:"round", delId:d.id, roundIdx:ri}});
+        const isWR = !!r.isWorkReview;
+        evs.push({id:`round-${d.id}-${ri}`, type:isWR?"workreview":"round",
+          date:r.deadline.slice(0,10), time:r.deadline.slice(11,16)||"09:00", hasTime:true,
+          label:`${d.title} · ${r.label}`, status:r.status,
+          color: isWR ? PROJ_CAL_TYPE_META.workreview.color : (RCOLOR[r.status]||PROJ_CAL_TYPE_META.round.color),
+          ref:{kind:"round", delId:d.id, roundIdx:ri},
+          groupId: isWR ? r.workReviewSessionId : (r.reviewRoundId||null), delTitle: d.title});
       });
     });
     (project.ingestDates||[]).forEach(ing=>{
@@ -22305,70 +22711,128 @@ const ProjectCalendar = ({project, onUpdateProject, onUpdateDel}) => {
 
   const visibleEvents = useMemo(()=>allEvents.filter(ev=>filters[ev.type]),[allEvents,filters]);
 
+  // Merge round/work-review events that share the same group id AND are still
+  // at the same date+time (i.e. haven't individually diverged since being
+  // batch-created) into a single calendar chip covering every asset, so the
+  // Calendar reads as "one review, N deliverables" instead of N duplicate rows.
+  const groupedEvents = useMemo(()=>{
+    const byGroupKey = {};
+    const singles = [];
+    visibleEvents.forEach(ev=>{
+      if(!ev.groupId){ singles.push(ev); return; }
+      const key = `${ev.groupId}|${ev.date}|${ev.time}`;
+      (byGroupKey[key] = byGroupKey[key]||[]).push(ev);
+    });
+    Object.values(byGroupKey).forEach(members=>{
+      if(members.length===1){ singles.push(members[0]); return; }
+      const first = members[0];
+      const typeLabel = first.type==="workreview" ? "Work Review" : "Review Round";
+      singles.push({...first, id:`group-${first.groupId}-${first.date}-${first.time}`,
+        label:`${typeLabel} (${members.length})`, _members:members,
+        _tooltip:`${typeLabel}: ${members.map(m=>m.delTitle).join(", ")}`});
+    });
+    return singles;
+  },[visibleEvents]);
+
   const byDay = useMemo(()=>{
     const m = {};
-    visibleEvents.forEach(ev=>{ if(!m[ev.date]) m[ev.date]=[]; m[ev.date].push(ev); });
+    groupedEvents.forEach(ev=>{ if(!m[ev.date]) m[ev.date]=[]; m[ev.date].push(ev); });
     return m;
-  },[visibleEvents]);
+  },[groupedEvents]);
 
   const daysInMonth = new Date(calY,calM+1,0).getDate();
   const firstDow    = new Date(calY,calM,1).getDay();
 
   // Applies a new date (and, for time-bearing events, an optional new time)
-  // back to whatever this event was sourced from — dragging a chip to a new
-  // day, or editing it via the popover, both funnel through here so the
-  // change reflects immediately in Deliverables / Production / etc.
+  // back to whatever this event was sourced from — dragging a chip, or
+  // editing it via the popover, both funnel through here so the change
+  // reflects immediately in Deliverables / Production / etc. Grouped events
+  // (multiple deliverables sharing one review round) apply to every member.
   const applyDateChange = (ev, newDate, newTime) => {
     if(!canEdit || !ev || !newDate) return;
-    if(ev.type==="poststart") {
-      const time = newTime || ev.time || "09:00";
-      onUpdateProject(project.id, "postStartDate", `${newDate}T${time}`);
-      return;
-    }
-    const ref = ev.ref;
-    if(!ref) return;
-    if(ref.kind==="production") {
-      const prod = (project.productions||[]).find(p=>p.id===ref.id);
-      if(!prod) return;
-      const durMin = prod.endTime ? (new Date(prod.endTime)-new Date(prod.startTime))/60000 : null;
-      const time = newTime || (prod.startTime||"").slice(11,16) || "09:00";
-      const newStart = `${newDate}T${time}`;
-      const newEnd = durMin!=null ? new Date(new Date(newStart).getTime()+durMin*60000).toISOString().slice(0,16) : prod.endTime;
-      const newProds = (project.productions||[]).map(p=>p.id===ref.id?{...p,startTime:newStart,endTime:newEnd}:p);
-      onUpdateProject(project.id,"productions",newProds);
-    } else if(ref.kind==="deliverable") {
-      onUpdateDel(project.id, ref.id, "deadline", newDate);
-    } else if(ref.kind==="round") {
-      const del = (project.deliverables||[]).find(d=>d.id===ref.delId);
-      if(!del) return;
-      const newRounds = (del.rounds||[]).map((r,i)=>i===ref.roundIdx?{...r,deadline:newDate}:r);
-      onUpdateDel(project.id, del.id, "rounds", newRounds);
-    } else if(ref.kind==="ingest") {
-      const ing = (project.ingestDates||[]).find(i=>i.id===ref.id);
-      if(!ing) return;
-      const time = newTime || (ing.datetime||"").slice(11,16) || "09:00";
-      const newIngests = (project.ingestDates||[]).map(i=>i.id===ref.id?{...i,datetime:`${newDate}T${time}`}:i);
-      onUpdateProject(project.id,"ingestDates",newIngests);
-    }
+    const members = ev._members || [ev];
+    members.forEach(m=>{
+      if(m.type==="poststart") {
+        const time = newTime || m.time || "09:00";
+        onUpdateProject(project.id, "postStartDate", `${newDate}T${time}`);
+        return;
+      }
+      const ref = m.ref;
+      if(!ref) return;
+      if(ref.kind==="production") {
+        const prod = (project.productions||[]).find(p=>p.id===ref.id);
+        if(!prod) return;
+        const durMin = prod.endTime ? (new Date(prod.endTime)-new Date(prod.startTime))/60000 : null;
+        const time = newTime || (prod.startTime||"").slice(11,16) || "09:00";
+        const newStart = `${newDate}T${time}`;
+        const newEnd = durMin!=null ? new Date(new Date(newStart).getTime()+durMin*60000).toISOString().slice(0,16) : prod.endTime;
+        const newProds = (project.productions||[]).map(p=>p.id===ref.id?{...p,startTime:newStart,endTime:newEnd}:p);
+        onUpdateProject(project.id,"productions",newProds);
+      } else if(ref.kind==="deliverable") {
+        onUpdateDel(project.id, ref.id, "deadline", newDate);
+      } else if(ref.kind==="round") {
+        const del = (project.deliverables||[]).find(d=>d.id===ref.delId);
+        if(!del) return;
+        const time = newTime || (del.rounds[ref.roundIdx]?.deadline||"").slice(11,16) || "09:00";
+        const newRounds = (del.rounds||[]).map((r,i)=>i===ref.roundIdx?{...r,deadline:`${newDate}T${time}`}:r);
+        onUpdateDel(project.id, del.id, "rounds", newRounds);
+      } else if(ref.kind==="ingest") {
+        const ing = (project.ingestDates||[]).find(i=>i.id===ref.id);
+        if(!ing) return;
+        const time = newTime || (ing.datetime||"").slice(11,16) || "09:00";
+        const newIngests = (project.ingestDates||[]).map(i=>i.id===ref.id?{...i,datetime:`${newDate}T${time}`}:i);
+        onUpdateProject(project.id,"ingestDates",newIngests);
+      }
+    });
   };
 
   const handleDrop = (e, ds) => {
     e.preventDefault();
-    const ev = allEvents.find(x=>x.id===dragId);
+    const ev = groupedEvents.find(x=>x.id===dragId);
     setDragId(null);
     if(!ev || ev.date===ds) return;
     applyDateChange(ev, ds);
   };
 
+  const openEditEvent = ev => setEditEvent({id:ev.id, label:ev.label, date:ev.date, time:ev.time||"", hasTime:ev.hasTime});
+
+  const shiftWeek = delta => setWeekStart(w=>{ const n=new Date(w); n.setDate(n.getDate()+delta*7); return n; });
+
   return (
     <div style={{background:"#0f172a",border:"1px solid #1f2937",borderRadius:12,padding:"16px 20px"}}>
-      {/* Month nav */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-        <button onClick={()=>{if(calM===0){setCalM(11);setCalY(y=>y-1);}else setCalM(m=>m-1);}}
-          style={{background:"#1f2937",border:"none",borderRadius:6,color:"#e2e8f0",width:30,height:30,cursor:"pointer",fontSize:19}}>‹</button>
-        <div style={{fontSize:19,fontWeight:800,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>{MONTHS_LONG[calM]} {calY}</div>
-        <button onClick={()=>{if(calM===11){setCalM(0);setCalY(y=>y+1);}else setCalM(m=>m+1);}}
-          style={{background:"#1f2937",border:"none",borderRadius:6,color:"#e2e8f0",width:30,height:30,cursor:"pointer",fontSize:19}}>›</button>
+      {/* Nav + view toggle + composer buttons */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10}}>
+        {viewMode==="month"?(
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <button onClick={()=>{if(calM===0){setCalM(11);setCalY(y=>y-1);}else setCalM(m=>m-1);}}
+              style={{background:"#1f2937",border:"none",borderRadius:6,color:"#e2e8f0",width:30,height:30,cursor:"pointer",fontSize:19}}>‹</button>
+            <div style={{fontSize:19,fontWeight:800,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>{MONTHS_LONG[calM]} {calY}</div>
+            <button onClick={()=>{if(calM===11){setCalM(0);setCalY(y=>y+1);}else setCalM(m=>m+1);}}
+              style={{background:"#1f2937",border:"none",borderRadius:6,color:"#e2e8f0",width:30,height:30,cursor:"pointer",fontSize:19}}>›</button>
+          </div>
+        ):(
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <button onClick={()=>shiftWeek(-1)} style={{background:"#1f2937",border:"none",borderRadius:6,color:"#e2e8f0",width:30,height:30,cursor:"pointer",fontSize:19}}>‹</button>
+            <div style={{fontSize:19,fontWeight:800,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>
+              Week of {weekStart.toLocaleDateString("en-US",{month:"long",day:"numeric"})}
+            </div>
+            <button onClick={()=>shiftWeek(1)} style={{background:"#1f2937",border:"none",borderRadius:6,color:"#e2e8f0",width:30,height:30,cursor:"pointer",fontSize:19}}>›</button>
+          </div>
+        )}
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{display:"flex",background:"#111827",border:"1px solid #1f2937",borderRadius:8,overflow:"hidden"}}>
+            {["month","week"].map(m=>(
+              <button key={m} onClick={()=>setViewMode(m)}
+                style={{background:viewMode===m?"#6366f1":"transparent",border:"none",color:viewMode===m?"#fff":"#9ca3af",padding:"6px 14px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.05em"}}>
+                {m}
+              </button>
+            ))}
+          </div>
+          {canEdit&&<>
+            <Btn small variant="ghost" onClick={()=>setShowAddReviewRound(true)}>+ Review Round</Btn>
+            <Btn small variant="ghost" onClick={()=>setShowAddWorkReview(true)}>+ Work Review</Btn>
+          </>}
+        </div>
       </div>
 
       {/* Filter / legend toggles */}
@@ -22384,48 +22848,58 @@ const ProjectCalendar = ({project, onUpdateProject, onUpdateDel}) => {
             </button>
           );
         })}
-        {canEdit&&<div style={{fontSize:12,color:"#4b5563",marginLeft:"auto",alignSelf:"center"}}>Drag a date to reschedule · click to edit time</div>}
+        {canEdit&&<div style={{fontSize:12,color:"#4b5563",marginLeft:"auto",alignSelf:"center"}}>
+          {viewMode==="month" ? "Drag a date to reschedule · click to edit time" : "Drag an event to change its time · click to fine-tune"}
+        </div>}
       </div>
 
-      {/* Day headers */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(0,1fr))",gap:2,marginBottom:2}}>
-        {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>(
-          <div key={d} style={{textAlign:"center",fontSize:13,fontWeight:700,color:"#838ba0",padding:"3px 0",fontFamily:"'Barlow Condensed',sans-serif"}}>{d}</div>
-        ))}
-      </div>
+      {viewMode==="week"?(
+        <ProjectCalendarWeek weekStart={weekStart} events={groupedEvents} canEdit={canEdit}
+          onCommitMove={(ev,newDate,newTime)=>applyDateChange(ev,newDate,newTime)}
+          onEventClick={openEditEvent}/>
+      ):(
+        <>
+          {/* Day headers */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(0,1fr))",gap:2,marginBottom:2}}>
+            {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>(
+              <div key={d} style={{textAlign:"center",fontSize:13,fontWeight:700,color:"#838ba0",padding:"3px 0",fontFamily:"'Barlow Condensed',sans-serif"}}>{d}</div>
+            ))}
+          </div>
 
-      {/* Day grid */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(0,1fr))",gap:2}}>
-        {Array.from({length:firstDow}).map((_,i)=><div key={`e${i}`}/>)}
-        {Array.from({length:daysInMonth},(_,i)=>i+1).map(day=>{
-          const ds = `${calY}-${pad(calM+1)}-${pad(day)}`;
-          const evs = byDay[ds]||[];
-          const isToday = ds===todayStr;
-          return (
-            <div key={day}
-              onDragOver={canEdit?e=>e.preventDefault():undefined}
-              onDrop={canEdit?e=>handleDrop(e,ds):undefined}
-              style={{background:isToday?"#6366f115":"#111827",border:`1px solid ${isToday?"#6366f1":"#1f2937"}`,borderRadius:6,padding:"4px 4px 6px",minHeight:72,display:"flex",flexDirection:"column",gap:2}}>
-              <div style={{fontSize:14,fontWeight:isToday?800:400,color:isToday?"#818cf8":"#6b7280",textAlign:"right",lineHeight:1.2,marginBottom:2}}>{day}</div>
-              {evs.slice(0,4).map(ev=>{
-                const meta = PROJ_CAL_TYPE_META[ev.type];
-                return (
-                  <div key={ev.id}
-                    draggable={canEdit&&!!ev.ref||ev.type==="poststart"}
-                    onDragStart={canEdit?e=>{setDragId(ev.id); e.dataTransfer.effectAllowed="move";}:undefined}
-                    onDragEnd={()=>setDragId(null)}
-                    onClick={canEdit?()=>setEditEvent({id:ev.id,label:ev.label,date:ev.date,time:ev.time||"",hasTime:ev.hasTime}):undefined}
-                    title={`${ev.label}${ev.status?" — "+ev.status:""}${ev.time?" · "+ev.time:""}`}
-                    style={{background:ev.color+"25",borderLeft:`2px solid ${ev.color}`,borderRadius:"0 3px 3px 0",padding:"1px 4px",fontSize:11,color:ev.color,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Barlow Condensed',sans-serif",cursor:canEdit?"grab":"default",opacity:dragId===ev.id?0.4:1}}>
-                    {meta.icon} {ev.label}
-                  </div>
-                );
-              })}
-              {evs.length>4&&<div style={{fontSize:11,color:"#838ba0",textAlign:"center"}}>+{evs.length-4} more</div>}
-            </div>
-          );
-        })}
-      </div>
+          {/* Day grid */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(0,1fr))",gap:2}}>
+            {Array.from({length:firstDow}).map((_,i)=><div key={`e${i}`}/>)}
+            {Array.from({length:daysInMonth},(_,i)=>i+1).map(day=>{
+              const ds = `${calY}-${pad(calM+1)}-${pad(day)}`;
+              const evs = byDay[ds]||[];
+              const isToday = ds===todayStr;
+              return (
+                <div key={day}
+                  onDragOver={canEdit?e=>e.preventDefault():undefined}
+                  onDrop={canEdit?e=>handleDrop(e,ds):undefined}
+                  style={{background:isToday?"#6366f115":"#111827",border:`1px solid ${isToday?"#6366f1":"#1f2937"}`,borderRadius:6,padding:"4px 4px 6px",minHeight:72,display:"flex",flexDirection:"column",gap:2}}>
+                  <div style={{fontSize:14,fontWeight:isToday?800:400,color:isToday?"#818cf8":"#6b7280",textAlign:"right",lineHeight:1.2,marginBottom:2}}>{day}</div>
+                  {evs.slice(0,4).map(ev=>{
+                    const meta = PROJ_CAL_TYPE_META[ev.type];
+                    return (
+                      <div key={ev.id}
+                        draggable={canEdit&&(!!ev.ref||ev.type==="poststart"||!!ev._members)}
+                        onDragStart={canEdit?e=>{setDragId(ev.id); e.dataTransfer.effectAllowed="move";}:undefined}
+                        onDragEnd={()=>setDragId(null)}
+                        onClick={canEdit?()=>openEditEvent(ev):undefined}
+                        title={ev._tooltip||`${ev.label}${ev.status?" — "+ev.status:""}${ev.time?" · "+ev.time:""}`}
+                        style={{background:ev.color+"25",borderLeft:`2px solid ${ev.color}`,borderRadius:"0 3px 3px 0",padding:"1px 4px",fontSize:11,color:ev.color,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Barlow Condensed',sans-serif",cursor:canEdit?"grab":"default",opacity:dragId===ev.id?0.4:1}}>
+                        {meta.icon} {ev.label}
+                      </div>
+                    );
+                  })}
+                  {evs.length>4&&<div style={{fontSize:11,color:"#838ba0",textAlign:"center"}}>+{evs.length-4} more</div>}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* Edit-time popover */}
       {editEvent&&(
@@ -22444,7 +22918,7 @@ const ProjectCalendar = ({project, onUpdateProject, onUpdateDel}) => {
             )}
             <div style={{display:"flex",gap:8,marginTop:6}}>
               <button onClick={()=>{
-                  const ev = allEvents.find(x=>x.id===editEvent.id);
+                  const ev = groupedEvents.find(x=>x.id===editEvent.id);
                   applyDateChange(ev, editEvent.date, editEvent.time);
                   setEditEvent(null);
                 }}
@@ -22454,6 +22928,15 @@ const ProjectCalendar = ({project, onUpdateProject, onUpdateDel}) => {
             </div>
           </div>
         </div>
+      )}
+
+      {showAddReviewRound&&(
+        <AddReviewRoundModal project={project} onUpdateDel={onUpdateDel} reviewerNames={reviewerNames} addReviewerName={addReviewerName} onClose={()=>setShowAddReviewRound(false)}/>
+      )}
+      {showAddWorkReview&&(
+        <AddWorkReviewRoundModal project={project} allProjects={allProjects} onUpdateDel={onUpdateDel}
+          workReviewSessions={workReviewSessions} addWorkReviewSession={addWorkReviewSession} updateWorkReviewSession={updateWorkReviewSession}
+          reviewerNames={reviewerNames} addReviewerName={addReviewerName} onClose={()=>setShowAddWorkReview(false)}/>
       )}
     </div>
   );
@@ -25945,6 +26428,8 @@ function App() {
       // Load production presets
       safeGet(PRESET_STORAGE_KEY).then(ps=>{ try{if(ps?.value)setAppPresets(JSON.parse(ps.value));}catch(e){} }).catch(()=>{});
       safeGet(VENDOR_STORAGE_KEY).then(vc=>{ try{if(vc?.value){ const list=JSON.parse(vc.value); if(Array.isArray(list)&&list.length>0) setVendorCompanies(list); }}catch(e){} }).catch(()=>{});
+      safeGet(REVIEWER_NAMES_STORAGE_KEY).then(rn=>{ try{if(rn?.value){ const list=JSON.parse(rn.value); if(Array.isArray(list)) setReviewerNames(list); }}catch(e){} }).catch(()=>{});
+      safeGet(WORK_REVIEW_SESSIONS_STORAGE_KEY).then(wr=>{ try{if(wr?.value){ const list=JSON.parse(wr.value); if(Array.isArray(list)) setWorkReviewSessions(list); }}catch(e){} }).catch(()=>{});
       safeGet(INTAKE_STORAGE_KEY).then(iv=>{ try{if(iv?.value){ const list=JSON.parse(iv.value); if(Array.isArray(list)) setIntakes(list); }}catch(e){} }).catch(()=>{});
       safeGet(BEC_REQUEST_STORAGE_KEY).then(bv=>{ try{if(bv?.value){ const list=JSON.parse(bv.value); if(Array.isArray(list)) setBecRequests(list); }}catch(e){} }).catch(()=>{});
       safeGet(MEDIA_CARDS_STORAGE_KEY).then(mv=>{ try{if(mv?.value){ const list=JSON.parse(mv.value); if(Array.isArray(list)) setMediaCards(list); }}catch(e){} }).catch(()=>{});
@@ -26175,6 +26660,50 @@ function App() {
       if(prev.some(c=>c.toLowerCase()===trimmed.toLowerCase())) return prev;
       const next = [...prev, trimmed];
       window.storage?.set(VENDOR_STORAGE_KEY, JSON.stringify(next)).catch(()=>{});
+      return next;
+    });
+  },[]);
+
+  // Reviewer name autocomplete pool — free-text review-round reviewers aren't
+  // software users, so this just grows as new names get typed, same pattern
+  // as vendorCompanies above. Shared globally across every project.
+  const REVIEWER_NAMES_STORAGE_KEY = "reviewer-names-v1";
+  const [reviewerNames, setReviewerNames] = useState([]);
+  const addReviewerName = useCallback(name=>{
+    const trimmed = name?.trim();
+    if(!trimmed) return;
+    setReviewerNames(prev=>{
+      if(prev.some(c=>c.toLowerCase()===trimmed.toLowerCase())) return prev;
+      const next = [...prev, trimmed];
+      window.storage?.set(REVIEWER_NAMES_STORAGE_KEY, JSON.stringify(next)).catch(()=>{});
+      return next;
+    });
+  },[]);
+
+  // Work Review sessions — a shared, cross-project list of the twice-weekly
+  // Work Review meeting instances (date/time/location/reviewers). Any
+  // project can attach its own deliverables to an upcoming session; each
+  // attached deliverable gets its own decoupled copy of the round info so
+  // per-deliverable status tracking still works independently afterward.
+  const WORK_REVIEW_SESSIONS_STORAGE_KEY = "work-review-sessions-v1";
+  const [workReviewSessions, setWorkReviewSessions] = useState([]);
+  const saveWorkReviewSessions = useCallback(list=>{
+    setWorkReviewSessions(list);
+    window.storage?.set(WORK_REVIEW_SESSIONS_STORAGE_KEY, JSON.stringify(list)).catch(()=>{});
+  },[]);
+  const addWorkReviewSession = useCallback(session=>{
+    const withId = {id:uid(), reviewers:[], notes:"", ...session};
+    setWorkReviewSessions(prev=>{
+      const next = [...prev, withId];
+      window.storage?.set(WORK_REVIEW_SESSIONS_STORAGE_KEY, JSON.stringify(next)).catch(()=>{});
+      return next;
+    });
+    return withId;
+  },[]);
+  const updateWorkReviewSession = useCallback((id,patch)=>{
+    setWorkReviewSessions(prev=>{
+      const next = prev.map(s=>s.id===id?{...s,...patch}:s);
+      window.storage?.set(WORK_REVIEW_SESSIONS_STORAGE_KEY, JSON.stringify(next)).catch(()=>{});
       return next;
     });
   },[]);
@@ -26801,8 +27330,8 @@ function App() {
             show the default layout. Give that one view more room; every
             other view keeps the standard cap. */}
         <div style={{maxWidth:view==="pipeline"?2000:1600,margin:(activeSidebarWidth||pushOffset)?"0":"0 auto",padding:"20px 24px"}}>
-          <StatsBar projects={allProjects} team={allTeam} setView={v=>{setView(v);if(v!=="projects")setStatsFilter(null);}} onOpenProject={openProject} onSetStatsFilter={setStatsFilter}/>
-          {view==="workReview"&&<WorkReviewView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster}/>}
+          <StatsBar projects={allProjects} team={allTeam} setView={v=>{setView(v);if(v!=="projects")setStatsFilter(null);}} onOpenProject={openProject} onSetStatsFilter={setStatsFilter} workReviewSessions={workReviewSessions}/>
+          {view==="workReview"&&<WorkReviewView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} workReviewSessions={workReviewSessions}/>}
           {view==="pipeline"&&<PipelineView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject}/>}
           {view==="animations"&&<AnimationView allProjects={allProjects} team={allTeam} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="intake"&&<IntakeView
@@ -26862,7 +27391,7 @@ function App() {
 
         {liveSelected&&(
           <ProjectOverviewErrorBoundary key={liveSelected.id} onClose={()=>setSelected(null)}>
-            <ProjectOverview project={liveSelected} team={allTeam} allProjects={allProjects} onClose={()=>setSelected(null)} onUpdateDel={updateDel} onAddDel={addDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} initialTab={initialTab?.tab} initialShootId={initialTab?.itemId} initialItemId={initialTab?.itemId} studioBookings={allStudioBookings} mediaCards={mediaCards} setupTypes={setupTypes} onAddSetupType={addSetupType} talentRoster={talentRoster} onUpdateTalentRoster={saveTalentRoster} nudges={nudges} onAddNudge={addNudge} furnitureList={furnitureList} propsList={propsList} screenContentOptions={screenContentOptions} gearList={gearList} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} appPresets={appPresets} onSaveAppPresets={saveAppPresets} vendorCompanies={vendorCompanies} addVendorCompany={addVendorCompany} intakes={intakes} becRequests={becRequests} canAccessBudget={canAccessTab("budget")}/>
+            <ProjectOverview project={liveSelected} team={allTeam} allProjects={allProjects} onClose={()=>setSelected(null)} onUpdateDel={updateDel} onAddDel={addDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} initialTab={initialTab?.tab} initialShootId={initialTab?.itemId} initialItemId={initialTab?.itemId} studioBookings={allStudioBookings} mediaCards={mediaCards} setupTypes={setupTypes} onAddSetupType={addSetupType} talentRoster={talentRoster} onUpdateTalentRoster={saveTalentRoster} nudges={nudges} onAddNudge={addNudge} furnitureList={furnitureList} propsList={propsList} screenContentOptions={screenContentOptions} gearList={gearList} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} appPresets={appPresets} onSaveAppPresets={saveAppPresets} vendorCompanies={vendorCompanies} addVendorCompany={addVendorCompany} intakes={intakes} becRequests={becRequests} canAccessBudget={canAccessTab("budget")} reviewerNames={reviewerNames} addReviewerName={addReviewerName} workReviewSessions={workReviewSessions} addWorkReviewSession={addWorkReviewSession} updateWorkReviewSession={updateWorkReviewSession}/>
           </ProjectOverviewErrorBoundary>
         )}
         {addingProject&&<AddProjectModal team={allTeam} existingProjects={allProjects} onClose={()=>setAddingProject(false)} onAdd={addProject}/>}
