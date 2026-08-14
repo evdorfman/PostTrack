@@ -506,54 +506,18 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     return "In Progress";
   };
   var PRODUCTION_TYPES = ["Content Shoot", "Social Content", "Pre-tape", "Live Event", "Live Broadcast", "Hybrid Event", "Live Playback", "Podcast", "Post-Only", "Other"];
-  var CREW_ROLES_DEFAULT = [
-    "Producer",
-    "Director",
-    "DP",
-    "Gaffer",
-    "Camera Op",
-    "Sound Mixer",
-    "Hair and Makeup",
-    "Production Assistant",
-    "Assistant Camera",
-    "Audio Op with Kit",
-    "Drone Operator with gear",
-    "Media Manager",
-    "DIT",
-    "Teleprompter Op",
-    "SM",
-    "A2",
-    "V1",
-    "A1",
-    "Playback Operator"
-  ];
-  var CREW_ROLES_BROADCAST_DEFAULT = [
-    "Live Director",
-    "Technical Director",
-    "Broadcast Coordinator",
-    "Camera Op",
-    "Audio Tech",
-    "Lighting Director",
-    "Producer",
-    "Project Manager",
-    "Video Engineer",
-    "V1",
-    "EVS Operator",
-    "Replay Operator",
-    "Graphics Operator",
-    "DP",
-    "Audio Op with Kit",
-    "Assistant Camera",
-    "Production Assistant",
-    "Drone Operator with gear",
-    "Media Manager",
-    "DIT",
-    "Teleprompter Op",
-    "SM",
-    "A2",
-    "A1",
-    "Playback Operator"
-  ];
+  var CREW_ROLE_CATEGORIES_DEFAULT = {
+    "Admin Roles": ["Broadcast Coordinator", "Project Manager", "Post Project Manager", "Team Lead", "Executive Producer", "Studio Approver", "Head of Production", "Head of Post Production", "Head of Broadcast"],
+    "Design Roles": ["Designer", "Motion Designer"],
+    "Production Roles": ["Producer", "Director", "DP", "Gaffer", "Camera Op", "Sound Mixer", "Hair and Makeup", "Production Assistant", "Assistant Camera", "Audio Op with Kit", "Drone Operator with Gear", "DIT", "Teleprompter Op", "SM", "A1", "A2", "V1", "Playback Operator", "Live Director", "Technical Director", "Audio Technician", "Lighting Director", "Video Engineer", "EVS Operator"],
+    "Post Production Roles": ["Media Manager", "Editor", "Animator", "Colorist", "Sound Mixer", "Assistant Editor"]
+  };
+  var CREW_ROLE_CATEGORY_LIST_KEYS = {
+    "Admin Roles": "adminRoles",
+    "Design Roles": "designRoles",
+    "Production Roles": "productionRoles",
+    "Post Production Roles": "postProductionRoles"
+  };
   var BOOKING_STATUSES = ["Tentative", "Confirmed", "In Progress", "Completed", "Cancelled"];
   var SHOOT_TYPES = ["Content Shoot", "Social Content", "Pre-tape", "Live Event", "Live Broadcast", "Hybrid Event", "Podcast"];
   var BROADCAST_TYPES = ["Live Event", "Live Broadcast", "Hybrid Event"];
@@ -1830,7 +1794,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         if (!map[date]) map[date] = {};
         if (!map[date][loc]) map[date][loc] = [];
         const sh = isoToHours(pr.startTime), eh = isoToHours(pr.endTime || pr.startTime);
-        if (sh != null) map[date][loc].push({ startH: sh, endH: eh || sh + 8, name: p.name, status: pr.status });
+        if (sh != null) map[date][loc].push({ startH: sh, endH: eh || sh + 8, name: p.name, status: pr.status, isOverallWindow: true });
         (pr.secondaryLocations || []).forEach((sl) => {
           if (!sl.location || !sl.startTime) return;
           if (!map[date][sl.location]) map[date][sl.location] = [];
@@ -2052,7 +2016,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
             alignItems: "center",
             pointerEvents: "none",
             overflow: "hidden"
-          } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: packedRoomBookings.totalLanes > 1 ? 12 : 14, color: ["Approved", "Happening Now"].includes(b.status) ? "#ef4444" : "#f59e0b", padding: "0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, b.name));
+          } }, !b.isOverallWindow && /* @__PURE__ */ React.createElement("div", { style: { fontSize: packedRoomBookings.totalLanes > 1 ? 12 : 14, color: ["Approved", "Happening Now"].includes(b.status) ? "#ef4444" : "#f59e0b", padding: "0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, b.name));
         }),
         hasSelection && /* @__PURE__ */ React.createElement("div", { style: {
           position: "absolute",
@@ -5045,7 +5009,7 @@ Brief content: ${content}`;
           onClose: () => setHandoffDelId(null)
         }
       );
-    })(), /* @__PURE__ */ React.createElement(SH, { label: "Deliverables", desc: "Every deliverable in this project \u2014 add new ones, sort, and track status and rounds from here." }), showAddDel && /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #374151", borderRadius: 12, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, "New Deliverable"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-end" } }, /* @__PURE__ */ React.createElement(LW, { label: "Title", style: { flex: 1 } }, /* @__PURE__ */ React.createElement(Inp, { value: newDelTitle, onChange: (e) => setNewDelTitle(e.target.value), placeholder: "Deliverable title\u2026", onKeyDown: (e) => e.key === "Enter" && newDelTitle.trim() && addDel() })), /* @__PURE__ */ React.createElement(Btn, { onClick: addDel, disabled: !newDelTitle.trim(), style: { flexShrink: 0, marginBottom: 1 } }, "+ Add")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement(LW, { label: "Aspect Ratio" }, /* @__PURE__ */ React.createElement(Sel, { value: newDelAR, onChange: (e) => setNewDelAR(e.target.value) }, ASPECT_RATIOS.map((r) => /* @__PURE__ */ React.createElement("option", { key: r }, r)))), /* @__PURE__ */ React.createElement(LW, { label: "Final Deadline", style: { gridColumn: "2/4" } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: newDelDeadline, onChange: (v) => setNewDelDeadline(v), label: "Set deadline" })), /* @__PURE__ */ React.createElement(LW, { label: "Editor / Animator", style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement(EditorPicker, { value: newDelEditor, onChange: (v) => setNewDelEditor(v), deadline: newDelDeadline, allProjects, team })))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 0, background: "#111827", border: "1px solid #1f2937", borderRadius: 8, overflow: "hidden", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(
+    })(), /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 12, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement(SH, { label: "Deliverables", desc: "Every deliverable in this project \u2014 add new ones, sort, and track status and rounds from here." }), showAddDel && /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #374151", borderRadius: 12, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, "New Deliverable"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-end" } }, /* @__PURE__ */ React.createElement(LW, { label: "Title", style: { flex: 1 } }, /* @__PURE__ */ React.createElement(Inp, { value: newDelTitle, onChange: (e) => setNewDelTitle(e.target.value), placeholder: "Deliverable title\u2026", onKeyDown: (e) => e.key === "Enter" && newDelTitle.trim() && addDel() })), /* @__PURE__ */ React.createElement(Btn, { onClick: addDel, disabled: !newDelTitle.trim(), style: { flexShrink: 0, marginBottom: 1 } }, "+ Add")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement(LW, { label: "Aspect Ratio" }, /* @__PURE__ */ React.createElement(Sel, { value: newDelAR, onChange: (e) => setNewDelAR(e.target.value) }, ASPECT_RATIOS.map((r) => /* @__PURE__ */ React.createElement("option", { key: r }, r)))), /* @__PURE__ */ React.createElement(LW, { label: "Final Deadline", style: { gridColumn: "2/4" } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: newDelDeadline, onChange: (v) => setNewDelDeadline(v), label: "Set deadline" })), /* @__PURE__ */ React.createElement(LW, { label: "Editor / Animator", style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement(EditorPicker, { value: newDelEditor, onChange: (v) => setNewDelEditor(v), deadline: newDelDeadline, allProjects, team })))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 0, background: "#111827", border: "1px solid #1f2937", borderRadius: 8, overflow: "hidden", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => {
@@ -5138,7 +5102,7 @@ Brief content: ${content}`;
           }
         )));
       });
-    })())), activeTab === "budget" && /* @__PURE__ */ React.createElement(BudgetTab, { project: lp, onUpdateProject }), activeTab === "production" && /* @__PURE__ */ React.createElement(
+    })()))), activeTab === "budget" && /* @__PURE__ */ React.createElement(BudgetTab, { project: lp, onUpdateProject }), activeTab === "production" && /* @__PURE__ */ React.createElement(
       ProductionSection,
       {
         productions: lp.productions || [],
@@ -9305,41 +9269,73 @@ Brief content: ${content}`;
       });
       onUpdateProject(projectId, "deliverables", newDels);
     };
+    const commitSessionDatetime = (session, newDatetime) => {
+      if (!newDatetime || newDatetime === session.datetime) return;
+      updateWorkReviewSession?.(session.id, { datetime: newDatetime });
+      projects.forEach((p) => {
+        let projChanged = false;
+        const newDels = (p.deliverables || []).map((d) => {
+          if (!(d.rounds || []).some((r) => r.isWorkReview && r.workReviewSessionId === session.id)) return d;
+          projChanged = true;
+          return { ...d, rounds: d.rounds.map((r) => r.isWorkReview && r.workReviewSessionId === session.id ? { ...r, deadline: newDatetime } : r) };
+        });
+        if (projChanged) onUpdateProject(p.id, "deliverables", newDels);
+      });
+    };
+    const [confirmRemoveKey, setConfirmRemoveKey] = (0, import_react.useState)(null);
     const totalItems = sessionGroups.reduce((a, g) => a + g.items.length, 0);
-    return /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ React.createElement("h1", { style: { fontSize: 31, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", margin: 0, letterSpacing: "0.02em" } }, "Work Review"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#838ba0", marginTop: 3 } }, totalItems, " deliverable", totalItems !== 1 ? "s" : "", " across ", sessionGroups.length, " upcoming session", sessionGroups.length !== 1 ? "s" : "")), sessionGroups.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, padding: "48px 24px", textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 38, marginBottom: 12 } }, "\u{1F4CB}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#4b5563", marginBottom: 6 } }, "No deliverables queued for an upcoming Work Review"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#374151" } }, "Open a project's Deliverables tab and click ", /* @__PURE__ */ React.createElement("b", { style: { color: "#818cf8" } }, "+ Add a Work Review Round"), ".")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } }, sessionGroups.map(({ session, items }) => /* @__PURE__ */ React.createElement("div", { key: session.id, style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 18px", borderBottom: "1px solid #1f2937", display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" } }, "\u{1F3A5} ", fmtDT(session.datetime)), (session.reviewers || []).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280" } }, "Reviewers: ", session.reviewers.join(", ")), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#4b5563", marginLeft: "auto" } }, items.length, " deliverable", items.length !== 1 ? "s" : "")), updateWorkReviewSession && /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } }, /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ React.createElement("h1", { style: { fontSize: 31, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", margin: 0, letterSpacing: "0.02em" } }, "Work Review"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#838ba0", marginTop: 3 } }, totalItems, " deliverable", totalItems !== 1 ? "s" : "", " across ", sessionGroups.length, " upcoming session", sessionGroups.length !== 1 ? "s" : "")), sessionGroups.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, padding: "48px 24px", textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 38, marginBottom: 12 } }, "\u{1F4CB}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#4b5563", marginBottom: 6 } }, "No deliverables queued for an upcoming Work Review"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#374151" } }, "Open a project's Deliverables tab and click ", /* @__PURE__ */ React.createElement("b", { style: { color: "#818cf8" } }, "+ Add a Work Review Round"), ".")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } }, sessionGroups.map(({ session, items }) => /* @__PURE__ */ React.createElement("div", { key: session.id, style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 18px", borderBottom: "1px solid #1f2937", display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" } }, "\u{1F3A5} Work Review"), updateWorkReviewSession ? /* @__PURE__ */ React.createElement(DateTimePicker, { value: session.datetime, onChange: (v) => commitSessionDatetime(session, v), label: "Session date/time" }) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#e2e8f0", fontWeight: 700 } }, fmtDT(session.datetime)), (session.reviewers || []).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280" } }, "Reviewers: ", session.reviewers.join(", ")), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#4b5563", marginLeft: "auto" } }, items.length, " deliverable", items.length !== 1 ? "s" : "")), updateWorkReviewSession && /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 } }, "Location"), /* @__PURE__ */ React.createElement(
       "input",
       {
         value: session.location || "",
         onChange: (e) => updateWorkReviewSession(session.id, { location: e.target.value }),
-        placeholder: "Location (optional)",
-        style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#e2e8f0", padding: "5px 9px", fontSize: 13, outline: "none" }
+        placeholder: "e.g. Conference Room B",
+        style: { width: "100%", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#e2e8f0", padding: "5px 9px", fontSize: 13, outline: "none", boxSizing: "border-box" }
       }
-    ), /* @__PURE__ */ React.createElement(
+    )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 } }, "Zoom Link"), /* @__PURE__ */ React.createElement(
       "input",
       {
         value: session.zoomLink || "",
         onChange: (e) => updateWorkReviewSession(session.id, { zoomLink: e.target.value }),
-        placeholder: "Zoom link (optional)",
-        style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#e2e8f0", padding: "5px 9px", fontSize: 13, outline: "none" }
+        placeholder: "https://zoom.us/j/\u2026",
+        style: { width: "100%", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#e2e8f0", padding: "5px 9px", fontSize: 13, outline: "none", boxSizing: "border-box" }
       }
-    )), session.zoomLink && /* @__PURE__ */ React.createElement("a", { href: session.zoomLink, target: "_blank", rel: "noopener noreferrer", style: { fontSize: 13, color: "#818cf8", fontWeight: 700 } }, "Join Zoom \u2197")), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 18px", display: "flex", flexDirection: "column", gap: 6 } }, items.map(({ project: p, del: d, round }) => {
-      const statusColor = DCOLOR[d.status] || "#6b7280";
+    ))), session.zoomLink && /* @__PURE__ */ React.createElement("a", { href: session.zoomLink, target: "_blank", rel: "noopener noreferrer", style: { fontSize: 13, color: "#818cf8", fontWeight: 700 } }, "Join Zoom \u2197")), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 18px", display: "flex", flexDirection: "column", gap: 6 } }, items.map(({ project: p, del: d, round }) => {
       const producer = team.find((m) => m.id === d.producerId);
       const editor = team.find((m) => m.id === d.editorId);
       const animator = team.find((m) => m.id === d.animatorId);
       const designer = team.find((m) => m.id === d.designerId);
-      const personChip = (label, m) => m ? /* @__PURE__ */ React.createElement("span", { key: label, title: label, style: { display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#9ca3af", background: "#1f293780", borderRadius: 5, padding: "2px 8px 2px 4px", whiteSpace: "nowrap" } }, /* @__PURE__ */ React.createElement(Av, { name: m.name, size: 16 }), m.name) : null;
-      return /* @__PURE__ */ React.createElement("div", { key: `${p.id}-${d.id}`, style: { display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", background: "#111827", border: "1px solid #1f2937", borderRadius: 8, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: "1 1 220px" } }, /* @__PURE__ */ React.createElement(
+      const rowKey = `${p.id}-${d.id}`;
+      const isConfirming = confirmRemoveKey === rowKey;
+      const roleChip = (label, m) => m ? /* @__PURE__ */ React.createElement("span", { key: label, style: { display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#9ca3af", background: "#1f293780", borderRadius: 5, padding: "2px 8px 2px 4px", whiteSpace: "nowrap" } }, /* @__PURE__ */ React.createElement(Av, { name: m.name, size: 16 }), label, ": ", m.name) : null;
+      return /* @__PURE__ */ React.createElement("div", { key: rowKey, style: { display: "grid", gridTemplateColumns: "220px 100px 1fr auto auto", gap: 10, alignItems: "center", padding: "9px 14px", background: "#111827", border: "1px solid #1f2937", borderRadius: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ React.createElement(
         "button",
         {
           onClick: () => onOpenProject(p, "deliverables", d.id),
           style: { background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 16, fontWeight: 700, color: "#e2e8f0", textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", maxWidth: "100%" }
         },
         d.title || "Untitled"
-      ), /* @__PURE__ */ React.createElement("button", { onClick: () => onOpenProject(p), style: { background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 13, color: "#818cf8" } }, p.name)), /* @__PURE__ */ React.createElement(DelStatusSel, { status: d.status, onChange: (v) => onUpdateDel(p.id, d.id, "status", v), xs: true }), personChip("Producer", producer), personChip("Editor", editor), personChip("Animator", animator), personChip("Designer", designer), /* @__PURE__ */ React.createElement(DelFrameInfo, { frameLink: d.frameLink, framePW: d.framePW, small: true }), /* @__PURE__ */ React.createElement(
+      ), /* @__PURE__ */ React.createElement("button", { onClick: () => onOpenProject(p, "deliverables", d.id), style: { background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 13, color: "#818cf8" } }, p.name)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(DelStatusSel, { status: d.status, onChange: (v) => onUpdateDel(p.id, d.id, "status", v), xs: true })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" } }, roleChip("Producer", producer), roleChip("Editor", editor), roleChip("Animator", animator), roleChip("Designer", designer)), /* @__PURE__ */ React.createElement(DelFrameInfo, { frameLink: d.frameLink, framePW: d.framePW, small: true }), isConfirming ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#f59e0b", fontWeight: 700 } }, "Remove?"), /* @__PURE__ */ React.createElement(
         "button",
         {
-          onClick: () => removeFromWR(p.id, d.id, round.id),
+          onClick: () => {
+            removeFromWR(p.id, d.id, round.id);
+            setConfirmRemoveKey(null);
+          },
+          style: { background: "#ef444420", border: "1px solid #ef444450", borderRadius: 4, color: "#ef4444", padding: "3px 8px", fontSize: 12, fontWeight: 700, cursor: "pointer" }
+        },
+        "Yes"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => setConfirmRemoveKey(null),
+          style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 4, color: "#9ca3af", padding: "3px 8px", fontSize: 12, fontWeight: 700, cursor: "pointer" }
+        },
+        "No"
+      )) : /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => setConfirmRemoveKey(rowKey),
           title: "Remove from Work Review",
           style: { background: "#ef444415", border: "1px solid #ef444430", borderRadius: 5, color: "#f87171", padding: "3px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", flexShrink: 0 }
         },
@@ -10162,12 +10158,20 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
         if (idx !== -1) result[f.key] = line.slice(idx + f.label.length + 1).trim();
       });
     });
+    if (!result.reservationId) {
+      const line = lines.find((l) => /^Reservation No\.?:/i.test(l));
+      if (line) result.reservationId = line.replace(/^Reservation No\.?:/i, "").trim();
+    }
     result.reservationId = result.reservationId.replace(/[^0-9]/g, "");
+    if (!result.eventCoordinator) {
+      const line = lines.find((l) => /^Host:/i.test(l));
+      if (line) result.eventCoordinator = line.replace(/^Host:/i, "").trim();
+    }
     const norm = (s) => s.replace(/\s+/g, " ").trim();
     const knownLocs = Object.keys(GCS_LOCATION_MAP);
     let locationRaw = lines.find((l) => knownLocs.some((k) => norm(l) === norm(k))) || "";
     if (!locationRaw) {
-      locationRaw = lines.find((l) => /BEC/i.test(l) && !/^Location\b/i.test(l) && !BEC_LABEL_FIELDS.some((f) => l.includes(f.label + ":"))) || "";
+      locationRaw = lines.find((l) => /BEC/i.test(l) && !/^Location\b/i.test(l) && !BEC_LABEL_FIELDS.some((f) => l.includes(f.label + ":")) && (l.match(/\t/g) || []).length < 7) || "";
     }
     result.locationRaw = locationRaw;
     result.internalLocation = GCS_LOCATION_MAP[locationRaw] || (/BEC/i.test(locationRaw) ? "BEC" : locationRaw);
@@ -10205,6 +10209,28 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
       }
     }
     result.gearItems = gearItems;
+    const gridHeaderIdx = lines.findIndex((l) => /^Type\s+Date\s+Start\s+End\s+Building\s+Room\s+Event\s+Status$/i.test(l.replace(/\t+/g, " ").replace(/\s{2,}/g, " ").trim()));
+    if (gridHeaderIdx !== -1) {
+      const dataLine = lines.slice(gridHeaderIdx + 1).find((l) => l.trim());
+      if (dataLine) {
+        let cols = dataLine.split("	").map((c) => c.trim());
+        if (cols.length < 8) cols = dataLine.split(/\s{2,}/).map((c) => c.trim());
+        if (cols.length >= 8) {
+          const [, gDate, gStart, gEnd, gBuilding, gRoom, gEvent, gStatus] = cols;
+          if (!result.date) result.date = gDate;
+          if (!result.eventName) result.eventName = gEvent;
+          if (!result.status) result.status = gStatus;
+          if (!result.resStart && !result.eventStart) {
+            result.resStart = result.eventStart = gStart;
+            result.resEnd = result.eventEnd = gEnd;
+          }
+          if (!result.locationRaw) {
+            result.locationRaw = `${gBuilding} ${gRoom}`.trim();
+            result.internalLocation = GCS_LOCATION_MAP[result.locationRaw] || (/BEC/i.test(result.locationRaw) ? "BEC" : result.locationRaw);
+          }
+        }
+      }
+    }
     return result;
   };
   var summarizeIntakeDeliverables = (data) => {
@@ -11070,6 +11096,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     crewExternal = [],
     onUpdateCrewExternal,
     crewRoles = SETUP_CREW_ROLES,
+    crewRoleCategories = null,
     getCrewTimes,
     getSpaceCallTime,
     onRequestEmail,
@@ -11118,6 +11145,16 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     const ALL_CREW_TIMES = ["5:00 AM", "5:30 AM", "6:00 AM", "6:30 AM", "7:00 AM", "7:30 AM", "8:00 AM", "8:30 AM", "9:00 AM", "9:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM", "1:00 PM", "1:30 PM", "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM", "4:00 PM", "4:30 PM", "5:00 PM", "5:30 PM", "6:00 PM", "6:30 PM", "7:00 PM", "7:30 PM", "8:00 PM"];
     const BOUNDED_CREW_TIMES = ALL_CREW_TIMES;
     const updField = (f, v) => onUpdateSetup({ ...setup, [f]: v, _isCustom: true });
+    const [showAllRoles, setShowAllRoles] = (0, import_react.useState)(false);
+    const roleOptions = showAllRoles && crewRoleCategories ? Object.entries(crewRoleCategories).map(([cat, roles]) => /* @__PURE__ */ React.createElement("optgroup", { key: cat, label: cat }, roles.map((r) => /* @__PURE__ */ React.createElement("option", { key: r, value: r }, r)))) : crewRoles.map((r) => /* @__PURE__ */ React.createElement("option", { key: r, value: r }, r));
+    const roleListToggle = crewRoleCategories && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setShowAllRoles((s) => !s),
+        style: { background: "none", border: "none", color: "#6b7280", fontSize: 12, cursor: "pointer", textDecoration: "underline", padding: 0 }
+      },
+      showAllRoles ? "Show production roles only" : "Show full role list"
+    );
     const addCrewInt = () => onUpdateCrewInternal([...crewInternal, { id: uid(), role: "", memberId: null, callTime: "" }]);
     const updCrewInt = (cid, f, v) => onUpdateCrewInternal(crewInternal.map((c) => c.id !== cid ? c : { ...c, [f]: v, ...f === "memberId" ? { _autoNote: null } : {} }));
     const delCrewInt = (cid) => onUpdateCrewInternal(crewInternal.filter((c) => c.id !== cid));
@@ -11160,7 +11197,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
         size: 64,
         onRemove: () => updField("refPhotoKeys", (setup.refPhotoKeys || []).filter((x) => x !== k))
       }
-    )), /* @__PURE__ */ React.createElement(SetupPhotoUploadButton, { label: "Add", multiple: true, size: 64, onUploaded: (k) => updField("refPhotoKeys", [...setup.refPhotoKeys || [], k]) })))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid #1f2937", paddingTop: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { ...colLbl, marginBottom: 0 } }, "Crew \u2014 Internal"), /* @__PURE__ */ React.createElement(Btn, { small: true, onClick: addCrewInt }, "+ Add")), crewInternal.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0" } }, "No internal crew."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5 } }, crewInternal.map((c) => {
+    )), /* @__PURE__ */ React.createElement(SetupPhotoUploadButton, { label: "Add", multiple: true, size: 64, onUploaded: (k) => updField("refPhotoKeys", [...setup.refPhotoKeys || [], k]) })))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid #1f2937", paddingTop: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { ...colLbl, marginBottom: 0 } }, "Crew \u2014 Internal"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, roleListToggle, /* @__PURE__ */ React.createElement(Btn, { small: true, onClick: addCrewInt }, "+ Add"))), crewInternal.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0" } }, "No internal crew."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5 } }, crewInternal.map((c) => {
       const m = team.find((x) => x.id === c.memberId);
       const crewId = `i-${c.id || m?.id || c.memberId}`;
       const schedT = getCT(crewId);
@@ -11175,7 +11212,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
           style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#e2e8f0", padding: "5px 7px", fontSize: 14, outline: "none" }
         },
         /* @__PURE__ */ React.createElement("option", { value: "" }, "Role\u2026"),
-        crewRoles.map((r) => /* @__PURE__ */ React.createElement("option", { key: r, value: r }, r))
+        roleOptions
       ), /* @__PURE__ */ React.createElement(
         "select",
         {
@@ -11195,7 +11232,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
         /* @__PURE__ */ React.createElement("option", { value: "" }, "\u{1F4DE} ", callT || crewCallDisplay || "Same as call"),
         BOUNDED_CREW_TIMES.map((t) => /* @__PURE__ */ React.createElement("option", { key: t, value: t }, t))
       ), /* @__PURE__ */ React.createElement("div", { style: { background: "#0a0f1a", border: "1px solid #8b5cf630", borderRadius: 6, padding: "4px 7px", fontSize: 13, color: "#a78bfa", textAlign: "center" } }, "\u{1F3C1} ", wrapT || "\u2014"), /* @__PURE__ */ React.createElement("button", { onClick: () => delCrewInt(c.id), style: { background: "none", border: "none", color: "#8e97a6", cursor: "pointer", fontSize: 22, lineHeight: 1 } }, "\xD7")), c._autoNote && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#f59e0b", marginTop: 3, paddingLeft: 2 } }, "\u26A0 ", c._autoNote, " \u2014 please assign manually."));
-    }))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid #1f2937", paddingTop: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { ...colLbl, marginBottom: 0 } }, "Crew \u2014 External"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, onBulkRequest && /* @__PURE__ */ React.createElement(
+    }))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid #1f2937", paddingTop: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { ...colLbl, marginBottom: 0 } }, "Crew \u2014 External"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, roleListToggle, onBulkRequest && /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: onBulkRequest,
@@ -11210,7 +11247,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
       const wrapT = schedT.wrap || spaceT.wrap;
       const status = c.status || "Not Booked";
       const statusColor = EXT_CREW_STATUS_COLOR[status] || "#4b5563";
-      return /* @__PURE__ */ React.createElement("div", { key: c.id, style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 8, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "120px 1fr 1fr 70px 70px auto", gap: 5, alignItems: "center" } }, /* @__PURE__ */ React.createElement("select", { value: c.role || "", onChange: (e) => updCrewExt(c.id, "role", e.target.value), style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#e2e8f0", padding: "5px 7px", fontSize: 14, outline: "none" } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Role\u2026"), crewRoles.map((r) => /* @__PURE__ */ React.createElement("option", { key: r, value: r }, r))), /* @__PURE__ */ React.createElement(Inp, { value: c.name || "", onChange: (e) => updCrewExt(c.id, "name", e.target.value), placeholder: "Name\u2026" }), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", flex: 1 } }, /* @__PURE__ */ React.createElement("datalist", { id: "vendor-companies-list" }, vendorCompanies.map((c2) => /* @__PURE__ */ React.createElement("option", { key: c2, value: c2 }))), /* @__PURE__ */ React.createElement(
+      return /* @__PURE__ */ React.createElement("div", { key: c.id, style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 8, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "120px 1fr 1fr 70px 70px auto", gap: 5, alignItems: "center" } }, /* @__PURE__ */ React.createElement("select", { value: c.role || "", onChange: (e) => updCrewExt(c.id, "role", e.target.value), style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#e2e8f0", padding: "5px 7px", fontSize: 14, outline: "none" } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Role\u2026"), roleOptions), /* @__PURE__ */ React.createElement(Inp, { value: c.name || "", onChange: (e) => updCrewExt(c.id, "name", e.target.value), placeholder: "Name\u2026" }), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", flex: 1 } }, /* @__PURE__ */ React.createElement("datalist", { id: "vendor-companies-list" }, vendorCompanies.map((c2) => /* @__PURE__ */ React.createElement("option", { key: c2, value: c2 }))), /* @__PURE__ */ React.createElement(
         Inp,
         {
           list: "vendor-companies-list",
@@ -12363,7 +12400,11 @@ ${parsed.conditions}` : weather;
     (0, import_react.useEffect)(() => {
       setCustomPresetName("");
     }, [_activeId]);
-    const CREW_ROLES = [...isBroadcast ? lists.crewRolesBroadcast || CREW_ROLES_BROADCAST_DEFAULT : lists.crewRoles || CREW_ROLES_DEFAULT].sort((a, b) => a.localeCompare(b));
+    const crewRoleCategories = {};
+    Object.entries(CREW_ROLE_CATEGORY_LIST_KEYS).forEach(([cat, key]) => {
+      crewRoleCategories[cat] = [...lists[key] || CREW_ROLE_CATEGORIES_DEFAULT[cat]].sort((a, b) => a.localeCompare(b));
+    });
+    const CREW_ROLES = crewRoleCategories["Production Roles"];
     const cs = { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 9, padding: "12px 14px" };
     return /* @__PURE__ */ React.createElement("div", { style: { border: `1px solid ${exp ? pColor + "60" : "#1f2937"}`, borderRadius: 12, overflow: "hidden", marginBottom: 10 } }, showSavePreset && /* @__PURE__ */ React.createElement(
       SavePresetModal,
@@ -12631,6 +12672,7 @@ ${parsed.conditions}` : weather;
           crewExternal: production.crewExternal || [],
           onUpdateCrewExternal: (v) => updMarkCustom("crewExternal", v),
           crewRoles: CREW_ROLES,
+          crewRoleCategories,
           crewCallDisplay,
           productionStartTime: production.startTime || "",
           productionEndTime: production.endTime || "",
@@ -17631,41 +17673,35 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       businessUnits = BUSINESS_UNITS,
       productionTypes = PRODUCTION_TYPES,
       deliverableStatuses = [...DELIVERABLE_STATUSES],
-      animBatchStatuses = [...ANIM_ROUND_STATUSES],
-      crewRoles = [...CREW_ROLES_DEFAULT],
-      crewRolesBroadcast = [...CREW_ROLES_BROADCAST_DEFAULT]
+      animBatchStatuses = [...ANIM_ROUND_STATUSES]
     } = lists;
     const [ws, setWS] = (0, import_react.useState)(() => [...workstreams]);
     const [bu, setBU_] = (0, import_react.useState)(() => [...businessUnits]);
     const [pt, setPT] = (0, import_react.useState)(() => [...productionTypes]);
     const [ds, setDS] = (0, import_react.useState)(() => [...deliverableStatuses]);
     const [abs, setABS] = (0, import_react.useState)(() => [...animBatchStatuses]);
-    const [cr, setCR] = (0, import_react.useState)(() => [...crewRoles]);
-    const [crb, setCRB] = (0, import_react.useState)(() => [...crewRolesBroadcast]);
     const [newWS, setNewWS] = (0, import_react.useState)("");
     const [newBU, setNewBU] = (0, import_react.useState)("");
     const [newPT, setNewPT] = (0, import_react.useState)("");
     const [newDS, setNewDS] = (0, import_react.useState)("");
     const [newABS, setNewABS] = (0, import_react.useState)("");
-    const [newCR, setNewCR] = (0, import_react.useState)("");
-    const [newCRB, setNewCRB] = (0, import_react.useState)("");
-    const save = (nextWS, nextBU, nextPT, nextDS, nextABS, nextCR, nextCRB) => onUpdateLists({ workstreams: nextWS, businessUnits: nextBU, productionTypes: nextPT, deliverableStatuses: nextDS, animBatchStatuses: nextABS, crewRoles: nextCR, crewRolesBroadcast: nextCRB });
+    const save = (nextWS, nextBU, nextPT, nextDS, nextABS) => onUpdateLists({ workstreams: nextWS, businessUnits: nextBU, productionTypes: nextPT, deliverableStatuses: nextDS, animBatchStatuses: nextABS });
     const addItem = (list, setList, val, setNew, field) => {
       const v = val.trim();
       if (!v || list.includes(v)) return;
       const next = [...list, v];
       setList(next);
       setNew("");
-      const args = { ws, bu, pt, ds, abs, cr, crb };
+      const args = { ws, bu, pt, ds, abs };
       args[field] = next;
-      save(args.ws, args.bu, args.pt, args.ds, args.abs, args.cr, args.crb);
+      save(args.ws, args.bu, args.pt, args.ds, args.abs);
     };
     const removeItem = (list, setList, item, field) => {
       const next = list.filter((x) => x !== item);
       setList(next);
-      const args = { ws, bu, pt, ds, abs, cr, crb };
+      const args = { ws, bu, pt, ds, abs };
       args[field] = next;
-      save(args.ws, args.bu, args.pt, args.ds, args.abs, args.cr, args.crb);
+      save(args.ws, args.bu, args.pt, args.ds, args.abs);
     };
     return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#8e97a6", marginBottom: 18, lineHeight: 1.5 } }, "Manage dropdown options and status lists used across projects, productions, deliverables, and animations. Changes take effect immediately."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 20 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 4 } }, "Project Metadata"), /* @__PURE__ */ React.createElement(
       AdminListSection,
@@ -17727,31 +17763,61 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         onAdd: () => addItem(abs, setABS, newABS, setNewABS, "abs"),
         onRemove: (item) => removeItem(abs, setABS, item, "abs")
       }
-    )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 4 } }, "Production Crew Roles"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#6b7280", marginBottom: 10 } }, "Options shown in a production's Internal/External crew role dropdowns. Always displayed alphabetically regardless of the order added here."), /* @__PURE__ */ React.createElement(
-      AdminListSection,
-      {
-        title: "Crew Roles",
-        icon: "\u{1F3A5}",
-        items: cr,
-        newVal: newCR,
-        setNew: setNewCR,
-        chipColor: "#22c55e",
-        onAdd: () => addItem(cr, setCR, newCR, setNewCR, "cr"),
-        onRemove: (item) => removeItem(cr, setCR, item, "cr")
-      }
-    ), /* @__PURE__ */ React.createElement(
-      AdminListSection,
-      {
-        title: "Crew Roles \u2014 Broadcast",
-        icon: "\u{1F4E1}",
-        items: crb,
-        newVal: newCRB,
-        setNew: setNewCRB,
-        chipColor: "#0ea5e9",
-        onAdd: () => addItem(crb, setCRB, newCRB, setNewCRB, "crb"),
-        onRemove: (item) => removeItem(crb, setCRB, item, "crb")
-      }
     ))));
+  };
+  var CREW_ROLE_CATEGORY_COLORS = {
+    "Admin Roles": "#818cf8",
+    "Design Roles": "#f9a8d4",
+    "Production Roles": "#22c55e",
+    "Post Production Roles": "#0ea5e9"
+  };
+  var AdminCrewRolesTab = ({ lists, onUpdateLists }) => {
+    const categories = Object.keys(CREW_ROLE_CATEGORY_LIST_KEYS);
+    const [state, setState] = (0, import_react.useState)(() => {
+      const s = {};
+      categories.forEach((cat) => {
+        const key = CREW_ROLE_CATEGORY_LIST_KEYS[cat];
+        s[key] = [...lists[key] || CREW_ROLE_CATEGORIES_DEFAULT[cat]];
+      });
+      return s;
+    });
+    const [newVals, setNewVals] = (0, import_react.useState)(() => {
+      const s = {};
+      categories.forEach((cat) => {
+        s[CREW_ROLE_CATEGORY_LIST_KEYS[cat]] = "";
+      });
+      return s;
+    });
+    const addItem = (listKey, val) => {
+      const v = val.trim();
+      if (!v || state[listKey].includes(v)) return;
+      const next = { ...state, [listKey]: [...state[listKey], v] };
+      setState(next);
+      setNewVals((nv) => ({ ...nv, [listKey]: "" }));
+      onUpdateLists({ ...lists, ...next });
+    };
+    const removeItem = (listKey, item) => {
+      const next = { ...state, [listKey]: state[listKey].filter((x) => x !== item) };
+      setState(next);
+      onUpdateLists({ ...lists, ...next });
+    };
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#8e97a6", marginBottom: 18, lineHeight: 1.5 } }, `Manage the role options shown in a production's Internal/External crew dropdowns, organized by category. When assigning crew on a production, only Production Roles shows by default \u2014 the other categories are reachable behind a "show full list" toggle. Always displayed alphabetically regardless of the order added here.`), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 20 } }, categories.map((cat) => {
+      const listKey = CREW_ROLE_CATEGORY_LIST_KEYS[cat];
+      return /* @__PURE__ */ React.createElement(
+        AdminListSection,
+        {
+          key: cat,
+          title: cat,
+          icon: "\u{1F3A5}",
+          items: state[listKey],
+          newVal: newVals[listKey],
+          setNew: (v) => setNewVals((nv) => ({ ...nv, [listKey]: v })),
+          chipColor: CREW_ROLE_CATEGORY_COLORS[cat],
+          onAdd: () => addItem(listKey, newVals[listKey]),
+          onRemove: (item) => removeItem(listKey, item)
+        }
+      );
+    })));
   };
   var LOCKABLE_TABS = [
     { key: "resourcing", label: "Resourcing", hint: "The Resources tab in the main nav." },
@@ -18116,7 +18182,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
   var AdminView = ({ team, onUpdateTeam, projects = [], nudges = [], onOpenProject, gear, onUpdateGear, mediaCards = [], onUpdateMediaCards, furniture = [], onUpdateFurniture, props_ = [], onUpdateProps, screenContent = {}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes = [], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations = [], onUpdateWorkstations, talentRoster = [], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists = {}, onUpdateLists, presets = [], onUpdatePresets, tabLocks = {}, onUpdateTabLocks }) => {
     const [gearSubTab, setGearSubTab] = (0, import_react.useState)("equipment");
     const [tab, setTab] = (0, import_react.useState)("team");
-    const tabs = [{ id: "team", l: "\u{1F465} Team" }, { id: "gear", l: "\u{1F392} Gear" }, { id: "props", l: "\u{1FA91} Props & Furniture" }, { id: "screen", l: "\u{1F4FA} Screen Content" }, { id: "spaces", l: "\u{1F4CD} Spaces" }, { id: "setups", l: "\u{1F3AC} Setups" }, { id: "workstations", l: "\u{1F4BB} Workstations" }, { id: "talent", l: "\u{1F3A4} Talent" }, { id: "resources", l: "\u{1F4CA} Resources" }, { id: "lists", l: "\u{1F5C2} Metadata" }, { id: "presets", l: "\u2B50 Production Presets" }, { id: "access", l: "\u{1F512} Access" }];
+    const tabs = [{ id: "team", l: "\u{1F465} Team" }, { id: "gear", l: "\u{1F392} Gear" }, { id: "props", l: "\u{1FA91} Props & Furniture" }, { id: "screen", l: "\u{1F4FA} Screen Content" }, { id: "spaces", l: "\u{1F4CD} Spaces" }, { id: "setups", l: "\u{1F3AC} Setups" }, { id: "workstations", l: "\u{1F4BB} Workstations" }, { id: "talent", l: "\u{1F3A4} Talent" }, { id: "resources", l: "\u{1F4CA} Resources" }, { id: "lists", l: "\u{1F5C2} Metadata" }, { id: "crewRoles", l: "\u{1F3A5} Crew Roles" }, { id: "presets", l: "\u2B50 Production Presets" }, { id: "access", l: "\u{1F512} Access" }];
     return /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 26, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Admin"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#8e97a6" } }, "Manage your team roster, equipment inventory, and studio spaces.")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 8, marginBottom: 20 } }, tabs.map((t) => /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -18141,7 +18207,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       },
       "\u{1F4BE} Media Cards & Drives ",
       /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#838ba0", marginLeft: 4 } }, mediaCards.length)
-    )), gearSubTab === "equipment" && /* @__PURE__ */ React.createElement(AdminGearTab, { gear, onUpdateGear }), gearSubTab === "media" && /* @__PURE__ */ React.createElement(AdminMediaCardsTab, { mediaCards, onUpdateMediaCards })), tab === "props" && /* @__PURE__ */ React.createElement(AdminPropsFurnitureTab, { furniture, onUpdateFurniture, props_, onUpdateProps }), tab === "screen" && /* @__PURE__ */ React.createElement(AdminScreenContentTab, { screenContent, onUpdate: onUpdateScreenContent }), tab === "spaces" && /* @__PURE__ */ React.createElement(AdminSpacesTab, { spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta }), tab === "setups" && /* @__PURE__ */ React.createElement(AdminSetupsTab, { setupTypes, team, onAddSetupType, onUpdateSetupType, onDeleteSetupType, furnitureList: furniture, propsList: props_, screenContentOptions: screenContent, mediaCards: [] }), tab === "workstations" && /* @__PURE__ */ React.createElement(AdminWorkstationsTab, { workstations, team, onUpdateWorkstations }), tab === "talent" && /* @__PURE__ */ React.createElement(AdminTalentTab, { talentRoster, onUpdateTalentRoster }), tab === "resources" && /* @__PURE__ */ React.createElement(AdminResourceSettingsTab, { resourceConfig, onUpdateResourceConfig }), tab === "lists" && /* @__PURE__ */ React.createElement(AdminListsTab, { lists, onUpdateLists }), tab === "presets" && /* @__PURE__ */ React.createElement(
+    )), gearSubTab === "equipment" && /* @__PURE__ */ React.createElement(AdminGearTab, { gear, onUpdateGear }), gearSubTab === "media" && /* @__PURE__ */ React.createElement(AdminMediaCardsTab, { mediaCards, onUpdateMediaCards })), tab === "props" && /* @__PURE__ */ React.createElement(AdminPropsFurnitureTab, { furniture, onUpdateFurniture, props_, onUpdateProps }), tab === "screen" && /* @__PURE__ */ React.createElement(AdminScreenContentTab, { screenContent, onUpdate: onUpdateScreenContent }), tab === "spaces" && /* @__PURE__ */ React.createElement(AdminSpacesTab, { spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta }), tab === "setups" && /* @__PURE__ */ React.createElement(AdminSetupsTab, { setupTypes, team, onAddSetupType, onUpdateSetupType, onDeleteSetupType, furnitureList: furniture, propsList: props_, screenContentOptions: screenContent, mediaCards: [] }), tab === "workstations" && /* @__PURE__ */ React.createElement(AdminWorkstationsTab, { workstations, team, onUpdateWorkstations }), tab === "talent" && /* @__PURE__ */ React.createElement(AdminTalentTab, { talentRoster, onUpdateTalentRoster }), tab === "resources" && /* @__PURE__ */ React.createElement(AdminResourceSettingsTab, { resourceConfig, onUpdateResourceConfig }), tab === "lists" && /* @__PURE__ */ React.createElement(AdminListsTab, { lists, onUpdateLists }), tab === "crewRoles" && /* @__PURE__ */ React.createElement(AdminCrewRolesTab, { lists, onUpdateLists }), tab === "presets" && /* @__PURE__ */ React.createElement(
       ProductionPresetsAdmin,
       {
         presets,

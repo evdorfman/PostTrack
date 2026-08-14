@@ -125,14 +125,25 @@ const toKanban = s => {
 
 // ─── Studio + Milestone Constants ────────────────────────────────────────────
 const PRODUCTION_TYPES   = ["Content Shoot","Social Content","Pre-tape","Live Event","Live Broadcast","Hybrid Event","Live Playback","Podcast","Post-Only","Other"];
-// Default Internal/External crew role options for a production's crew
-// dropdowns — admin-editable via AdminListsTab (lists.crewRoles /
-// lists.crewRolesBroadcast); ProductionCard always renders whichever list
-// is active sorted alphabetically, regardless of storage order.
-const CREW_ROLES_DEFAULT = ["Producer","Director","DP","Gaffer","Camera Op","Sound Mixer","Hair and Makeup","Production Assistant","Assistant Camera",
-  "Audio Op with Kit","Drone Operator with gear","Media Manager","DIT","Teleprompter Op","SM","A2","V1","A1","Playback Operator"];
-const CREW_ROLES_BROADCAST_DEFAULT = ["Live Director","Technical Director","Broadcast Coordinator","Camera Op","Audio Tech","Lighting Director","Producer","Project Manager","Video Engineer","V1","EVS Operator","Replay Operator","Graphics Operator",
-  "DP","Audio Op with Kit","Assistant Camera","Production Assistant","Drone Operator with gear","Media Manager","DIT","Teleprompter Op","SM","A2","A1","Playback Operator"];
+// Crew role options for a production's Internal/External crew dropdowns,
+// organized into 4 categories — admin-editable via their own Admin > Crew
+// Roles tab (lists.adminRoles / designRoles / productionRoles /
+// postProductionRoles). Picking crew defaults to just Production Roles
+// (sorted alphabetically); a "show full list" toggle reveals all 4
+// categories grouped, for the rarer non-production-crew assignment.
+const CREW_ROLE_CATEGORIES_DEFAULT = {
+  "Admin Roles": ["Broadcast Coordinator","Project Manager","Post Project Manager","Team Lead","Executive Producer","Studio Approver","Head of Production","Head of Post Production","Head of Broadcast"],
+  "Design Roles": ["Designer","Motion Designer"],
+  "Production Roles": ["Producer","Director","DP","Gaffer","Camera Op","Sound Mixer","Hair and Makeup","Production Assistant","Assistant Camera","Audio Op with Kit","Drone Operator with Gear","DIT","Teleprompter Op","SM","A1","A2","V1","Playback Operator","Live Director","Technical Director","Audio Technician","Lighting Director","Video Engineer","EVS Operator"],
+  "Post Production Roles": ["Media Manager","Editor","Animator","Colorist","Sound Mixer","Assistant Editor"],
+};
+// Maps each category label to the lists.* key it's stored/edited under.
+const CREW_ROLE_CATEGORY_LIST_KEYS = {
+  "Admin Roles": "adminRoles",
+  "Design Roles": "designRoles",
+  "Production Roles": "productionRoles",
+  "Post Production Roles": "postProductionRoles",
+};
 const BOOKING_STATUSES   = ["Tentative","Confirmed","In Progress","Completed","Cancelled"];
 // Which production types have a shoot component (location/time/crew/gear)
 const SHOOT_TYPES = ["Content Shoot","Social Content","Pre-tape","Live Event","Live Broadcast","Hybrid Event","Podcast"];
@@ -1664,7 +1675,13 @@ const buildBookingMap = (allProjects, excludeProjectId) => {
       if(!map[date]) map[date]={};
       if(!map[date][loc]) map[date][loc]=[];
       const sh = isoToHours(pr.startTime), eh = isoToHours(pr.endTime||pr.startTime);
-      if(sh!=null) map[date][loc].push({startH:sh, endH:eh||sh+8, name:p.name, status:pr.status});
+      // isOverallWindow marks the production's own outer booking window, as
+      // opposed to its Primary Shoot secondary-location entry pushed below —
+      // those two nearly always overlap (the Primary Shoot is auto-created
+      // to sit inside the overall window, same location), so the overall
+      // entry's label is suppressed in the scheduler view to avoid stacking
+      // the same project's name on top of itself.
+      if(sh!=null) map[date][loc].push({startH:sh, endH:eh||sh+8, name:p.name, status:pr.status, isOverallWindow:true});
       // secondary locations
       (pr.secondaryLocations||[]).forEach(sl=>{
         if(!sl.location||!sl.startTime) return;
@@ -1757,6 +1774,12 @@ const AvailabilityCalendar = ({startTime, endTime, allProjects=[], projectId, on
   // (greedy interval scheduling, same idea as the Project Calendar's overlap
   // packing) so overlapping bookings stack into their own thin row instead.
   const packedRoomBookings = useMemo(()=>{
+    // A production's own overall booking window (isOverallWindow) and its
+    // auto-created Primary Shoot secondary-location entry share the same
+    // project name, room, and largely the same time range — showing both
+    // labels stacked the same name on top of itself. Never render text for
+    // the overall-window entry — just the block, for visual occupancy —
+    // since that's the specific source of the overlapping-text bug.
     const sorted = [...roomBookings].sort((a,b)=>a.startH-b.startH);
     const laneEnds = [];
     const placed = sorted.map(b=>{
@@ -1928,7 +1951,7 @@ const AvailabilityCalendar = ({startTime, endTime, allProjects=[], projectId, on
                             background:["Approved","Happening Now"].includes(b.status)?"#ef444330":"#f59e0b22",
                             border:`1px solid ${["Approved","Happening Now"].includes(b.status)?"#ef444460":"#f59e0b50"}`,
                             borderRadius:5,display:"flex",alignItems:"center",pointerEvents:"none",overflow:"hidden"}}>
-                            <div style={{fontSize:packedRoomBookings.totalLanes>1?12:14,color:["Approved","Happening Now"].includes(b.status)?"#ef4444":"#f59e0b",padding:"0 8px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.name}</div>
+                            {!b.isOverallWindow&&<div style={{fontSize:packedRoomBookings.totalLanes>1?12:14,color:["Approved","Happening Now"].includes(b.status)?"#ef4444":"#f59e0b",padding:"0 8px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.name}</div>}
                           </div>
                         );
                       })}
@@ -7270,6 +7293,7 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                 );
               })()}
               {/* ── Deliverables — every deliverable in this project, its status, and its own rounds ── */}
+              <div style={{background:"#0f172a",border:"1px solid #1f2937",borderRadius:12,padding:"14px 16px"}}>
               <SH label="Deliverables" desc="Every deliverable in this project — add new ones, sort, and track status and rounds from here."/>
 
               {/* ── Add New Deliverable — hidden by default ── */}
@@ -7380,6 +7404,7 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                   );
                 });
                 })()}
+              </div>
               </div>
             </div>
           )}
@@ -13865,6 +13890,27 @@ const WorkReviewView = ({projects, team=[], onOpenProject, onUpdateProject, onUp
     onUpdateProject(projectId,"deliverables",newDels);
   };
 
+  // This page IS the cross-project shared view of a Work Review session, so
+  // unlike the Calendar (which has to ask "just this project or all?"),
+  // changing the date here always updates the session record AND every
+  // attached round's deadline across every project — there's no "just this
+  // project" concept from this vantage point.
+  const commitSessionDatetime = (session, newDatetime) => {
+    if(!newDatetime || newDatetime===session.datetime) return;
+    updateWorkReviewSession?.(session.id, {datetime:newDatetime});
+    projects.forEach(p=>{
+      let projChanged = false;
+      const newDels = (p.deliverables||[]).map(d=>{
+        if(!(d.rounds||[]).some(r=>r.isWorkReview&&r.workReviewSessionId===session.id)) return d;
+        projChanged = true;
+        return {...d, rounds:d.rounds.map(r=>(r.isWorkReview&&r.workReviewSessionId===session.id)?{...r,deadline:newDatetime}:r)};
+      });
+      if(projChanged) onUpdateProject(p.id,"deliverables",newDels);
+    });
+  };
+
+  const [confirmRemoveKey, setConfirmRemoveKey] = useState(null);
+
   const totalItems = sessionGroups.reduce((a,g)=>a+g.items.length,0);
 
   return (
@@ -13885,54 +13931,76 @@ const WorkReviewView = ({projects, team=[], onOpenProject, onUpdateProject, onUp
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         {sessionGroups.map(({session, items})=>(
           <div key={session.id} style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:12,overflow:"hidden"}}>
-            <div style={{padding:"12px 18px",borderBottom:"1px solid #1f2937",display:"flex",flexDirection:"column",gap:8}}>
-              <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-                <div style={{fontSize:18,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>🎥 {fmtDT(session.datetime)}</div>
+            <div style={{padding:"12px 18px",borderBottom:"1px solid #1f2937",display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+                <div style={{fontSize:18,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>🎥 Work Review</div>
+                {updateWorkReviewSession
+                  ? <DateTimePicker value={session.datetime} onChange={v=>commitSessionDatetime(session,v)} label="Session date/time"/>
+                  : <div style={{fontSize:15,color:"#e2e8f0",fontWeight:700}}>{fmtDT(session.datetime)}</div>}
                 {(session.reviewers||[]).length>0&&<div style={{fontSize:13,color:"#6b7280"}}>Reviewers: {session.reviewers.join(", ")}</div>}
                 <span style={{fontSize:14,color:"#4b5563",marginLeft:"auto"}}>{items.length} deliverable{items.length!==1?"s":""}</span>
               </div>
               {updateWorkReviewSession&&(
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                  <input value={session.location||""} onChange={e=>updateWorkReviewSession(session.id,{location:e.target.value})} placeholder="Location (optional)"
-                    style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#e2e8f0",padding:"5px 9px",fontSize:13,outline:"none"}}/>
-                  <input value={session.zoomLink||""} onChange={e=>updateWorkReviewSession(session.id,{zoomLink:e.target.value})} placeholder="Zoom link (optional)"
-                    style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#e2e8f0",padding:"5px 9px",fontSize:13,outline:"none"}}/>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,color:"#6b7280",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>Location</div>
+                    <input value={session.location||""} onChange={e=>updateWorkReviewSession(session.id,{location:e.target.value})} placeholder="e.g. Conference Room B"
+                      style={{width:"100%",background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#e2e8f0",padding:"5px 9px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+                  </div>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,color:"#6b7280",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>Zoom Link</div>
+                    <input value={session.zoomLink||""} onChange={e=>updateWorkReviewSession(session.id,{zoomLink:e.target.value})} placeholder="https://zoom.us/j/…"
+                      style={{width:"100%",background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#e2e8f0",padding:"5px 9px",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+                  </div>
                 </div>
               )}
               {session.zoomLink&&<a href={session.zoomLink} target="_blank" rel="noopener noreferrer" style={{fontSize:13,color:"#818cf8",fontWeight:700}}>Join Zoom ↗</a>}
             </div>
             <div style={{padding:"12px 18px",display:"flex",flexDirection:"column",gap:6}}>
               {items.map(({project:p, del:d, round})=>{
-                const statusColor = DCOLOR[d.status]||"#6b7280";
                 const producer = team.find(m=>m.id===d.producerId);
                 const editor = team.find(m=>m.id===d.editorId);
                 const animator = team.find(m=>m.id===d.animatorId);
                 const designer = team.find(m=>m.id===d.designerId);
-                const personChip = (label, m) => m ? (
-                  <span key={label} title={label} style={{display:"flex",alignItems:"center",gap:4,fontSize:13,color:"#9ca3af",background:"#1f293780",borderRadius:5,padding:"2px 8px 2px 4px",whiteSpace:"nowrap"}}>
-                    <Av name={m.name} size={16}/>{m.name}
+                const rowKey = `${p.id}-${d.id}`;
+                const isConfirming = confirmRemoveKey===rowKey;
+                const roleChip = (label, m) => m ? (
+                  <span key={label} style={{display:"flex",alignItems:"center",gap:4,fontSize:13,color:"#9ca3af",background:"#1f293780",borderRadius:5,padding:"2px 8px 2px 4px",whiteSpace:"nowrap"}}>
+                    <Av name={m.name} size={16}/>{label}: {m.name}
                   </span>
                 ) : null;
                 return (
-                  <div key={`${p.id}-${d.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",background:"#111827",border:"1px solid #1f2937",borderRadius:8,flexWrap:"wrap"}}>
-                    <div style={{minWidth:0,flex:"1 1 220px"}}>
+                  <div key={rowKey} style={{display:"grid",gridTemplateColumns:"220px 100px 1fr auto auto",gap:10,alignItems:"center",padding:"9px 14px",background:"#111827",border:"1px solid #1f2937",borderRadius:8}}>
+                    <div style={{minWidth:0}}>
                       <button onClick={()=>onOpenProject(p,"deliverables",d.id)}
                         style={{background:"none",border:"none",padding:0,cursor:"pointer",fontSize:16,fontWeight:700,color:"#e2e8f0",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block",maxWidth:"100%"}}>
                         {d.title||"Untitled"}
                       </button>
-                      <button onClick={()=>onOpenProject(p)} style={{background:"none",border:"none",padding:0,cursor:"pointer",fontSize:13,color:"#818cf8"}}>{p.name}</button>
+                      <button onClick={()=>onOpenProject(p,"deliverables",d.id)} style={{background:"none",border:"none",padding:0,cursor:"pointer",fontSize:13,color:"#818cf8"}}>{p.name}</button>
                     </div>
-                    <DelStatusSel status={d.status} onChange={v=>onUpdateDel(p.id,d.id,"status",v)} xs/>
-                    {personChip("Producer",producer)}
-                    {personChip("Editor",editor)}
-                    {personChip("Animator",animator)}
-                    {personChip("Designer",designer)}
+                    <div><DelStatusSel status={d.status} onChange={v=>onUpdateDel(p.id,d.id,"status",v)} xs/></div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6,alignItems:"center"}}>
+                      {roleChip("Producer",producer)}
+                      {roleChip("Editor",editor)}
+                      {roleChip("Animator",animator)}
+                      {roleChip("Designer",designer)}
+                    </div>
                     <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW} small/>
-                    <button onClick={()=>removeFromWR(p.id,d.id,round.id)}
-                      title="Remove from Work Review"
-                      style={{background:"#ef444415",border:"1px solid #ef444430",borderRadius:5,color:"#f87171",padding:"3px 10px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0}}>
-                      Remove
-                    </button>
+                    {isConfirming ? (
+                      <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}>
+                        <span style={{fontSize:12,color:"#f59e0b",fontWeight:700}}>Remove?</span>
+                        <button onClick={()=>{removeFromWR(p.id,d.id,round.id);setConfirmRemoveKey(null);}}
+                          style={{background:"#ef444420",border:"1px solid #ef444450",borderRadius:4,color:"#ef4444",padding:"3px 8px",fontSize:12,fontWeight:700,cursor:"pointer"}}>Yes</button>
+                        <button onClick={()=>setConfirmRemoveKey(null)}
+                          style={{background:"#1f2937",border:"1px solid #374151",borderRadius:4,color:"#9ca3af",padding:"3px 8px",fontSize:12,fontWeight:700,cursor:"pointer"}}>No</button>
+                      </div>
+                    ) : (
+                      <button onClick={()=>setConfirmRemoveKey(rowKey)}
+                        title="Remove from Work Review"
+                        style={{background:"#ef444415",border:"1px solid #ef444430",borderRadius:5,color:"#f87171",padding:"3px 10px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0}}>
+                        Remove
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -15166,7 +15234,20 @@ const parseBECBookingText = text => {
       if(idx!==-1) result[f.key] = line.slice(idx+f.label.length+1).trim();
     });
   });
+  // "Reservation No.:" is a common alias for "Reservation ID:" seen in some
+  // GCS export formats (e.g. the simple grid export below) — check it
+  // separately since it's not one of the exact BEC_LABEL_FIELDS labels.
+  if(!result.reservationId){
+    const line = lines.find(l=>/^Reservation No\.?:/i.test(l));
+    if(line) result.reservationId = line.replace(/^Reservation No\.?:/i,"").trim();
+  }
   result.reservationId = result.reservationId.replace(/[^0-9]/g,"");
+  // "Host:" is the requester field in the simple grid export — no exact
+  // equivalent field exists, so it's captured as the event coordinator.
+  if(!result.eventCoordinator){
+    const line = lines.find(l=>/^Host:/i.test(l));
+    if(line) result.eventCoordinator = line.replace(/^Host:/i,"").trim();
+  }
 
   // Location — match a known GCS space string first, else fall back to any
   // standalone line mentioning BEC that isn't one of the labeled fields above.
@@ -15174,7 +15255,11 @@ const parseBECBookingText = text => {
   const knownLocs = Object.keys(GCS_LOCATION_MAP);
   let locationRaw = lines.find(l=>knownLocs.some(k=>norm(l)===norm(k))) || "";
   if(!locationRaw){
-    locationRaw = lines.find(l=>/BEC/i.test(l) && !/^Location\b/i.test(l) && !BEC_LABEL_FIELDS.some(f=>l.includes(f.label+":"))) || "";
+    // Exclude tab-delimited multi-column rows (7+ tabs) — those belong to the
+    // simple grid export parsed separately below, and picking the whole raw
+    // row here would leave a messy locationRaw even though it happens to
+    // still contain "BEC" somewhere in one of its columns.
+    locationRaw = lines.find(l=>/BEC/i.test(l) && !/^Location\b/i.test(l) && !BEC_LABEL_FIELDS.some(f=>l.includes(f.label+":")) && (l.match(/\t/g)||[]).length<7) || "";
   }
   result.locationRaw = locationRaw;
   result.internalLocation = GCS_LOCATION_MAP[locationRaw] || (/BEC/i.test(locationRaw) ? "BEC" : locationRaw);
@@ -15222,6 +15307,36 @@ const parseBECBookingText = text => {
     }
   }
   result.gearItems = gearItems;
+
+  // Simpler single-row grid export — "Type Date Start End Building Room
+  // Event Status" header immediately followed by one tab-separated data
+  // row, with no separate reservation-buffer window (just one Start/End
+  // pair, unlike the verbose format's Res Start/Event Start/Event
+  // End/Res End table above). Only fills fields the parsing above left
+  // empty, so it never overrides a successful verbose-format parse.
+  const gridHeaderIdx = lines.findIndex(l=>/^Type\s+Date\s+Start\s+End\s+Building\s+Room\s+Event\s+Status$/i.test(l.replace(/\t+/g," ").replace(/\s{2,}/g," ").trim()));
+  if(gridHeaderIdx!==-1){
+    const dataLine = lines.slice(gridHeaderIdx+1).find(l=>l.trim());
+    if(dataLine){
+      let cols = dataLine.split("\t").map(c=>c.trim());
+      if(cols.length<8) cols = dataLine.split(/\s{2,}/).map(c=>c.trim());
+      if(cols.length>=8){
+        const [, gDate, gStart, gEnd, gBuilding, gRoom, gEvent, gStatus] = cols;
+        if(!result.date) result.date = gDate;
+        if(!result.eventName) result.eventName = gEvent;
+        if(!result.status) result.status = gStatus;
+        if(!result.resStart && !result.eventStart){
+          // No separate buffer in this format — reservation window = event window.
+          result.resStart = result.eventStart = gStart;
+          result.resEnd = result.eventEnd = gEnd;
+        }
+        if(!result.locationRaw){
+          result.locationRaw = `${gBuilding} ${gRoom}`.trim();
+          result.internalLocation = GCS_LOCATION_MAP[result.locationRaw] || (/BEC/i.test(result.locationRaw) ? "BEC" : result.locationRaw);
+        }
+      }
+    }
+  }
 
   return result;
 };
@@ -16375,7 +16490,7 @@ const SetupInstanceCard = ({
   setup, team, onUpdateSetup,
   crewInternal=[], onUpdateCrewInternal,
   crewExternal=[], onUpdateCrewExternal,
-  crewRoles=SETUP_CREW_ROLES, getCrewTimes, getSpaceCallTime, onRequestEmail, onBulkRequest,
+  crewRoles=SETUP_CREW_ROLES, crewRoleCategories=null, getCrewTimes, getSpaceCallTime, onRequestEmail, onBulkRequest,
   crewCallDisplay="", productionStartTime="", productionEndTime="",
   equipmentIds=[], externalGear=[], mediaCardIds=[],
   onUpdateEquipmentIds, onUpdateExternalGear, onUpdateMediaCardIds,
@@ -16394,6 +16509,22 @@ const SetupInstanceCard = ({
   const ALL_CREW_TIMES = ["5:00 AM","5:30 AM","6:00 AM","6:30 AM","7:00 AM","7:30 AM","8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM","6:30 PM","7:00 PM","7:30 PM","8:00 PM"];
   const BOUNDED_CREW_TIMES = ALL_CREW_TIMES;
   const updField = (f,v) => onUpdateSetup({...setup,[f]:v,_isCustom:true});
+
+  // Role dropdowns default to just Production Roles (crewRoles); toggling
+  // this reveals every category (Admin/Design/Production/Post Production)
+  // grouped via optgroup, for the rarer non-production-crew assignment.
+  const [showAllRoles, setShowAllRoles] = useState(false);
+  const roleOptions = showAllRoles && crewRoleCategories
+    ? Object.entries(crewRoleCategories).map(([cat,roles])=>(
+        <optgroup key={cat} label={cat}>{roles.map(r=><option key={r} value={r}>{r}</option>)}</optgroup>
+      ))
+    : crewRoles.map(r=><option key={r} value={r}>{r}</option>);
+  const roleListToggle = crewRoleCategories&&(
+    <button onClick={()=>setShowAllRoles(s=>!s)}
+      style={{background:"none",border:"none",color:"#6b7280",fontSize:12,cursor:"pointer",textDecoration:"underline",padding:0}}>
+      {showAllRoles?"Show production roles only":"Show full role list"}
+    </button>
+  );
 
   // Internal crew helpers
   const addCrewInt = () => onUpdateCrewInternal([...crewInternal,{id:uid(),role:"",memberId:null,callTime:""}]);
@@ -16471,7 +16602,10 @@ const SetupInstanceCard = ({
         <div style={{borderTop:"1px solid #1f2937",paddingTop:10}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
             <div style={{...colLbl,marginBottom:0}}>Crew — Internal</div>
-            <Btn small onClick={addCrewInt}>+ Add</Btn>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              {roleListToggle}
+              <Btn small onClick={addCrewInt}>+ Add</Btn>
+            </div>
           </div>
           {crewInternal.length===0&&<div style={{fontSize:13,color: "#838ba0"}}>No internal crew.</div>}
           <div style={{display:"flex",flexDirection:"column",gap:5}}>
@@ -16487,7 +16621,7 @@ const SetupInstanceCard = ({
                   <div style={{display:"grid",gridTemplateColumns:"130px 1fr 100px 76px auto",gap:5,alignItems:"center"}}>
                     <select value={c.role||""} onChange={e=>updCrewInt(c.id,"role",e.target.value)}
                       style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#e2e8f0",padding:"5px 7px",fontSize:14,outline:"none"}}>
-                      <option value="">Role…</option>{crewRoles.map(r=><option key={r} value={r}>{r}</option>)}
+                      <option value="">Role…</option>{roleOptions}
                     </select>
                     <select value={c.memberId||""} onChange={e=>updCrewInt(c.id,"memberId",e.target.value?Number(e.target.value):null)}
                       style={{background:"#0a0f1a",border:`1px solid ${c._autoNote?"#f59e0b50":"#1f2937"}`,borderRadius:6,color:c.memberId?"#e2e8f0":"#4b5563",padding:"5px 7px",fontSize:14,outline:"none"}}>
@@ -16514,7 +16648,8 @@ const SetupInstanceCard = ({
         <div style={{borderTop:"1px solid #1f2937",paddingTop:10}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
             <div style={{...colLbl,marginBottom:0}}>Crew — External</div>
-            <div style={{display:"flex",gap:6}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              {roleListToggle}
               {onBulkRequest&&<button onClick={onBulkRequest}
                 style={{display:"flex",alignItems:"center",gap:5,background:"#8b5cf615",border:"1px solid #8b5cf630",borderRadius:6,color:"#a78bfa",padding:"4px 11px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.05em"}}>
                 📧 Bulk Request
@@ -16536,7 +16671,7 @@ const SetupInstanceCard = ({
                 <div key={c.id} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:8,padding:"8px 10px",display:"flex",flexDirection:"column",gap:6}}>
                   <div style={{display:"grid",gridTemplateColumns:"120px 1fr 1fr 70px 70px auto",gap:5,alignItems:"center"}}>
                     <select value={c.role||""} onChange={e=>updCrewExt(c.id,"role",e.target.value)} style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#e2e8f0",padding:"5px 7px",fontSize:14,outline:"none"}}>
-                      <option value="">Role…</option>{crewRoles.map(r=><option key={r} value={r}>{r}</option>)}
+                      <option value="">Role…</option>{roleOptions}
                     </select>
                     <Inp value={c.name||""} onChange={e=>updCrewExt(c.id,"name",e.target.value)} placeholder="Name…"/>
                     <div style={{position:"relative",flex:1}}>
@@ -18340,7 +18475,13 @@ const ProductionCard = ({production, idx, projectId, allProductions, allProjectD
   const [customPresetName, setCustomPresetName] = useState("");
   useEffect(()=>{ setCustomPresetName(""); }, [_activeId]);
 
-  const CREW_ROLES = [...(isBroadcast ? (lists.crewRolesBroadcast||CREW_ROLES_BROADCAST_DEFAULT) : (lists.crewRoles||CREW_ROLES_DEFAULT))].sort((a,b)=>a.localeCompare(b));
+  // Crew picker defaults to just Production Roles (sorted); SetupInstanceCard's
+  // "show full list" toggle reveals every category via crewRoleCategories.
+  const crewRoleCategories = {};
+  Object.entries(CREW_ROLE_CATEGORY_LIST_KEYS).forEach(([cat,key])=>{
+    crewRoleCategories[cat] = [...(lists[key]||CREW_ROLE_CATEGORIES_DEFAULT[cat])].sort((a,b)=>a.localeCompare(b));
+  });
+  const CREW_ROLES = crewRoleCategories["Production Roles"];
 
   const cs = {background:"#0f172a",border:"1px solid #1f2937",borderRadius:9,padding:"12px 14px"};
 
@@ -18718,6 +18859,7 @@ const ProductionCard = ({production, idx, projectId, allProductions, allProjectD
                             crewExternal={production.crewExternal||[]}
                             onUpdateCrewExternal={v=>updMarkCustom("crewExternal",v)}
                             crewRoles={CREW_ROLES}
+                            crewRoleCategories={crewRoleCategories}
                             crewCallDisplay={crewCallDisplay}
                             productionStartTime={production.startTime||""}
                             productionEndTime={production.endTime||""}
@@ -25540,8 +25682,6 @@ const AdminListsTab = ({lists, onUpdateLists}) => {
     workstreams=WORKSTREAMS, businessUnits=BUSINESS_UNITS, productionTypes=PRODUCTION_TYPES,
     deliverableStatuses=[...DELIVERABLE_STATUSES],
     animBatchStatuses=[...ANIM_ROUND_STATUSES],
-    crewRoles=[...CREW_ROLES_DEFAULT],
-    crewRolesBroadcast=[...CREW_ROLES_BROADCAST_DEFAULT],
   } = lists;
 
   const [ws,  setWS]  = useState(()=>[...workstreams]);
@@ -25549,28 +25689,25 @@ const AdminListsTab = ({lists, onUpdateLists}) => {
   const [pt,  setPT]  = useState(()=>[...productionTypes]);
   const [ds,  setDS]  = useState(()=>[...deliverableStatuses]);
   const [abs, setABS] = useState(()=>[...animBatchStatuses]);
-  const [cr,  setCR]  = useState(()=>[...crewRoles]);
-  const [crb, setCRB] = useState(()=>[...crewRolesBroadcast]);
   const [newWS, setNewWS] = useState(""); const [newBU, setNewBU] = useState("");
   const [newPT, setNewPT] = useState(""); const [newDS, setNewDS] = useState("");
   const [newABS, setNewABS] = useState("");
-  const [newCR, setNewCR] = useState(""); const [newCRB, setNewCRB] = useState("");
 
-  const save = (nextWS, nextBU, nextPT, nextDS, nextABS, nextCR, nextCRB) =>
-    onUpdateLists({workstreams:nextWS, businessUnits:nextBU, productionTypes:nextPT, deliverableStatuses:nextDS, animBatchStatuses:nextABS, crewRoles:nextCR, crewRolesBroadcast:nextCRB});
+  const save = (nextWS, nextBU, nextPT, nextDS, nextABS) =>
+    onUpdateLists({workstreams:nextWS, businessUnits:nextBU, productionTypes:nextPT, deliverableStatuses:nextDS, animBatchStatuses:nextABS});
 
   const addItem = (list, setList, val, setNew, field) => {
     const v = val.trim(); if(!v||list.includes(v)) return;
     const next = [...list, v]; setList(next); setNew("");
-    const args = {ws,bu,pt,ds,abs,cr,crb};
+    const args = {ws,bu,pt,ds,abs};
     args[field] = next;
-    save(args.ws, args.bu, args.pt, args.ds, args.abs, args.cr, args.crb);
+    save(args.ws, args.bu, args.pt, args.ds, args.abs);
   };
   const removeItem = (list, setList, item, field) => {
     const next = list.filter(x=>x!==item); setList(next);
-    const args = {ws,bu,pt,ds,abs,cr,crb};
+    const args = {ws,bu,pt,ds,abs};
     args[field] = next;
-    save(args.ws, args.bu, args.pt, args.ds, args.abs, args.cr, args.crb);
+    save(args.ws, args.bu, args.pt, args.ds, args.abs);
   };
 
   return (
@@ -25598,14 +25735,61 @@ const AdminListsTab = ({lists, onUpdateLists}) => {
           <AdminListSection title="Animation Batch Status" icon="✨" items={abs} newVal={newABS} setNew={setNewABS} chipColor="#f9a8d4"
             onAdd={()=>addItem(abs,setABS,newABS,setNewABS,"abs")} onRemove={item=>removeItem(abs,setABS,item,"abs")}/>
         </div>
-        <div>
-          <div style={{fontSize:13,fontWeight:800,color:"#6b7280",textTransform:"uppercase",letterSpacing:"0.1em",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:4}}>Production Crew Roles</div>
-          <div style={{fontSize:14,color:"#6b7280",marginBottom:10}}>Options shown in a production's Internal/External crew role dropdowns. Always displayed alphabetically regardless of the order added here.</div>
-          <AdminListSection title="Crew Roles" icon="🎥" items={cr} newVal={newCR} setNew={setNewCR} chipColor="#22c55e"
-            onAdd={()=>addItem(cr,setCR,newCR,setNewCR,"cr")} onRemove={item=>removeItem(cr,setCR,item,"cr")}/>
-          <AdminListSection title="Crew Roles — Broadcast" icon="📡" items={crb} newVal={newCRB} setNew={setNewCRB} chipColor="#0ea5e9"
-            onAdd={()=>addItem(crb,setCRB,newCRB,setNewCRB,"crb")} onRemove={item=>removeItem(crb,setCRB,item,"crb")}/>
-        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Admin: Crew Roles — organized into Admin/Design/Production/Post Production
+// categories. Production Roles is the default set shown when assigning crew
+// on a production (see ProductionCard); the other 3 categories only appear
+// there behind a "show full list" toggle.
+const CREW_ROLE_CATEGORY_COLORS = {
+  "Admin Roles": "#818cf8",
+  "Design Roles": "#f9a8d4",
+  "Production Roles": "#22c55e",
+  "Post Production Roles": "#0ea5e9",
+};
+const AdminCrewRolesTab = ({lists, onUpdateLists}) => {
+  const categories = Object.keys(CREW_ROLE_CATEGORY_LIST_KEYS);
+  const [state, setState] = useState(()=>{
+    const s = {};
+    categories.forEach(cat=>{
+      const key = CREW_ROLE_CATEGORY_LIST_KEYS[cat];
+      s[key] = [...(lists[key]||CREW_ROLE_CATEGORIES_DEFAULT[cat])];
+    });
+    return s;
+  });
+  const [newVals, setNewVals] = useState(()=>{
+    const s = {}; categories.forEach(cat=>{ s[CREW_ROLE_CATEGORY_LIST_KEYS[cat]] = ""; }); return s;
+  });
+
+  const addItem = (listKey, val) => {
+    const v = val.trim(); if(!v||state[listKey].includes(v)) return;
+    const next = {...state, [listKey]:[...state[listKey], v]};
+    setState(next); setNewVals(nv=>({...nv,[listKey]:""}));
+    onUpdateLists({...lists, ...next});
+  };
+  const removeItem = (listKey, item) => {
+    const next = {...state, [listKey]:state[listKey].filter(x=>x!==item)};
+    setState(next);
+    onUpdateLists({...lists, ...next});
+  };
+
+  return (
+    <div>
+      <div style={{fontSize:16,color:"#8e97a6",marginBottom:18,lineHeight:1.5}}>
+        Manage the role options shown in a production's Internal/External crew dropdowns, organized by category. When assigning crew on a production, only Production Roles shows by default — the other categories are reachable behind a "show full list" toggle. Always displayed alphabetically regardless of the order added here.
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:20}}>
+        {categories.map(cat=>{
+          const listKey = CREW_ROLE_CATEGORY_LIST_KEYS[cat];
+          return (
+            <AdminListSection key={cat} title={cat} icon="🎥" items={state[listKey]} newVal={newVals[listKey]}
+              setNew={v=>setNewVals(nv=>({...nv,[listKey]:v}))} chipColor={CREW_ROLE_CATEGORY_COLORS[cat]}
+              onAdd={()=>addItem(listKey,newVals[listKey])} onRemove={item=>removeItem(listKey,item)}/>
+          );
+        })}
       </div>
     </div>
   );
@@ -26036,7 +26220,7 @@ const ProductionPresetsAdmin = ({presets=[], onUpdatePresets, setupTypes=[], tea
 const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, gear, onUpdateGear, mediaCards=[], onUpdateMediaCards, furniture=[], onUpdateFurniture, props_=[], onUpdateProps, screenContent={}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes=[], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations=[], onUpdateWorkstations, talentRoster=[], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists={}, onUpdateLists, presets=[], onUpdatePresets, tabLocks={}, onUpdateTabLocks}) => {
   const [gearSubTab, setGearSubTab] = useState("equipment"); // "equipment" | "media"
   const [tab, setTab] = useState("team");
-  const tabs = [{id:"team",l:"👥 Team"},{id:"gear",l:"🎒 Gear"},{id:"props",l:"🪑 Props & Furniture"},{id:"screen",l:"📺 Screen Content"},{id:"spaces",l:"📍 Spaces"},{id:"setups",l:"🎬 Setups"},{id:"workstations",l:"💻 Workstations"},{id:"talent",l:"🎤 Talent"},{id:"resources",l:"📊 Resources"},{id:"lists",l:"🗂 Metadata"},{id:"presets",l:"⭐ Production Presets"},{id:"access",l:"🔒 Access"}];
+  const tabs = [{id:"team",l:"👥 Team"},{id:"gear",l:"🎒 Gear"},{id:"props",l:"🪑 Props & Furniture"},{id:"screen",l:"📺 Screen Content"},{id:"spaces",l:"📍 Spaces"},{id:"setups",l:"🎬 Setups"},{id:"workstations",l:"💻 Workstations"},{id:"talent",l:"🎤 Talent"},{id:"resources",l:"📊 Resources"},{id:"lists",l:"🗂 Metadata"},{id:"crewRoles",l:"🎥 Crew Roles"},{id:"presets",l:"⭐ Production Presets"},{id:"access",l:"🔒 Access"}];
 
   return (
     <div style={{maxWidth:900,margin:"0 auto"}}>
@@ -26073,6 +26257,7 @@ const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, g
       {tab==="talent" &&<AdminTalentTab talentRoster={talentRoster} onUpdateTalentRoster={onUpdateTalentRoster}/>}
       {tab==="resources" &&<AdminResourceSettingsTab resourceConfig={resourceConfig} onUpdateResourceConfig={onUpdateResourceConfig}/>}
       {tab==="lists" &&<AdminListsTab lists={lists} onUpdateLists={onUpdateLists}/>}
+      {tab==="crewRoles" &&<AdminCrewRolesTab lists={lists} onUpdateLists={onUpdateLists}/>}
 
       {/* ── PRESETS TAB ── */}
       {tab==="presets"&&(
