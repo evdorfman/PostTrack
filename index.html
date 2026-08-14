@@ -361,7 +361,7 @@ var supabase=(function(e){function t(e,t){var n={};for(var r in e)Object.prototy
 `))throw Error(`@supabase/auth-js: Invalid SIWE message field "statement". Statement must not include '\\n'. Provided value: ${e.statement}`);let f=gi(e.address),p=`${l?`${l}://${n}`:n} wants you to sign in with your Ethereum account:\n${f}\n\n${e.statement?`${e.statement}\n`:``}`,m=`URI: ${u}\nVersion: ${d}\nChain ID: ${t}${a?`\nNonce: ${a}`:``}\nIssued At: ${i.toISOString()}`;if(r&&(m+=`\nExpiration Time: ${r.toISOString()}`),o&&(m+=`\nNot Before: ${o.toISOString()}`),s&&(m+=`\nRequest ID: ${s}`),c){let e=`
 Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/auth-js: Invalid SIWE message field "resources". Every resource must be a valid string. Provided value: ${t}`);e+=`\n- ${t}`}m+=e}return`${p}\n${m}`}var $=class extends Error{constructor({message:e,code:t,cause:n,name:r}){super(e,{cause:n}),this.__isWebAuthnError=!0,this.name=r??(n instanceof Error?n.name:void 0)??`Unknown Error`,this.code=t}toJSON(){return{name:this.name,message:this.message,code:this.code}}},bi=class extends ${constructor(e,t){super({code:`ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY`,cause:t,message:e}),this.name=`WebAuthnUnknownError`,this.originalError=t}};function xi({error:e,options:t}){let{publicKey:n}=t;if(!n)throw Error(`options was missing required publicKey property`);if(e.name===`AbortError`){if(t.signal instanceof AbortSignal)return new $({message:`Registration ceremony was sent an abort signal`,code:`ERROR_CEREMONY_ABORTED`,cause:e})}else if(e.name===`ConstraintError`){if(n.authenticatorSelection?.requireResidentKey===!0)return new $({message:`Discoverable credentials were required but no available authenticator supported it`,code:`ERROR_AUTHENTICATOR_MISSING_DISCOVERABLE_CREDENTIAL_SUPPORT`,cause:e});if(t.mediation===`conditional`&&n.authenticatorSelection?.userVerification===`required`)return new $({message:`User verification was required during automatic registration but it could not be performed`,code:`ERROR_AUTO_REGISTER_USER_VERIFICATION_FAILURE`,cause:e});if(n.authenticatorSelection?.userVerification===`required`)return new $({message:`User verification was required but no available authenticator supported it`,code:`ERROR_AUTHENTICATOR_MISSING_USER_VERIFICATION_SUPPORT`,cause:e})}else if(e.name===`InvalidStateError`)return new $({message:`The authenticator was previously registered`,code:`ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED`,cause:e});else if(e.name===`NotAllowedError`)return new $({message:e.message,code:`ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY`,cause:e});else if(e.name===`NotSupportedError`)return n.pubKeyCredParams.filter(e=>e.type===`public-key`).length===0?new $({message:`No entry in pubKeyCredParams was of type "public-key"`,code:`ERROR_MALFORMED_PUBKEYCREDPARAMS`,cause:e}):new $({message:`No available authenticator supported any of the specified pubKeyCredParams algorithms`,code:`ERROR_AUTHENTICATOR_NO_SUPPORTED_PUBKEYCREDPARAMS_ALG`,cause:e});else if(e.name===`SecurityError`){let t=window.location.hostname;if(Oi(t)){if(n.rp.id!==t)return new $({message:`The RP ID "${n.rp.id}" is invalid for this domain`,code:`ERROR_INVALID_RP_ID`,cause:e})}else return new $({message:`${window.location.hostname} is an invalid domain`,code:`ERROR_INVALID_DOMAIN`,cause:e})}else if(e.name===`TypeError`){if(n.user.id.byteLength<1||n.user.id.byteLength>64)return new $({message:`User ID was not between 1 and 64 characters`,code:`ERROR_INVALID_USER_ID_LENGTH`,cause:e})}else if(e.name===`UnknownError`)return new $({message:`The authenticator was unable to process the specified options, or could not create a new credential`,code:`ERROR_AUTHENTICATOR_GENERAL_ERROR`,cause:e});return new $({message:`a Non-Webauthn related error has occurred`,code:`ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY`,cause:e})}function Si({error:e,options:t}){let{publicKey:n}=t;if(!n)throw Error(`options was missing required publicKey property`);if(e.name===`AbortError`){if(t.signal instanceof AbortSignal)return new $({message:`Authentication ceremony was sent an abort signal`,code:`ERROR_CEREMONY_ABORTED`,cause:e})}else if(e.name===`NotAllowedError`)return new $({message:e.message,code:`ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY`,cause:e});else if(e.name===`SecurityError`){let t=window.location.hostname;if(Oi(t)){if(n.rpId!==t)return new $({message:`The RP ID "${n.rpId}" is invalid for this domain`,code:`ERROR_INVALID_RP_ID`,cause:e})}else return new $({message:`${window.location.hostname} is an invalid domain`,code:`ERROR_INVALID_DOMAIN`,cause:e})}else if(e.name===`UnknownError`)return new $({message:`The authenticator was unable to process the specified options, or could not create a new assertion signature`,code:`ERROR_AUTHENTICATOR_GENERAL_ERROR`,cause:e});return new $({message:`a Non-Webauthn related error has occurred`,code:`ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY`,cause:e})}let Ci=new class{createNewAbortSignal(){if(this.controller){let e=Error(`Cancelling existing WebAuthn API call for new one`);e.name=`AbortError`,this.controller.abort(e)}let e=new AbortController;return this.controller=e,e.signal}cancelCeremony(){if(this.controller){let e=Error(`Manually cancelling existing WebAuthn API call`);e.name=`AbortError`,this.controller.abort(e),this.controller=void 0}}};function wi(e){if(!e)throw Error(`Credential creation options are required`);if(typeof PublicKeyCredential<`u`&&`parseCreationOptionsFromJSON`in PublicKeyCredential&&typeof PublicKeyCredential.parseCreationOptionsFromJSON==`function`)return PublicKeyCredential.parseCreationOptionsFromJSON(e);let{challenge:n,user:r,excludeCredentials:i}=e,a=t(e,[`challenge`,`user`,`excludeCredentials`]),o=R(n).buffer,s=Object.assign(Object.assign({},r),{id:R(r.id).buffer}),c=Object.assign(Object.assign({},a),{challenge:o,user:s});if(i&&i.length>0){c.excludeCredentials=Array(i.length);for(let e=0;e<i.length;e++){let t=i[e];c.excludeCredentials[e]=Object.assign(Object.assign({},t),{id:R(t.id).buffer,type:t.type||`public-key`,transports:t.transports})}}return c}function Ti(e){if(!e)throw Error(`Credential request options are required`);if(typeof PublicKeyCredential<`u`&&`parseRequestOptionsFromJSON`in PublicKeyCredential&&typeof PublicKeyCredential.parseRequestOptionsFromJSON==`function`)return PublicKeyCredential.parseRequestOptionsFromJSON(e);let{challenge:n,allowCredentials:r}=e,i=t(e,[`challenge`,`allowCredentials`]),a=R(n).buffer,o=Object.assign(Object.assign({},i),{challenge:a});if(r&&r.length>0){o.allowCredentials=Array(r.length);for(let e=0;e<r.length;e++){let t=r[e];o.allowCredentials[e]=Object.assign(Object.assign({},t),{id:R(t.id).buffer,type:t.type||`public-key`,transports:t.transports})}}return o}function Ei(e){if(`toJSON`in e&&typeof e.toJSON==`function`)return e.toJSON();let t=e;return{id:e.id,rawId:e.id,response:{attestationObject:z(new Uint8Array(e.response.attestationObject)),clientDataJSON:z(new Uint8Array(e.response.clientDataJSON))},type:`public-key`,clientExtensionResults:e.getClientExtensionResults(),authenticatorAttachment:t.authenticatorAttachment??void 0}}function Di(e){if(`toJSON`in e&&typeof e.toJSON==`function`)return e.toJSON();let t=e,n=e.getClientExtensionResults(),r=e.response;return{id:e.id,rawId:e.id,response:{authenticatorData:z(new Uint8Array(r.authenticatorData)),clientDataJSON:z(new Uint8Array(r.clientDataJSON)),signature:z(new Uint8Array(r.signature)),userHandle:r.userHandle?z(new Uint8Array(r.userHandle)):void 0},type:`public-key`,clientExtensionResults:n,authenticatorAttachment:t.authenticatorAttachment??void 0}}function Oi(e){return e===`localhost`||/^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$/i.test(e)}function ki(){return!!(B()&&`PublicKeyCredential`in window&&window.PublicKeyCredential&&`credentials`in navigator&&typeof(navigator==null?void 0:navigator.credentials)?.create==`function`&&typeof(navigator==null?void 0:navigator.credentials)?.get==`function`)}async function Ai(e){try{let t=await navigator.credentials.create(e);return t?t instanceof PublicKeyCredential?{data:t,error:null}:{data:null,error:new bi(`Browser returned unexpected credential type`,t)}:{data:null,error:new bi(`Empty credential response`,t)}}catch(t){return{data:null,error:xi({error:t,options:e})}}}async function ji(e){try{let t=await navigator.credentials.get(e);return t?t instanceof PublicKeyCredential?{data:t,error:null}:{data:null,error:new bi(`Browser returned unexpected credential type`,t)}:{data:null,error:new bi(`Empty credential response`,t)}}catch(t){return{data:null,error:Si({error:t,options:e})}}}let Mi={hints:[`security-key`],authenticatorSelection:{authenticatorAttachment:`cross-platform`,requireResidentKey:!1,userVerification:`preferred`,residentKey:`discouraged`},attestation:`direct`},Ni={userVerification:`preferred`,hints:[`security-key`],attestation:`direct`};function Pi(...e){let t=e=>typeof e==`object`&&!!e&&!Array.isArray(e),n=e=>e instanceof ArrayBuffer||ArrayBuffer.isView(e),r={};for(let i of e)if(i)for(let e in i){let a=i[e];if(a!==void 0)if(Array.isArray(a))r[e]=a;else if(n(a))r[e]=a;else if(t(a)){let n=r[e];t(n)?r[e]=Pi(n,a):r[e]=Pi(a)}else r[e]=a}return r}function Fi(e,t){return Pi(Mi,e,t||{})}function Ii(e,t){return Pi(Ni,e,t||{})}var Li=class{constructor(e){this.client=e,this.enroll=this._enroll.bind(this),this.challenge=this._challenge.bind(this),this.verify=this._verify.bind(this),this.authenticate=this._authenticate.bind(this),this.register=this._register.bind(this)}async _enroll(e){return this.client.mfa.enroll(Object.assign(Object.assign({},e),{factorType:`webauthn`}))}async _challenge({factorId:e,webauthn:t,friendlyName:n,signal:r},i){try{let{data:a,error:o}=await this.client.mfa.challenge({factorId:e,webauthn:t});if(!a)return{data:null,error:o};let s=r??Ci.createNewAbortSignal();if(a.webauthn.type===`create`){let{user:e}=a.webauthn.credential_options.publicKey;if(!e.name){let t=n;if(t)e.name=`${e.id}:${t}`;else{let t=(await this.client.getUser()).data.user,n=t?.user_metadata?.name||t?.email||t?.id||`User`;e.name=`${e.id}:${n}`}}e.displayName||=e.name}switch(a.webauthn.type){case`create`:{let{data:t,error:n}=await Ai({publicKey:Fi(a.webauthn.credential_options.publicKey,i?.create),signal:s});return t?{data:{factorId:e,challengeId:a.id,webauthn:{type:a.webauthn.type,credential_response:t}},error:null}:{data:null,error:n}}case`request`:{let t=Ii(a.webauthn.credential_options.publicKey,i?.request),{data:n,error:r}=await ji(Object.assign(Object.assign({},a.webauthn.credential_options),{publicKey:t,signal:s}));return n?{data:{factorId:e,challengeId:a.id,webauthn:{type:a.webauthn.type,credential_response:n}},error:null}:{data:null,error:r}}}}catch(e){return N(e)?{data:null,error:e}:{data:null,error:new P(`Unexpected error in challenge`,e)}}}async _verify({challengeId:e,factorId:t,webauthn:n}){return this.client.mfa.verify({factorId:t,challengeId:e,webauthn:n})}async _authenticate({factorId:e,webauthn:{rpId:t=typeof window<`u`?window.location.hostname:void 0,rpOrigins:n=typeof window<`u`?[window.location.origin]:void 0,signal:r}={}},i){if(!t)return{data:null,error:new Gn(`rpId is required for WebAuthn authentication`)};try{if(!ki())return{data:null,error:new P(`Browser does not support WebAuthn`,null)};let{data:a,error:o}=await this.challenge({factorId:e,webauthn:{rpId:t,rpOrigins:n},signal:r},{request:i});if(!a)return{data:null,error:o};let{webauthn:s}=a;return this._verify({factorId:e,challengeId:a.challengeId,webauthn:{type:s.type,rpId:t,rpOrigins:n,credential_response:s.credential_response}})}catch(e){return N(e)?{data:null,error:e}:{data:null,error:new P(`Unexpected error in authenticate`,e)}}}async _register({friendlyName:e,webauthn:{rpId:t=typeof window<`u`?window.location.hostname:void 0,rpOrigins:n=typeof window<`u`?[window.location.origin]:void 0,signal:r}={}},i){if(!t)return{data:null,error:new Gn(`rpId is required for WebAuthn registration`)};try{if(!ki())return{data:null,error:new P(`Browser does not support WebAuthn`,null)};let{data:a,error:o}=await this._enroll({friendlyName:e});if(!a)return await this.client.mfa.listFactors().then(t=>t.data?.all.find(t=>t.factor_type===`webauthn`&&t.friendly_name===e&&t.status!==`unverified`)).then(e=>e?this.client.mfa.unenroll({factorId:e?.id}):void 0),{data:null,error:o};let{data:s,error:c}=await this._challenge({factorId:a.id,friendlyName:a.friendly_name,webauthn:{rpId:t,rpOrigins:n},signal:r},{create:i});return s?this._verify({factorId:a.id,challengeId:s.challengeId,webauthn:{rpId:t,rpOrigins:n,type:s.webauthn.type,credential_response:s.webauthn.credential_response}}):{data:null,error:c}}catch(e){return N(e)?{data:null,error:e}:{data:null,error:new P(`Unexpected error in register`,e)}}}};hi();let Ri={url:`http://localhost:9999`,storageKey:`supabase.auth.token`,autoRefreshToken:!0,persistSession:!0,detectSessionInUrl:!0,headers:Vn,flowType:`implicit`,debug:!1,hasCustomAuthorizationHeader:!1,throwOnError:!1,lockAcquireTimeout:5e3,skipAutoInitialize:!1,experimental:{}},zi={};var Bi=class e{get jwks(){return zi[this.storageKey]?.jwks??{keys:[]}}set jwks(e){zi[this.storageKey]=Object.assign(Object.assign({},zi[this.storageKey]),{jwks:e})}get jwks_cached_at(){return zi[this.storageKey]?.cachedAt??-(2**53-1)}set jwks_cached_at(e){zi[this.storageKey]=Object.assign(Object.assign({},zi[this.storageKey]),{cachedAt:e})}constructor(t){var n;this.userStorage=null,this.memoryStorage=null,this.stateChangeEmitters=new Map,this.autoRefreshTicker=null,this.autoRefreshTickTimeout=null,this.visibilityChangedCallback=null,this.refreshingDeferred=null,this.lastRefreshFailure=null,this._sessionRemovalEpoch=0,this.initializePromise=null,this._pendingInitNotifications=null,this.detectSessionInUrl=!0,this.hasCustomAuthorizationHeader=!1,this.suppressGetSessionWarning=!1,this.lock=null,this.lockAcquired=!1,this.pendingInLock=[],this.broadcastChannel=null,this.logger=console.log;let r=Object.assign(Object.assign({},Ri),t);if(this.storageKey=r.storageKey,this.instanceID=e.nextInstanceID[this.storageKey]??0,e.nextInstanceID[this.storageKey]=this.instanceID+1,this.logDebugMessages=!!r.debug,typeof r.debug==`function`&&(this.logger=r.debug),this.instanceID>0&&B()){let e=`${this._logPrefix()} Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.`;console.warn(e),this.logDebugMessages&&console.trace(e)}if(this.persistSession=r.persistSession,this.autoRefreshToken=r.autoRefreshToken,this.experimental=r.experimental??{},this.admin=new si({url:r.url,headers:r.headers,fetch:r.fetch,experimental:this.experimental}),this.url=r.url,this.headers=r.headers,this.fetch=Sr(r.fetch),this.detectSessionInUrl=r.detectSessionInUrl,this.flowType=r.flowType,this.hasCustomAuthorizationHeader=r.hasCustomAuthorizationHeader,this.throwOnError=r.throwOnError,this.lockAcquireTimeout=r.lockAcquireTimeout,r.lock!=null&&(this.lock=r.lock),this.jwks||(this.jwks={keys:[]},this.jwks_cached_at=-(2**53-1)),this.mfa={verify:this._verify.bind(this),enroll:this._enroll.bind(this),unenroll:this._unenroll.bind(this),challenge:this._challenge.bind(this),listFactors:this._listFactors.bind(this),challengeAndVerify:this._challengeAndVerify.bind(this),getAuthenticatorAssuranceLevel:this._getAuthenticatorAssuranceLevel.bind(this),webauthn:new Li(this)},this.oauth={getAuthorizationDetails:this._getAuthorizationDetails.bind(this),approveAuthorization:this._approveAuthorization.bind(this),denyAuthorization:this._denyAuthorization.bind(this),listGrants:this._listOAuthGrants.bind(this),revokeGrant:this._revokeOAuthGrant.bind(this)},this.passkey={startRegistration:this._startPasskeyRegistration.bind(this),verifyRegistration:this._verifyPasskeyRegistration.bind(this),startAuthentication:this._startPasskeyAuthentication.bind(this),verifyAuthentication:this._verifyPasskeyAuthentication.bind(this),list:this._listPasskeys.bind(this),update:this._updatePasskey.bind(this),delete:this._deletePasskey.bind(this)},this.persistSession?(r.storage?this.storage=r.storage:br()?this.storage=globalThis.localStorage:(this.memoryStorage={},this.storage=ci(this.memoryStorage)),r.userStorage&&(this.userStorage=r.userStorage)):(this.memoryStorage={},this.storage=ci(this.memoryStorage)),B()&&globalThis.BroadcastChannel&&this.persistSession&&this.storageKey){try{this.broadcastChannel=new globalThis.BroadcastChannel(this.storageKey)}catch(e){console.error(`Failed to create a new BroadcastChannel, multi-tab state changes will not be available`,e)}(n=this.broadcastChannel)==null||n.addEventListener(`message`,async e=>{this._debug(`received broadcast notification from other tab or client`,e),(e.data.event===`TOKEN_REFRESHED`||e.data.event===`SIGNED_IN`)&&(this.lastRefreshFailure=null);try{await this._notifyAllSubscribers(e.data.event,e.data.session,!1)}catch(e){this._debug(`#broadcastChannel`,`error`,e)}})}r.skipAutoInitialize||this.initialize().catch(e=>{this._debug(`#initialize()`,`error`,e)})}isThrowOnErrorEnabled(){return this.throwOnError}_returnResult(e){if(this.throwOnError&&e&&e.error)throw e.error;return e}_logPrefix(){return`GoTrueClient@${this.storageKey}:${this.instanceID} (${zn}) ${new Date().toISOString()}`}_debug(...e){return this.logDebugMessages&&this.logger(this._logPrefix(),...e),this}async initialize(){if(this.initializePromise)return await this.initializePromise;this._pendingInitNotifications=[],this.initializePromise=(async()=>this.lock==null?await this._initialize():await this._acquireLock(this.lockAcquireTimeout,async()=>await this._initialize()))();let e=await this.initializePromise,t=this._pendingInitNotifications??[];this._pendingInitNotifications=null;for(let e of t)await this._notifyAllSubscribers(e.event,e.session,e.broadcast);return e}async _initialize(){try{let e={},t=`none`;if(B()&&(e=xr(window.location.href),this._isImplicitGrantCallback(e)?t=`implicit`:await this._isPKCECallback(e)&&(t=`pkce`)),B()&&this.detectSessionInUrl&&t!==`none`){let{data:n,error:r}=await this._getSessionFromURL(e,t);if(r){if(this._debug(`#_initialize()`,`error detecting session from URL`,r),Zn(r)){let e=r.details?.code;if(e===`identity_already_exists`||e===`identity_not_found`||e===`single_identity_not_deletable`)return{error:r}}return{error:r}}let{session:i,redirectType:a}=n;return this._debug(`#_initialize()`,`detected session in URL`,i,`redirect type`,a),await this._saveSession(i),setTimeout(async()=>{a===`recovery`?await this._notifyAllSubscribers(`PASSWORD_RECOVERY`,i):await this._notifyAllSubscribers(`SIGNED_IN`,i)},0),{error:null}}return await this._recoverAndRefresh(),{error:null}}catch(e){return N(e)?this._returnResult({error:e}):this._returnResult({error:new P(`Unexpected error during initialization`,e)})}finally{await this._handleVisibilityChange(),this._debug(`#_initialize()`,`end`)}}async signInAnonymously(e){try{let{data:t,error:n}=await Y(this.fetch,`POST`,`${this.url}/signup`,{headers:this.headers,body:{data:e?.options?.data??{},gotrue_meta_security:{captcha_token:e?.options?.captchaToken}},xform:X});if(n||!t)return this._returnResult({data:{user:null,session:null},error:n});let r=t.session,i=t.user;return t.session&&(await this._saveSession(t.session),await this._notifyAllSubscribers(`SIGNED_IN`,r)),this._returnResult({data:{user:i,session:r},error:null})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async signUp(e){let t=null;try{let n;if(`email`in e){let{email:r,password:i,options:a}=e,o=null,s=null;this.flowType===`pkce`&&([o,s,t]=await this._getCodeChallengeAndMethod()),n=await Y(this.fetch,`POST`,`${this.url}/signup`,{headers:this.headers,redirectTo:this._maybeAppendFlowIdToRedirect(a?.emailRedirectTo,t),body:{email:r,password:i,data:a?.data??{},gotrue_meta_security:{captcha_token:a?.captchaToken},code_challenge:o,code_challenge_method:s},xform:X})}else if(`phone`in e){let{phone:t,password:r,options:i}=e;n=await Y(this.fetch,`POST`,`${this.url}/signup`,{headers:this.headers,body:{phone:t,password:r,data:i?.data??{},channel:i?.channel??`sms`,gotrue_meta_security:{captcha_token:i?.captchaToken}},xform:X})}else throw new Yn(`You must provide either an email or phone number and a password`);let{data:r,error:i}=n;if(i||!r)return await G(this.storage,this.storageKey,t),this._returnResult({data:{user:null,session:null},error:i});let a=r.session,o=r.user;return r.session&&(await this._saveSession(r.session),await this._notifyAllSubscribers(`SIGNED_IN`,a)),this._returnResult({data:{user:o,session:a},error:null})}catch(e){if(await G(this.storage,this.storageKey,t),N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async signInWithPassword(e){try{let t;if(`email`in e){let{email:n,password:r,options:i}=e;t=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=password`,{headers:this.headers,body:{email:n,password:r,gotrue_meta_security:{captcha_token:i?.captchaToken}},xform:ti})}else if(`phone`in e){let{phone:n,password:r,options:i}=e;t=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=password`,{headers:this.headers,body:{phone:n,password:r,gotrue_meta_security:{captcha_token:i?.captchaToken}},xform:ti})}else throw new Yn(`You must provide either an email or phone number and a password`);let{data:n,error:r}=t;if(r)return this._returnResult({data:{user:null,session:null},error:r});if(!n||!n.session||!n.user){let e=new L;return this._returnResult({data:{user:null,session:null},error:e})}return n.session&&(await this._saveSession(n.session),await this._notifyAllSubscribers(`SIGNED_IN`,n.session)),this._returnResult({data:Object.assign({user:n.user,session:n.session},n.weak_password?{weakPassword:n.weak_password}:null),error:r})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async signInWithOAuth(e){return await this._handleProviderSignIn(e.provider,{redirectTo:e.options?.redirectTo,scopes:e.options?.scopes,queryParams:e.options?.queryParams,skipBrowserRedirect:e.options?.skipBrowserRedirect})}async exchangeCodeForSession(e,t){return await this.initializePromise,this.lock==null?this._exchangeCodeForSession(e,t):this._acquireLock(this.lockAcquireTimeout,async()=>this._exchangeCodeForSession(e,t))}async signInWithWeb3(e){let{chain:t}=e;switch(t){case`ethereum`:return await this.signInWithEthereum(e);case`solana`:return await this.signInWithSolana(e);default:throw Error(`@supabase/auth-js: Unsupported chain "${t}"`)}}async signInWithEthereum(e){let t,n;if(`message`in e)t=e.message,n=e.signature;else{let{chain:r,wallet:i,statement:a,options:o}=e,s;if(B())if(typeof i==`object`)s=i;else{let e=window;if(`ethereum`in e&&typeof e.ethereum==`object`&&`request`in e.ethereum&&typeof e.ethereum.request==`function`)s=e.ethereum;else throw Error(`@supabase/auth-js: No compatible Ethereum wallet interface on the window object (window.ethereum) detected. Make sure the user already has a wallet installed and connected for this app. Prefer passing the wallet interface object directly to signInWithWeb3({ chain: 'ethereum', wallet: resolvedUserWallet }) instead.`)}else{if(typeof i!=`object`||!o?.url)throw Error(`@supabase/auth-js: Both wallet and url must be specified in non-browser environments.`);s=i}let c=new URL(o?.url??window.location.href),l=await s.request({method:`eth_requestAccounts`}).then(e=>e).catch(()=>{throw Error(`@supabase/auth-js: Wallet method eth_requestAccounts is missing or invalid`)});if(!l||l.length===0)throw Error(`@supabase/auth-js: No accounts available. Please ensure the wallet is connected.`);let u=gi(l[0]),d=o?.signInWithEthereum?.chainId;d||=_i(await s.request({method:`eth_chainId`})),t=yi({domain:c.host,address:u,statement:a,uri:c.href,version:`1`,chainId:d,nonce:o?.signInWithEthereum?.nonce,issuedAt:o?.signInWithEthereum?.issuedAt??new Date,expirationTime:o?.signInWithEthereum?.expirationTime,notBefore:o?.signInWithEthereum?.notBefore,requestId:o?.signInWithEthereum?.requestId,resources:o?.signInWithEthereum?.resources}),n=await s.request({method:`personal_sign`,params:[vi(t),u]})}try{let{data:r,error:i}=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=web3`,{headers:this.headers,body:Object.assign({chain:`ethereum`,message:t,signature:n},e.options?.captchaToken?{gotrue_meta_security:{captcha_token:e.options?.captchaToken}}:null),xform:X});if(i)throw i;if(!r||!r.session||!r.user){let e=new L;return this._returnResult({data:{user:null,session:null},error:e})}return r.session&&(await this._saveSession(r.session),await this._notifyAllSubscribers(`SIGNED_IN`,r.session)),this._returnResult({data:Object.assign({},r),error:i})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async signInWithSolana(e){let t,n;if(`message`in e)t=e.message,n=e.signature;else{let{chain:r,wallet:i,statement:a,options:o}=e,s;if(B())if(typeof i==`object`)s=i;else{let e=window;if(`solana`in e&&typeof e.solana==`object`&&(`signIn`in e.solana&&typeof e.solana.signIn==`function`||`signMessage`in e.solana&&typeof e.solana.signMessage==`function`))s=e.solana;else throw Error(`@supabase/auth-js: No compatible Solana wallet interface on the window object (window.solana) detected. Make sure the user already has a wallet installed and connected for this app. Prefer passing the wallet interface object directly to signInWithWeb3({ chain: 'solana', wallet: resolvedUserWallet }) instead.`)}else{if(typeof i!=`object`||!o?.url)throw Error(`@supabase/auth-js: Both wallet and url must be specified in non-browser environments.`);s=i}let c=new URL(o?.url??window.location.href);if(`signIn`in s&&s.signIn){let e=await s.signIn(Object.assign(Object.assign(Object.assign({issuedAt:new Date().toISOString()},o?.signInWithSolana),{version:`1`,domain:c.host,uri:c.href}),a?{statement:a}:null)),r;if(Array.isArray(e)&&e[0]&&typeof e[0]==`object`)r=e[0];else if(e&&typeof e==`object`&&`signedMessage`in e&&`signature`in e)r=e;else throw Error(`@supabase/auth-js: Wallet method signIn() returned unrecognized value`);if(`signedMessage`in r&&`signature`in r&&(typeof r.signedMessage==`string`||r.signedMessage instanceof Uint8Array)&&r.signature instanceof Uint8Array)t=typeof r.signedMessage==`string`?r.signedMessage:new TextDecoder().decode(r.signedMessage),n=r.signature;else throw Error(`@supabase/auth-js: Wallet method signIn() API returned object without signedMessage and signature fields`)}else{if(!(`signMessage`in s)||typeof s.signMessage!=`function`||!(`publicKey`in s)||typeof s!=`object`||!s.publicKey||!(`toBase58`in s.publicKey)||typeof s.publicKey.toBase58!=`function`)throw Error(`@supabase/auth-js: Wallet does not have a compatible signMessage() and publicKey.toBase58() API`);t=[`${c.host} wants you to sign in with your Solana account:`,s.publicKey.toBase58(),...a?[``,a,``]:[``],`Version: 1`,`URI: ${c.href}`,`Issued At: ${o?.signInWithSolana?.issuedAt??new Date().toISOString()}`,...o?.signInWithSolana?.notBefore?[`Not Before: ${o.signInWithSolana.notBefore}`]:[],...o?.signInWithSolana?.expirationTime?[`Expiration Time: ${o.signInWithSolana.expirationTime}`]:[],...o?.signInWithSolana?.chainId?[`Chain ID: ${o.signInWithSolana.chainId}`]:[],...o?.signInWithSolana?.nonce?[`Nonce: ${o.signInWithSolana.nonce}`]:[],...o?.signInWithSolana?.requestId?[`Request ID: ${o.signInWithSolana.requestId}`]:[],...o?.signInWithSolana?.resources?.length?[`Resources`,...o.signInWithSolana.resources.map(e=>`- ${e}`)]:[]].join(`
 `);let e=await s.signMessage(new TextEncoder().encode(t),`utf8`);if(!e||!(e instanceof Uint8Array))throw Error(`@supabase/auth-js: Wallet signMessage() API returned an recognized value`);n=e}}try{let{data:r,error:i}=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=web3`,{headers:this.headers,body:Object.assign({chain:`solana`,message:t,signature:z(n)},e.options?.captchaToken?{gotrue_meta_security:{captcha_token:e.options?.captchaToken}}:null),xform:X});if(i)throw i;if(!r||!r.session||!r.user){let e=new L;return this._returnResult({data:{user:null,session:null},error:e})}return r.session&&(await this._saveSession(r.session),await this._notifyAllSubscribers(`SIGNED_IN`,r.session)),this._returnResult({data:Object.assign({},r),error:i})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async _exchangeCodeForSession(e,t){let n=t?.flowId!=null,r=n?Nr(t?.flowId):B()?Nr(xr(window.location.href)[M]):null;n&&!r&&this._debug(`#_exchangeCodeForSession()`,`provided flowId is not a valid flow id`,t?.flowId);let{verifier:i,flowId:a}=n&&!r?{verifier:null,flowId:null}:await zr(this.storage,this.storageKey,r),[o,s]=(i??``).split(`/`);try{if(!o&&this.flowType===`pkce`)throw new $n;let{data:t,error:n}=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=pkce`,{headers:this.headers,body:{auth_code:e,code_verifier:o},xform:X});if(await G(this.storage,this.storageKey,a),n)throw n;if(!t||!t.session||!t.user){let e=new L;return this._returnResult({data:{user:null,session:null,redirectType:null},error:e})}return t.session&&(await this._saveSession(t.session),await this._notifyAllSubscribers(s===`recovery`?`PASSWORD_RECOVERY`:`SIGNED_IN`,t.session)),this._returnResult({data:Object.assign(Object.assign({},t),{redirectType:s??null}),error:n})}catch(e){if(await G(this.storage,this.storageKey,a),N(e))return this._returnResult({data:{user:null,session:null,redirectType:null},error:e});throw e}}async signInWithIdToken(e){try{let{options:t,provider:n,token:r,access_token:i,nonce:a}=e,{data:o,error:s}=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=id_token`,{headers:this.headers,body:{provider:n,id_token:r,access_token:i,nonce:a,gotrue_meta_security:{captcha_token:t?.captchaToken}},xform:X});if(s)return this._returnResult({data:{user:null,session:null},error:s});if(!o||!o.session||!o.user){let e=new L;return this._returnResult({data:{user:null,session:null},error:e})}return o.session&&(await this._saveSession(o.session),await this._notifyAllSubscribers(`SIGNED_IN`,o.session)),this._returnResult({data:o,error:s})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async signInWithOtp(e){let t=null;try{if(`email`in e){let{email:n,options:r}=e,i=null,a=null;this.flowType===`pkce`&&([i,a,t]=await this._getCodeChallengeAndMethod());let{error:o}=await Y(this.fetch,`POST`,`${this.url}/otp`,{headers:this.headers,body:{email:n,data:r?.data??{},create_user:r?.shouldCreateUser??!0,gotrue_meta_security:{captcha_token:r?.captchaToken},code_challenge:i,code_challenge_method:a},redirectTo:this._maybeAppendFlowIdToRedirect(r?.emailRedirectTo,t)});return this._returnResult({data:{user:null,session:null},error:o})}if(`phone`in e){let{phone:t,options:n}=e,{data:r,error:i}=await Y(this.fetch,`POST`,`${this.url}/otp`,{headers:this.headers,body:{phone:t,data:n?.data??{},create_user:n?.shouldCreateUser??!0,gotrue_meta_security:{captcha_token:n?.captchaToken},channel:n?.channel??`sms`}});return this._returnResult({data:{user:null,session:null,messageId:r?.message_id},error:i})}throw new Yn(`You must provide either an email or phone number.`)}catch(e){if(await G(this.storage,this.storageKey,t),N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async verifyOtp(e){try{let t,n;`options`in e&&(t=e.options?.redirectTo,n=e.options?.captchaToken);let{data:r,error:i}=await Y(this.fetch,`POST`,`${this.url}/verify`,{headers:this.headers,body:Object.assign(Object.assign({},e),{gotrue_meta_security:{captcha_token:n}}),redirectTo:t,xform:X});if(i)throw i;if(!r)throw Error(`An error occurred on token verification.`);let a=r.session,o=r.user;return a?.access_token&&(await this._saveSession(a),await this._notifyAllSubscribers(e.type==`recovery`?`PASSWORD_RECOVERY`:`SIGNED_IN`,a)),this._returnResult({data:{user:o,session:a},error:null})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async signInWithSSO(e){let t=null;try{let n=null,r=null;this.flowType===`pkce`&&([n,r,t]=await this._getCodeChallengeAndMethod());let i=await Y(this.fetch,`POST`,`${this.url}/sso`,{body:Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({},`providerId`in e?{provider_id:e.providerId}:null),`domain`in e?{domain:e.domain}:null),{redirect_to:this._maybeAppendFlowIdToRedirect(e.options?.redirectTo,t)}),e?.options?.captchaToken?{gotrue_meta_security:{captcha_token:e.options.captchaToken}}:null),{skip_http_redirect:!0,code_challenge:n,code_challenge_method:r}),headers:this.headers,xform:ni});return i.data?.url&&B()&&!e.options?.skipBrowserRedirect&&window.location.assign(i.data.url),this._returnResult(i)}catch(e){if(await G(this.storage,this.storageKey,t),N(e))return this._returnResult({data:null,error:e});throw e}}async reauthenticate(){return await this.initializePromise,this.lock==null?await this._reauthenticate():await this._acquireLock(this.lockAcquireTimeout,async()=>await this._reauthenticate())}async _reauthenticate(){try{return await this._useSession(async e=>{let{data:{session:t},error:n}=e;if(n)throw n;if(!t)throw new I;let{error:r}=await Y(this.fetch,`GET`,`${this.url}/reauthenticate`,{headers:this.headers,jwt:t.access_token});return this._returnResult({data:{user:null,session:null},error:r})})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async resend(e){let t=null;try{let n=`${this.url}/resend`;if(`email`in e){let{email:r,type:i,options:a}=e,o=null,s=null;this.flowType===`pkce`&&([o,s,t]=await this._getCodeChallengeAndMethod());let{error:c}=await Y(this.fetch,`POST`,n,{headers:this.headers,body:{email:r,type:i,gotrue_meta_security:{captcha_token:a?.captchaToken},code_challenge:o,code_challenge_method:s},redirectTo:this._maybeAppendFlowIdToRedirect(a?.emailRedirectTo,t)});return c&&await G(this.storage,this.storageKey,t),this._returnResult({data:{user:null,session:null},error:c})}else if(`phone`in e){let{phone:t,type:r,options:i}=e,{data:a,error:o}=await Y(this.fetch,`POST`,n,{headers:this.headers,body:{phone:t,type:r,gotrue_meta_security:{captcha_token:i?.captchaToken}}});return this._returnResult({data:{user:null,session:null,messageId:a?.message_id},error:o})}throw new Yn(`You must provide either an email or phone number and a type`)}catch(e){if(await G(this.storage,this.storageKey,t),N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async getSession(){return await this.initializePromise,this.lock==null?await this._useSession(async e=>e):await this._acquireLock(this.lockAcquireTimeout,async()=>this._useSession(async e=>e))}async _acquireLock(e,t){this._debug(`#_acquireLock`,`begin`,e);try{if(this.lockAcquired){let e=this.pendingInLock.length?this.pendingInLock[this.pendingInLock.length-1]:Promise.resolve(),n=(async()=>(await e,await t()))();return this.pendingInLock.push((async()=>{try{await n}catch{}})()),n}return await this.lock(`lock:${this.storageKey}`,e,async()=>{this._debug(`#_acquireLock`,`lock acquired for storage key`,this.storageKey);try{this.lockAcquired=!0;let e=t();for(this.pendingInLock.push((async()=>{try{await e}catch{}})()),await e;this.pendingInLock.length;){let e=[...this.pendingInLock];await Promise.all(e),this.pendingInLock.splice(0,e.length)}return await e}finally{this._debug(`#_acquireLock`,`lock released for storage key`,this.storageKey),this.lockAcquired=!1}})}finally{this._debug(`#_acquireLock`,`end`)}}async _useSession(e){this._debug(`#_useSession`,`begin`);try{return await e(await this.__loadSession())}finally{this._debug(`#_useSession`,`end`)}}async __loadSession(){this._debug(`#__loadSession()`,`begin`),this.lock!=null&&!this.lockAcquired&&this._debug(`#__loadSession()`,`used outside of an acquired lock!`,Error().stack);try{let e=null,t=await U(this.storage,this.storageKey);if(this._debug(`#getSession()`,`session from storage`,t),t!==null&&(this._isValidSession(t)?e=t:(this._debug(`#getSession()`,`session from storage is not valid`),await this._removeSession())),!e)return{data:{session:null},error:null};let n=e.expires_at?e.expires_at*1e3-Date.now()<Bn:!1;if(this._debug(`#__loadSession()`,`session has${n?``:` not`} expired`,`expires_at`,e.expires_at),!n){if(this.userStorage){let t=await U(this.userStorage,this.storageKey+`-user`);t?.user?e.user=t.user:e.user=Jr()}if(this.storage.isServer&&e.user&&!e.user.__isUserNotAvailableProxy){let t={value:this.suppressGetSessionWarning};e.user=Yr(e.user,t),t.value&&(this.suppressGetSessionWarning=!0)}return{data:{session:e},error:null}}let{data:r,error:i}=await this._callRefreshToken(e.refresh_token);if(i){if(e.expires_at&&e.expires_at*1e3>Date.now()){let t=await U(this.storage,this.storageKey);if(t&&t.refresh_token===e.refresh_token)return this._returnResult({data:{session:e},error:null})}return this._returnResult({data:{session:null},error:i})}return this._returnResult({data:{session:r},error:null})}finally{this._debug(`#__loadSession()`,`end`)}}async getUser(e){if(e)return await this._getUser(e);await this.initializePromise;let t;return t=this.lock==null?await this._getUser():await this._acquireLock(this.lockAcquireTimeout,async()=>await this._getUser()),t.data.user&&(this.suppressGetSessionWarning=!0),t}async _getUser(e){try{return e?await Y(this.fetch,`GET`,`${this.url}/user`,{headers:this.headers,jwt:e,xform:Z}):await this._useSession(async e=>{let{data:t,error:n}=e;if(n)throw n;return!t.session?.access_token&&!this.hasCustomAuthorizationHeader?{data:{user:null},error:new I}:await Y(this.fetch,`GET`,`${this.url}/user`,{headers:this.headers,jwt:t.session?.access_token??void 0,xform:Z})})}catch(e){if(N(e))return Jn(e)&&await this._removeSession(),this._returnResult({data:{user:null},error:e});throw e}}async updateUser(e,t={}){return await this.initializePromise,this.lock==null?await this._updateUser(e,t):await this._acquireLock(this.lockAcquireTimeout,async()=>await this._updateUser(e,t))}async _updateUser(e,t={}){let n=null;try{return await this._useSession(async r=>{let{data:i,error:a}=r;if(a)throw a;if(!i.session)throw new I;let o=i.session,s=null,c=null;this.flowType===`pkce`&&e.email!=null&&([s,c,n]=await this._getCodeChallengeAndMethod());let{data:l,error:u}=await Y(this.fetch,`PUT`,`${this.url}/user`,{headers:this.headers,redirectTo:this._maybeAppendFlowIdToRedirect(t?.emailRedirectTo,n),body:Object.assign(Object.assign({},e),{code_challenge:s,code_challenge_method:c}),jwt:o.access_token,xform:Z});if(u)throw u;return o.user=l.user,await this._saveSession(o),await this._notifyAllSubscribers(`USER_UPDATED`,o),this._returnResult({data:{user:o.user},error:null})})}catch(e){if(await G(this.storage,this.storageKey,n),N(e))return this._returnResult({data:{user:null},error:e});throw e}}async setSession(e){return await this.initializePromise,this.lock==null?await this._setSession(e):await this._acquireLock(this.lockAcquireTimeout,async()=>await this._setSession(e))}async _setSession(e){try{if(!e.access_token||!e.refresh_token)throw new I;let t=Date.now()/1e3,n=t,r=!0,i=null,{payload:a}=Tr(e.access_token);if(a.exp&&(n=a.exp,r=n<=t),r){let{data:t,error:n}=await this._callRefreshToken(e.refresh_token);if(n)return this._returnResult({data:{user:null,session:null},error:n});if(!t)return{data:{user:null,session:null},error:null};i=t}else{let{data:r,error:a}=await this._getUser(e.access_token);if(a)return this._returnResult({data:{user:null,session:null},error:a});i={access_token:e.access_token,refresh_token:e.refresh_token,user:r.user,token_type:`bearer`,expires_in:n-t,expires_at:n},await this._saveSession(i),await this._notifyAllSubscribers(`SIGNED_IN`,i)}return this._returnResult({data:{user:i.user,session:i},error:null})}catch(e){if(N(e))return this._returnResult({data:{session:null,user:null},error:e});throw e}}async refreshSession(e){return await this.initializePromise,this.lock==null?await this._refreshSession(e):await this._acquireLock(this.lockAcquireTimeout,async()=>await this._refreshSession(e))}async _refreshSession(e){try{return await this._useSession(async t=>{if(!e){let{data:n,error:r}=t;if(r)throw r;e=n.session??void 0}if(!e?.refresh_token)throw new I;let{data:n,error:r}=await this._callRefreshToken(e.refresh_token);return r?this._returnResult({data:{user:null,session:null},error:r}):n?this._returnResult({data:{user:n.user,session:n},error:null}):this._returnResult({data:{user:null,session:null},error:null})})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async _getSessionFromURL(e,t){try{if(!B())throw new Xn(`No browser detected.`);if(e.error||e.error_description||e.error_code)throw new Xn(e.error_description||`Error in URL with unspecified error_description`,{error:e.error||`unspecified_error`,code:e.error_code||`unspecified_code`});switch(t){case`implicit`:if(this.flowType===`pkce`)throw new Qn(`Not a valid PKCE flow url.`);break;case`pkce`:if(this.flowType===`implicit`)throw new Xn(`Not a valid implicit grant flow url.`);break;default:}if(t===`pkce`){if(this._debug(`#_initialize()`,`begin`,`is PKCE flow`,!0),!e.code)throw new Qn(`No code detected.`);let{data:t,error:n}=await this._exchangeCodeForSession(e.code,{flowId:e[M]});if(n)throw n;let r=new URL(window.location.href);return r.searchParams.delete(`code`),r.searchParams.delete(M),window.history.replaceState(window.history.state,``,r.toString()),{data:{session:t.session,redirectType:t.redirectType??null},error:null}}let{provider_token:n,provider_refresh_token:r,access_token:i,refresh_token:a,expires_in:o,expires_at:s,token_type:c}=e;if(!i||!o||!a||!c)throw new Xn(`No session defined in URL`);let l=Math.round(Date.now()/1e3),u=parseInt(o),d=l+u;s&&(d=parseInt(s));let f=d-l;f*1e3<=j&&console.warn(`@supabase/gotrue-js: Session as retrieved from URL expires in ${f}s, should have been closer to ${u}s`);let p=d-u;l-p>=120?console.warn(`@supabase/gotrue-js: Session as retrieved from URL was issued over 120s ago, URL could be stale`,p,d,l):l-p<0&&console.warn(`@supabase/gotrue-js: Session as retrieved from URL was issued in the future? Check the device clock for skew`,p,d,l);let{data:m,error:h}=await this._getUser(i);if(h)throw h;let g={provider_token:n,provider_refresh_token:r,access_token:i,expires_in:u,expires_at:d,refresh_token:a,token_type:c,user:m.user};return window.location.hash=``,this._debug(`#_getSessionFromURL()`,`clearing window.location.hash`),this._returnResult({data:{session:g,redirectType:e.type},error:null})}catch(e){if(N(e))return this._returnResult({data:{session:null,redirectType:null},error:e});throw e}}_isImplicitGrantCallback(e){return typeof this.detectSessionInUrl==`function`?this.detectSessionInUrl(new URL(window.location.href),e):!!(e.access_token||e.error||e.error_description||e.error_code)}async _isPKCECallback(e){if(!e.code)return!1;let t=Nr(e[M]);return t&&await U(this.storage,Fr(this.storageKey,t))?!0:!!await U(this.storage,`${this.storageKey}-code-verifier`)}async signOut(e={scope:`global`}){return await this.initializePromise,this.lock==null?await this._signOut(e):await this._acquireLock(this.lockAcquireTimeout,async()=>await this._signOut(e))}async _signOut({scope:e}={scope:`global`}){return await this._useSession(async t=>{let n=async()=>{await this._removeSession()},{data:r,error:i}=t;if(i&&!Jn(i))return this._returnResult({error:i});let a=r.session?.access_token;if(a){let{error:t}=await this.admin.signOut(a,e);if(t&&!(qn(t)&&(t.status===404||t.status===401||t.status===403)||Jn(t)))return e!==`others`&&await n(),this._returnResult({error:t})}return e!==`others`&&await n(),this._returnResult({error:null})})}onAuthStateChange(e){let t=yr(),n={id:t,callback:e,unsubscribe:()=>{this._debug(`#unsubscribe()`,`state change callback with id removed`,t),this.stateChangeEmitters.delete(t)}};return this._debug(`#onAuthStateChange()`,`registered callback with id`,t),this.stateChangeEmitters.set(t,n),(async()=>{await this.initializePromise,this.lock==null?await this._emitInitialSession(t):await this._acquireLock(this.lockAcquireTimeout,async()=>{this._emitInitialSession(t)})})(),{data:{subscription:n}}}async _emitInitialSession(e){return await this._useSession(async t=>{try{let{data:{session:n},error:r}=t;if(r)throw r;await this.stateChangeEmitters.get(e)?.callback(`INITIAL_SESSION`,n),this._debug(`INITIAL_SESSION`,`callback id`,e,`session`,n)}catch(t){await this.stateChangeEmitters.get(e)?.callback(`INITIAL_SESSION`,null),this._debug(`INITIAL_SESSION`,`callback id`,e,`error`,t),Jn(t)||nr(t)||qn(t)&&(t.code===`refresh_token_not_found`||t.code===`refresh_token_already_used`||t.code===`session_expired`)?console.warn(t):console.error(t)}})}async resetPasswordForEmail(e,t={}){let n=null,r=null,i=null;this.flowType===`pkce`&&([n,r,i]=await this._getCodeChallengeAndMethod(!0));try{return await Y(this.fetch,`POST`,`${this.url}/recover`,{body:{email:e,code_challenge:n,code_challenge_method:r,gotrue_meta_security:{captcha_token:t.captchaToken}},headers:this.headers,redirectTo:this._maybeAppendFlowIdToRedirect(t.redirectTo,i)})}catch(e){if(await G(this.storage,this.storageKey,i),N(e))return this._returnResult({data:null,error:e});throw e}}async getUserIdentities(){try{let{data:e,error:t}=await this.getUser();if(t)throw t;return this._returnResult({data:{identities:e.user.identities??[]},error:null})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async linkIdentity(e){return`token`in e?this.linkIdentityIdToken(e):this.linkIdentityOAuth(e)}async linkIdentityOAuth(e){let t=null;try{let{data:n,error:r}=await this._useSession(async n=>{let{data:r,error:i}=n;if(i)throw i;let{url:a,flowId:o}=await this._getUrlForProvider(`${this.url}/user/identities/authorize`,e.provider,{redirectTo:e.options?.redirectTo,scopes:e.options?.scopes,queryParams:e.options?.queryParams,skipBrowserRedirect:!0});return t=o,await Y(this.fetch,`GET`,a,{headers:this.headers,jwt:r.session?.access_token??void 0})});if(r)throw r;return B()&&!e.options?.skipBrowserRedirect&&window.location.assign(n?.url),this._returnResult({data:{provider:e.provider,url:n?.url,flowId:t},error:null})}catch(n){if(N(n))return this._returnResult({data:{provider:e.provider,url:null,flowId:t},error:n});throw n}}async linkIdentityIdToken(e){return await this._useSession(async t=>{try{let{error:n,data:{session:r}}=t;if(n)throw n;let{options:i,provider:a,token:o,access_token:s,nonce:c}=e,{data:l,error:u}=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=id_token`,{headers:this.headers,jwt:r?.access_token??void 0,body:{provider:a,id_token:o,access_token:s,nonce:c,link_identity:!0,gotrue_meta_security:{captcha_token:i?.captchaToken}},xform:X});return u?this._returnResult({data:{user:null,session:null},error:u}):!l||!l.session||!l.user?this._returnResult({data:{user:null,session:null},error:new L}):(l.session&&(await this._saveSession(l.session),await this._notifyAllSubscribers(`USER_UPDATED`,l.session)),this._returnResult({data:l,error:u}))}catch(e){if(await G(this.storage,this.storageKey,null),N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}})}async unlinkIdentity(e){try{return await this._useSession(async t=>{let{data:n,error:r}=t;if(r)throw r;return await Y(this.fetch,`DELETE`,`${this.url}/user/identities/${e.identity_id}`,{headers:this.headers,jwt:n.session?.access_token??void 0})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _refreshAccessToken(e){let t=`#_refreshAccessToken()`;this._debug(t,`begin`);try{let n=Date.now();return await Dr(async n=>(n>0&&await Er(200*2**(n-1)),this._debug(t,`refreshing attempt`,n),await Y(this.fetch,`POST`,`${this.url}/token?grant_type=refresh_token`,{body:{refresh_token:e},headers:this.headers,xform:X})),(e,t)=>{let r=200*2**e;return t&&nr(t)&&Date.now()+r-n<j})}catch(e){if(this._debug(t,`error`,e),N(e))return this._returnResult({data:{session:null,user:null},error:e});throw e}finally{this._debug(t,`end`)}}_isValidSession(e){return typeof e==`object`&&!!e&&`access_token`in e&&`refresh_token`in e&&`expires_at`in e}async _handleProviderSignIn(e,t){let{url:n,flowId:r}=await this._getUrlForProvider(`${this.url}/authorize`,e,{redirectTo:t.redirectTo,scopes:t.scopes,queryParams:t.queryParams});return this._debug(`#_handleProviderSignIn()`,`provider`,e,`options`,t,`url`,n),B()&&!t.skipBrowserRedirect&&window.location.assign(n),{data:{provider:e,url:n,flowId:r},error:null}}async _recoverAndRefresh(){let e=`#_recoverAndRefresh()`;this._debug(e,`begin`);try{let t=await U(this.storage,this.storageKey);if(t&&this.userStorage){let e=await U(this.userStorage,this.storageKey+`-user`);!this.storage.isServer&&Object.is(this.storage,this.userStorage)&&!e&&(e={user:t.user},await H(this.userStorage,this.storageKey+`-user`,e)),t.user=e?.user??Jr()}else if(t&&!t.user&&!t.user){let e=await U(this.storage,this.storageKey+`-user`);e&&e?.user?(t.user=e.user,await W(this.storage,this.storageKey+`-user`),await H(this.storage,this.storageKey,t)):t.user=Jr()}if(this._debug(e,`session from storage`,t),!this._isValidSession(t)){this._debug(e,`session is not valid`),t!==null&&await this._removeSession();return}let n=(t.expires_at??1/0)*1e3-Date.now()<Bn;if(this._debug(e,`session has${n?``:` not`} expired with margin of ${Bn}s`),n){if(this.autoRefreshToken&&t.refresh_token){let{error:n}=await this._callRefreshToken(t.refresh_token);n&&(ir(n)?this._debug(e,`refresh discarded by commit guard`,n):this._debug(e,`refresh failed`,n))}}else if(t.user&&t.user.__isUserNotAvailableProxy===!0)try{let{data:n,error:r}=await this._getUser(t.access_token);!r&&n?.user?(t.user=n.user,await this._saveSession(t),await this._notifyAllSubscribers(`SIGNED_IN`,t)):this._debug(e,`could not get user data, skipping SIGNED_IN notification`)}catch(t){console.error(`Error getting user data:`,t),this._debug(e,`error getting user data, skipping SIGNED_IN notification`,t)}else await this._notifyAllSubscribers(`SIGNED_IN`,t)}catch(t){this._debug(e,`error`,t),nr(t)?console.warn(t):console.error(t);return}finally{this._debug(e,`end`)}}async _callRefreshToken(e){var t,n;if(!e)throw new I;if(this.refreshingDeferred)return this.refreshingDeferred.promise;if(this.lastRefreshFailure&&this.lastRefreshFailure.refreshToken===e&&Date.now()<this.lastRefreshFailure.expiresAt)return this._debug(`#_callRefreshToken()`,`returning cached failure (cooldown active)`),this.lastRefreshFailure.result;let r=`#_callRefreshToken()`;this._debug(r,`begin`);try{this.refreshingDeferred=new wr;let t=await U(this.storage,this.storageKey),{data:n,error:i}=await this._refreshAccessToken(e);if(i)throw i;if(!n.session)throw new I;let a=await U(this.storage,this.storageKey);if(t!==null&&(a===null||a.refresh_token!==t.refresh_token)){this._debug(r,`commit guard: storage changed since refresh started, discarding rotated tokens`,{startedWith:`present`,nowHolds:a?`replaced`:`cleared`});let e={data:null,error:new rr};return this.refreshingDeferred.resolve(e),e}let o=this._sessionRemovalEpoch;if(await this._saveSession(n.session),this._sessionRemovalEpoch!==o){this._debug(r,`commit guard (post-save): _removeSession ran during _saveSession, undoing write`),await W(this.storage,this.storageKey),this.userStorage&&await W(this.userStorage,this.storageKey+`-user`);let e={data:null,error:new rr};return this.refreshingDeferred.resolve(e),e}await this._notifyAllSubscribers(`TOKEN_REFRESHED`,n.session);let s={data:n.session,error:null};return this.lastRefreshFailure=null,this.refreshingDeferred.resolve(s),s}catch(i){if(this._debug(r,`error`,i),N(i)){let n={data:null,error:i};if(!nr(i)){let e=await U(this.storage,this.storageKey);e?.expires_at&&e.expires_at*1e3>Date.now()?this._debug(r,`proactive refresh failed, access token still valid — preserving session`):await this._removeSession()}return this.lastRefreshFailure={refreshToken:e,result:n,expiresAt:Date.now()+6e4},(t=this.refreshingDeferred)==null||t.resolve(n),n}throw(n=this.refreshingDeferred)==null||n.reject(i),i}finally{this.refreshingDeferred=null,this._debug(r,`end`)}}async _notifyAllSubscribers(e,t,n=!0){if(this._pendingInitNotifications!==null&&n){this._pendingInitNotifications.push({event:e,session:t,broadcast:n});return}let r=`#_notifyAllSubscribers(${e})`;this._debug(r,`begin`,t,`broadcast = ${n}`);try{this.broadcastChannel&&n&&this.broadcastChannel.postMessage({event:e,session:t});let r=[],i=Array.from(this.stateChangeEmitters.values()).map(async n=>{try{await n.callback(e,t)}catch(e){r.push(e)}});if(await Promise.all(i),r.length>0){for(let e=0;e<r.length;e+=1)console.error(r[e]);throw r[0]}}finally{this._debug(r,`end`)}}async _saveSession(e){this._debug(`#_saveSession()`,e),this.suppressGetSessionWarning=!0;let t=Object.assign({},e),n=t.user&&t.user.__isUserNotAvailableProxy===!0;if(this.userStorage){!n&&t.user&&await H(this.userStorage,this.storageKey+`-user`,{user:t.user});let e=Object.assign({},t);delete e.user;let r=Xr(e);await H(this.storage,this.storageKey,r)}else{let e=Xr(t);await H(this.storage,this.storageKey,e)}}async _removeSession(){this._sessionRemovalEpoch+=1,this._debug(`#_removeSession()`),this.lastRefreshFailure=null,this.suppressGetSessionWarning=!1,await W(this.storage,this.storageKey),await Br(this.storage,this.storageKey),await W(this.storage,this.storageKey+`-user`),this.userStorage&&await W(this.userStorage,this.storageKey+`-user`),await this._notifyAllSubscribers(`SIGNED_OUT`,null)}_removeVisibilityChangedCallback(){this._debug(`#_removeVisibilityChangedCallback()`);let e=this.visibilityChangedCallback;this.visibilityChangedCallback=null;try{e&&B()&&window!=null&&window.removeEventListener&&window.removeEventListener(`visibilitychange`,e)}catch(e){console.error(`removing visibilitychange callback failed`,e)}}async _startAutoRefresh(){await this._stopAutoRefresh(),this._debug(`#_startAutoRefresh()`);let e=setInterval(()=>this._autoRefreshTokenTick(),j);this.autoRefreshTicker=e,e&&typeof e==`object`&&typeof e.unref==`function`?e.unref():typeof Deno<`u`&&typeof Deno.unrefTimer==`function`&&Deno.unrefTimer(e);let t=setTimeout(async()=>{await this.initializePromise,await this._autoRefreshTokenTick()},0);this.autoRefreshTickTimeout=t,t&&typeof t==`object`&&typeof t.unref==`function`?t.unref():typeof Deno<`u`&&typeof Deno.unrefTimer==`function`&&Deno.unrefTimer(t)}async _stopAutoRefresh(){this._debug(`#_stopAutoRefresh()`);let e=this.autoRefreshTicker;this.autoRefreshTicker=null,e&&clearInterval(e);let t=this.autoRefreshTickTimeout;this.autoRefreshTickTimeout=null,t&&clearTimeout(t)}async startAutoRefresh(){this._removeVisibilityChangedCallback(),await this._startAutoRefresh()}async stopAutoRefresh(){this._removeVisibilityChangedCallback(),await this._stopAutoRefresh()}async dispose(){var e;this._removeVisibilityChangedCallback(),await this._stopAutoRefresh(),(e=this.broadcastChannel)==null||e.close(),this.broadcastChannel=null,this.stateChangeEmitters.clear()}async _autoRefreshTokenTick(){if(this._debug(`#_autoRefreshTokenTick()`,`begin`),this.lock!=null){try{await this._acquireLock(0,async()=>{try{let e=Date.now();try{return await this._useSession(async t=>{let{data:{session:n}}=t;if(!n||!n.refresh_token||!n.expires_at){this._debug(`#_autoRefreshTokenTick()`,`no session`);return}let r=Math.floor((n.expires_at*1e3-e)/j);this._debug(`#_autoRefreshTokenTick()`,`access token expires in ${r} ticks, a tick lasts ${j}ms, refresh threshold is 3 ticks`),r<=3&&await this._callRefreshToken(n.refresh_token)})}catch(e){console.error(`Auto refresh tick failed with error. This is likely a transient error.`,e)}}finally{this._debug(`#_autoRefreshTokenTick()`,`end`)}})}catch(e){if(e instanceof li)this._debug(`auto refresh token tick lock not available`);else throw e}return}if(this.refreshingDeferred!==null){this._debug(`#_autoRefreshTokenTick()`,`refresh already in flight, skipping`);return}try{let e=Date.now();try{await this._useSession(async t=>{let{data:{session:n}}=t;if(!n||!n.refresh_token||!n.expires_at){this._debug(`#_autoRefreshTokenTick()`,`no session`);return}let r=Math.floor((n.expires_at*1e3-e)/j);this._debug(`#_autoRefreshTokenTick()`,`access token expires in ${r} ticks, a tick lasts ${j}ms, refresh threshold is 3 ticks`),r<=3&&await this._callRefreshToken(n.refresh_token)})}catch(e){console.error(`Auto refresh tick failed with error. This is likely a transient error.`,e)}}finally{this._debug(`#_autoRefreshTokenTick()`,`end`)}}async _handleVisibilityChange(){if(this._debug(`#_handleVisibilityChange()`),!B()||!(window!=null&&window.addEventListener))return this.autoRefreshToken&&this.startAutoRefresh(),!1;try{this.visibilityChangedCallback=async()=>{try{await this._onVisibilityChanged(!1)}catch(e){this._debug(`#visibilityChangedCallback`,`error`,e)}},window==null||window.addEventListener(`visibilitychange`,this.visibilityChangedCallback),await this._onVisibilityChanged(!0)}catch(e){console.error(`_handleVisibilityChange`,e)}}async _onVisibilityChanged(e){let t=`#_onVisibilityChanged(${e})`;if(this._debug(t,`visibilityState`,document.visibilityState),document.visibilityState===`visible`){if(this.autoRefreshToken&&this._startAutoRefresh(),!e)if(await this.initializePromise,this.lock!=null)await this._acquireLock(this.lockAcquireTimeout,async()=>{if(document.visibilityState!==`visible`){this._debug(t,`acquired the lock to recover the session, but the browser visibilityState is no longer visible, aborting`);return}await this._recoverAndRefresh()});else{if(document.visibilityState!==`visible`){this._debug(t,`visibilityState is no longer visible, skipping recovery`);return}await this._recoverAndRefresh()}}else document.visibilityState===`hidden`&&this.autoRefreshToken&&this._stopAutoRefresh()}async _getUrlForProvider(e,t,n){let r=n?.redirectTo,i=null,a=null,o=null;this.flowType===`pkce`&&([i,a,o]=await this._getCodeChallengeAndMethod(),r=this._maybeAppendFlowIdToRedirect(r,o));let s=[`provider=${encodeURIComponent(t)}`];if(r&&s.push(`redirect_to=${encodeURIComponent(r)}`),n?.scopes&&s.push(`scopes=${encodeURIComponent(n.scopes)}`),i!=null&&a!=null){let e=new URLSearchParams({code_challenge:`${encodeURIComponent(i)}`,code_challenge_method:`${encodeURIComponent(a)}`});s.push(e.toString())}if(n?.queryParams){let e=new URLSearchParams(n.queryParams);s.push(e.toString())}return n?.skipBrowserRedirect&&s.push(`skip_http_redirect=${n.skipBrowserRedirect}`),{url:`${e}?${s.join(`&`)}`,flowId:o}}_maybeAppendFlowIdToRedirect(e,t){return!e||!t||!this.experimental.appendPkceFlowIdToRedirects?e??void 0:Vr(e,t)}async _getCodeChallengeAndMethod(e=!1){return Hr(this.storage,this.storageKey,e,e=>this._debug(`#_getCodeChallengeAndMethod()`,`evicted oldest pending PKCE verifier slot`,e))}async _unenroll(e){try{return await this._useSession(async t=>{let{data:n,error:r}=t;return r?this._returnResult({data:null,error:r}):await Y(this.fetch,`DELETE`,`${this.url}/factors/${e.factorId}`,{headers:this.headers,jwt:n?.session?.access_token})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _enroll(e){try{return await this._useSession(async t=>{let{data:n,error:r}=t;if(r)return this._returnResult({data:null,error:r});let i=Object.assign({friendly_name:e.friendlyName,factor_type:e.factorType},e.factorType===`phone`?{phone:e.phone}:e.factorType===`totp`?{issuer:e.issuer}:{}),{data:a,error:o}=await Y(this.fetch,`POST`,`${this.url}/factors`,{body:i,headers:this.headers,jwt:n?.session?.access_token});return o?this._returnResult({data:null,error:o}):(e.factorType===`totp`&&a.type===`totp`&&a?.totp?.qr_code&&(a.totp.qr_code=`data:image/svg+xml;utf-8,${a.totp.qr_code}`),this._returnResult({data:a,error:null}))})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _verify(e){let t=async()=>{try{return await this._useSession(async t=>{let{data:n,error:r}=t;if(r)return this._returnResult({data:null,error:r});let i=Object.assign({challenge_id:e.challengeId},`webauthn`in e?{webauthn:Object.assign(Object.assign({},e.webauthn),{credential_response:e.webauthn.type===`create`?Ei(e.webauthn.credential_response):Di(e.webauthn.credential_response)})}:{code:e.code}),{data:a,error:o}=await Y(this.fetch,`POST`,`${this.url}/factors/${e.factorId}/verify`,{body:i,headers:this.headers,jwt:n?.session?.access_token});return o?this._returnResult({data:null,error:o}):(await this._saveSession(Object.assign({expires_at:Math.round(Date.now()/1e3)+a.expires_in},a)),await this._notifyAllSubscribers(`MFA_CHALLENGE_VERIFIED`,a),this._returnResult({data:a,error:o}))})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}};return this.lock==null?t():this._acquireLock(this.lockAcquireTimeout,t)}async _challenge(e){let t=async()=>{try{return await this._useSession(async t=>{let{data:n,error:r}=t;if(r)return this._returnResult({data:null,error:r});let i=await Y(this.fetch,`POST`,`${this.url}/factors/${e.factorId}/challenge`,{body:e,headers:this.headers,jwt:n?.session?.access_token});if(i.error)return i;let{data:a}=i;if(a.type!==`webauthn`)return{data:a,error:null};switch(a.webauthn.type){case`create`:return{data:Object.assign(Object.assign({},a),{webauthn:Object.assign(Object.assign({},a.webauthn),{credential_options:Object.assign(Object.assign({},a.webauthn.credential_options),{publicKey:wi(a.webauthn.credential_options.publicKey)})})}),error:null};case`request`:return{data:Object.assign(Object.assign({},a),{webauthn:Object.assign(Object.assign({},a.webauthn),{credential_options:Object.assign(Object.assign({},a.webauthn.credential_options),{publicKey:Ti(a.webauthn.credential_options.publicKey)})})}),error:null}}})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}};return this.lock==null?t():this._acquireLock(this.lockAcquireTimeout,t)}async _challengeAndVerify(e){let{data:t,error:n}=await this._challenge({factorId:e.factorId});return n?this._returnResult({data:null,error:n}):await this._verify({factorId:e.factorId,challengeId:t.id,code:e.code})}async _listFactors(){let{data:{user:e},error:t}=await this.getUser();if(t)return{data:null,error:t};let n={all:[],phone:[],totp:[],webauthn:[]};for(let t of e?.factors??[])n.all.push(t),t.status===`verified`&&n[t.factor_type].push(t);return{data:n,error:null}}async _getAuthenticatorAssuranceLevel(e){if(e)try{let{payload:t}=Tr(e),n=null;t.aal&&(n=t.aal);let r=n,{data:{user:i},error:a}=await this.getUser(e);if(a)return this._returnResult({data:null,error:a});((i?.factors)?.filter(e=>e.status===`verified`)??[]).length>0&&(r=`aal2`);let o=t.amr||[];return{data:{currentLevel:n,nextLevel:r,currentAuthenticationMethods:o},error:null}}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}let{data:{session:t},error:n}=await this.getSession();if(n)return this._returnResult({data:null,error:n});if(!t)return{data:{currentLevel:null,nextLevel:null,currentAuthenticationMethods:[]},error:null};let{payload:r}=Tr(t.access_token),i=null;r.aal&&(i=r.aal);let a=i;(t.user.factors?.filter(e=>e.status===`verified`)??[]).length>0&&(a=`aal2`);let o=r.amr||[];return{data:{currentLevel:i,nextLevel:a,currentAuthenticationMethods:o},error:null}}async _getAuthorizationDetails(e){try{return await this._useSession(async t=>{let{data:{session:n},error:r}=t;return r?this._returnResult({data:null,error:r}):n?await Y(this.fetch,`GET`,`${this.url}/oauth/authorizations/${e}`,{headers:this.headers,jwt:n.access_token,xform:e=>({data:e,error:null})}):this._returnResult({data:null,error:new I})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _approveAuthorization(e,t){try{return await this._useSession(async n=>{let{data:{session:r},error:i}=n;if(i)return this._returnResult({data:null,error:i});if(!r)return this._returnResult({data:null,error:new I});let a=await Y(this.fetch,`POST`,`${this.url}/oauth/authorizations/${e}/consent`,{headers:this.headers,jwt:r.access_token,body:{action:`approve`},xform:e=>({data:e,error:null})});return a.data&&a.data.redirect_url&&B()&&!t?.skipBrowserRedirect&&window.location.assign(a.data.redirect_url),a})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _denyAuthorization(e,t){try{return await this._useSession(async n=>{let{data:{session:r},error:i}=n;if(i)return this._returnResult({data:null,error:i});if(!r)return this._returnResult({data:null,error:new I});let a=await Y(this.fetch,`POST`,`${this.url}/oauth/authorizations/${e}/consent`,{headers:this.headers,jwt:r.access_token,body:{action:`deny`},xform:e=>({data:e,error:null})});return a.data&&a.data.redirect_url&&B()&&!t?.skipBrowserRedirect&&window.location.assign(a.data.redirect_url),a})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _listOAuthGrants(){try{return await this._useSession(async e=>{let{data:{session:t},error:n}=e;return n?this._returnResult({data:null,error:n}):t?await Y(this.fetch,`GET`,`${this.url}/user/oauth/grants`,{headers:this.headers,jwt:t.access_token,xform:e=>({data:e,error:null})}):this._returnResult({data:null,error:new I})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _revokeOAuthGrant(e){try{return await this._useSession(async t=>{let{data:{session:n},error:r}=t;return r?this._returnResult({data:null,error:r}):n?(await Y(this.fetch,`DELETE`,`${this.url}/user/oauth/grants`,{headers:this.headers,jwt:n.access_token,query:{client_id:e.clientId},noResolveJson:!0}),{data:{},error:null}):this._returnResult({data:null,error:new I})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async fetchJwk(e,t={keys:[]}){let n=t.keys.find(t=>t.kid===e);if(n)return n;let r=Date.now();if(n=this.jwks.keys.find(t=>t.kid===e),n&&this.jwks_cached_at+6e5>r)return n;let{data:i,error:a}=await Y(this.fetch,`GET`,`${this.url}/.well-known/jwks.json`,{headers:this.headers});if(a)throw a;return!i.keys||i.keys.length===0||(this.jwks=i,this.jwks_cached_at=r,n=i.keys.find(t=>t.kid===e),!n)?null:n}async getClaims(e,t={}){try{let n=e;if(!n){let{data:e,error:t}=await this.getSession();if(t||!e.session)return this._returnResult({data:null,error:t});n=e.session.access_token}let{header:r,payload:i,signature:a,raw:{header:o,payload:s}}=Tr(n);if(!t?.allowExpired)try{Gr(i.exp)}catch(e){throw new sr(e instanceof Error?e.message:`JWT validation failed`)}let c=!r.alg||r.alg.startsWith(`HS`)||!r.kid||!(`crypto`in globalThis&&`subtle`in globalThis.crypto)?null:await this.fetchJwk(r.kid,t?.keys?{keys:t.keys}:t?.jwks);if(!c){let{error:e}=await this.getUser(n);if(e)throw e;return{data:{claims:i,header:r,signature:a},error:null}}let l=Kr(r.alg),u=await crypto.subtle.importKey(`jwk`,c,l,!0,[`verify`]);if(!await crypto.subtle.verify(l,u,a,_r(`${o}.${s}`)))throw new sr(`Invalid JWT signature`);return{data:{claims:i,header:r,signature:a},error:null}}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async signInWithPasskey(e){q(this.experimental);try{if(!ki())return this._returnResult({data:null,error:new P(`Browser does not support WebAuthn`,null)});let{data:t,error:n}=await this._startPasskeyAuthentication({options:{captchaToken:e?.options?.captchaToken}});if(n||!t)return this._returnResult({data:null,error:n});let{data:r,error:i}=await ji({publicKey:Ti(t.options),signal:e?.options?.signal??Ci.createNewAbortSignal()});if(i||!r)return this._returnResult({data:null,error:i??new P(`WebAuthn ceremony failed`,null)});let a=Di(r);return this._verifyPasskeyAuthentication({challengeId:t.challenge_id,credential:a})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async registerPasskey(e){q(this.experimental);try{if(!ki())return this._returnResult({data:null,error:new P(`Browser does not support WebAuthn`,null)});let{data:t,error:n}=await this._startPasskeyRegistration();if(n||!t)return this._returnResult({data:null,error:n});let{data:r,error:i}=await Ai({publicKey:wi(t.options),signal:e?.options?.signal??Ci.createNewAbortSignal()});if(i||!r)return this._returnResult({data:null,error:i??new P(`WebAuthn ceremony failed`,null)});let a=Ei(r);return this._verifyPasskeyRegistration({challengeId:t.challenge_id,credential:a})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _startPasskeyRegistration(){q(this.experimental);try{return await this._useSession(async e=>{let{data:{session:t},error:n}=e;if(n)return this._returnResult({data:null,error:n});if(!t)return this._returnResult({data:null,error:new I});let{data:r,error:i}=await Y(this.fetch,`POST`,`${this.url}/passkeys/registration/options`,{headers:this.headers,jwt:t.access_token,body:{}});return i?this._returnResult({data:null,error:i}):this._returnResult({data:r,error:null})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _verifyPasskeyRegistration(e){q(this.experimental);try{return await this._useSession(async t=>{let{data:{session:n},error:r}=t;if(r)return this._returnResult({data:null,error:r});if(!n)return this._returnResult({data:null,error:new I});let{data:i,error:a}=await Y(this.fetch,`POST`,`${this.url}/passkeys/registration/verify`,{headers:this.headers,jwt:n.access_token,body:{challenge_id:e.challengeId,credential:e.credential}});return a?this._returnResult({data:null,error:a}):this._returnResult({data:i,error:null})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _startPasskeyAuthentication(e){q(this.experimental);try{let{data:t,error:n}=await Y(this.fetch,`POST`,`${this.url}/passkeys/authentication/options`,{headers:this.headers,body:{gotrue_meta_security:{captcha_token:e?.options?.captchaToken}}});return n?this._returnResult({data:null,error:n}):this._returnResult({data:t,error:null})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _verifyPasskeyAuthentication(e){q(this.experimental);try{let{data:t,error:n}=await Y(this.fetch,`POST`,`${this.url}/passkeys/authentication/verify`,{headers:this.headers,body:{challenge_id:e.challengeId,credential:e.credential},xform:X});return n?this._returnResult({data:null,error:n}):(t.session&&(await this._saveSession(t.session),await this._notifyAllSubscribers(`SIGNED_IN`,t.session)),this._returnResult({data:t,error:null}))}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _listPasskeys(){q(this.experimental);try{return await this._useSession(async e=>{let{data:{session:t},error:n}=e;if(n)return this._returnResult({data:null,error:n});if(!t)return this._returnResult({data:null,error:new I});let{data:r,error:i}=await Y(this.fetch,`GET`,`${this.url}/passkeys`,{headers:this.headers,jwt:t.access_token,xform:e=>({data:e,error:null})});return i?this._returnResult({data:null,error:i}):this._returnResult({data:r,error:null})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _updatePasskey(e){q(this.experimental);try{return await this._useSession(async t=>{let{data:{session:n},error:r}=t;if(r)return this._returnResult({data:null,error:r});if(!n)return this._returnResult({data:null,error:new I});let{data:i,error:a}=await Y(this.fetch,`PATCH`,`${this.url}/passkeys/${e.passkeyId}`,{headers:this.headers,jwt:n.access_token,body:{friendly_name:e.friendlyName}});return a?this._returnResult({data:null,error:a}):this._returnResult({data:i,error:null})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _deletePasskey(e){q(this.experimental);try{return await this._useSession(async t=>{let{data:{session:n},error:r}=t;if(r)return this._returnResult({data:null,error:r});if(!n)return this._returnResult({data:null,error:new I});let{error:i}=await Y(this.fetch,`DELETE`,`${this.url}/passkeys/${e.passkeyId}`,{headers:this.headers,jwt:n.access_token,noResolveJson:!0});return i?this._returnResult({data:null,error:i}):this._returnResult({data:null,error:null})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}};Bi.nextInstanceID={};var Vi=Bi,Hi=si,Ui=Vi,Wi=class extends Ui{constructor(e){super(e)}},Gi=class{constructor(e,t,n){this.supabaseUrl=e,this.supabaseKey=t;let r=Rn(e);if(!t)throw Error(`supabaseKey is required.`);jn(t),this.realtimeUrl=new URL(`realtime/v1`,r),this.realtimeUrl.protocol=this.realtimeUrl.protocol.replace(`http`,`ws`),this.authUrl=new URL(`auth/v1`,r),this.storageUrl=new URL(`storage/v1`,r),this.functionsUrl=new URL(`functions/v1`,r);let i=`sb-${r.hostname.split(`.`)[0]}-auth-token`,a={db:_n,realtime:yn,auth:{...vn,storageKey:i},global:gn,tracePropagation:bn},o=Ln(n??{},a);this.settings=o,this.storageKey=o.auth.storageKey??``,this.headers=o.global.headers??{},o.accessToken?(this.accessToken=o.accessToken,this.auth=new Proxy({},{get:(e,t)=>{throw Error(`@supabase/supabase-js: Supabase Client is configured with the accessToken option, accessing supabase.auth.${String(t)} is not possible`)}})):this.auth=this._initSupabaseAuthClient(o.auth??{},this.headers,o.global.fetch),this.fetch=Mn(t,e,this._getSessionToken.bind(this),o.global.fetch,o.tracePropagation),this.functionsFetch=Mn(t,e,this._getSessionToken.bind(this),o.global.fetch,o.tracePropagation,{omitApiKeyAsBearer:!0}),this.realtime=this._initRealtimeClient({headers:this.headers,accessToken:this._getAccessToken.bind(this),fetch:this.fetch,...o.realtime}),this.accessToken&&Promise.resolve(this.accessToken()).then(e=>this.realtime.setAuth(e)).catch(e=>console.warn(`Failed to set initial Realtime auth token:`,e)),this.rest=new le(new URL(`rest/v1`,r).href,{headers:this.headers,schema:o.db.schema,fetch:this.fetch,timeout:o.db.timeout,urlLengthLimit:o.db.urlLengthLimit,retry:o.db.retry}),this.storage=new fn(this.storageUrl.href,this.headers,this.fetch,n?.storage),o.accessToken||this._listenForAuthEvents()}get functions(){return new l(this.functionsUrl.href,{headers:this.headers,customFetch:this.functionsFetch})}from(e){return this.rest.from(e)}schema(e){return this.rest.schema(e)}rpc(e,t={},n={head:!1,get:!1,count:void 0}){return this.rest.rpc(e,t,n)}channel(e,t={config:{}}){return this.realtime.channel(e,t)}getChannels(){return this.realtime.getChannels()}removeChannel(e){return this.realtime.removeChannel(e)}removeAllChannels(){return this.realtime.removeAllChannels()}async _getSessionToken(){if(this.accessToken)return await this.accessToken();let{data:e}=await this.auth.getSession();return e.session?.access_token??null}async _getAccessToken(){return await this._getSessionToken()??this.supabaseKey}_initSupabaseAuthClient({autoRefreshToken:e,persistSession:t,detectSessionInUrl:n,storage:r,userStorage:i,storageKey:a,flowType:o,lock:s,debug:c,throwOnError:l,experimental:u,lockAcquireTimeout:d,skipAutoInitialize:f},p,m){let h={Authorization:`Bearer ${this.supabaseKey}`,apikey:`${this.supabaseKey}`};return new Wi({url:this.authUrl.href,headers:{...h,...p},storageKey:a,autoRefreshToken:e,persistSession:t,detectSessionInUrl:n,storage:r,userStorage:i,flowType:o,lock:s,debug:c,throwOnError:l,experimental:u,fetch:m,lockAcquireTimeout:d,skipAutoInitialize:f,hasCustomAuthorizationHeader:Object.keys(this.headers).some(e=>e.toLowerCase()===`authorization`)})}_initRealtimeClient(e){return new ht(this.realtimeUrl.href,{...e,params:{apikey:this.supabaseKey,...e?.params}})}_listenForAuthEvents(){return this.auth.onAuthStateChange((e,t)=>{this._handleTokenChanged(e,`CLIENT`,t?.access_token)})}_handleTokenChanged(e,t,n){(e===`TOKEN_REFRESHED`||e===`SIGNED_IN`||e===`INITIAL_SESSION`)&&this.changedAccessToken!==n?(this.changedAccessToken=n,this.realtime.setAuth(n)):e===`SIGNED_OUT`&&(this.realtime.setAuth(),t==`STORAGE`&&this.auth.signOut(),this.changedAccessToken=void 0)}};let Ki=(e,t,n)=>new Gi(e,t,n);function qi(){if(typeof window<`u`||globalThis.Deno!==void 0)return!1;let e=globalThis.process;if(!e)return!1;let t=e.version;if(t==null)return!1;let n=t.match(/^v(\d+)\./);return n?parseInt(n[1],10)<=20:!1}return qi()&&console.warn(`⚠️  Node.js 20 and below are deprecated and will no longer be supported in future versions of @supabase/supabase-js. Please upgrade to Node.js 22 or later. For more information, visit: https://github.com/orgs/supabase/discussions/45715`),e.AuthAdminApi=Hi,e.AuthApiError=Kn,e.AuthClient=Ui,e.AuthError=Gn,e.AuthImplicitGrantRedirectError=Xn,e.AuthInvalidCredentialsError=Yn,e.AuthInvalidJwtError=sr,e.AuthInvalidTokenResponseError=L,e.AuthPKCECodeVerifierMissingError=$n,e.AuthPKCEGrantCodeExchangeError=Qn,e.AuthRefreshDiscardedError=rr,e.AuthRetryableFetchError=tr,e.AuthSessionMissingError=I,e.AuthUnknownError=P,e.AuthWeakPasswordError=ar,e.CustomAuthError=F,Object.defineProperty(e,`FunctionRegion`,{enumerable:!0,get:function(){return c}}),e.FunctionsError=i,e.FunctionsFetchError=a,e.FunctionsHttpError=s,e.FunctionsRelayError=o,e.GoTrueAdminApi=si,e.GoTrueClient=Vi,e.NavigatorLockAcquireTimeoutError=ui,e.PostgrestError=p,e.REALTIME_CHANNEL_STATES=ct,Object.defineProperty(e,`REALTIME_LISTEN_TYPES`,{enumerable:!0,get:function(){return w}}),Object.defineProperty(e,`REALTIME_POSTGRES_CHANGES_LISTEN_EVENT`,{enumerable:!0,get:function(){return st}}),Object.defineProperty(e,`REALTIME_PRESENCE_LISTEN_EVENTS`,{enumerable:!0,get:function(){return Je}}),Object.defineProperty(e,`REALTIME_SUBSCRIBE_STATES`,{enumerable:!0,get:function(){return T}}),e.RealtimeChannel=lt,e.RealtimeClient=ht,e.RealtimePostgresFilterBuilder=at,e.RealtimePresence=Ye,e.SIGN_OUT_SCOPES=oi,e.StorageApiError=jt,e.SupabaseClient=Gi,e.WebSocketFactory=ue,e.createClient=Ki,e.isAuthApiError=qn,e.isAuthError=N,e.isAuthImplicitGrantRedirectError=Zn,e.isAuthPKCECodeVerifierMissingError=er,e.isAuthRefreshDiscardedError=ir,e.isAuthRetryableFetchError=nr,e.isAuthSessionMissingError=Jn,e.isAuthWeakPasswordError=or,e.lockInternals=Q,e.navigatorLock=fi,e.postgresChangesFilter=ot,e.processLock=mi,e})({});</script>
-<script>window.require=function(m){if(m==="react")return window.React;if(m==="recharts")return window.Recharts;throw new Error("Cannot require "+m);};</script>
+<script>window.require=function(m){if(m==="react")return window.React;if(m==="recharts")return window.Recharts;throw new Error("Cannot find module "+m);};</script>
 <script>
 (() => {
   var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
@@ -1738,7 +1738,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const v = { primary: { background: "#6366f1", color: "#fff" }, ghost: { background: "transparent", color: "#9ca3af", border: "1px solid #1f2937" }, danger: { background: "#ef444418", color: "#ef4444", border: "1px solid #ef444430" }, success: { background: "#10b98118", color: "#10b981", border: "1px solid #10b98130" } };
     return /* @__PURE__ */ React.createElement("button", { onClick: disabled ? void 0 : onClick, style: { ...base, ...v[variant] || v.primary } }, children);
   };
-  var SH = ({ label, action }) => /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" } }, label), action);
+  var SH = ({ label, action, desc }) => /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: desc ? "flex-start" : "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" } }, label), desc && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#5b6472", marginTop: 3, textTransform: "none", letterSpacing: "normal", fontFamily: "inherit" } }, desc)), action);
   var LW = ({ label, children, style: s = {} }) => /* @__PURE__ */ React.createElement("div", { style: { ...s } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 5 } }, label), children);
   var StableInp = ({ value = "", onChange, style: s = {}, textarea, ...p }) => {
     const [local, setLocal] = (0, import_react.useState)(String(value || ""));
@@ -4846,6 +4846,10 @@ Brief content: ${content}`;
         onOpenProductionTab: () => setActiveTab("production"),
         onUpdateProject,
         onUpdateDel,
+        onGoToDeliverable: (delId) => {
+          setActiveTab("deliverables");
+          setActiveDelModal(delId);
+        },
         reviewerNames,
         addReviewerName,
         workReviewSessions,
@@ -4856,14 +4860,21 @@ Brief content: ${content}`;
       const suggested = getEarliestProjectIngestReadyDate(lp);
       const hasOverride = !!lp.postStartDate;
       const noFootageNeeded = lp.basedOnExistingMaterial && !suggested && !hasOverride;
-      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" } }, "Post Start Date"), hasOverride && /* @__PURE__ */ React.createElement(
-        "button",
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+        SH,
         {
-          onClick: () => onUpdateProject(project.id, "postStartDate", null),
-          style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 6, color: "#9ca3af", padding: "4px 10px", fontSize: 13, cursor: "pointer" }
-        },
-        "Reset to suggested"
-      )), noFootageNeeded ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af" } }, "Marked as based on previous material \u2014 no footage dependency, deliverables can start anytime ahead of their own deadlines.") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+          label: "Post Start Date",
+          desc: "The earliest date resource planning assumes this project's deliverables can begin work.",
+          action: hasOverride && /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: () => onUpdateProject(project.id, "postStartDate", null),
+              style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 6, color: "#9ca3af", padding: "4px 10px", fontSize: 13, cursor: "pointer" }
+            },
+            "Reset to suggested"
+          )
+        }
+      ), noFootageNeeded ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af" } }, "Marked as based on previous material \u2014 no footage dependency, deliverables can start anytime ahead of their own deadlines.") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
         DateTimePicker,
         {
           value: lp.postStartDate || (suggested ? suggested.toISOString().slice(0, 16) : ""),
@@ -4871,21 +4882,21 @@ Brief content: ${content}`;
           label: "When can post realistically begin?"
         }
       ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 5 } }, hasOverride ? `Overridden \u2014 based on ingest data, the system would otherwise suggest ${suggested ? fmtDT(suggested.toISOString()) : "no constraint"}.` : suggested ? `Suggested from the earliest ingest not yet fully received. Resource planning assumes none of this project's deliverables start before this date.` : `No ingest data found yet to suggest from. If this project doesn't depend on new footage, check "based entirely on previous material" in Project Info \u2014 otherwise, set a date manually once a shoot is scheduled.`)));
-    })()), /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 12, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" } }, "Review Rounds"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(
+    })()), /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 12, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement(SH, { label: "Review Rounds", desc: "Every review and Work Review round across this project's deliverables \u2014 grouped and editable here." }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 0, background: "#111827", border: "1px solid #1f2937", borderRadius: 8, overflow: "hidden", flexShrink: 0, width: "fit-content", marginBottom: 10 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => setShowAddReviewRound(true),
-        style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 8, color: "#818cf8", padding: "7px 14px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }
+        style: { background: "transparent", border: "none", borderRight: "1px solid #1f2937", color: "#818cf8", padding: "7px 14px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }
       },
       "+ Add a Review Round"
     ), /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => setShowAddWorkReview(true),
-        style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 8, color: "#818cf8", padding: "7px 14px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }
+        style: { background: "transparent", border: "none", color: "#818cf8", padding: "7px 14px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }
       },
       "+ Add a Work Review Round"
-    ))), /* @__PURE__ */ React.createElement(ProjectReviewRoundsList, { project: lp, onUpdateDel, reviewerNames, addReviewerName })), showAddReviewRound && /* @__PURE__ */ React.createElement(AddReviewRoundModal, { project: lp, onUpdateDel, reviewerNames, addReviewerName, onClose: () => setShowAddReviewRound(false) }), showAddWorkReview && /* @__PURE__ */ React.createElement(
+    )), /* @__PURE__ */ React.createElement(ProjectReviewRoundsList, { project: lp, onUpdateDel, reviewerNames, addReviewerName })), showAddReviewRound && /* @__PURE__ */ React.createElement(AddReviewRoundModal, { project: lp, onUpdateDel, reviewerNames, addReviewerName, onClose: () => setShowAddReviewRound(false) }), showAddWorkReview && /* @__PURE__ */ React.createElement(
       AddWorkReviewRoundModal,
       {
         project: lp,
@@ -4957,7 +4968,7 @@ Brief content: ${content}`;
           onClose: () => setHandoffDelId(null)
         }
       );
-    })(), showAddDel && /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #374151", borderRadius: 12, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, "New Deliverable"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-end" } }, /* @__PURE__ */ React.createElement(LW, { label: "Title", style: { flex: 1 } }, /* @__PURE__ */ React.createElement(Inp, { value: newDelTitle, onChange: (e) => setNewDelTitle(e.target.value), placeholder: "Deliverable title\u2026", onKeyDown: (e) => e.key === "Enter" && newDelTitle.trim() && addDel() })), /* @__PURE__ */ React.createElement(Btn, { onClick: addDel, disabled: !newDelTitle.trim(), style: { flexShrink: 0, marginBottom: 1 } }, "+ Add")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement(LW, { label: "Aspect Ratio" }, /* @__PURE__ */ React.createElement(Sel, { value: newDelAR, onChange: (e) => setNewDelAR(e.target.value) }, ASPECT_RATIOS.map((r) => /* @__PURE__ */ React.createElement("option", { key: r }, r)))), /* @__PURE__ */ React.createElement(LW, { label: "Final Deadline", style: { gridColumn: "2/4" } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: newDelDeadline, onChange: (v) => setNewDelDeadline(v), label: "Set deadline" })), /* @__PURE__ */ React.createElement(LW, { label: "Editor / Animator", style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement(EditorPicker, { value: newDelEditor, onChange: (v) => setNewDelEditor(v), deadline: newDelDeadline, allProjects, team })))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 0, background: "#111827", border: "1px solid #1f2937", borderRadius: 8, overflow: "hidden", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(
+    })(), /* @__PURE__ */ React.createElement(SH, { label: "Deliverables", desc: "Every deliverable in this project \u2014 add new ones, sort, and track status and rounds from here." }), showAddDel && /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #374151", borderRadius: 12, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, "New Deliverable"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-end" } }, /* @__PURE__ */ React.createElement(LW, { label: "Title", style: { flex: 1 } }, /* @__PURE__ */ React.createElement(Inp, { value: newDelTitle, onChange: (e) => setNewDelTitle(e.target.value), placeholder: "Deliverable title\u2026", onKeyDown: (e) => e.key === "Enter" && newDelTitle.trim() && addDel() })), /* @__PURE__ */ React.createElement(Btn, { onClick: addDel, disabled: !newDelTitle.trim(), style: { flexShrink: 0, marginBottom: 1 } }, "+ Add")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement(LW, { label: "Aspect Ratio" }, /* @__PURE__ */ React.createElement(Sel, { value: newDelAR, onChange: (e) => setNewDelAR(e.target.value) }, ASPECT_RATIOS.map((r) => /* @__PURE__ */ React.createElement("option", { key: r }, r)))), /* @__PURE__ */ React.createElement(LW, { label: "Final Deadline", style: { gridColumn: "2/4" } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: newDelDeadline, onChange: (v) => setNewDelDeadline(v), label: "Set deadline" })), /* @__PURE__ */ React.createElement(LW, { label: "Editor / Animator", style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement(EditorPicker, { value: newDelEditor, onChange: (v) => setNewDelEditor(v), deadline: newDelDeadline, allProjects, team })))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 0, background: "#111827", border: "1px solid #1f2937", borderRadius: 8, overflow: "hidden", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => {
@@ -15330,14 +15341,16 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     poststart: { icon: "\u{1F680}", label: "Post Start", color: "#a855f7" },
     round: { icon: "\u21BA", label: "Review Rounds", color: "#eab308" },
     workreview: { icon: "\u{1F3A5}", label: "Work Review", color: "#ec4899" },
-    deliverable: { icon: "\u{1F4CB}", label: "Final Delivery", color: "#f59e0b" },
+    deliverable: { icon: "\u{1F4CB}", label: "Final Delivery", color: "#ef4444" },
     ingest: { icon: "\u{1F4BE}", label: "Ingest", color: "#06b6d4" }
   };
+  var PROJ_CAL_NOMINAL_DUR = { poststart: 0.5, round: 0.75, workreview: 0.75, ingest: 0.5 };
   var PROJ_CAL_MONTH_START_H = 7;
   var PROJ_CAL_MONTH_END_H = 20;
   var PROJ_CAL_DAY_START_H = 0;
   var PROJ_CAL_DAY_END_H = 24;
-  var PROJ_CAL_HOUR_PX = 44;
+  var PROJ_CAL_HOUR_PX_BASE = 64;
+  var PROJ_CAL_MONTH_STRIP_H_BASE = 320;
   var projCalSnapQ = (h) => Math.round(h * 4) / 4;
   var projCalHhmmToH = (t) => {
     const p = (t || "09:00").split(":").map(Number);
@@ -15347,36 +15360,43 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const hh = Math.max(0, Math.min(23, Math.floor(h))), mm = Math.round((h - Math.floor(h)) * 60) % 60;
     return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
   };
-  var CalEventHoverCard = ({ ev, project, allProjects = [], team = [], talentRoster = [], onUpdateDel, x, y, onMouseEnter, onMouseLeave }) => {
+  var projCalPackDay = (events) => {
+    const sorted = [...events].sort((a, b) => a.startH - b.startH || a.endH - b.endH);
+    const placements = {};
+    let cluster = null;
+    const clusters = [];
+    sorted.forEach((ev) => {
+      if (!cluster || ev.startH >= cluster.maxEnd) {
+        cluster = { events: [ev], maxEnd: ev.endH };
+        clusters.push(cluster);
+      } else {
+        cluster.events.push(ev);
+        cluster.maxEnd = Math.max(cluster.maxEnd, ev.endH);
+      }
+    });
+    clusters.forEach((cl) => {
+      const colEnds = [];
+      cl.events.forEach((ev) => {
+        let col = colEnds.findIndex((end) => end <= ev.startH);
+        if (col === -1) {
+          col = colEnds.length;
+          colEnds.push(ev.endH);
+        } else colEnds[col] = ev.endH;
+        placements[ev.id] = { col };
+      });
+      cl.events.forEach((ev) => {
+        placements[ev.id].totalCols = colEnds.length;
+      });
+    });
+    return placements;
+  };
+  var CalEventHoverCard = ({ ev, project, team = [], talentRoster = [], x, y, onMouseEnter, onMouseLeave, onOpen }) => {
     if (!ev) return null;
     const meta = PROJ_CAL_TYPE_META[ev.type];
     const members = ev._members || [ev];
     const w = 300;
     const left = Math.min(x + 14, (typeof window !== "undefined" ? window.innerWidth : 1200) - w - 16);
     const top = Math.min(y + 14, (typeof window !== "undefined" ? window.innerHeight : 800) - 320);
-    const removeMember = (m) => {
-      const del = (project.deliverables || []).find((d) => d.id === m.ref?.delId);
-      if (!del) return;
-      const newRounds = (del.rounds || []).filter((_, i) => i !== m.ref.roundIdx);
-      onUpdateDel(project.id, del.id, "rounds", newRounds);
-    };
-    const addMember = (delId) => {
-      const del = (project.deliverables || []).find((d) => d.id === delId);
-      const template = members[0];
-      if (!del || !template) return;
-      const newRound = {
-        id: uid(),
-        label: template.type === "workreview" ? "Work Review" : `Round ${(del.rounds || []).length + 1}`,
-        deadline: `${template.date}T${template.time}`,
-        reviewers: [...template.reviewers || []],
-        status: ROUND_STATUSES[0],
-        notes: "",
-        reviewRoundId: template.groupId && template.type === "round" ? template.groupId : null,
-        isWorkReview: template.type === "workreview",
-        workReviewSessionId: template.type === "workreview" ? template.groupId : null
-      };
-      onUpdateDel(project.id, del.id, "rounds", [...del.rounds || [], newRound]);
-    };
     const F = (label, val) => val != null && val !== "" ? /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'Barlow Condensed',sans-serif" } }, label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#e2e8f0" } }, val)) : null;
     let body = null;
     if (ev.type === "production") {
@@ -15388,44 +15408,31 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       const editorNames = editorIds.map((id) => team.find((m) => m.id === id)?.name).filter(Boolean);
       body = /* @__PURE__ */ React.createElement(React.Fragment, null, F("Deliverables", (project.deliverables || []).length), F("Editor Assigned", editorNames.length ? editorNames.join(", ") : "Unassigned"));
     } else if (ev.type === "deliverable") {
-      const del = (project.deliverables || []).find((d) => d.id === ev.ref?.id);
-      body = /* @__PURE__ */ React.createElement(React.Fragment, null, F("Status", del?.status || "\u2014"), F("Editor", team.find((m) => m.id === del?.editorId)?.name || "Unassigned"));
+      body = /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6, display: "flex", flexDirection: "column", gap: 4 } }, members.map((m) => {
+        const del = (project.deliverables || []).find((d) => d.id === m.ref?.id);
+        return /* @__PURE__ */ React.createElement("div", { key: m.id, style: { fontSize: 14, color: "#e2e8f0" } }, m.delTitle || del?.title, " ", /* @__PURE__ */ React.createElement("span", { style: { color: "#6b7280" } }, "\xB7 ", del?.status || "\u2014"));
+      }));
     } else if (ev.type === "ingest") {
-      const ing = (project.ingestDates || []).find((i) => i.id === ev.ref?.id);
+      const ing = (project.ingestDates || []).find((i) => i.id === ev.ref?.id) || (project.productions || []).find((p) => p.id === ev.ref?.id)?.ingest;
       body = /* @__PURE__ */ React.createElement(React.Fragment, null, F("Notes", ing?.notes || "No notes"), F("Call Sheet", ing?.callSheet ? "Attached" : "None attached"));
     } else if (ev.type === "round" || ev.type === "workreview") {
       const reviewers = members[0]?.reviewers || [];
-      const attachedIds = members.map((m) => m.ref?.delId).filter(Boolean);
-      const candidates = (project.deliverables || []).filter((d) => !attachedIds.includes(d.id));
-      body = /* @__PURE__ */ React.createElement(React.Fragment, null, F("Reviewers", reviewers.length ? reviewers.join(", ") : "None set"), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 4 } }, "Deliverables"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 3, maxHeight: 110, overflowY: "auto" } }, members.map((m) => /* @__PURE__ */ React.createElement("div", { key: m.id, style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#e2e8f0", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, m.delTitle), onUpdateDel && /* @__PURE__ */ React.createElement("button", { onClick: () => removeMember(m), style: { background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 15, lineHeight: 1, padding: 0 } }, "\xD7")))), onUpdateDel && candidates.length > 0 && /* @__PURE__ */ React.createElement(
-        "select",
-        {
-          defaultValue: "",
-          onChange: (e) => {
-            if (e.target.value) {
-              addMember(e.target.value);
-              e.target.value = "";
-            }
-          },
-          style: { marginTop: 6, width: "100%", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 5, color: "#9ca3af", padding: "4px 6px", fontSize: 12, outline: "none" }
-        },
-        /* @__PURE__ */ React.createElement("option", { value: "" }, "+ Add deliverable\u2026"),
-        candidates.map((d) => /* @__PURE__ */ React.createElement("option", { key: d.id, value: d.id }, d.title || "Untitled"))
-      )));
+      body = /* @__PURE__ */ React.createElement(React.Fragment, null, F("Reviewers", reviewers.length ? reviewers.join(", ") : "None set"), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 4 } }, "Deliverables"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 3, maxHeight: 110, overflowY: "auto" } }, members.map((m) => /* @__PURE__ */ React.createElement("div", { key: m.id, style: { fontSize: 13, color: "#e2e8f0" } }, m.delTitle)))));
     }
     return /* @__PURE__ */ React.createElement(
       "div",
       {
         onMouseEnter,
         onMouseLeave,
-        onClick: (e) => e.stopPropagation(),
-        style: { position: "fixed", left, top, width: w, zIndex: 970, background: "#0d1117", border: `1px solid ${ev.color}50`, borderRadius: 10, padding: "12px 14px", boxShadow: "0 12px 32px #000b" }
+        onClick: () => onOpen?.(ev),
+        style: { position: "fixed", left, top, width: w, zIndex: 970, background: "#0d1117", border: `1px solid ${ev.color}50`, borderRadius: 10, padding: "12px 14px", boxShadow: "0 12px 32px #000b", cursor: "pointer" }
       },
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.02em" } }, meta?.icon, " ", ev._ghost ? "Work Review (none from this project \u2014 click to add)" : ev.label),
-      body
+      body,
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#4b5563", marginTop: 8 } }, "Click for details \u2192")
     );
   };
-  var ProjectCalendarWeek = ({ weekStart, events, onCommitMove, onEventClick, onEventEnter, onEventLeave, onProductionDragBlocked, canEdit }) => {
+  var ProjectCalendarWeek = ({ weekStart, events, hourPx, onCommitMove, onEventClick, onEventEnter, onEventLeave, onProductionDragBlocked, canEdit }) => {
     const gridRef = (0, import_react.useRef)();
     const [drag, setDrag] = (0, import_react.useState)(null);
     const dragRef = (0, import_react.useRef)(null);
@@ -15441,8 +15448,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const dayStrs = days.map((d) => d.toISOString().slice(0, 10));
     const timed = events.filter((e) => e.hasTime);
     const allDay = events.filter((e) => !e.hasTime);
-    const hToY = (h) => (h - PROJ_CAL_DAY_START_H) * PROJ_CAL_HOUR_PX;
-    const yToH = (y) => projCalSnapQ(Math.max(PROJ_CAL_DAY_START_H, Math.min(PROJ_CAL_DAY_END_H - 0.25, PROJ_CAL_DAY_START_H + y / PROJ_CAL_HOUR_PX)));
+    const hToY = (h) => (h - PROJ_CAL_DAY_START_H) * hourPx;
+    const yToH = (y) => projCalSnapQ(Math.max(PROJ_CAL_DAY_START_H, Math.min(PROJ_CAL_DAY_END_H - 0.25, PROJ_CAL_DAY_START_H + y / hourPx)));
     const gridHeight = hToY(PROJ_CAL_DAY_END_H);
     const hourMarks = [];
     for (let h = PROJ_CAL_DAY_START_H; h <= PROJ_CAL_DAY_END_H; h++) hourMarks.push(h);
@@ -15489,7 +15496,23 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       }
       onEventClick(ev);
     };
-    return /* @__PURE__ */ React.createElement("div", null, allDay.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "46px repeat(7,1fr)", gap: 2, marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", null), dayStrs.map((ds) => /* @__PURE__ */ React.createElement("div", { key: ds, style: { minHeight: 20, display: "flex", flexDirection: "column", gap: 2 } }, allDay.filter((ev) => ev.date === ds).map((ev) => {
+    const packedByDay = (0, import_react.useMemo)(() => {
+      const out = {};
+      dayStrs.forEach((ds) => {
+        const dayEvs = timed.filter((ev) => {
+          const effDate = drag && drag.ev.id === ev.id ? dayStrs[drag.dayIdx] : ev.date;
+          return effDate === ds;
+        }).map((ev) => {
+          const isDragging = drag?.ev.id === ev.id;
+          const startH = isDragging ? drag.hour : projCalHhmmToH(ev.time);
+          const durH = ev.durationH || 0.5;
+          return { ...ev, startH, endH: Math.min(PROJ_CAL_DAY_END_H, startH + durH) };
+        });
+        out[ds] = { events: dayEvs, placements: projCalPackDay(dayEvs) };
+      });
+      return out;
+    }, [timed, dayStrs, drag]);
+    return /* @__PURE__ */ React.createElement("div", null, allDay.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "56px repeat(7,1fr)", gap: 3, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", null), dayStrs.map((ds) => /* @__PURE__ */ React.createElement("div", { key: ds, style: { minHeight: 24, display: "flex", flexDirection: "column", gap: 3 } }, allDay.filter((ev) => ev.date === ds).map((ev) => {
       const meta = PROJ_CAL_TYPE_META[ev.type];
       return /* @__PURE__ */ React.createElement(
         "div",
@@ -15498,64 +15521,66 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           onClick: () => handleClick(ev),
           onMouseEnter: (e) => onEventEnter?.(ev, e.clientX, e.clientY),
           onMouseLeave: onEventLeave,
-          style: { background: ev.color + "25", borderLeft: `2px solid ${ev.color}`, borderRadius: "0 3px 3px 0", padding: "1px 4px", fontSize: 11, color: ev.color, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: canEdit ? "pointer" : "default" }
+          style: { background: ev.color + "25", borderLeft: `3px solid ${ev.color}`, borderRadius: "0 4px 4px 0", padding: "3px 7px", fontSize: 14, color: ev.color, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: canEdit ? "pointer" : "default" }
         },
         meta.icon,
         " ",
         ev.label
       );
-    })))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "46px repeat(7,1fr)", gap: 2, marginBottom: 4 } }, /* @__PURE__ */ React.createElement("div", null), days.map((d, i) => {
+    })))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "56px repeat(7,1fr)", gap: 3, marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", null), days.map((d, i) => {
       const isToday = dayStrs[i] === (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-      return /* @__PURE__ */ React.createElement("div", { key: i, style: { textAlign: "center", fontSize: 13, fontWeight: 700, color: isToday ? "#818cf8" : "#838ba0", padding: "3px 0", fontFamily: "'Barlow Condensed',sans-serif" } }, ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i], " ", d.getDate());
-    })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "46px 1fr" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: gridHeight } }, hourMarks.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", top: hToY(h) - 6, right: 6, fontSize: 11, color: "#4b5563" } }, fmtH(h)))), /* @__PURE__ */ React.createElement("div", { ref: gridRef, style: { position: "relative", height: gridHeight, background: "#111827", borderRadius: 6, overflow: "hidden" } }, hourMarks.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", left: 0, right: 0, top: hToY(h), height: 1, background: "#1f2937" } })), [1, 2, 3, 4, 5, 6].map((i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { position: "absolute", left: `${i / 7 * 100}%`, top: 0, bottom: 0, width: 1, background: "#1f2937" } })), timed.map((ev) => {
-      const isDragging = drag?.ev.id === ev.id;
-      const dayIdx = isDragging ? drag.dayIdx : dayStrs.indexOf(ev.date);
-      const hour = isDragging ? drag.hour : projCalHhmmToH(ev.time);
-      if (dayIdx < 0) return null;
-      const meta = PROJ_CAL_TYPE_META[ev.type];
-      const isProd = ev.ref?.kind === "production";
-      return /* @__PURE__ */ React.createElement(
-        "div",
-        {
-          key: ev.id,
-          onPointerDown: (e) => startDrag(e, ev),
-          onClick: () => handleClick(ev),
-          onMouseEnter: (e) => onEventEnter?.(ev, e.clientX, e.clientY),
-          onMouseLeave: onEventLeave,
-          title: `${ev.label}${ev.status ? " \u2014 " + ev.status : ""} \xB7 ${projCalHToHhmm(hour)}`,
-          style: {
-            position: "absolute",
-            left: `${dayIdx / 7 * 100}%`,
-            width: `calc(${100 / 7}% - 3px)`,
-            top: hToY(hour),
-            height: 22,
-            background: ev.color + (isDragging ? "40" : ev._ghost ? "12" : "28"),
-            border: `1.5px solid ${ev.color}${isDragging ? "ee" : ev._ghost ? "55" : "88"}`,
-            borderRadius: 4,
-            borderStyle: ev._ghost ? "dashed" : "solid",
-            opacity: ev._ghost ? 0.75 : 1,
-            padding: "1px 4px",
-            fontSize: 11,
-            color: ev.color,
-            fontWeight: 700,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            cursor: canEdit ? isProd ? "pointer" : "grab" : "default",
-            zIndex: isDragging ? 10 : 2,
-            boxSizing: "border-box",
-            touchAction: "none"
-          }
-        },
-        meta.icon,
-        " ",
-        ev.label
-      );
+      return /* @__PURE__ */ React.createElement("div", { key: i, style: { textAlign: "center", fontSize: 15, fontWeight: 700, color: isToday ? "#818cf8" : "#838ba0", padding: "4px 0", fontFamily: "'Barlow Condensed',sans-serif" } }, ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i], " ", d.getDate());
+    })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "56px 1fr" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: gridHeight } }, hourMarks.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", top: hToY(h) - 7, right: 8, fontSize: 13, color: "#4b5563" } }, fmtH(h)))), /* @__PURE__ */ React.createElement("div", { ref: gridRef, style: { position: "relative", height: gridHeight, background: "#111827", borderRadius: 6, overflow: "hidden" } }, hourMarks.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", left: 0, right: 0, top: hToY(h), height: 1, background: "#1f2937" } })), [1, 2, 3, 4, 5, 6].map((i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { position: "absolute", left: `${i / 7 * 100}%`, top: 0, bottom: 0, width: 1, background: "#1f2937" } })), dayStrs.map((ds, dayIdxStatic) => {
+      const { events: dayEvs, placements } = packedByDay[ds];
+      return dayEvs.map((ev) => {
+        const isDragging = drag?.ev.id === ev.id;
+        const dayIdx = isDragging ? drag.dayIdx : dayIdxStatic;
+        const place = placements[ev.id] || { col: 0, totalCols: 1 };
+        const meta = PROJ_CAL_TYPE_META[ev.type];
+        const isProd = ev.ref?.kind === "production";
+        const colW = 100 / 7 / place.totalCols;
+        return /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            key: ev.id,
+            onPointerDown: (e) => startDrag(e, ev),
+            onClick: () => handleClick(ev),
+            onMouseEnter: (e) => onEventEnter?.(ev, e.clientX, e.clientY),
+            onMouseLeave: onEventLeave,
+            title: `${ev.label}${ev.status ? " \u2014 " + ev.status : ""} \xB7 ${projCalHToHhmm(ev.startH)}\u2013${projCalHToHhmm(ev.endH)}`,
+            style: {
+              position: "absolute",
+              left: `calc(${dayIdx / 7 * 100 + place.col * colW}% + 1px)`,
+              width: `calc(${colW}% - 3px)`,
+              top: hToY(ev.startH),
+              height: Math.max(hToY(ev.endH) - hToY(ev.startH), 20),
+              background: ev.color + (isDragging ? "48" : ev._ghost ? "14" : "30"),
+              border: `1.5px solid ${ev.color}${isDragging ? "ee" : ev._ghost ? "55" : "90"}`,
+              borderRadius: 5,
+              borderStyle: ev._ghost ? "dashed" : "solid",
+              opacity: ev._ghost ? 0.8 : 1,
+              padding: "2px 6px",
+              fontSize: 13,
+              lineHeight: 1.25,
+              color: ev.color,
+              fontWeight: 700,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              cursor: canEdit ? isProd ? "pointer" : "grab" : "default",
+              zIndex: isDragging ? 10 : 2,
+              boxSizing: "border-box",
+              touchAction: "none"
+            }
+          },
+          meta.icon,
+          " ",
+          ev.label
+        );
+      });
     }))));
   };
-  var PROJ_CAL_MONTH_HEADER_H = 40;
-  var PROJ_CAL_MONTH_STRIP_H = 160;
-  var ProjectCalendarMonth = ({ calY, calM, events, onCommitMove, onEventClick, onDayContextMenu, onEventEnter, onEventLeave, onProductionDragBlocked, canEdit }) => {
+  var PROJ_CAL_MONTH_HEADER_H = 44;
+  var ProjectCalendarMonth = ({ calY, calM, events, stripH, onCommitMove, onEventClick, onDayContextMenu, onEventEnter, onEventLeave, onProductionDragBlocked, canEdit }) => {
     const stripRefs = (0, import_react.useRef)({});
     const [drag, setDrag] = (0, import_react.useState)(null);
     const dragRef = (0, import_react.useRef)(null);
@@ -15570,16 +15595,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const timed = events.filter((e) => e.hasTime);
     const allDay = events.filter((e) => !e.hasTime);
-    const hToY = (h) => (h - PROJ_CAL_MONTH_START_H) / (PROJ_CAL_MONTH_END_H - PROJ_CAL_MONTH_START_H) * PROJ_CAL_MONTH_STRIP_H;
-    const yToH = (y, stripH) => projCalSnapQ(Math.max(PROJ_CAL_MONTH_START_H, Math.min(PROJ_CAL_MONTH_END_H - 0.25, PROJ_CAL_MONTH_START_H + y / stripH * (PROJ_CAL_MONTH_END_H - PROJ_CAL_MONTH_START_H))));
-    const timedByDate = (0, import_react.useMemo)(() => {
-      const m = {};
-      timed.forEach((ev) => {
-        const effDate = drag && drag.ev.id === ev.id ? drag.date : ev.date;
-        (m[effDate] = m[effDate] || []).push(ev);
-      });
-      return m;
-    }, [timed, drag]);
+    const hToY = (h) => (h - PROJ_CAL_MONTH_START_H) / (PROJ_CAL_MONTH_END_H - PROJ_CAL_MONTH_START_H) * stripH;
+    const yToH = (y, sh) => projCalSnapQ(Math.max(PROJ_CAL_MONTH_START_H, Math.min(PROJ_CAL_MONTH_END_H - 0.25, PROJ_CAL_MONTH_START_H + y / sh * (PROJ_CAL_MONTH_END_H - PROJ_CAL_MONTH_START_H))));
     const allDayByDate = (0, import_react.useMemo)(() => {
       const m = {};
       allDay.forEach((ev) => {
@@ -15638,8 +15655,26 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       }
       onEventClick(ev);
     };
+    const packedByDate = (0, import_react.useMemo)(() => {
+      const byDate = {};
+      timed.forEach((ev) => {
+        const effDate = drag && drag.ev.id === ev.id ? drag.date : ev.date;
+        (byDate[effDate] = byDate[effDate] || []).push(ev);
+      });
+      const out = {};
+      Object.entries(byDate).forEach(([ds, evs]) => {
+        const withRange = evs.map((ev) => {
+          const isDragging = drag?.ev.id === ev.id;
+          const startH = isDragging ? drag.hour : projCalHhmmToH(ev.time);
+          const durH = ev.durationH || 0.5;
+          return { ...ev, startH, endH: Math.min(PROJ_CAL_MONTH_END_H, startH + durH) };
+        });
+        out[ds] = { events: withRange, placements: projCalPackDay(withRange) };
+      });
+      return out;
+    }, [timed, drag]);
     const hourMarks = [];
-    for (let h = PROJ_CAL_MONTH_START_H; h <= PROJ_CAL_MONTH_END_H; h += 3) hourMarks.push(h);
+    for (let h = PROJ_CAL_MONTH_START_H; h <= PROJ_CAL_MONTH_END_H; h += 2) hourMarks.push(h);
     const cells = [
       ...Array.from({ length: firstDow }, () => null),
       ...Array.from({ length: daysInMonth }, (_, i) => i + 1)
@@ -15647,13 +15682,13 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     while (cells.length % 7 !== 0) cells.push(null);
     const weeks = [];
     for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "32px repeat(7,minmax(0,1fr))", gap: 2, marginBottom: 2 } }, /* @__PURE__ */ React.createElement("div", null), ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => /* @__PURE__ */ React.createElement("div", { key: d, style: { textAlign: "center", fontSize: 13, fontWeight: 700, color: "#838ba0", padding: "3px 0", fontFamily: "'Barlow Condensed',sans-serif" } }, d))), weeks.map((week, wi) => /* @__PURE__ */ React.createElement("div", { key: wi, style: { display: "grid", gridTemplateColumns: "32px repeat(7,minmax(0,1fr))", gap: 2, marginBottom: 2 } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: PROJ_CAL_MONTH_HEADER_H + PROJ_CAL_MONTH_STRIP_H } }, hourMarks.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", top: PROJ_CAL_MONTH_HEADER_H + hToY(h) - 5, right: 2, fontSize: 9, color: "#4b5563", whiteSpace: "nowrap" } }, fmtH(h).replace(":00", "").replace(" ", "")))), week.map((day, di) => {
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "40px repeat(7,minmax(0,1fr))", gap: 3, marginBottom: 3 } }, /* @__PURE__ */ React.createElement("div", null), ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => /* @__PURE__ */ React.createElement("div", { key: d, style: { textAlign: "center", fontSize: 15, fontWeight: 700, color: "#838ba0", padding: "4px 0", fontFamily: "'Barlow Condensed',sans-serif" } }, d))), weeks.map((week, wi) => /* @__PURE__ */ React.createElement("div", { key: wi, style: { display: "grid", gridTemplateColumns: "40px repeat(7,minmax(0,1fr))", gap: 3, marginBottom: 3 } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: PROJ_CAL_MONTH_HEADER_H + stripH } }, hourMarks.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", top: PROJ_CAL_MONTH_HEADER_H + hToY(h) - 6, right: 3, fontSize: 11, color: "#4b5563", whiteSpace: "nowrap" } }, fmtH(h).replace(":00", "").replace(" ", "")))), week.map((day, di) => {
       if (day == null) return /* @__PURE__ */ React.createElement("div", { key: di });
       const ds = `${calY}-${pad(calM + 1)}-${pad(day)}`;
       const isToday = ds === todayStr;
       const isHovered = hoveredDate === ds;
       const dayAllEvs = allDayByDate[ds] || [];
-      const dayTimedEvs = timedByDate[ds] || [];
+      const { events: dayTimedEvs = [], placements = {} } = packedByDate[ds] || {};
       return /* @__PURE__ */ React.createElement(
         "div",
         {
@@ -15674,7 +15709,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
             transition: "background 0.1s,border-color 0.1s"
           }
         },
-        /* @__PURE__ */ React.createElement("div", { style: { padding: "3px 5px 0", display: "flex", flexDirection: "column", gap: 2, minHeight: PROJ_CAL_MONTH_HEADER_H } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: isToday ? 800 : 400, color: isToday ? "#818cf8" : "#6b7280", textAlign: "right", lineHeight: 1.2 } }, day), dayAllEvs.slice(0, 2).map((ev) => {
+        /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 6px 0", display: "flex", flexDirection: "column", gap: 3, minHeight: PROJ_CAL_MONTH_HEADER_H } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: isToday ? 800 : 400, color: isToday ? "#818cf8" : "#6b7280", textAlign: "right", lineHeight: 1.2 } }, day), dayAllEvs.slice(0, 3).map((ev) => {
           const meta = PROJ_CAL_TYPE_META[ev.type];
           return /* @__PURE__ */ React.createElement(
             "div",
@@ -15683,13 +15718,13 @@ Never delete without explicit confirmation. Be conversational and use studio ter
               onClick: () => handleClick(ev),
               onMouseEnter: (e) => onEventEnter?.(ev, e.clientX, e.clientY),
               onMouseLeave: onEventLeave,
-              style: { background: ev.color + "25", borderLeft: `2px solid ${ev.color}`, borderRadius: "0 3px 3px 0", padding: "0 4px", fontSize: 10, color: ev.color, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: canEdit ? "pointer" : "default" }
+              style: { background: ev.color + "25", borderLeft: `3px solid ${ev.color}`, borderRadius: "0 4px 4px 0", padding: "2px 5px", fontSize: 12, color: ev.color, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: canEdit ? "pointer" : "default" }
             },
             meta.icon,
             " ",
             ev.label
           );
-        }), dayAllEvs.length > 2 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#838ba0" } }, "+", dayAllEvs.length - 2, " more")),
+        }), dayAllEvs.length > 3 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#838ba0" } }, "+", dayAllEvs.length - 3, " more")),
         /* @__PURE__ */ React.createElement(
           "div",
           {
@@ -15697,14 +15732,15 @@ Never delete without explicit confirmation. Be conversational and use studio ter
               if (el) stripRefs.current[ds] = el;
               else delete stripRefs.current[ds];
             },
-            style: { position: "relative", flex: 1, minHeight: PROJ_CAL_MONTH_STRIP_H, borderTop: "1px solid #1f293780" }
+            style: { position: "relative", flex: 1, minHeight: stripH, borderTop: "1px solid #1f293780" }
           },
           hourMarks.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", left: 0, right: 0, top: hToY(h), height: 1, background: "#1f293750" } })),
           dayTimedEvs.map((ev) => {
             const isDragging = drag?.ev.id === ev.id;
-            const hour = isDragging ? drag.hour : projCalHhmmToH(ev.time);
+            const place = placements[ev.id] || { col: 0, totalCols: 1 };
             const meta = PROJ_CAL_TYPE_META[ev.type];
             const isProd = ev.ref?.kind === "production";
+            const colW = 100 / place.totalCols;
             return /* @__PURE__ */ React.createElement(
               "div",
               {
@@ -15713,21 +15749,21 @@ Never delete without explicit confirmation. Be conversational and use studio ter
                 onClick: () => handleClick(ev),
                 onMouseEnter: (e) => onEventEnter?.(ev, e.clientX, e.clientY),
                 onMouseLeave: onEventLeave,
-                title: `${ev._tooltip || ev.label}${ev.status ? " \u2014 " + ev.status : ""} \xB7 ${projCalHToHhmm(hour)}`,
+                title: `${ev._tooltip || ev.label}${ev.status ? " \u2014 " + ev.status : ""} \xB7 ${projCalHToHhmm(ev.startH)}\u2013${projCalHToHhmm(ev.endH)}`,
                 style: {
                   position: "absolute",
-                  left: 2,
-                  right: 2,
-                  top: hToY(hour),
-                  height: 13,
-                  background: ev.color + (isDragging ? "45" : ev._ghost ? "12" : "2a"),
+                  left: `calc(${place.col * colW}% + 1px)`,
+                  width: `calc(${colW}% - 2px)`,
+                  top: hToY(ev.startH),
+                  height: Math.max(hToY(ev.endH) - hToY(ev.startH), 16),
+                  background: ev.color + (isDragging ? "48" : ev._ghost ? "14" : "30"),
                   border: `1px solid ${ev.color}${isDragging ? "ee" : ev._ghost ? "55" : "99"}`,
-                  borderRadius: 3,
+                  borderRadius: 4,
                   borderStyle: ev._ghost ? "dashed" : "solid",
-                  opacity: ev._ghost ? 0.75 : 1,
-                  padding: "0 3px",
-                  fontSize: 9,
-                  lineHeight: "11px",
+                  opacity: ev._ghost ? 0.8 : 1,
+                  padding: "1px 4px",
+                  fontSize: 11,
+                  lineHeight: 1.2,
                   color: ev.color,
                   fontWeight: 700,
                   overflow: "hidden",
@@ -15747,7 +15783,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       );
     }))));
   };
-  var ProjectCalendar = ({ project, allProjects = [], team = [], talentRoster = [], onOpenProductionTab, onUpdateProject, onUpdateDel, reviewerNames = [], addReviewerName, workReviewSessions = [], addWorkReviewSession, updateWorkReviewSession }) => {
+  var ProjectCalendar = ({ project, allProjects = [], team = [], talentRoster = [], onOpenProductionTab, onGoToDeliverable, onUpdateProject, onUpdateDel, reviewerNames = [], addReviewerName, workReviewSessions = [], addWorkReviewSession, updateWorkReviewSession }) => {
     const today = /* @__PURE__ */ new Date();
     const [calY, setCalY] = (0, import_react.useState)(today.getFullYear());
     const [calM, setCalM] = (0, import_react.useState)(today.getMonth());
@@ -15761,11 +15797,16 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [contextMenu, setContextMenu] = (0, import_react.useState)(null);
     const [modalInitialSessionId, setModalInitialSessionId] = (0, import_react.useState)(null);
     const [prodBlockedEv, setProdBlockedEv] = (0, import_react.useState)(null);
+    const [wrConfirm, setWrConfirm] = (0, import_react.useState)(null);
     const [hoverEv, setHoverEv] = (0, import_react.useState)(null);
     const hoverTimerRef = (0, import_react.useRef)(null);
     const [undoStack, setUndoStack] = (0, import_react.useState)([]);
     const [redoStack, setRedoStack] = (0, import_react.useState)([]);
+    const [zoom, setZoom] = (0, import_react.useState)(1);
+    const zoomDragRef = (0, import_react.useRef)(null);
     const canEdit = !!(onUpdateProject && onUpdateDel);
+    const hourPx = PROJ_CAL_HOUR_PX_BASE * zoom;
+    const stripH = PROJ_CAL_MONTH_STRIP_H_BASE * zoom;
     const allEvents = (0, import_react.useMemo)(() => {
       const evs = [];
       if (project.postStartDate) {
@@ -15777,11 +15818,13 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           hasTime: true,
           label: "Post Start Date",
           status: "",
-          color: PROJ_CAL_TYPE_META.poststart.color
+          color: PROJ_CAL_TYPE_META.poststart.color,
+          durationH: PROJ_CAL_NOMINAL_DUR.poststart
         });
       }
       (project.productions || []).forEach((p) => {
         if (!p.startTime) return;
+        const durationH = p.endTime ? Math.max(0.5, (new Date(p.endTime) - new Date(p.startTime)) / 36e5) : 0.5;
         evs.push({
           id: `prod-${p.id}`,
           type: "production",
@@ -15791,7 +15834,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           label: p.title || p.type || "Production",
           status: p.status,
           color: PCOLOR[p.status] || PROJ_CAL_TYPE_META.production.color,
-          ref: { kind: "production", id: p.id }
+          ref: { kind: "production", id: p.id },
+          durationH
         });
       });
       (project.deliverables || []).forEach((d) => {
@@ -15800,10 +15844,12 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           type: "deliverable",
           date: d.deadline.slice(0, 10),
           hasTime: false,
-          label: d.title,
+          label: `${d.title} Due`,
           status: d.status,
-          color: DCOLOR[d.status] || PROJ_CAL_TYPE_META.deliverable.color,
-          ref: { kind: "deliverable", id: d.id }
+          color: PROJ_CAL_TYPE_META.deliverable.color,
+          ref: { kind: "deliverable", id: d.id },
+          groupId: `del-${d.deadline.slice(0, 10)}`,
+          delTitle: d.title
         });
         (d.rounds || []).forEach((r, ri) => {
           if (!r.deadline) return;
@@ -15820,7 +15866,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
             ref: { kind: "round", delId: d.id, roundIdx: ri },
             groupId: isWR ? r.workReviewSessionId : r.reviewRoundId || null,
             delTitle: d.title,
-            reviewers: r.reviewers || []
+            reviewers: r.reviewers || [],
+            durationH: PROJ_CAL_NOMINAL_DUR[isWR ? "workreview" : "round"]
           });
         });
       });
@@ -15835,7 +15882,23 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           label: ing.notes || "Media Ingest",
           status: "Ingest",
           color: PROJ_CAL_TYPE_META.ingest.color,
-          ref: { kind: "ingest", id: ing.id }
+          ref: { kind: "ingest", id: ing.id, source: "manual" },
+          durationH: PROJ_CAL_NOMINAL_DUR.ingest
+        });
+      });
+      (project.productions || []).forEach((p) => {
+        if (!p.ingest?.datetime) return;
+        evs.push({
+          id: `ingest-prod-${p.id}`,
+          type: "ingest",
+          date: p.ingest.datetime.slice(0, 10),
+          time: p.ingest.datetime.slice(11, 16) || "",
+          hasTime: true,
+          label: p.ingest.notes || `${p.title || p.type || "Production"} Ingest`,
+          status: "Ingest",
+          color: PROJ_CAL_TYPE_META.ingest.color,
+          ref: { kind: "ingest", id: p.id, source: "production" },
+          durationH: PROJ_CAL_NOMINAL_DUR.ingest
         });
       });
       const attachedSessionIds = /* @__PURE__ */ new Set();
@@ -15857,7 +15920,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           ref: null,
           groupId: null,
           _ghost: true,
-          _ghostSessionId: s.id
+          _ghostSessionId: s.id,
+          durationH: PROJ_CAL_NOMINAL_DUR.workreview
         });
       });
       return evs;
@@ -15880,13 +15944,16 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           return;
         }
         const first = members[0];
-        const typeLabel = first.type === "workreview" ? "Work Review" : "Review Round";
+        const isDel = first.type === "deliverable";
+        const typeLabel = first.type === "workreview" ? "Work Review" : isDel ? "Final Delivery" : "Review Round";
+        const label = isDel ? "Multiple deliverables due" : `${typeLabel} (${members.length})`;
+        const tooltip = isDel ? `Due: ${members.map((m) => m.delTitle).join(", ")}` : `${typeLabel}: ${members.map((m) => m.delTitle).join(", ")}`;
         singles.push({
           ...first,
           id: `group-${first.groupId}-${first.date}-${first.time}`,
-          label: `${typeLabel} (${members.length})`,
+          label,
           _members: members,
-          _tooltip: `${typeLabel}: ${members.map((m) => m.delTitle).join(", ")}`
+          _tooltip: tooltip
         });
       });
       return singles;
@@ -15920,11 +15987,18 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           const newRounds = (del.rounds || []).map((r, i) => i === ref.roundIdx ? { ...r, deadline: `${newDate}T${time}` } : r);
           onUpdateDel(project.id, del.id, "rounds", newRounds);
         } else if (ref.kind === "ingest") {
-          const ing = (project.ingestDates || []).find((i) => i.id === ref.id);
-          if (!ing) return;
-          const time = newTime || (ing.datetime || "").slice(11, 16) || "09:00";
-          const newIngests = (project.ingestDates || []).map((i) => i.id === ref.id ? { ...i, datetime: `${newDate}T${time}` } : i);
-          onUpdateProject(project.id, "ingestDates", newIngests);
+          const time = newTime || m.time || "09:00";
+          if (ref.source === "production") {
+            const prod = (project.productions || []).find((p) => p.id === ref.id);
+            if (!prod?.ingest) return;
+            const newProds = (project.productions || []).map((p) => p.id === ref.id ? { ...p, ingest: { ...p.ingest, datetime: `${newDate}T${time}` } } : p);
+            onUpdateProject(project.id, "productions", newProds);
+          } else {
+            const ing = (project.ingestDates || []).find((i) => i.id === ref.id);
+            if (!ing) return;
+            const newIngests = (project.ingestDates || []).map((i) => i.id === ref.id ? { ...i, datetime: `${newDate}T${time}` } : i);
+            onUpdateProject(project.id, "ingestDates", newIngests);
+          }
         }
       });
     };
@@ -15948,8 +16022,12 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           return r ? { kind: "round", delId: ref.delId, roundIdx: ref.roundIdx, prev: r.deadline } : null;
         }
         if (ref.kind === "ingest") {
+          if (ref.source === "production") {
+            const prod = (project.productions || []).find((p) => p.id === ref.id);
+            return prod?.ingest ? { kind: "ingest", source: "production", id: ref.id, prev: prod.ingest.datetime } : null;
+          }
           const ing = (project.ingestDates || []).find((i) => i.id === ref.id);
-          return ing ? { kind: "ingest", id: ref.id, prev: ing.datetime } : null;
+          return ing ? { kind: "ingest", source: "manual", id: ref.id, prev: ing.datetime } : null;
         }
         return null;
       }).filter(Boolean);
@@ -15967,8 +16045,13 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           const newRounds = (del.rounds || []).map((r, i) => i === s.roundIdx ? { ...r, deadline: s.prev } : r);
           onUpdateDel(project.id, s.delId, "rounds", newRounds);
         } else if (s.kind === "ingest") {
-          const newIngests = (project.ingestDates || []).map((i) => i.id === s.id ? { ...i, datetime: s.prev } : i);
-          onUpdateProject(project.id, "ingestDates", newIngests);
+          if (s.source === "production") {
+            const newProds = (project.productions || []).map((p) => p.id === s.id ? { ...p, ingest: { ...p.ingest, datetime: s.prev } } : p);
+            onUpdateProject(project.id, "productions", newProds);
+          } else {
+            const newIngests = (project.ingestDates || []).map((i) => i.id === s.id ? { ...i, datetime: s.prev } : i);
+            onUpdateProject(project.id, "ingestDates", newIngests);
+          }
         }
       });
     };
@@ -15992,6 +16075,43 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       setUndoStack((s) => [...s, last]);
       return r.slice(0, -1);
     });
+    const requestDateChange = (ev, newDate, newTime) => {
+      if (ev.type === "workreview" && !ev._ghost) {
+        setWrConfirm({ ev, newDate, newTime });
+        return;
+      }
+      commitDateChange(ev, newDate, newTime);
+    };
+    const commitWorkReviewChange = (ev, newDate, newTime, mode) => {
+      const members = ev._members || [ev];
+      const sessionId = members[0].groupId;
+      if (!sessionId) return;
+      const newDatetime = `${newDate}T${newTime || members[0].time || "14:00"}`;
+      if (mode === "all") {
+        updateWorkReviewSession(sessionId, { datetime: newDatetime });
+        allProjects.forEach((p) => {
+          (p.deliverables || []).forEach((d) => {
+            let changed = false;
+            const newRounds = (d.rounds || []).map((r) => {
+              if (r.isWorkReview && r.workReviewSessionId === sessionId) {
+                changed = true;
+                return { ...r, deadline: newDatetime };
+              }
+              return r;
+            });
+            if (changed) onUpdateDel(p.id, d.id, "rounds", newRounds);
+          });
+        });
+      } else {
+        const newSession = addWorkReviewSession({ datetime: newDatetime, location: "", reviewers: [...members[0].reviewers || []] });
+        members.forEach((m) => {
+          const del = (project.deliverables || []).find((d) => d.id === m.ref?.delId);
+          if (!del) return;
+          const newRounds = (del.rounds || []).map((r, i) => i === m.ref.roundIdx ? { ...r, deadline: newDatetime, workReviewSessionId: newSession.id } : r);
+          onUpdateDel(project.id, del.id, "rounds", newRounds);
+        });
+      }
+    };
     const openEditEvent = (ev) => setEditEvent({ id: ev.id, label: ev.label, date: ev.date, time: ev.time || "", hasTime: ev.hasTime });
     const handleEventClick = (ev) => {
       if (ev._ghost) {
@@ -16018,12 +16138,54 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const handleCardLeave = () => {
       hoverTimerRef.current = setTimeout(() => setHoverEv(null), 200);
     };
+    const handleCardOpen = (ev) => {
+      setHoverEv(null);
+      handleEventClick(ev);
+    };
     const shiftWeek = (delta) => setWeekStart((w) => {
       const n = new Date(w);
       n.setDate(n.getDate() + delta * 7);
       return n;
     });
     const openDayContextMenu = (ds, x, y) => setContextMenu({ date: ds, x, y });
+    const startZoomDrag = (e) => {
+      e.preventDefault();
+      zoomDragRef.current = { startY: e.clientY, startZoom: zoom };
+      const onMove = (ev) => {
+        const dy = ev.clientY - zoomDragRef.current.startY;
+        setZoom(Math.max(1, Math.min(3, zoomDragRef.current.startZoom + dy / 260)));
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    };
+    const removeRoundMember = (m) => {
+      const del = (project.deliverables || []).find((d) => d.id === m.ref?.delId);
+      if (!del) return;
+      const newRounds = (del.rounds || []).filter((_, i) => i !== m.ref.roundIdx);
+      onUpdateDel(project.id, del.id, "rounds", newRounds);
+    };
+    const addRoundMember = (template, delId) => {
+      const del = (project.deliverables || []).find((d) => d.id === delId);
+      if (!del || !template) return;
+      const newRound = {
+        id: uid(),
+        label: template.type === "workreview" ? "Work Review" : `Round ${(del.rounds || []).length + 1}`,
+        deadline: `${template.date}T${template.time}`,
+        reviewers: [...template.reviewers || []],
+        status: ROUND_STATUSES[0],
+        notes: "",
+        reviewRoundId: template.groupId && template.type === "round" ? template.groupId : null,
+        isWorkReview: template.type === "workreview",
+        workReviewSessionId: template.type === "workreview" ? template.groupId : null
+      };
+      onUpdateDel(project.id, del.id, "rounds", [...del.rounds || [], newRound]);
+    };
+    const editingEv = editEvent ? groupedEvents.find((x) => x.id === editEvent.id) : null;
+    const editingMembers = editingEv ? editingEv._members || [editingEv] : [];
     return /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 20px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 } }, viewMode === "month" ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -16108,8 +16270,9 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       {
         weekStart,
         events: groupedEvents,
+        hourPx,
         canEdit,
-        onCommitMove: commitDateChange,
+        onCommitMove: requestDateChange,
         onEventClick: handleEventClick,
         onEventEnter: handleEventEnter,
         onEventLeave: handleEventLeave,
@@ -16121,29 +16284,68 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         calY,
         calM,
         events: groupedEvents,
+        stripH,
         canEdit,
-        onCommitMove: commitDateChange,
+        onCommitMove: requestDateChange,
         onEventClick: handleEventClick,
         onEventEnter: handleEventEnter,
         onEventLeave: handleEventLeave,
         onProductionDragBlocked: (ev) => setProdBlockedEv(ev),
         onDayContextMenu: openDayContextMenu
       }
+    ), canEdit && /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onPointerDown: startZoomDrag,
+        title: "Drag to expand the calendar for more precise timing",
+        style: { height: 16, marginTop: 6, display: "flex", alignItems: "center", justifyContent: "center", cursor: "ns-resize", borderTop: "1px dashed #1f2937" }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { width: 44, height: 4, borderRadius: 2, background: "#374151" } })
     ), hoverEv && /* @__PURE__ */ React.createElement(
       CalEventHoverCard,
       {
         ev: hoverEv.ev,
         project,
-        allProjects,
         team,
         talentRoster,
-        onUpdateDel,
         x: hoverEv.x,
         y: hoverEv.y,
         onMouseEnter: handleCardEnter,
-        onMouseLeave: handleCardLeave
+        onMouseLeave: handleCardLeave,
+        onOpen: handleCardOpen
       }
-    ), editEvent && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 900, display: "flex", alignItems: "center", justifyContent: "center" }, onClick: () => setEditEvent(null) }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 10, padding: 20, width: 280 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#f1f5f9", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif" } }, editEvent.label), editEvent.hasTime && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 14 } }, "Currently ", editEvent.time || "\u2014", " \xB7 drag the event box to change the time"), /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, color: "#8e97a6", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4, marginTop: editEvent.hasTime ? 0 : 14 } }, "Date"), /* @__PURE__ */ React.createElement(
+    ), editEvent && editingEv && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 900, display: "flex", alignItems: "center", justifyContent: "center" }, onClick: () => setEditEvent(null) }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 10, padding: 20, width: 340, maxHeight: "80vh", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#f1f5f9", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif" } }, editEvent.label), editEvent.hasTime && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 14 } }, "Currently ", editEvent.time || "\u2014", " \xB7 drag the event box to change the time"), editingEv.type === "deliverable" && /* @__PURE__ */ React.createElement("div", { style: { marginTop: editEvent.hasTime ? 0 : 10, marginBottom: 14, display: "flex", flexDirection: "column", gap: 6 } }, editingMembers.map((m) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: m.id,
+        onClick: () => {
+          onGoToDeliverable?.(m.ref?.id);
+          setEditEvent(null);
+        },
+        style: { textAlign: "left", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, padding: "8px 10px", color: "#818cf8", fontSize: 14, fontWeight: 700, cursor: "pointer" }
+      },
+      "\u2192 ",
+      m.delTitle,
+      " \u2014 open in Deliverables"
+    ))), (editingEv.type === "round" || editingEv.type === "workreview") && (() => {
+      const attachedIds = editingMembers.map((m) => m.ref?.delId).filter(Boolean);
+      const candidates = (project.deliverables || []).filter((d) => !attachedIds.includes(d.id));
+      return /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#8e97a6", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Reviewers"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#e2e8f0", marginBottom: 10 } }, (editingMembers[0].reviewers || []).join(", ") || "None set"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#8e97a6", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Deliverables"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 6 } }, editingMembers.map((m) => /* @__PURE__ */ React.createElement("div", { key: m.id, style: { display: "flex", alignItems: "center", gap: 8, background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, padding: "5px 8px" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#e2e8f0", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, m.delTitle), /* @__PURE__ */ React.createElement("button", { onClick: () => removeRoundMember(m), style: { background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 16, lineHeight: 1 } }, "\xD7")))), candidates.length > 0 && /* @__PURE__ */ React.createElement(
+        "select",
+        {
+          defaultValue: "",
+          onChange: (e) => {
+            if (e.target.value === "__all__") candidates.forEach((d) => addRoundMember(editingMembers[0], d.id));
+            else if (e.target.value) addRoundMember(editingMembers[0], e.target.value);
+            e.target.value = "";
+          },
+          style: { width: "100%", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#9ca3af", padding: "6px 8px", fontSize: 13, outline: "none" }
+        },
+        /* @__PURE__ */ React.createElement("option", { value: "" }, "+ Add deliverable\u2026"),
+        candidates.length > 1 && /* @__PURE__ */ React.createElement("option", { value: "__all__" }, "\u2795 All Deliverables (", candidates.length, ")"),
+        candidates.map((d) => /* @__PURE__ */ React.createElement("option", { key: d.id, value: d.id }, d.title || "Untitled"))
+      ));
+    })(), /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, color: "#8e97a6", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 } }, "Date"), /* @__PURE__ */ React.createElement(
       "input",
       {
         type: "date",
@@ -16155,8 +16357,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       "button",
       {
         onClick: () => {
-          const ev = groupedEvents.find((x) => x.id === editEvent.id);
-          commitDateChange(ev, editEvent.date, editEvent.time);
+          requestDateChange(editingEv, editEvent.date, editEvent.time);
           setEditEvent(null);
         },
         style: { flex: 1, background: "#6366f1", border: "none", borderRadius: 6, color: "#fff", padding: "8px 0", fontSize: 14, fontWeight: 700, cursor: "pointer" }
@@ -16184,6 +16385,33 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       {
         onClick: () => setProdBlockedEv(null),
         style: { flex: 1, background: "#1f2937", border: "none", borderRadius: 6, color: "#9ca3af", padding: "8px 0", fontSize: 14, fontWeight: 700, cursor: "pointer" }
+      },
+      "Cancel"
+    )))), wrConfirm && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 900, display: "flex", alignItems: "center", justifyContent: "center" }, onClick: () => setWrConfirm(null) }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 10, padding: 20, width: 360 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#f1f5f9", marginBottom: 8, fontFamily: "'Barlow Condensed',sans-serif" } }, "Change Work Review Time?"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", marginBottom: 16 } }, "This session may be shared with other projects. How should this change apply?"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => {
+          commitWorkReviewChange(wrConfirm.ev, wrConfirm.newDate, wrConfirm.newTime, "all");
+          setWrConfirm(null);
+        },
+        style: { background: "#6366f1", border: "none", borderRadius: 6, color: "#fff", padding: "9px 10px", fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "left" }
+      },
+      "Change time for ALL projects using this session"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => {
+          commitWorkReviewChange(wrConfirm.ev, wrConfirm.newDate, wrConfirm.newTime, "fork");
+          setWrConfirm(null);
+        },
+        style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 6, color: "#e2e8f0", padding: "9px 10px", fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "left" }
+      },
+      "Create a new Work Review with just these deliverables"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setWrConfirm(null),
+        style: { background: "none", border: "none", color: "#6b7280", padding: "6px 10px", fontSize: 13, cursor: "pointer" }
       },
       "Cancel"
     )))), contextMenu && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 950 }, onClick: () => setContextMenu(null), onContextMenu: (e) => {
