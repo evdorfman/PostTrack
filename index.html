@@ -506,6 +506,54 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     return "In Progress";
   };
   var PRODUCTION_TYPES = ["Content Shoot", "Social Content", "Pre-tape", "Live Event", "Live Broadcast", "Hybrid Event", "Live Playback", "Podcast", "Post-Only", "Other"];
+  var CREW_ROLES_DEFAULT = [
+    "Producer",
+    "Director",
+    "DP",
+    "Gaffer",
+    "Camera Op",
+    "Sound Mixer",
+    "Hair and Makeup",
+    "Production Assistant",
+    "Assistant Camera",
+    "Audio Op with Kit",
+    "Drone Operator with gear",
+    "Media Manager",
+    "DIT",
+    "Teleprompter Op",
+    "SM",
+    "A2",
+    "V1",
+    "A1",
+    "Playback Operator"
+  ];
+  var CREW_ROLES_BROADCAST_DEFAULT = [
+    "Live Director",
+    "Technical Director",
+    "Broadcast Coordinator",
+    "Camera Op",
+    "Audio Tech",
+    "Lighting Director",
+    "Producer",
+    "Project Manager",
+    "Video Engineer",
+    "V1",
+    "EVS Operator",
+    "Replay Operator",
+    "Graphics Operator",
+    "DP",
+    "Audio Op with Kit",
+    "Assistant Camera",
+    "Production Assistant",
+    "Drone Operator with gear",
+    "Media Manager",
+    "DIT",
+    "Teleprompter Op",
+    "SM",
+    "A2",
+    "A1",
+    "Playback Operator"
+  ];
   var BOOKING_STATUSES = ["Tentative", "Confirmed", "In Progress", "Completed", "Cancelled"];
   var SHOOT_TYPES = ["Content Shoot", "Social Content", "Pre-tape", "Live Event", "Live Broadcast", "Hybrid Event", "Podcast"];
   var BROADCAST_TYPES = ["Live Event", "Live Broadcast", "Hybrid Event"];
@@ -1860,6 +1908,19 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const hasSelection = selStart !== null && selEnd !== null && selEnd - selStart >= 0.25;
     const dayBookings = selDate ? bookingMap[selDate] || {} : {};
     const roomBookings = dayBookings[selRoom] || [];
+    const packedRoomBookings = (0, import_react.useMemo)(() => {
+      const sorted = [...roomBookings].sort((a, b) => a.startH - b.startH);
+      const laneEnds = [];
+      const placed = sorted.map((b) => {
+        let lane = laneEnds.findIndex((end) => end <= b.startH);
+        if (lane === -1) {
+          lane = laneEnds.length;
+          laneEnds.push(b.endH);
+        } else laneEnds[lane] = b.endH;
+        return { ...b, lane };
+      });
+      return { items: placed, totalLanes: Math.max(1, laneEnds.length) };
+    }, [roomBookings]);
     const allTicks = [];
     for (let h = AVAIL_HOURS_START; h <= AVAIL_HOURS_END; h += 0.25) {
       const isHour = Number.isInteger(h);
@@ -1976,19 +2037,23 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           background: isHour ? "#374151" : isHalf ? "#293447" : "#1f2d40",
           pointerEvents: "none"
         } })),
-        roomBookings.map((b, i) => /* @__PURE__ */ React.createElement("div", { key: i, title: b.name, style: {
-          position: "absolute",
-          left: `${hToP(b.startH)}%`,
-          width: `${hToP(b.endH) - hToP(b.startH)}%`,
-          top: "18%",
-          bottom: "18%",
-          background: ["Approved", "Happening Now"].includes(b.status) ? "#ef444330" : "#f59e0b22",
-          border: `1px solid ${["Approved", "Happening Now"].includes(b.status) ? "#ef444460" : "#f59e0b50"}`,
-          borderRadius: 5,
-          display: "flex",
-          alignItems: "center",
-          pointerEvents: "none"
-        } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: ["Approved", "Happening Now"].includes(b.status) ? "#ef4444" : "#f59e0b", padding: "0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, b.name))),
+        packedRoomBookings.items.map((b, i) => {
+          const laneH = 64 / packedRoomBookings.totalLanes;
+          return /* @__PURE__ */ React.createElement("div", { key: i, title: b.name, style: {
+            position: "absolute",
+            left: `${hToP(b.startH)}%`,
+            width: `${hToP(b.endH) - hToP(b.startH)}%`,
+            top: `${18 + b.lane * laneH}%`,
+            height: `${laneH}%`,
+            background: ["Approved", "Happening Now"].includes(b.status) ? "#ef444330" : "#f59e0b22",
+            border: `1px solid ${["Approved", "Happening Now"].includes(b.status) ? "#ef444460" : "#f59e0b50"}`,
+            borderRadius: 5,
+            display: "flex",
+            alignItems: "center",
+            pointerEvents: "none",
+            overflow: "hidden"
+          } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: packedRoomBookings.totalLanes > 1 ? 12 : 14, color: ["Approved", "Happening Now"].includes(b.status) ? "#ef4444" : "#f59e0b", padding: "0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, b.name));
+        }),
         hasSelection && /* @__PURE__ */ React.createElement("div", { style: {
           position: "absolute",
           left: `${hToP(selStart)}%`,
@@ -3370,6 +3435,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const [choice, setChoice] = (0, import_react.useState)(initialDate ? WORK_REVIEW_NEW_VALUE : initialSessionId || "");
     const [newDatetime, setNewDatetime] = (0, import_react.useState)(initialDate ? `${initialDate}T14:00` : "");
     const [newLocation, setNewLocation] = (0, import_react.useState)("");
+    const [newZoomLink, setNewZoomLink] = (0, import_react.useState)("");
     const [newReviewers, setNewReviewers] = (0, import_react.useState)([]);
     const [selectedIds, setSelectedIds] = (0, import_react.useState)([]);
     const nowISO = (/* @__PURE__ */ new Date()).toISOString().slice(0, 16);
@@ -3395,7 +3461,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const canSubmit = (isNew ? !!newDatetime : !!session) && selectedIds.length > 0;
     const submit = () => {
       if (!canSubmit) return;
-      const targetSession = isNew ? addWorkReviewSession({ datetime: newDatetime, location: newLocation.trim(), reviewers: [...newReviewers] }) : session;
+      const targetSession = isNew ? addWorkReviewSession({ datetime: newDatetime, location: newLocation.trim(), zoomLink: newZoomLink.trim(), reviewers: [...newReviewers] }) : session;
       selectedIds.filter((id) => !alreadyAttachedIds.includes(id)).forEach((delId) => {
         const del = deliverables.find((d) => d.id === delId);
         if (!del) return;
@@ -3415,7 +3481,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       });
       onClose();
     };
-    return /* @__PURE__ */ React.createElement(Modal, { onClose, maxWidth: 560 }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.02em", marginBottom: 16 } }, "Add a Work Review Round"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(FLabel, null, "Work Review Session"), /* @__PURE__ */ React.createElement(Sel, { value: choice, onChange: (e) => setChoice(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 select \u2014"), /* @__PURE__ */ React.createElement("option", { value: WORK_REVIEW_NEW_VALUE }, "\u2795 New Work Review"), upcoming.map((s) => /* @__PURE__ */ React.createElement("option", { key: s.id, value: s.id }, fmtDT(s.datetime), s.location ? ` \xB7 ${s.location}` : "")))), choice && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(FLabel, null, "Date & Time"), isNew ? /* @__PURE__ */ React.createElement(DateTimePicker, { value: newDatetime, onChange: setNewDatetime, label: "Work Review date/time" }) : /* @__PURE__ */ React.createElement(DateTimePicker, { value: session?.datetime || "", onChange: (v) => updateWorkReviewSession(session.id, { datetime: v }), label: "Work Review date/time" })), isNew && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(FLabel, null, "Location ", /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "#4b5563" } }, "(optional)")), /* @__PURE__ */ React.createElement(Inp, { value: newLocation, onChange: (e) => setNewLocation(e.target.value), placeholder: "e.g. Conference Room B" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(FLabel, null, "Reviewers ", /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "#4b5563" } }, "(optional)")), /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement(Modal, { onClose, maxWidth: 560 }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.02em", marginBottom: 16 } }, "Add a Work Review Round"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(FLabel, null, "Work Review Session"), /* @__PURE__ */ React.createElement(Sel, { value: choice, onChange: (e) => setChoice(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 select \u2014"), /* @__PURE__ */ React.createElement("option", { value: WORK_REVIEW_NEW_VALUE }, "\u2795 New Work Review"), upcoming.map((s) => /* @__PURE__ */ React.createElement("option", { key: s.id, value: s.id }, fmtDT(s.datetime), s.location ? ` \xB7 ${s.location}` : "")))), choice && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(FLabel, null, "Date & Time"), isNew ? /* @__PURE__ */ React.createElement(DateTimePicker, { value: newDatetime, onChange: setNewDatetime, label: "Work Review date/time" }) : /* @__PURE__ */ React.createElement(DateTimePicker, { value: session?.datetime || "", onChange: (v) => updateWorkReviewSession(session.id, { datetime: v }), label: "Work Review date/time" })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(FLabel, null, "Location ", /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "#4b5563" } }, "(optional)")), isNew ? /* @__PURE__ */ React.createElement(Inp, { value: newLocation, onChange: (e) => setNewLocation(e.target.value), placeholder: "e.g. Conference Room B" }) : /* @__PURE__ */ React.createElement(Inp, { value: session?.location || "", onChange: (e) => updateWorkReviewSession(session.id, { location: e.target.value }), placeholder: "e.g. Conference Room B" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(FLabel, null, "Zoom Link ", /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "#4b5563" } }, "(optional)")), isNew ? /* @__PURE__ */ React.createElement(Inp, { value: newZoomLink, onChange: (e) => setNewZoomLink(e.target.value), placeholder: "https://zoom.us/j/\u2026" }) : /* @__PURE__ */ React.createElement(Inp, { value: session?.zoomLink || "", onChange: (e) => updateWorkReviewSession(session.id, { zoomLink: e.target.value }), placeholder: "https://zoom.us/j/\u2026" }))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(FLabel, null, "Reviewers ", /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "#4b5563" } }, "(optional)")), /* @__PURE__ */ React.createElement(
       ReviewerTagInput,
       {
         value: isNew ? newReviewers : session?.reviewers || [],
@@ -3435,7 +3501,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       }
     ))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 } }, /* @__PURE__ */ React.createElement(Btn, { variant: "ghost", onClick: onClose }, "Cancel"), /* @__PURE__ */ React.createElement(Btn, { onClick: submit, disabled: !canSubmit }, "Add to Work Review"))));
   };
-  var ProjectReviewRoundsList = ({ project, onUpdateDel, reviewerNames = [], addReviewerName }) => {
+  var ProjectReviewRoundsList = ({ project, onUpdateDel, reviewerNames = [], addReviewerName, workReviewSessions = [], updateWorkReviewSession }) => {
     const [expandedKey, setExpandedKey] = (0, import_react.useState)(null);
     const groups = (0, import_react.useMemo)(() => {
       const byKey = {};
@@ -3472,7 +3538,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       const isWR = !!first.isWorkReview;
       const isExp = expandedKey === key;
       const color = isWR ? "#ec4899" : RCOLOR[first.status] || "#eab308";
-      return /* @__PURE__ */ React.createElement("div", { key, style: { background: "#0a0f1a", border: `1px solid ${color}30`, borderRadius: 8, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { onClick: () => setExpandedKey(isExp ? null : key), style: { display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", cursor: "pointer" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15 } }, isWR ? "\u{1F3A5}" : "\u21BA"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: "#e2e8f0" } }, isWR ? "Work Review" : "Review Round", " \u2014 ", fmtDT(first.deadline)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, members.map((m) => m.del.title || "Untitled").join(", "))), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#4b5563", flexShrink: 0 } }, members.length, " deliverable", members.length !== 1 ? "s" : ""), /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontSize: 13, flexShrink: 0 } }, isExp ? "\u25B2" : "\u25BC")), isExp && /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { padding: "10px 12px", borderTop: "1px solid #1f2937", display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: first.deadline, onChange: (v) => updateGroupField(members, "deadline", v), label: "Round date/time" }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", fontWeight: 700, marginBottom: 5, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.08em", textTransform: "uppercase" } }, "Reviewers"), /* @__PURE__ */ React.createElement(
+      const session = isWR ? workReviewSessions.find((s) => s.id === first.workReviewSessionId) : null;
+      return /* @__PURE__ */ React.createElement("div", { key, style: { background: "#0a0f1a", border: `1px solid ${color}30`, borderRadius: 8, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { onClick: () => setExpandedKey(isExp ? null : key), style: { display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", cursor: "pointer" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15 } }, isWR ? "\u{1F3A5}" : "\u21BA"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: "#e2e8f0" } }, isWR ? "Work Review" : "Review Round", " \u2014 ", fmtDT(first.deadline), isWR && session?.location && /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontWeight: 400 } }, " \xB7 ", session.location), isWR && session?.zoomLink && /* @__PURE__ */ React.createElement("a", { href: session.zoomLink, target: "_blank", rel: "noopener noreferrer", onClick: (e) => e.stopPropagation(), style: { marginLeft: 6, fontSize: 12, color: "#818cf8" } }, "Zoom \u2197")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, members.map((m) => m.del.title || "Untitled").join(", "))), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#4b5563", flexShrink: 0 } }, members.length, " deliverable", members.length !== 1 ? "s" : ""), /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontSize: 13, flexShrink: 0 } }, isExp ? "\u25B2" : "\u25BC")), isExp && /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { padding: "10px 12px", borderTop: "1px solid #1f2937", display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: first.deadline, onChange: (v) => updateGroupField(members, "deadline", v), label: "Round date/time" }), isWR && session && updateWorkReviewSession && /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", fontWeight: 700, marginBottom: 5, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.08em", textTransform: "uppercase" } }, "Location"), /* @__PURE__ */ React.createElement(Inp, { value: session.location || "", onChange: (e) => updateWorkReviewSession(session.id, { location: e.target.value }), placeholder: "e.g. Conference Room B" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", fontWeight: 700, marginBottom: 5, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.08em", textTransform: "uppercase" } }, "Zoom Link"), /* @__PURE__ */ React.createElement(Inp, { value: session.zoomLink || "", onChange: (e) => updateWorkReviewSession(session.id, { zoomLink: e.target.value }), placeholder: "https://zoom.us/j/\u2026" }))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", fontWeight: 700, marginBottom: 5, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.08em", textTransform: "uppercase" } }, "Reviewers"), /* @__PURE__ */ React.createElement(
         ReviewerTagInput,
         {
           value: first.reviewers || [],
@@ -4606,7 +4673,7 @@ Brief content: ${content}`;
       return this.props.children;
     }
   };
-  var ProjectOverview = ({ project, team, allProjects, onClose, onUpdateDel, onAddDel, onDeleteDel, onUpdateProject, initialDelId, initialTab, initialShootId, initialItemId, studioBookings = [], mediaCards = [], setupTypes = [], onAddSetupType, talentRoster = [], onUpdateTalentRoster, nudges = [], onAddNudge, furnitureList = [], propsList = [], screenContentOptions = {}, gearList = [], customTasks = [], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, appPresets = [], onSaveAppPresets, vendorCompanies = [], addVendorCompany, intakes = [], becRequests = [], canAccessBudget = true, reviewerNames = [], addReviewerName, workReviewSessions = [], addWorkReviewSession, updateWorkReviewSession }) => {
+  var ProjectOverview = ({ project, team, allProjects, onClose, onUpdateDel, onAddDel, onDeleteDel, onUpdateProject, initialDelId, initialTab, initialShootId, initialItemId, studioBookings = [], mediaCards = [], setupTypes = [], onAddSetupType, talentRoster = [], onUpdateTalentRoster, nudges = [], onAddNudge, furnitureList = [], propsList = [], screenContentOptions = {}, gearList = [], customTasks = [], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, appPresets = [], onSaveAppPresets, vendorCompanies = [], addVendorCompany, intakes = [], becRequests = [], canAccessBudget = true, reviewerNames = [], addReviewerName, workReviewSessions = [], addWorkReviewSession, updateWorkReviewSession, lists = {} }) => {
     const [activeDelModal, setActiveDelModal] = (0, import_react.useState)(initialDelId || (initialTab === "deliverables" || initialTab === "ingest" ? initialItemId : null) || null);
     const [handoffDelId, setHandoffDelId] = (0, import_react.useState)(null);
     const editors = team.filter((m) => m.roles?.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
@@ -4896,7 +4963,17 @@ Brief content: ${content}`;
         style: { background: "transparent", border: "none", color: "#818cf8", padding: "7px 14px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" }
       },
       "+ Add a Work Review Round"
-    )), /* @__PURE__ */ React.createElement(ProjectReviewRoundsList, { project: lp, onUpdateDel, reviewerNames, addReviewerName })), showAddReviewRound && /* @__PURE__ */ React.createElement(AddReviewRoundModal, { project: lp, onUpdateDel, reviewerNames, addReviewerName, onClose: () => setShowAddReviewRound(false) }), showAddWorkReview && /* @__PURE__ */ React.createElement(
+    )), /* @__PURE__ */ React.createElement(
+      ProjectReviewRoundsList,
+      {
+        project: lp,
+        onUpdateDel,
+        reviewerNames,
+        addReviewerName,
+        workReviewSessions,
+        updateWorkReviewSession
+      }
+    )), showAddReviewRound && /* @__PURE__ */ React.createElement(AddReviewRoundModal, { project: lp, onUpdateDel, reviewerNames, addReviewerName, onClose: () => setShowAddReviewRound(false) }), showAddWorkReview && /* @__PURE__ */ React.createElement(
       AddWorkReviewRoundModal,
       {
         project: lp,
@@ -5082,6 +5159,7 @@ Brief content: ${content}`;
         gearList,
         appPresets,
         onSaveAppPresets,
+        lists,
         vendorCompanies,
         addVendorCompany,
         onUpdate: (prods) => onUpdateProject(project.id, "productions", prods),
@@ -7831,7 +7909,7 @@ Brief content: ${content}`;
       "div",
       {
         onClick,
-        style: { display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", background: isExpanded ? "#1f2937" : "#111827", border: `1px solid ${isExpanded ? "#6366f1" : changes ? "#ef444430" : "#1f2937"}`, borderRadius: isExpanded ? "10px 10px 0 0" : 10, cursor: onClick ? "pointer" : "default" },
+        style: { display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", background: isExpanded ? "#1f2937" : "#111827", border: `1px solid ${isExpanded ? "#6366f1" : changes ? "#ef444430" : "#1f2937"}`, borderRadius: isExpanded ? "10px 10px 0 0" : 10, cursor: onClick ? "pointer" : "default" },
         onMouseEnter: (e) => {
           if (!isExpanded) e.currentTarget.style.borderColor = changes ? "#ef4444" : "#374151";
         },
@@ -7839,16 +7917,16 @@ Brief content: ${content}`;
           if (!isExpanded) e.currentTarget.style.borderColor = changes ? "#ef444430" : "#1f2937";
         }
       },
-      /* @__PURE__ */ React.createElement("div", { style: { width: 9, height: 9, borderRadius: "50%", background: DCOLOR[d.status], flexShrink: 0 } }),
-      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 2, flexWrap: "wrap" } }, editable ? /* @__PURE__ */ React.createElement("input", { value: d.title || "", onChange: (e) => {
+      /* @__PURE__ */ React.createElement("div", { style: { width: 8, height: 8, borderRadius: "50%", background: DCOLOR[d.status], flexShrink: 0 } }),
+      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 1, flexWrap: "wrap" } }, editable ? /* @__PURE__ */ React.createElement("input", { value: d.title || "", onChange: (e) => {
         e.stopPropagation();
         onUpdateDel(projectId, d.id, "title", e.target.value);
-      }, onClick: (e) => e.stopPropagation(), onFocus: (e) => e.stopPropagation(), placeholder: "Deliverable title\u2026", style: { fontWeight: 700, fontSize: 20, color: "#f1f5f9", background: "transparent", border: "none", outline: "none", padding: 0, cursor: "text", fontFamily: "'DM Sans',sans-serif", flex: "0 1 auto", minWidth: 60 } }) : /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, fontSize: 20, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, d.title || "Untitled"), readOnly ? /* @__PURE__ */ React.createElement(Chip, { label: d.status, color: DCOLOR[d.status], xs: true }) : /* @__PURE__ */ React.createElement(DelStatusSel, { status: d.status, onChange: (v) => onUpdateDel(projectId, d.id, "status", v), xs: true }), !readOnly && editorEditable && /* @__PURE__ */ React.createElement(DelEditorSel, { editorId: d.editorId, editors: editors || [], onChange: (v) => onUpdateDel(projectId, d.id, "editorId", v), xs: true }), d._fromPreset && /* @__PURE__ */ React.createElement(Chip, { label: "Internal Planning", color: "#8b5cf6", xs: true }), d.aspectRatio && /* @__PURE__ */ React.createElement(Chip, { label: d.aspectRatio, color: "#374151", xs: true }), d.srtNeeded && /* @__PURE__ */ React.createElement(Chip, { label: "SRT", color: "#06b6d4", xs: true }), d.captionsNeeded && /* @__PURE__ */ React.createElement(Chip, { label: "Captions", color: "#a855f7", xs: true }), allAppr && /* @__PURE__ */ React.createElement(Chip, { label: "\u2713 Approved", color: "#10b981", xs: true }), changes && /* @__PURE__ */ React.createElement(Chip, { label: "\u21A9 Changes", color: "#ef4444", xs: true })), activeR && activeR.deadline && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: RCOLOR[activeR.status], marginBottom: 2 } }, activeR.label, " due ", fmtDT(activeR.deadline), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 6 } }, /* @__PURE__ */ React.createElement(Dl, { date: activeR.deadline, inline: true }))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 1, fontSize: 14, color: "#9ca3af" } }, !editorEditable && ed && /* @__PURE__ */ React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(Av, { name: ed.name, size: 14 }), ed.name), showProject && /* @__PURE__ */ React.createElement("span", { style: { color: "#6366f1" } }, projectName), d._segments?.length > 1 && d._segments.map((seg, i) => {
+      }, onClick: (e) => e.stopPropagation(), onFocus: (e) => e.stopPropagation(), placeholder: "Deliverable title\u2026", style: { fontWeight: 700, fontSize: 16, color: "#f1f5f9", background: "transparent", border: "none", outline: "none", padding: 0, cursor: "text", fontFamily: "'DM Sans',sans-serif", flex: "0 1 auto", minWidth: 60 } }) : /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, fontSize: 16, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, d.title || "Untitled"), readOnly ? /* @__PURE__ */ React.createElement(Chip, { label: d.status, color: DCOLOR[d.status], xs: true }) : /* @__PURE__ */ React.createElement(DelStatusSel, { status: d.status, onChange: (v) => onUpdateDel(projectId, d.id, "status", v), xs: true }), !readOnly && editorEditable && /* @__PURE__ */ React.createElement(DelEditorSel, { editorId: d.editorId, editors: editors || [], onChange: (v) => onUpdateDel(projectId, d.id, "editorId", v), xs: true }), d._fromPreset && /* @__PURE__ */ React.createElement(Chip, { label: "Internal Planning", color: "#8b5cf6", xs: true }), d.aspectRatio && /* @__PURE__ */ React.createElement(Chip, { label: d.aspectRatio, color: "#374151", xs: true }), d.srtNeeded && /* @__PURE__ */ React.createElement(Chip, { label: "SRT", color: "#06b6d4", xs: true }), d.captionsNeeded && /* @__PURE__ */ React.createElement(Chip, { label: "Captions", color: "#a855f7", xs: true }), allAppr && /* @__PURE__ */ React.createElement(Chip, { label: "\u2713 Approved", color: "#10b981", xs: true }), changes && /* @__PURE__ */ React.createElement(Chip, { label: "\u21A9 Changes", color: "#ef4444", xs: true })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", fontSize: 13, color: "#9ca3af" } }, !editorEditable && ed && /* @__PURE__ */ React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(Av, { name: ed.name, size: 13 }), ed.name), showProject && /* @__PURE__ */ React.createElement("span", { style: { color: "#6366f1" } }, projectName), activeR && activeR.deadline && /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600, color: RCOLOR[activeR.status] } }, activeR.label, " due ", fmtDT(activeR.deadline), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 5 } }, /* @__PURE__ */ React.createElement(Dl, { date: activeR.deadline, inline: true }))), d._segments?.length > 1 && d._segments.map((seg, i) => {
         const segEd = team?.find((m) => m.id === seg.editorId);
         const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
         const isCurrent = (!seg.from || seg.from <= todayStr) && (!seg.to || seg.to >= todayStr);
-        return /* @__PURE__ */ React.createElement("span", { key: i, style: { fontSize: 13, color: isCurrent ? "#d1d5db" : "#838ba0", background: "#1f293780", borderRadius: 4, padding: "1px 6px", display: "flex", alignItems: "center", gap: 3 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 5, height: 5, borderRadius: "50%", background: isCurrent ? "#10b981" : "#374151", flexShrink: 0 } }), segEd?.name || "?", ": ", fmtSegRange(seg.from, seg.to));
-      }), (d.deliverableType || "Standard") === "BXTV" && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "#818cf8", background: "#6366f115", border: "1px solid #6366f140", borderRadius: 4, padding: "1px 7px", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "\u{1F4FA} BXTV", d.bxtvLink?.episodeProjectId && (() => {
+        return /* @__PURE__ */ React.createElement("span", { key: i, style: { fontSize: 12, color: isCurrent ? "#d1d5db" : "#838ba0", background: "#1f293780", borderRadius: 4, padding: "1px 6px", display: "flex", alignItems: "center", gap: 3 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 5, height: 5, borderRadius: "50%", background: isCurrent ? "#10b981" : "#374151", flexShrink: 0 } }), segEd?.name || "?", ": ", fmtSegRange(seg.from, seg.to));
+      }), (d.deliverableType || "Standard") === "BXTV" && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: "#818cf8", background: "#6366f115", border: "1px solid #6366f140", borderRadius: 4, padding: "1px 7px", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "\u{1F4FA} BXTV", d.bxtvLink?.episodeProjectId && (() => {
         const ep = allProjects.find((p) => p.id === d.bxtvLink.episodeProjectId);
         return ep ? ` \xB7 ${getBXTVEpisodeName(ep) || ep.name}` : "";
       })()), onHandoff && /* @__PURE__ */ React.createElement(
@@ -7858,7 +7936,7 @@ Brief content: ${content}`;
             e.stopPropagation();
             onHandoff(d.id);
           },
-          style: { fontSize: 12, fontWeight: 700, color: "#818cf8", background: "#6366f115", border: "1px solid #6366f140", cursor: "pointer", padding: "2px 9px", borderRadius: 4, flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" },
+          style: { fontSize: 11, fontWeight: 700, color: "#818cf8", background: "#6366f115", border: "1px solid #6366f140", cursor: "pointer", padding: "1px 8px", borderRadius: 4, flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" },
           onMouseEnter: (e) => {
             e.currentTarget.style.background = "#6366f125";
             e.currentTarget.style.borderColor = "#6366f170";
@@ -7869,57 +7947,59 @@ Brief content: ${content}`;
           }
         },
         "\u2194 Assign Editors"
-      )), editable && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginTop: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#374151" } }, "Type:"), ["Standard", "BXTV"].map((t) => {
+      ), editable && ["Standard", "BXTV"].map((t) => {
         const active = (d.deliverableType || "Standard") === t;
+        if (!active) return null;
         return /* @__PURE__ */ React.createElement(
           "button",
           {
             key: t,
             onClick: (e) => {
               e.stopPropagation();
-              onUpdateDel(projectId, d.id, "deliverableType", t);
+              onUpdateDel(projectId, d.id, "deliverableType", t === "Standard" ? "BXTV" : "Standard");
             },
-            style: { padding: "1px 8px", borderRadius: 4, border: `1px solid ${active && t === "BXTV" ? "#6366f1" : active ? "#374151" : "#1f2937"}`, background: active && t === "BXTV" ? "#6366f115" : active ? "#1f2937" : "transparent", color: active && t === "BXTV" ? "#818cf8" : active ? "#e2e8f0" : "#374151", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" }
+            title: "Click to toggle Standard/BXTV",
+            style: { padding: "1px 7px", borderRadius: 4, border: `1px solid ${t === "BXTV" ? "#6366f1" : "#374151"}`, background: t === "BXTV" ? "#6366f115" : "#1f2937", color: t === "BXTV" ? "#818cf8" : "#9ca3af", fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" }
           },
           t
         );
       }))),
-      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 3 } }, (d.rounds || []).map((r, i) => /* @__PURE__ */ React.createElement("div", { key: i, title: `${r.label}: ${r.status}`, style: { width: 20, height: 20, borderRadius: "50%", background: RCOLOR[r.status] + "30", border: `2px solid ${RCOLOR[r.status]}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: RCOLOR[r.status] } }, i + 1))), editable ? /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 } }, /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, fontWeight: 700, color: "#6b7280", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.07em" } }, "Final Due"), /* @__PURE__ */ React.createElement(
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 2 } }, (d.rounds || []).map((r, i) => /* @__PURE__ */ React.createElement("div", { key: i, title: `${r.label}: ${r.status}`, style: { width: 16, height: 16, borderRadius: "50%", background: RCOLOR[r.status] + "30", border: `1.5px solid ${RCOLOR[r.status]}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: RCOLOR[r.status] } }, i + 1))), editable ? /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement(
         "input",
         {
           type: "date",
           value: d.deadline || "",
           onChange: (e) => onUpdateDel(projectId, d.id, "deadline", e.target.value),
-          style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 5, color: d.deadline ? "#e2e8f0" : "#4b5563", padding: "3px 6px", fontSize: 14, outline: "none", cursor: "pointer", colorScheme: "dark", fontFamily: "inherit" }
+          style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 5, color: d.deadline ? "#e2e8f0" : "#4b5563", padding: "2px 5px", fontSize: 12, outline: "none", cursor: "pointer", colorScheme: "dark", fontFamily: "inherit" }
         }
-      ), d.deadline && /* @__PURE__ */ React.createElement(Dl, { date: d.deadline })) : /* @__PURE__ */ React.createElement(Dl, { date: d.deadline }), editable && onDeleteDel && /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation() }, confirmDelete ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#f59e0b", fontWeight: 700 } }, "Delete?"), /* @__PURE__ */ React.createElement(
+      ), d.deadline && /* @__PURE__ */ React.createElement(Dl, { date: d.deadline })) : /* @__PURE__ */ React.createElement(Dl, { date: d.deadline }), editable && onDeleteDel && /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation() }, confirmDelete ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#f59e0b", fontWeight: 700 } }, "Delete?"), /* @__PURE__ */ React.createElement(
         "button",
         {
           onClick: () => {
             onDeleteDel(projectId, d.id);
             setConfirmDelete(false);
           },
-          style: { background: "#ef444420", border: "1px solid #ef444450", borderRadius: 4, color: "#ef4444", padding: "2px 8px", fontSize: 12, fontWeight: 700, cursor: "pointer" }
+          style: { background: "#ef444420", border: "1px solid #ef444450", borderRadius: 4, color: "#ef4444", padding: "1px 7px", fontSize: 11, fontWeight: 700, cursor: "pointer" }
         },
         "Yes"
       ), /* @__PURE__ */ React.createElement(
         "button",
         {
           onClick: () => setConfirmDelete(false),
-          style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 4, color: "#9ca3af", padding: "2px 8px", fontSize: 12, fontWeight: 700, cursor: "pointer" }
+          style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 4, color: "#9ca3af", padding: "1px 7px", fontSize: 11, fontWeight: 700, cursor: "pointer" }
         },
         "No"
       )) : /* @__PURE__ */ React.createElement(
         "button",
         {
           onClick: () => setConfirmDelete(true),
-          style: { background: "none", border: "none", color: "#374151", cursor: "pointer", fontSize: 17, padding: "2px 4px", lineHeight: 1 },
+          style: { background: "none", border: "none", color: "#374151", cursor: "pointer", fontSize: 14, padding: "1px 3px", lineHeight: 1 },
           title: "Delete deliverable"
         },
         "\u{1F5D1}"
       ))),
-      /* @__PURE__ */ React.createElement(DelFrameInfo, { frameLink: d.frameLink, framePW: d.framePW }),
-      onClick && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 17, color: isExpanded ? "#6366f1" : "#4b5563" } }, isExpanded ? "\u25B2" : "\u203A")
+      /* @__PURE__ */ React.createElement(DelFrameInfo, { frameLink: d.frameLink, framePW: d.framePW, small: true }),
+      onClick && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, color: isExpanded ? "#6366f1" : "#4b5563" } }, isExpanded ? "\u25B2" : "\u203A")
     );
   };
   var DelFrameInfo = ({ frameLink, framePW, small }) => {
@@ -9196,13 +9276,7 @@ Brief content: ${content}`;
     })) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#374151", fontStyle: "italic" } }, "No active deliverables right now."))));
   };
   var MyViewHeader = ({ member, isAdmin, setSelectedMember, projects, onUpdateProject, onOpenProject }) => /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 24, paddingBottom: 16, borderBottom: "1px solid #1f2937" } }, isAdmin && /* @__PURE__ */ React.createElement("button", { onClick: () => setSelectedMember(null), style: { background: "#1f2937", border: "none", borderRadius: 7, color: "#9ca3af", padding: "6px 12px", cursor: "pointer", fontSize: 16, fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "\u2630 Browse All My Views"), /* @__PURE__ */ React.createElement(Av, { name: member.name, size: 40 }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 24, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, member.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#9ca3af" } }, member.roles.join(" \xB7 "), " \xB7 ", member.employeeType)), /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto" } }, /* @__PURE__ */ React.createElement(NotificationBell, { member, projects, onUpdateProject, onOpenProject })));
-  var WorkReviewView = ({ projects, team = [], onOpenProject, onUpdateProject, onUpdateDel, onDeleteDel, talentRoster = [], workReviewSessions = [] }) => {
-    const [expandedIds, setExpandedIds] = (0, import_react.useState)(/* @__PURE__ */ new Set());
-    const toggleExpanded = (id) => setExpandedIds((prev) => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
+  var WorkReviewView = ({ projects, team = [], onOpenProject, onUpdateProject, onUpdateDel, onDeleteDel, talentRoster = [], workReviewSessions = [], updateWorkReviewSession }) => {
     const nowISO = (/* @__PURE__ */ new Date()).toISOString().slice(0, 16);
     const upcomingSessions = (0, import_react.useMemo)(
       () => (workReviewSessions || []).filter((s) => s.datetime >= nowISO).sort((a, b) => a.datetime.localeCompare(b.datetime)),
@@ -9232,37 +9306,45 @@ Brief content: ${content}`;
       onUpdateProject(projectId, "deliverables", newDels);
     };
     const totalItems = sessionGroups.reduce((a, g) => a + g.items.length, 0);
-    return /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ React.createElement("h1", { style: { fontSize: 31, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", margin: 0, letterSpacing: "0.02em" } }, "Work Review"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#838ba0", marginTop: 3 } }, totalItems, " deliverable", totalItems !== 1 ? "s" : "", " across ", sessionGroups.length, " upcoming session", sessionGroups.length !== 1 ? "s" : "")), sessionGroups.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, padding: "48px 24px", textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 38, marginBottom: 12 } }, "\u{1F4CB}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#4b5563", marginBottom: 6 } }, "No deliverables queued for an upcoming Work Review"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#374151" } }, "Open a project's Deliverables tab and click ", /* @__PURE__ */ React.createElement("b", { style: { color: "#818cf8" } }, "+ Add a Work Review Round"), ".")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } }, sessionGroups.map(({ session, items }) => /* @__PURE__ */ React.createElement("div", { key: session.id, style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 18px", borderBottom: "1px solid #1f2937", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" } }, "\u{1F3A5} ", fmtDT(session.datetime)), (session.location || (session.reviewers || []).length > 0) && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280", marginTop: 2 } }, session.location, session.location && (session.reviewers || []).length > 0 ? " \xB7 " : "", (session.reviewers || []).length > 0 && `Reviewers: ${session.reviewers.join(", ")}`)), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#4b5563", marginLeft: "auto" } }, items.length, " deliverable", items.length !== 1 ? "s" : "")), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 18px", display: "flex", flexDirection: "column", gap: 8 } }, items.map(({ project: p, del: d, round }) => {
+    return /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ React.createElement("h1", { style: { fontSize: 31, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", margin: 0, letterSpacing: "0.02em" } }, "Work Review"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#838ba0", marginTop: 3 } }, totalItems, " deliverable", totalItems !== 1 ? "s" : "", " across ", sessionGroups.length, " upcoming session", sessionGroups.length !== 1 ? "s" : "")), sessionGroups.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, padding: "48px 24px", textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 38, marginBottom: 12 } }, "\u{1F4CB}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#4b5563", marginBottom: 6 } }, "No deliverables queued for an upcoming Work Review"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#374151" } }, "Open a project's Deliverables tab and click ", /* @__PURE__ */ React.createElement("b", { style: { color: "#818cf8" } }, "+ Add a Work Review Round"), ".")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } }, sessionGroups.map(({ session, items }) => /* @__PURE__ */ React.createElement("div", { key: session.id, style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 18px", borderBottom: "1px solid #1f2937", display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" } }, "\u{1F3A5} ", fmtDT(session.datetime)), (session.reviewers || []).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280" } }, "Reviewers: ", session.reviewers.join(", ")), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#4b5563", marginLeft: "auto" } }, items.length, " deliverable", items.length !== 1 ? "s" : "")), updateWorkReviewSession && /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        value: session.location || "",
+        onChange: (e) => updateWorkReviewSession(session.id, { location: e.target.value }),
+        placeholder: "Location (optional)",
+        style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#e2e8f0", padding: "5px 9px", fontSize: 13, outline: "none" }
+      }
+    ), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        value: session.zoomLink || "",
+        onChange: (e) => updateWorkReviewSession(session.id, { zoomLink: e.target.value }),
+        placeholder: "Zoom link (optional)",
+        style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#e2e8f0", padding: "5px 9px", fontSize: 13, outline: "none" }
+      }
+    )), session.zoomLink && /* @__PURE__ */ React.createElement("a", { href: session.zoomLink, target: "_blank", rel: "noopener noreferrer", style: { fontSize: 13, color: "#818cf8", fontWeight: 700 } }, "Join Zoom \u2197")), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 18px", display: "flex", flexDirection: "column", gap: 6 } }, items.map(({ project: p, del: d, round }) => {
       const statusColor = DCOLOR[d.status] || "#6b7280";
-      const isExp = expandedIds.has(d.id);
-      return /* @__PURE__ */ React.createElement("div", { key: `${p.id}-${d.id}`, style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 8, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { onClick: () => toggleExpanded(d.id), style: { display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", cursor: "pointer" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, d.title || "Untitled"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 3, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { background: statusColor + "20", color: statusColor, borderRadius: 99, padding: "1px 8px", fontSize: 12, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, d.status), /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
-        e.stopPropagation();
-        onOpenProject(p);
-      }, style: { background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 13, color: "#818cf8" } }, p.name), d.type && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#6b7280" } }, d.type), /* @__PURE__ */ React.createElement(DelFrameInfo, { frameLink: d.frameLink, framePW: d.framePW, small: true }))), /* @__PURE__ */ React.createElement(
+      const producer = team.find((m) => m.id === d.producerId);
+      const editor = team.find((m) => m.id === d.editorId);
+      const animator = team.find((m) => m.id === d.animatorId);
+      const designer = team.find((m) => m.id === d.designerId);
+      const personChip = (label, m) => m ? /* @__PURE__ */ React.createElement("span", { key: label, title: label, style: { display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#9ca3af", background: "#1f293780", borderRadius: 5, padding: "2px 8px 2px 4px", whiteSpace: "nowrap" } }, /* @__PURE__ */ React.createElement(Av, { name: m.name, size: 16 }), m.name) : null;
+      return /* @__PURE__ */ React.createElement("div", { key: `${p.id}-${d.id}`, style: { display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", background: "#111827", border: "1px solid #1f2937", borderRadius: 8, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: "1 1 220px" } }, /* @__PURE__ */ React.createElement(
         "button",
         {
-          onClick: (e) => {
-            e.stopPropagation();
-            removeFromWR(p.id, d.id, round.id);
-          },
+          onClick: () => onOpenProject(p, "deliverables", d.id),
+          style: { background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 16, fontWeight: 700, color: "#e2e8f0", textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", maxWidth: "100%" }
+        },
+        d.title || "Untitled"
+      ), /* @__PURE__ */ React.createElement("button", { onClick: () => onOpenProject(p), style: { background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 13, color: "#818cf8" } }, p.name)), /* @__PURE__ */ React.createElement(DelStatusSel, { status: d.status, onChange: (v) => onUpdateDel(p.id, d.id, "status", v), xs: true }), personChip("Producer", producer), personChip("Editor", editor), personChip("Animator", animator), personChip("Designer", designer), /* @__PURE__ */ React.createElement(DelFrameInfo, { frameLink: d.frameLink, framePW: d.framePW, small: true }), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => removeFromWR(p.id, d.id, round.id),
           title: "Remove from Work Review",
           style: { background: "#ef444415", border: "1px solid #ef444430", borderRadius: 5, color: "#f87171", padding: "3px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", flexShrink: 0 }
         },
         "Remove"
-      ), /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontSize: 14, flexShrink: 0 } }, isExp ? "\u25B2" : "\u25BC")), isExp && /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { borderTop: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement(
-        DeliverableDetailModal,
-        {
-          del: d,
-          projectId: p.id,
-          team,
-          allProjects: projects,
-          onUpdateDel,
-          onDeleteDel,
-          onUpdateProject,
-          project: p,
-          talentRoster
-        }
-      )));
+      ));
     }))))));
   };
   var StatsBar = ({ projects, team, setView, onOpenProject, onSetStatsFilter, workReviewSessions = [] }) => {
@@ -12039,7 +12121,7 @@ ${parsed.conditions}` : weather;
       triggerSave();
     } })))), Array.from({ length: Math.max(0, 8 - editSched.length) }).map((_, i) => /* @__PURE__ */ React.createElement("tr", { key: `se${i}` }, /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, height: 20 }, colSpan: 4 })))))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: cs.subhdr }, "TALENT"), /* @__PURE__ */ React.createElement("table", { style: tblStyle }, /* @__PURE__ */ React.createElement("tbody", null, talentRows.length > 0 ? talentRows.map((t, i) => /* @__PURE__ */ React.createElement("tr", { key: t.id, style: { background: i % 2 === 0 ? "#fff" : "#fafafa" } }, /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, width: 70, textAlign: "center" } }, t.photoKey ? /* @__PURE__ */ React.createElement(SetupPhotoThumb, { photoKey: t.photoKey, size: 56 }) : /* @__PURE__ */ React.createElement("div", { style: { width: 56, height: 56, borderRadius: "50%", background: "#e8e8e8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, margin: "0 auto", fontWeight: 800, color: "#888" } }, t.name.split(" ").map((n) => n[0]).join("").slice(0, 2))), /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, fontWeight: 700 } }, t.name), /* @__PURE__ */ React.createElement("td", { style: cs.cell }, t.category || ""), /* @__PURE__ */ React.createElement("td", { style: cs.cell }, t.bio || ""), /* @__PURE__ */ React.createElement("td", { style: cs.cell }))) : /* @__PURE__ */ React.createElement(React.Fragment, null, Array.from({ length: 3 }).map((_, i) => /* @__PURE__ */ React.createElement("tr", { key: i }, /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, height: 60 }, colSpan: 5 })))))))))));
   };
-  var ProductionCard = ({ production, idx, projectId, allProductions, allProjectDels, team, studioBookings, mediaCards, allProjects = [], presets = [], setupTypes = [], onAddSetupType, talentRoster = [], onUpdateTalentRoster, onUpdate, onDelete, onDuplicate, onSavePreset, onLoadPreset, onAddDeliverable, onDeleteDeliverable, onSendForApproval, onUnapprove, furnitureList = [], propsList = [], screenContentOptions = {}, gearList = [], vendorCompanies = ["AbelCine", "Crews Control"], addVendorCompany }) => {
+  var ProductionCard = ({ production, idx, projectId, allProductions, allProjectDels, team, studioBookings, mediaCards, allProjects = [], presets = [], setupTypes = [], onAddSetupType, talentRoster = [], onUpdateTalentRoster, onUpdate, onDelete, onDuplicate, onSavePreset, onLoadPreset, onAddDeliverable, onDeleteDeliverable, onSendForApproval, onUnapprove, furnitureList = [], propsList = [], screenContentOptions = {}, gearList = [], vendorCompanies = ["AbelCine", "Crews Control"], addVendorCompany, lists = {} }) => {
     const [exp, setExp] = (0, import_react.useState)(!production.startTime);
     const [delOpen, setDelOpen] = (0, import_react.useState)(false);
     const [newDelTitle, setNewDelTitle] = (0, import_react.useState)("");
@@ -12281,53 +12363,7 @@ ${parsed.conditions}` : weather;
     (0, import_react.useEffect)(() => {
       setCustomPresetName("");
     }, [_activeId]);
-    const CREW_ROLES = isBroadcast ? [
-      "Live Director",
-      "Technical Director",
-      "Broadcast Coordinator",
-      "Camera Op",
-      "Audio Tech",
-      "Lighting Director",
-      "Producer",
-      "Project Manager",
-      "Video Engineer",
-      "V1",
-      "EVS Operator",
-      "Replay Operator",
-      "Graphics Operator",
-      "DP",
-      "Audio Op with Kit",
-      "Assistant Camera",
-      "Production Assistant",
-      "Drone Operator with gear",
-      "Media Manager",
-      "DIT",
-      "Teleprompter Op",
-      "SM",
-      "A2",
-      "A1",
-      "Playback Operator"
-    ] : [
-      "Producer",
-      "Director",
-      "DP",
-      "Gaffer",
-      "Camera Op",
-      "Sound Mixer",
-      "Hair and Makeup",
-      "Production Assistant",
-      "Assistant Camera",
-      "Audio Op with Kit",
-      "Drone Operator with gear",
-      "Media Manager",
-      "DIT",
-      "Teleprompter Op",
-      "SM",
-      "A2",
-      "V1",
-      "A1",
-      "Playback Operator"
-    ];
+    const CREW_ROLES = [...isBroadcast ? lists.crewRolesBroadcast || CREW_ROLES_BROADCAST_DEFAULT : lists.crewRoles || CREW_ROLES_DEFAULT].sort((a, b) => a.localeCompare(b));
     const cs = { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 9, padding: "12px 14px" };
     return /* @__PURE__ */ React.createElement("div", { style: { border: `1px solid ${exp ? pColor + "60" : "#1f2937"}`, borderRadius: 12, overflow: "hidden", marginBottom: 10 } }, showSavePreset && /* @__PURE__ */ React.createElement(
       SavePresetModal,
@@ -12835,7 +12871,7 @@ ${parsed.conditions}` : weather;
       }
     ));
   };
-  var ProductionSection = ({ productions = [], projectDeliverables = [], onUpdate, onAddToMainDels, onAddIngestDate, team, studioBookings, mediaCards, onUpdateStudioBookings, allProjects = [], projectId = null, projectAssignees = {}, setupTypes = [], onAddSetupType, talentRoster = [], onUpdateTalentRoster, furnitureList = [], propsList = [], screenContentOptions = {}, gearList = [], appPresets = [], onSaveAppPresets, vendorCompanies = ["AbelCine", "Crews Control"], addVendorCompany }) => {
+  var ProductionSection = ({ productions = [], projectDeliverables = [], onUpdate, onAddToMainDels, onAddIngestDate, team, studioBookings, mediaCards, onUpdateStudioBookings, allProjects = [], projectId = null, projectAssignees = {}, setupTypes = [], onAddSetupType, talentRoster = [], onUpdateTalentRoster, furnitureList = [], propsList = [], screenContentOptions = {}, gearList = [], appPresets = [], onSaveAppPresets, vendorCompanies = ["AbelCine", "Crews Control"], addVendorCompany, lists = {} }) => {
     const [showAdd, setShowAdd] = (0, import_react.useState)(false);
     const [newType, setNewType] = (0, import_react.useState)("Content Shoot");
     const [addFormOpen, setAddFormOpen] = (0, import_react.useState)(false);
@@ -13097,7 +13133,8 @@ ${parsed.conditions}` : weather;
           screenContentOptions,
           gearList,
           vendorCompanies,
-          addVendorCompany
+          addVendorCompany,
+          lists
         }
       ))));
     }));
@@ -15390,7 +15427,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     });
     return placements;
   };
-  var CalEventHoverCard = ({ ev, project, team = [], talentRoster = [], x, y, onMouseEnter, onMouseLeave, onOpen }) => {
+  var CalEventHoverCard = ({ ev, project, team = [], talentRoster = [], workReviewSessions = [], x, y, onMouseEnter, onMouseLeave, onOpen }) => {
     if (!ev) return null;
     const meta = PROJ_CAL_TYPE_META[ev.type];
     const members = ev._members || [ev];
@@ -15417,7 +15454,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       body = /* @__PURE__ */ React.createElement(React.Fragment, null, F("Notes", ing?.notes || "No notes"), F("Call Sheet", ing?.callSheet ? "Attached" : "None attached"));
     } else if (ev.type === "round" || ev.type === "workreview") {
       const reviewers = members[0]?.reviewers || [];
-      body = /* @__PURE__ */ React.createElement(React.Fragment, null, F("Reviewers", reviewers.length ? reviewers.join(", ") : "None set"), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 4 } }, "Deliverables"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 3, maxHeight: 110, overflowY: "auto" } }, members.map((m) => /* @__PURE__ */ React.createElement("div", { key: m.id, style: { fontSize: 13, color: "#e2e8f0" } }, m.delTitle)))));
+      const wrSession = ev.type === "workreview" ? workReviewSessions.find((s) => s.id === members[0]?.groupId) : null;
+      body = /* @__PURE__ */ React.createElement(React.Fragment, null, F("Reviewers", reviewers.length ? reviewers.join(", ") : "None set"), wrSession?.location && F("Location", wrSession.location), wrSession?.zoomLink && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'Barlow Condensed',sans-serif" } }, "Zoom"), /* @__PURE__ */ React.createElement("a", { href: wrSession.zoomLink, target: "_blank", rel: "noopener noreferrer", onClick: (e) => e.stopPropagation(), style: { fontSize: 14, color: "#818cf8" } }, "Join link \u2197")), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 4 } }, "Deliverables"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 3, maxHeight: 110, overflowY: "auto" } }, members.map((m) => /* @__PURE__ */ React.createElement("div", { key: m.id, style: { fontSize: 13, color: "#e2e8f0" } }, m.delTitle)))));
     }
     return /* @__PURE__ */ React.createElement(
       "div",
@@ -15530,7 +15568,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     })))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "56px repeat(7,1fr)", gap: 3, marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", null), days.map((d, i) => {
       const isToday = dayStrs[i] === (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
       return /* @__PURE__ */ React.createElement("div", { key: i, style: { textAlign: "center", fontSize: 15, fontWeight: 700, color: isToday ? "#818cf8" : "#838ba0", padding: "4px 0", fontFamily: "'Barlow Condensed',sans-serif" } }, ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i], " ", d.getDate());
-    })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "56px 1fr" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: gridHeight } }, hourMarks.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", top: hToY(h) - 7, right: 8, fontSize: 13, color: "#4b5563" } }, fmtH(h)))), /* @__PURE__ */ React.createElement("div", { ref: gridRef, style: { position: "relative", height: gridHeight, background: "#111827", borderRadius: 6, overflow: "hidden" } }, hourMarks.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", left: 0, right: 0, top: hToY(h), height: 1, background: "#1f2937" } })), [1, 2, 3, 4, 5, 6].map((i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { position: "absolute", left: `${i / 7 * 100}%`, top: 0, bottom: 0, width: 1, background: "#1f2937" } })), dayStrs.map((ds, dayIdxStatic) => {
+    })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "56px 1fr" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: gridHeight } }, hourMarks.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", top: hToY(h) - 7, right: 8, fontSize: 13, color: "#4b5563" } }, fmtH(h)))), /* @__PURE__ */ React.createElement("div", { ref: gridRef, style: { position: "relative", height: gridHeight, background: "#111827", borderRadius: 6, overflow: "hidden" } }, hourMarks.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", left: 0, right: 0, top: hToY(h), height: 1, background: "#1f2937" } })), hourMarks.slice(0, -1).map((h) => /* @__PURE__ */ React.createElement("div", { key: h + ".5", style: { position: "absolute", left: 0, right: 0, top: hToY(h + 0.5), height: 0, borderTop: "1px dotted #1f293760" } })), [1, 2, 3, 4, 5, 6].map((i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { position: "absolute", left: `${i / 7 * 100}%`, top: 0, bottom: 0, width: 1, background: "#1f2937" } })), dayStrs.map((ds, dayIdxStatic) => {
       const { events: dayEvs, placements } = packedByDay[ds];
       return dayEvs.map((ev) => {
         const isDragging = drag?.ev.id === ev.id;
@@ -15675,6 +15713,9 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     }, [timed, drag]);
     const hourMarks = [];
     for (let h = PROJ_CAL_MONTH_START_H; h <= PROJ_CAL_MONTH_END_H; h += 2) hourMarks.push(h);
+    const fullHourMarks = [];
+    for (let h = PROJ_CAL_MONTH_START_H; h <= PROJ_CAL_MONTH_END_H; h++) fullHourMarks.push(h);
+    const halfHourMarks = fullHourMarks.slice(0, -1).map((h) => h + 0.5);
     const cells = [
       ...Array.from({ length: firstDow }, () => null),
       ...Array.from({ length: daysInMonth }, (_, i) => i + 1)
@@ -15734,7 +15775,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
             },
             style: { position: "relative", flex: 1, minHeight: stripH, borderTop: "1px solid #1f293780" }
           },
-          hourMarks.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", left: 0, right: 0, top: hToY(h), height: 1, background: "#1f293750" } })),
+          fullHourMarks.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", left: 0, right: 0, top: hToY(h), height: 1, background: "#1f293750" } })),
+          halfHourMarks.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", left: 0, right: 0, top: hToY(h), height: 0, borderTop: "1px dotted #1f293735" } })),
           dayTimedEvs.map((ev) => {
             const isDragging = drag?.ev.id === ev.id;
             const place = placements[ev.id] || { col: 0, totalCols: 1 };
@@ -15905,14 +15947,17 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       (project.deliverables || []).forEach((d) => (d.rounds || []).forEach((r) => {
         if (r.isWorkReview && r.workReviewSessionId) attachedSessionIds.add(r.workReviewSessionId);
       }));
+      const attachedWRSlots = new Set(evs.filter((e) => e.type === "workreview").map((e) => `${e.date}|${e.time}`));
       const nowFullISO = (/* @__PURE__ */ new Date()).toISOString().slice(0, 16);
       (workReviewSessions || []).forEach((s) => {
         if (attachedSessionIds.has(s.id) || s.datetime < nowFullISO) return;
+        const gTime = s.datetime.slice(11, 16) || "14:00";
+        if (attachedWRSlots.has(`${s.datetime.slice(0, 10)}|${gTime}`)) return;
         evs.push({
           id: `ghost-wr-${s.id}`,
           type: "workreview",
           date: s.datetime.slice(0, 10),
-          time: s.datetime.slice(11, 16) || "14:00",
+          time: gTime,
           hasTime: true,
           label: "Work Review",
           status: "",
@@ -16308,6 +16353,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         project,
         team,
         talentRoster,
+        workReviewSessions,
         x: hoverEv.x,
         y: hoverEv.y,
         onMouseEnter: handleCardEnter,
@@ -16330,7 +16376,24 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     ))), (editingEv.type === "round" || editingEv.type === "workreview") && (() => {
       const attachedIds = editingMembers.map((m) => m.ref?.delId).filter(Boolean);
       const candidates = (project.deliverables || []).filter((d) => !attachedIds.includes(d.id));
-      return /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#8e97a6", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Reviewers"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#e2e8f0", marginBottom: 10 } }, (editingMembers[0].reviewers || []).join(", ") || "None set"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#8e97a6", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Deliverables"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 6 } }, editingMembers.map((m) => /* @__PURE__ */ React.createElement("div", { key: m.id, style: { display: "flex", alignItems: "center", gap: 8, background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, padding: "5px 8px" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#e2e8f0", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, m.delTitle), /* @__PURE__ */ React.createElement("button", { onClick: () => removeRoundMember(m), style: { background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 16, lineHeight: 1 } }, "\xD7")))), candidates.length > 0 && /* @__PURE__ */ React.createElement(
+      const wrSession = editingEv.type === "workreview" ? workReviewSessions.find((s) => s.id === editingMembers[0]?.groupId) : null;
+      return /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#8e97a6", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Reviewers"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#e2e8f0", marginBottom: 10 } }, (editingMembers[0].reviewers || []).join(", ") || "None set"), wrSession && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#8e97a6", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Location"), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          value: wrSession.location || "",
+          onChange: (e) => updateWorkReviewSession(wrSession.id, { location: e.target.value }),
+          placeholder: "e.g. Conference Room B",
+          style: { width: "100%", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#e2e8f0", padding: "6px 8px", fontSize: 14, marginBottom: 10, outline: "none" }
+        }
+      ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#8e97a6", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Zoom Link"), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          value: wrSession.zoomLink || "",
+          onChange: (e) => updateWorkReviewSession(wrSession.id, { zoomLink: e.target.value }),
+          placeholder: "https://zoom.us/j/\u2026",
+          style: { width: "100%", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#e2e8f0", padding: "6px 8px", fontSize: 14, marginBottom: 10, outline: "none" }
+        }
+      )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#8e97a6", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Deliverables"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 6 } }, editingMembers.map((m) => /* @__PURE__ */ React.createElement("div", { key: m.id, style: { display: "flex", alignItems: "center", gap: 8, background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, padding: "5px 8px" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#e2e8f0", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, m.delTitle), /* @__PURE__ */ React.createElement("button", { onClick: () => removeRoundMember(m), style: { background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 16, lineHeight: 1 } }, "\xD7")))), candidates.length > 0 && /* @__PURE__ */ React.createElement(
         "select",
         {
           defaultValue: "",
@@ -17568,35 +17631,41 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       businessUnits = BUSINESS_UNITS,
       productionTypes = PRODUCTION_TYPES,
       deliverableStatuses = [...DELIVERABLE_STATUSES],
-      animBatchStatuses = [...ANIM_ROUND_STATUSES]
+      animBatchStatuses = [...ANIM_ROUND_STATUSES],
+      crewRoles = [...CREW_ROLES_DEFAULT],
+      crewRolesBroadcast = [...CREW_ROLES_BROADCAST_DEFAULT]
     } = lists;
     const [ws, setWS] = (0, import_react.useState)(() => [...workstreams]);
     const [bu, setBU_] = (0, import_react.useState)(() => [...businessUnits]);
     const [pt, setPT] = (0, import_react.useState)(() => [...productionTypes]);
     const [ds, setDS] = (0, import_react.useState)(() => [...deliverableStatuses]);
     const [abs, setABS] = (0, import_react.useState)(() => [...animBatchStatuses]);
+    const [cr, setCR] = (0, import_react.useState)(() => [...crewRoles]);
+    const [crb, setCRB] = (0, import_react.useState)(() => [...crewRolesBroadcast]);
     const [newWS, setNewWS] = (0, import_react.useState)("");
     const [newBU, setNewBU] = (0, import_react.useState)("");
     const [newPT, setNewPT] = (0, import_react.useState)("");
     const [newDS, setNewDS] = (0, import_react.useState)("");
     const [newABS, setNewABS] = (0, import_react.useState)("");
-    const save = (nextWS, nextBU, nextPT, nextDS, nextABS) => onUpdateLists({ workstreams: nextWS, businessUnits: nextBU, productionTypes: nextPT, deliverableStatuses: nextDS, animBatchStatuses: nextABS });
+    const [newCR, setNewCR] = (0, import_react.useState)("");
+    const [newCRB, setNewCRB] = (0, import_react.useState)("");
+    const save = (nextWS, nextBU, nextPT, nextDS, nextABS, nextCR, nextCRB) => onUpdateLists({ workstreams: nextWS, businessUnits: nextBU, productionTypes: nextPT, deliverableStatuses: nextDS, animBatchStatuses: nextABS, crewRoles: nextCR, crewRolesBroadcast: nextCRB });
     const addItem = (list, setList, val, setNew, field) => {
       const v = val.trim();
       if (!v || list.includes(v)) return;
       const next = [...list, v];
       setList(next);
       setNew("");
-      const args = { ws, bu, pt, ds, abs };
+      const args = { ws, bu, pt, ds, abs, cr, crb };
       args[field] = next;
-      save(args.ws, args.bu, args.pt, args.ds, args.abs);
+      save(args.ws, args.bu, args.pt, args.ds, args.abs, args.cr, args.crb);
     };
     const removeItem = (list, setList, item, field) => {
       const next = list.filter((x) => x !== item);
       setList(next);
-      const args = { ws, bu, pt, ds, abs };
+      const args = { ws, bu, pt, ds, abs, cr, crb };
       args[field] = next;
-      save(args.ws, args.bu, args.pt, args.ds, args.abs);
+      save(args.ws, args.bu, args.pt, args.ds, args.abs, args.cr, args.crb);
     };
     return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#8e97a6", marginBottom: 18, lineHeight: 1.5 } }, "Manage dropdown options and status lists used across projects, productions, deliverables, and animations. Changes take effect immediately."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 20 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 4 } }, "Project Metadata"), /* @__PURE__ */ React.createElement(
       AdminListSection,
@@ -17657,6 +17726,30 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         chipColor: "#f9a8d4",
         onAdd: () => addItem(abs, setABS, newABS, setNewABS, "abs"),
         onRemove: (item) => removeItem(abs, setABS, item, "abs")
+      }
+    )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 4 } }, "Production Crew Roles"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#6b7280", marginBottom: 10 } }, "Options shown in a production's Internal/External crew role dropdowns. Always displayed alphabetically regardless of the order added here."), /* @__PURE__ */ React.createElement(
+      AdminListSection,
+      {
+        title: "Crew Roles",
+        icon: "\u{1F3A5}",
+        items: cr,
+        newVal: newCR,
+        setNew: setNewCR,
+        chipColor: "#22c55e",
+        onAdd: () => addItem(cr, setCR, newCR, setNewCR, "cr"),
+        onRemove: (item) => removeItem(cr, setCR, item, "cr")
+      }
+    ), /* @__PURE__ */ React.createElement(
+      AdminListSection,
+      {
+        title: "Crew Roles \u2014 Broadcast",
+        icon: "\u{1F4E1}",
+        items: crb,
+        newVal: newCRB,
+        setNew: setNewCRB,
+        chipColor: "#0ea5e9",
+        onAdd: () => addItem(crb, setCRB, newCRB, setNewCRB, "crb"),
+        onRemove: (item) => removeItem(crb, setCRB, item, "crb")
       }
     ))));
   };
@@ -19561,7 +19654,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     )))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "row", alignItems: "stretch", flex: 1, minHeight: 0 } }, /* @__PURE__ */ React.createElement("div", { ref: setSidebarSlotNode, style: { width: activeSidebarWidth, flexShrink: 0, overflow: "hidden", position: "relative", transition: navSidebarHandle.dragging ? "none" : "width 0.22s cubic-bezier(0.4,0,0.2,1)", borderRight: activeSidebarWidth ? "1px solid #1f2937" : "none" } }, !!activeSidebarWidth && /* @__PURE__ */ React.createElement(SidebarResizeHandle, { ...navSidebarHandle })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, marginLeft: pushOffset, transform: pushTransformX ? `translateX(${pushTransformX}px)` : void 0, transition: pushTransitionOn ? "transform 0.22s cubic-bezier(0.4,0,0.2,1)" : "none" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: view === "pipeline" ? 2e3 : 1600, margin: activeSidebarWidth || pushOffset ? "0" : "0 auto", padding: "20px 24px" } }, /* @__PURE__ */ React.createElement(StatsBar, { projects: allProjects, team: allTeam, setView: (v) => {
       setView(v);
       if (v !== "projects") setStatsFilter(null);
-    }, onOpenProject: openProject, onSetStatsFilter: setStatsFilter, workReviewSessions }), view === "workReview" && /* @__PURE__ */ React.createElement(WorkReviewView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster, workReviewSessions }), view === "pipeline" && /* @__PURE__ */ React.createElement(PipelineView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject }), view === "animations" && /* @__PURE__ */ React.createElement(AnimationView, { allProjects, team: allTeam, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "intake" && /* @__PURE__ */ React.createElement(
+    }, onOpenProject: openProject, onSetStatsFilter: setStatsFilter, workReviewSessions }), view === "workReview" && /* @__PURE__ */ React.createElement(WorkReviewView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster, workReviewSessions, updateWorkReviewSession }), view === "pipeline" && /* @__PURE__ */ React.createElement(PipelineView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject }), view === "animations" && /* @__PURE__ */ React.createElement(AnimationView, { allProjects, team: allTeam, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "intake" && /* @__PURE__ */ React.createElement(
       IntakeView,
       {
         intakes,
@@ -19626,7 +19719,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         tabLocks,
         onUpdateTabLocks: saveTabLocks
       }
-    )))), liveSelected && /* @__PURE__ */ React.createElement(ProjectOverviewErrorBoundary, { key: liveSelected.id, onClose: () => setSelected(null) }, /* @__PURE__ */ React.createElement(ProjectOverview, { project: liveSelected, team: allTeam, allProjects, onClose: () => setSelected(null), onUpdateDel: updateDel, onAddDel: addDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, initialTab: initialTab?.tab, initialShootId: initialTab?.itemId, initialItemId: initialTab?.itemId, studioBookings: allStudioBookings, mediaCards, setupTypes, onAddSetupType: addSetupType, talentRoster, onUpdateTalentRoster: saveTalentRoster, nudges, onAddNudge: addNudge, furnitureList, propsList, screenContentOptions, gearList, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, appPresets, onSaveAppPresets: saveAppPresets, vendorCompanies, addVendorCompany, intakes, becRequests, canAccessBudget: canAccessTab("budget"), reviewerNames, addReviewerName, workReviewSessions, addWorkReviewSession, updateWorkReviewSession })), addingProject && /* @__PURE__ */ React.createElement(AddProjectModal, { team: allTeam, existingProjects: allProjects, onClose: () => setAddingProject(false), onAdd: addProject }), createFromIntake && /* @__PURE__ */ React.createElement(
+    )))), liveSelected && /* @__PURE__ */ React.createElement(ProjectOverviewErrorBoundary, { key: liveSelected.id, onClose: () => setSelected(null) }, /* @__PURE__ */ React.createElement(ProjectOverview, { project: liveSelected, team: allTeam, allProjects, onClose: () => setSelected(null), onUpdateDel: updateDel, onAddDel: addDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, initialTab: initialTab?.tab, initialShootId: initialTab?.itemId, initialItemId: initialTab?.itemId, studioBookings: allStudioBookings, mediaCards, setupTypes, onAddSetupType: addSetupType, talentRoster, onUpdateTalentRoster: saveTalentRoster, nudges, onAddNudge: addNudge, furnitureList, propsList, screenContentOptions, gearList, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, appPresets, onSaveAppPresets: saveAppPresets, vendorCompanies, addVendorCompany, intakes, becRequests, canAccessBudget: canAccessTab("budget"), reviewerNames, addReviewerName, workReviewSessions, addWorkReviewSession, updateWorkReviewSession, lists })), addingProject && /* @__PURE__ */ React.createElement(AddProjectModal, { team: allTeam, existingProjects: allProjects, onClose: () => setAddingProject(false), onAdd: addProject }), createFromIntake && /* @__PURE__ */ React.createElement(
       AddProjectModal,
       {
         team: allTeam,

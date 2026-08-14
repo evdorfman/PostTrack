@@ -125,6 +125,14 @@ const toKanban = s => {
 
 // ─── Studio + Milestone Constants ────────────────────────────────────────────
 const PRODUCTION_TYPES   = ["Content Shoot","Social Content","Pre-tape","Live Event","Live Broadcast","Hybrid Event","Live Playback","Podcast","Post-Only","Other"];
+// Default Internal/External crew role options for a production's crew
+// dropdowns — admin-editable via AdminListsTab (lists.crewRoles /
+// lists.crewRolesBroadcast); ProductionCard always renders whichever list
+// is active sorted alphabetically, regardless of storage order.
+const CREW_ROLES_DEFAULT = ["Producer","Director","DP","Gaffer","Camera Op","Sound Mixer","Hair and Makeup","Production Assistant","Assistant Camera",
+  "Audio Op with Kit","Drone Operator with gear","Media Manager","DIT","Teleprompter Op","SM","A2","V1","A1","Playback Operator"];
+const CREW_ROLES_BROADCAST_DEFAULT = ["Live Director","Technical Director","Broadcast Coordinator","Camera Op","Audio Tech","Lighting Director","Producer","Project Manager","Video Engineer","V1","EVS Operator","Replay Operator","Graphics Operator",
+  "DP","Audio Op with Kit","Assistant Camera","Production Assistant","Drone Operator with gear","Media Manager","DIT","Teleprompter Op","SM","A2","A1","Playback Operator"];
 const BOOKING_STATUSES   = ["Tentative","Confirmed","In Progress","Completed","Cancelled"];
 // Which production types have a shoot component (location/time/crew/gear)
 const SHOOT_TYPES = ["Content Shoot","Social Content","Pre-tape","Live Event","Live Broadcast","Hybrid Event","Podcast"];
@@ -1742,6 +1750,24 @@ const AvailabilityCalendar = ({startTime, endTime, allProjects=[], projectId, on
   const dayBookings = selDate ? (bookingMap[selDate]||{}) : {};
   const roomBookings= dayBookings[selRoom]||[];
 
+  // Existing bookings that overlap in time (e.g. two productions double-booked
+  // into the same room, or a production plus its own secondary-location entry)
+  // used to all render at the same fixed top/bottom band, so their labels sat
+  // directly on top of each other and were unreadable. Pack them into lanes
+  // (greedy interval scheduling, same idea as the Project Calendar's overlap
+  // packing) so overlapping bookings stack into their own thin row instead.
+  const packedRoomBookings = useMemo(()=>{
+    const sorted = [...roomBookings].sort((a,b)=>a.startH-b.startH);
+    const laneEnds = [];
+    const placed = sorted.map(b=>{
+      let lane = laneEnds.findIndex(end=>end<=b.startH);
+      if(lane===-1){ lane = laneEnds.length; laneEnds.push(b.endH); }
+      else laneEnds[lane] = b.endH;
+      return {...b, lane};
+    });
+    return {items:placed, totalLanes:Math.max(1,laneEnds.length)};
+  },[roomBookings]);
+
   // Build multi-density tick marks: hour / half / quarter
   const allTicks = [];
   for(let h = AVAIL_HOURS_START; h <= AVAIL_HOURS_END; h += 0.25) {
@@ -1889,18 +1915,23 @@ const AvailabilityCalendar = ({startTime, endTime, allProjects=[], projectId, on
                         }}/>
                       ))}
 
-                      {/* Existing bookings for this room */}
-                      {roomBookings.map((b,i)=>(
-                        <div key={i} title={b.name} style={{
-                          position:"absolute",left:`${hToP(b.startH)}%`,
-                          width:`${hToP(b.endH)-hToP(b.startH)}%`,
-                          top:"18%",bottom:"18%",
-                          background:["Approved","Happening Now"].includes(b.status)?"#ef444330":"#f59e0b22",
-                          border:`1px solid ${["Approved","Happening Now"].includes(b.status)?"#ef444460":"#f59e0b50"}`,
-                          borderRadius:5,display:"flex",alignItems:"center",pointerEvents:"none"}}>
-                          <div style={{fontSize:14,color:["Approved","Happening Now"].includes(b.status)?"#ef4444":"#f59e0b",padding:"0 8px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.name}</div>
-                        </div>
-                      ))}
+                      {/* Existing bookings for this room — packed into lanes so
+                          overlapping bookings stack into their own row instead
+                          of rendering directly on top of each other */}
+                      {packedRoomBookings.items.map((b,i)=>{
+                        const laneH = 64/packedRoomBookings.totalLanes;
+                        return (
+                          <div key={i} title={b.name} style={{
+                            position:"absolute",left:`${hToP(b.startH)}%`,
+                            width:`${hToP(b.endH)-hToP(b.startH)}%`,
+                            top:`${18+b.lane*laneH}%`,height:`${laneH}%`,
+                            background:["Approved","Happening Now"].includes(b.status)?"#ef444330":"#f59e0b22",
+                            border:`1px solid ${["Approved","Happening Now"].includes(b.status)?"#ef444460":"#f59e0b50"}`,
+                            borderRadius:5,display:"flex",alignItems:"center",pointerEvents:"none",overflow:"hidden"}}>
+                            <div style={{fontSize:packedRoomBookings.totalLanes>1?12:14,color:["Approved","Happening Now"].includes(b.status)?"#ef4444":"#f59e0b",padding:"0 8px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.name}</div>
+                          </div>
+                        );
+                      })}
 
                       {/* Drag selection */}
                       {hasSelection&&(
@@ -4566,6 +4597,7 @@ const AddWorkReviewRoundModal = ({project, allProjects=[], onUpdateDel, workRevi
   const [choice,setChoice] = useState(initialDate ? WORK_REVIEW_NEW_VALUE : (initialSessionId || ""));
   const [newDatetime,setNewDatetime] = useState(initialDate?`${initialDate}T14:00`:"");
   const [newLocation,setNewLocation] = useState("");
+  const [newZoomLink,setNewZoomLink] = useState("");
   const [newReviewers,setNewReviewers] = useState([]);
   const [selectedIds,setSelectedIds] = useState([]);
 
@@ -4599,7 +4631,7 @@ const AddWorkReviewRoundModal = ({project, allProjects=[], onUpdateDel, workRevi
   const submit = () => {
     if(!canSubmit) return;
     const targetSession = isNew
-      ? addWorkReviewSession({datetime:newDatetime, location:newLocation.trim(), reviewers:[...newReviewers]})
+      ? addWorkReviewSession({datetime:newDatetime, location:newLocation.trim(), zoomLink:newZoomLink.trim(), reviewers:[...newReviewers]})
       : session;
     selectedIds.filter(id=>!alreadyAttachedIds.includes(id)).forEach(delId=>{
       const del = deliverables.find(d=>d.id===delId);
@@ -4637,12 +4669,20 @@ const AddWorkReviewRoundModal = ({project, allProjects=[], onUpdateDel, workRevi
                 ? <DateTimePicker value={newDatetime} onChange={setNewDatetime} label="Work Review date/time"/>
                 : <DateTimePicker value={session?.datetime||""} onChange={v=>updateWorkReviewSession(session.id,{datetime:v})} label="Work Review date/time"/>}
             </div>
-            {isNew&&(
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               <div>
                 <FLabel>Location <span style={{fontWeight:400,textTransform:"none",letterSpacing:0,color:"#4b5563"}}>(optional)</span></FLabel>
-                <Inp value={newLocation} onChange={e=>setNewLocation(e.target.value)} placeholder="e.g. Conference Room B"/>
+                {isNew
+                  ? <Inp value={newLocation} onChange={e=>setNewLocation(e.target.value)} placeholder="e.g. Conference Room B"/>
+                  : <Inp value={session?.location||""} onChange={e=>updateWorkReviewSession(session.id,{location:e.target.value})} placeholder="e.g. Conference Room B"/>}
               </div>
-            )}
+              <div>
+                <FLabel>Zoom Link <span style={{fontWeight:400,textTransform:"none",letterSpacing:0,color:"#4b5563"}}>(optional)</span></FLabel>
+                {isNew
+                  ? <Inp value={newZoomLink} onChange={e=>setNewZoomLink(e.target.value)} placeholder="https://zoom.us/j/…"/>
+                  : <Inp value={session?.zoomLink||""} onChange={e=>updateWorkReviewSession(session.id,{zoomLink:e.target.value})} placeholder="https://zoom.us/j/…"/>}
+              </div>
+            </div>
             <div>
               <FLabel>Reviewers <span style={{fontWeight:400,textTransform:"none",letterSpacing:0,color:"#4b5563"}}>(optional)</span></FLabel>
               <ReviewerTagInput value={isNew?newReviewers:(session?.reviewers||[])}
@@ -4684,7 +4724,7 @@ const AddWorkReviewRoundModal = ({project, allProjects=[], onUpdateDel, workRevi
 // deliverable's own card. Date/time/reviewers/notes edit the whole group at
 // once; status stays per-deliverable since that's meant to update
 // independently.
-const ProjectReviewRoundsList = ({project, onUpdateDel, reviewerNames=[], addReviewerName}) => {
+const ProjectReviewRoundsList = ({project, onUpdateDel, reviewerNames=[], addReviewerName, workReviewSessions=[], updateWorkReviewSession}) => {
   const [expandedKey, setExpandedKey] = useState(null);
 
   const groups = useMemo(()=>{
@@ -4731,12 +4771,17 @@ const ProjectReviewRoundsList = ({project, onUpdateDel, reviewerNames=[], addRev
         const isWR = !!first.isWorkReview;
         const isExp = expandedKey===key;
         const color = isWR ? "#ec4899" : (RCOLOR[first.status]||"#eab308");
+        const session = isWR ? workReviewSessions.find(s=>s.id===first.workReviewSessionId) : null;
         return (
           <div key={key} style={{background:"#0a0f1a",border:`1px solid ${color}30`,borderRadius:8,overflow:"hidden"}}>
             <div onClick={()=>setExpandedKey(isExp?null:key)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",cursor:"pointer"}}>
               <span style={{fontSize:15}}>{isWR?"🎥":"↺"}</span>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:700,color:"#e2e8f0"}}>{isWR?"Work Review":"Review Round"} — {fmtDT(first.deadline)}</div>
+                <div style={{fontSize:15,fontWeight:700,color:"#e2e8f0"}}>
+                  {isWR?"Work Review":"Review Round"} — {fmtDT(first.deadline)}
+                  {isWR&&session?.location&&<span style={{color:"#8e97a6",fontWeight:400}}> · {session.location}</span>}
+                  {isWR&&session?.zoomLink&&<a href={session.zoomLink} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{marginLeft:6,fontSize:12,color:"#818cf8"}}>Zoom ↗</a>}
+                </div>
                 <div style={{fontSize:13,color:"#8e97a6",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{members.map(m=>m.del.title||"Untitled").join(", ")}</div>
               </div>
               <span style={{fontSize:13,color:"#4b5563",flexShrink:0}}>{members.length} deliverable{members.length!==1?"s":""}</span>
@@ -4745,6 +4790,18 @@ const ProjectReviewRoundsList = ({project, onUpdateDel, reviewerNames=[], addRev
             {isExp&&(
               <div onClick={e=>e.stopPropagation()} style={{padding:"10px 12px",borderTop:"1px solid #1f2937",display:"flex",flexDirection:"column",gap:10}}>
                 <DateTimePicker value={first.deadline} onChange={v=>updateGroupField(members,"deadline",v)} label="Round date/time"/>
+                {isWR&&session&&updateWorkReviewSession&&(
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                    <div>
+                      <div style={{fontSize:13,color:"#8e97a6",fontWeight:700,marginBottom:5,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.08em",textTransform:"uppercase"}}>Location</div>
+                      <Inp value={session.location||""} onChange={e=>updateWorkReviewSession(session.id,{location:e.target.value})} placeholder="e.g. Conference Room B"/>
+                    </div>
+                    <div>
+                      <div style={{fontSize:13,color:"#8e97a6",fontWeight:700,marginBottom:5,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.08em",textTransform:"uppercase"}}>Zoom Link</div>
+                      <Inp value={session.zoomLink||""} onChange={e=>updateWorkReviewSession(session.id,{zoomLink:e.target.value})} placeholder="https://zoom.us/j/…"/>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <div style={{fontSize:13,color:"#8e97a6",fontWeight:700,marginBottom:5,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.08em",textTransform:"uppercase"}}>Reviewers</div>
                   <ReviewerTagInput value={first.reviewers||[]} onChange={list=>updateGroupField(members,"reviewers",list)}
@@ -6612,7 +6669,7 @@ class ProjectOverviewErrorBoundary extends React.Component {
   }
 }
 
-const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,onDeleteDel,onUpdateProject,initialDelId,initialTab,initialShootId,initialItemId,studioBookings=[],mediaCards=[],setupTypes=[],onAddSetupType,talentRoster=[],onUpdateTalentRoster,nudges=[],onAddNudge,furnitureList=[],propsList=[],screenContentOptions={},gearList=[],customTasks=[],onAddCustomTask,onUpdateCustomTask,onDeleteCustomTask,appPresets=[],onSaveAppPresets,vendorCompanies=[],addVendorCompany,intakes=[],becRequests=[],canAccessBudget=true,reviewerNames=[],addReviewerName,workReviewSessions=[],addWorkReviewSession,updateWorkReviewSession}) => {
+const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,onDeleteDel,onUpdateProject,initialDelId,initialTab,initialShootId,initialItemId,studioBookings=[],mediaCards=[],setupTypes=[],onAddSetupType,talentRoster=[],onUpdateTalentRoster,nudges=[],onAddNudge,furnitureList=[],propsList=[],screenContentOptions={},gearList=[],customTasks=[],onAddCustomTask,onUpdateCustomTask,onDeleteCustomTask,appPresets=[],onSaveAppPresets,vendorCompanies=[],addVendorCompany,intakes=[],becRequests=[],canAccessBudget=true,reviewerNames=[],addReviewerName,workReviewSessions=[],addWorkReviewSession,updateWorkReviewSession,lists={}}) => {
   const [activeDelModal,setActiveDelModal]=useState(initialDelId||((initialTab==="deliverables"||initialTab==="ingest")?initialItemId:null)||null);
   const [handoffDelId,  setHandoffDelId]  = useState(null); // for editor assignment modal in deliverables tab
   const editors = team.filter(m=>m.roles?.some(r=>["Editor","Animator","Designer"].includes(r)));
@@ -7130,7 +7187,8 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                     + Add a Work Review Round
                   </button>
                 </div>
-                <ProjectReviewRoundsList project={lp} onUpdateDel={onUpdateDel} reviewerNames={reviewerNames} addReviewerName={addReviewerName}/>
+                <ProjectReviewRoundsList project={lp} onUpdateDel={onUpdateDel} reviewerNames={reviewerNames} addReviewerName={addReviewerName}
+                  workReviewSessions={workReviewSessions} updateWorkReviewSession={updateWorkReviewSession}/>
               </div>
               {showAddReviewRound&&(
                 <AddReviewRoundModal project={lp} onUpdateDel={onUpdateDel} reviewerNames={reviewerNames} addReviewerName={addReviewerName} onClose={()=>setShowAddReviewRound(false)}/>
@@ -7352,6 +7410,7 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
               gearList={gearList}
               appPresets={appPresets}
               onSaveAppPresets={onSaveAppPresets}
+              lists={lists}
               vendorCompanies={vendorCompanies}
               addVendorCompany={addVendorCompany}
               onUpdate={prods=>onUpdateProject(project.id,"productions",prods)}
@@ -11871,16 +11930,16 @@ const DeliverableRow = ({
   const activeR = (d.rounds||[]).find(r=>r.status!=="Approved");
   return (
     <div onClick={onClick}
-      style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",background:isExpanded?"#1f2937":"#111827",border:`1px solid ${isExpanded?"#6366f1":changes?"#ef444430":"#1f2937"}`,borderRadius:isExpanded?"10px 10px 0 0":10,cursor:onClick?"pointer":"default"}}
+      style={{display:"flex",alignItems:"center",gap:10,padding:"8px 14px",background:isExpanded?"#1f2937":"#111827",border:`1px solid ${isExpanded?"#6366f1":changes?"#ef444430":"#1f2937"}`,borderRadius:isExpanded?"10px 10px 0 0":10,cursor:onClick?"pointer":"default"}}
       onMouseEnter={e=>{if(!isExpanded)e.currentTarget.style.borderColor=changes?"#ef4444":"#374151";}}
       onMouseLeave={e=>{if(!isExpanded)e.currentTarget.style.borderColor=changes?"#ef444430":"#1f2937";}}>
-      <div style={{width:9,height:9,borderRadius:"50%",background:DCOLOR[d.status],flexShrink:0}}/>
+      <div style={{width:8,height:8,borderRadius:"50%",background:DCOLOR[d.status],flexShrink:0}}/>
       <div style={{flex:1,minWidth:0}}>
         {/* Row 1: title + status + chips */}
-        <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:2,flexWrap:"wrap"}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:1,flexWrap:"wrap"}}>
           {editable
-            ? <input value={d.title||""} onChange={e=>{e.stopPropagation();onUpdateDel(projectId,d.id,"title",e.target.value);}} onClick={e=>e.stopPropagation()} onFocus={e=>e.stopPropagation()} placeholder="Deliverable title…" style={{fontWeight:700,fontSize:20,color:"#f1f5f9",background:"transparent",border:"none",outline:"none",padding:0,cursor:"text",fontFamily:"'DM Sans',sans-serif",flex:"0 1 auto",minWidth:60}}/>
-            : <span style={{fontWeight:700,fontSize:20,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title||"Untitled"}</span>}
+            ? <input value={d.title||""} onChange={e=>{e.stopPropagation();onUpdateDel(projectId,d.id,"title",e.target.value);}} onClick={e=>e.stopPropagation()} onFocus={e=>e.stopPropagation()} placeholder="Deliverable title…" style={{fontWeight:700,fontSize:16,color:"#f1f5f9",background:"transparent",border:"none",outline:"none",padding:0,cursor:"text",fontFamily:"'DM Sans',sans-serif",flex:"0 1 auto",minWidth:60}}/>
+            : <span style={{fontWeight:700,fontSize:16,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title||"Untitled"}</span>}
           {readOnly ? <Chip label={d.status} color={DCOLOR[d.status]} xs/> : <DelStatusSel status={d.status} onChange={v=>onUpdateDel(projectId,d.id,"status",v)} xs/>}
           {!readOnly&&editorEditable&&<DelEditorSel editorId={d.editorId} editors={editors||[]} onChange={v=>onUpdateDel(projectId,d.id,"editorId",v)} xs/>}
           {d._fromPreset&&<Chip label="Internal Planning" color="#8b5cf6" xs/>}
@@ -11890,65 +11949,59 @@ const DeliverableRow = ({
           {allAppr&&<Chip label="✓ Approved" color="#10b981" xs/>}
           {changes&&<Chip label="↩ Changes" color="#ef4444" xs/>}
         </div>
-        {/* Row 2: active round due date */}
-        {activeR&&activeR.deadline&&(
-          <div style={{fontSize:14,fontWeight:600,color:RCOLOR[activeR.status],marginBottom:2}}>
-            {activeR.label} due {fmtDT(activeR.deadline)}
-            <span style={{marginLeft:6}}><Dl date={activeR.deadline} inline/></span>
-          </div>
-        )}
-        {/* Row 3: editor + project (if shown) + handoff schedule + BXTV badge */}
-        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginTop:1,fontSize:14,color:"#9ca3af"}}>
-          {!editorEditable&&ed&&<span style={{display:"flex",alignItems:"center",gap:4}}><Av name={ed.name} size={14}/>{ed.name}</span>}
+        {/* Row 2: editor + project + active round due + handoff + BXTV + type — all one compact wrapping line */}
+        <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap",fontSize:13,color:"#9ca3af"}}>
+          {!editorEditable&&ed&&<span style={{display:"flex",alignItems:"center",gap:4}}><Av name={ed.name} size={13}/>{ed.name}</span>}
           {showProject&&<span style={{color:"#6366f1"}}>{projectName}</span>}
+          {activeR&&activeR.deadline&&(
+            <span style={{fontWeight:600,color:RCOLOR[activeR.status]}}>
+              {activeR.label} due {fmtDT(activeR.deadline)}
+              <span style={{marginLeft:5}}><Dl date={activeR.deadline} inline/></span>
+            </span>
+          )}
           {d._segments?.length>1&&d._segments.map((seg,i)=>{
             const segEd=team?.find(m=>m.id===seg.editorId);
             const todayStr=new Date().toISOString().slice(0,10);
             const isCurrent=(!seg.from||seg.from<=todayStr)&&(!seg.to||seg.to>=todayStr);
             return (
-              <span key={i} style={{fontSize:13,color:isCurrent?"#d1d5db":"#838ba0",background:"#1f293780",borderRadius:4,padding:"1px 6px",display:"flex",alignItems:"center",gap:3}}>
+              <span key={i} style={{fontSize:12,color:isCurrent?"#d1d5db":"#838ba0",background:"#1f293780",borderRadius:4,padding:"1px 6px",display:"flex",alignItems:"center",gap:3}}>
                 <span style={{width:5,height:5,borderRadius:"50%",background:isCurrent?"#10b981":"#374151",flexShrink:0}}/>
                 {segEd?.name||"?"}: {fmtSegRange(seg.from,seg.to)}
               </span>
             );
           })}
           {(d.deliverableType||"Standard")==="BXTV"&&(
-            <span style={{fontSize:12,fontWeight:700,color:"#818cf8",background:"#6366f115",border:"1px solid #6366f140",borderRadius:4,padding:"1px 7px",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
+            <span style={{fontSize:11,fontWeight:700,color:"#818cf8",background:"#6366f115",border:"1px solid #6366f140",borderRadius:4,padding:"1px 7px",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
               📺 BXTV
               {d.bxtvLink?.episodeProjectId&&(()=>{const ep=allProjects.find(p=>p.id===d.bxtvLink.episodeProjectId);return ep?` · ${getBXTVEpisodeName(ep)||ep.name}`:""})()}
             </span>
           )}
           {onHandoff&&<button onClick={e=>{e.stopPropagation();onHandoff(d.id);}}
-            style={{fontSize:12,fontWeight:700,color:"#818cf8",background:"#6366f115",border:"1px solid #6366f140",cursor:"pointer",padding:"2px 9px",borderRadius:4,flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}
+            style={{fontSize:11,fontWeight:700,color:"#818cf8",background:"#6366f115",border:"1px solid #6366f140",cursor:"pointer",padding:"1px 8px",borderRadius:4,flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}
             onMouseEnter={e=>{e.currentTarget.style.background="#6366f125";e.currentTarget.style.borderColor="#6366f170";}}
             onMouseLeave={e=>{e.currentTarget.style.background="#6366f115";e.currentTarget.style.borderColor="#6366f140";}}>
             ↔ Assign Editors
           </button>}
+          {editable&&["Standard","BXTV"].map(t=>{
+            const active=(d.deliverableType||"Standard")===t;
+            if(!active) return null;
+            return <button key={t} onClick={e=>{e.stopPropagation();onUpdateDel(projectId,d.id,"deliverableType",t==="Standard"?"BXTV":"Standard");}}
+              title="Click to toggle Standard/BXTV"
+              style={{padding:"1px 7px",borderRadius:4,border:`1px solid ${t==="BXTV"?"#6366f1":"#374151"}`,background:t==="BXTV"?"#6366f115":"#1f2937",color:t==="BXTV"?"#818cf8":"#9ca3af",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>{t}</button>;
+          })}
         </div>
-        {/* Row 4: type toggle */}
-        {editable&&(
-          <div style={{display:"flex",alignItems:"center",gap:5,marginTop:2}}>
-            <span style={{fontSize:12,color:"#374151"}}>Type:</span>
-            {["Standard","BXTV"].map(t=>{
-              const active=(d.deliverableType||"Standard")===t;
-              return <button key={t} onClick={e=>{e.stopPropagation();onUpdateDel(projectId,d.id,"deliverableType",t);}}
-                style={{padding:"1px 8px",borderRadius:4,border:`1px solid ${active&&t==="BXTV"?"#6366f1":active?"#374151":"#1f2937"}`,background:active&&t==="BXTV"?"#6366f115":active?"#1f2937":"transparent",color:active&&t==="BXTV"?"#818cf8":active?"#e2e8f0":"#374151",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>{t}</button>;
-            })}
-          </div>
-        )}
       </div>
       {/* Right side: round circles + editable due date + delete */}
-      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5,flexShrink:0}}>
-        <div style={{display:"flex",gap:3}}>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0}}>
+        <div style={{display:"flex",gap:2}}>
           {(d.rounds||[]).map((r,i)=>(
-            <div key={i} title={`${r.label}: ${r.status}`} style={{width:20,height:20,borderRadius:"50%",background:RCOLOR[r.status]+"30",border:`2px solid ${RCOLOR[r.status]}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:RCOLOR[r.status]}}>{i+1}</div>
+            <div key={i} title={`${r.label}: ${r.status}`} style={{width:16,height:16,borderRadius:"50%",background:RCOLOR[r.status]+"30",border:`1.5px solid ${RCOLOR[r.status]}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:RCOLOR[r.status]}}>{i+1}</div>
           ))}
         </div>
         {editable ? (
-          <div onClick={e=>e.stopPropagation()} style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>
-            <label style={{fontSize:12,fontWeight:700,color:"#6b7280",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.07em"}}>Final Due</label>
+          <div onClick={e=>e.stopPropagation()} style={{display:"flex",alignItems:"center",gap:5}}>
             <input type="date" value={d.deadline||""} onChange={e=>onUpdateDel(projectId,d.id,"deadline",e.target.value)}
-              style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:5,color:d.deadline?"#e2e8f0":"#4b5563",padding:"3px 6px",fontSize:14,outline:"none",cursor:"pointer",colorScheme:"dark",fontFamily:"inherit"}}/>
+              style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:5,color:d.deadline?"#e2e8f0":"#4b5563",padding:"2px 5px",fontSize:12,outline:"none",cursor:"pointer",colorScheme:"dark",fontFamily:"inherit"}}/>
             {d.deadline&&<Dl date={d.deadline}/>}
           </div>
         ) : <Dl date={d.deadline}/>}
@@ -11956,19 +12009,19 @@ const DeliverableRow = ({
           <div onClick={e=>e.stopPropagation()}>
             {confirmDelete
               ? <div style={{display:"flex",alignItems:"center",gap:5}}>
-                  <span style={{fontSize:12,color:"#f59e0b",fontWeight:700}}>Delete?</span>
+                  <span style={{fontSize:11,color:"#f59e0b",fontWeight:700}}>Delete?</span>
                   <button onClick={()=>{onDeleteDel(projectId,d.id);setConfirmDelete(false);}}
-                    style={{background:"#ef444420",border:"1px solid #ef444450",borderRadius:4,color:"#ef4444",padding:"2px 8px",fontSize:12,fontWeight:700,cursor:"pointer"}}>Yes</button>
+                    style={{background:"#ef444420",border:"1px solid #ef444450",borderRadius:4,color:"#ef4444",padding:"1px 7px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Yes</button>
                   <button onClick={()=>setConfirmDelete(false)}
-                    style={{background:"#1f2937",border:"1px solid #374151",borderRadius:4,color:"#9ca3af",padding:"2px 8px",fontSize:12,fontWeight:700,cursor:"pointer"}}>No</button>
+                    style={{background:"#1f2937",border:"1px solid #374151",borderRadius:4,color:"#9ca3af",padding:"1px 7px",fontSize:11,fontWeight:700,cursor:"pointer"}}>No</button>
                 </div>
               : <button onClick={()=>setConfirmDelete(true)}
-                  style={{background:"none",border:"none",color:"#374151",cursor:"pointer",fontSize:17,padding:"2px 4px",lineHeight:1}} title="Delete deliverable">🗑</button>}
+                  style={{background:"none",border:"none",color:"#374151",cursor:"pointer",fontSize:14,padding:"1px 3px",lineHeight:1}} title="Delete deliverable">🗑</button>}
           </div>
         )}
       </div>
-      <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW}/>
-      {onClick&&<span style={{fontSize:17,color:isExpanded?"#6366f1":"#4b5563"}}>{isExpanded?"▲":"›"}</span>}
+      <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW} small/>
+      {onClick&&<span style={{fontSize:15,color:isExpanded?"#6366f1":"#4b5563"}}>{isExpanded?"▲":"›"}</span>}
     </div>
   );
 };
@@ -13779,10 +13832,7 @@ const MyViewHeader = ({member, isAdmin, setSelectedMember, projects, onUpdatePro
 
 // ─── Stats Bar ────────────────────────────────────────────────────────────────
 // ── Work Review View ──────────────────────────────────────────────────────────
-const WorkReviewView = ({projects, team=[], onOpenProject, onUpdateProject, onUpdateDel, onDeleteDel, talentRoster=[], workReviewSessions=[]}) => {
-  const [expandedIds, setExpandedIds] = useState(new Set());
-  const toggleExpanded = id => setExpandedIds(prev=>{const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n;});
-
+const WorkReviewView = ({projects, team=[], onOpenProject, onUpdateProject, onUpdateDel, onDeleteDel, talentRoster=[], workReviewSessions=[], updateWorkReviewSession}) => {
   const nowISO = new Date().toISOString().slice(0,16);
   const upcomingSessions = useMemo(()=>
     (workReviewSessions||[]).filter(s=>s.datetime>=nowISO).sort((a,b)=>a.datetime.localeCompare(b.datetime))
@@ -13835,48 +13885,54 @@ const WorkReviewView = ({projects, team=[], onOpenProject, onUpdateProject, onUp
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         {sessionGroups.map(({session, items})=>(
           <div key={session.id} style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:12,overflow:"hidden"}}>
-            <div style={{padding:"12px 18px",borderBottom:"1px solid #1f2937",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-              <div>
+            <div style={{padding:"12px 18px",borderBottom:"1px solid #1f2937",display:"flex",flexDirection:"column",gap:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                 <div style={{fontSize:18,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>🎥 {fmtDT(session.datetime)}</div>
-                {(session.location||(session.reviewers||[]).length>0)&&(
-                  <div style={{fontSize:13,color:"#6b7280",marginTop:2}}>
-                    {session.location}{session.location&&(session.reviewers||[]).length>0?" · ":""}
-                    {(session.reviewers||[]).length>0&&`Reviewers: ${session.reviewers.join(", ")}`}
-                  </div>
-                )}
+                {(session.reviewers||[]).length>0&&<div style={{fontSize:13,color:"#6b7280"}}>Reviewers: {session.reviewers.join(", ")}</div>}
+                <span style={{fontSize:14,color:"#4b5563",marginLeft:"auto"}}>{items.length} deliverable{items.length!==1?"s":""}</span>
               </div>
-              <span style={{fontSize:14,color:"#4b5563",marginLeft:"auto"}}>{items.length} deliverable{items.length!==1?"s":""}</span>
+              {updateWorkReviewSession&&(
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <input value={session.location||""} onChange={e=>updateWorkReviewSession(session.id,{location:e.target.value})} placeholder="Location (optional)"
+                    style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#e2e8f0",padding:"5px 9px",fontSize:13,outline:"none"}}/>
+                  <input value={session.zoomLink||""} onChange={e=>updateWorkReviewSession(session.id,{zoomLink:e.target.value})} placeholder="Zoom link (optional)"
+                    style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#e2e8f0",padding:"5px 9px",fontSize:13,outline:"none"}}/>
+                </div>
+              )}
+              {session.zoomLink&&<a href={session.zoomLink} target="_blank" rel="noopener noreferrer" style={{fontSize:13,color:"#818cf8",fontWeight:700}}>Join Zoom ↗</a>}
             </div>
-            <div style={{padding:"12px 18px",display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{padding:"12px 18px",display:"flex",flexDirection:"column",gap:6}}>
               {items.map(({project:p, del:d, round})=>{
                 const statusColor = DCOLOR[d.status]||"#6b7280";
-                const isExp = expandedIds.has(d.id);
+                const producer = team.find(m=>m.id===d.producerId);
+                const editor = team.find(m=>m.id===d.editorId);
+                const animator = team.find(m=>m.id===d.animatorId);
+                const designer = team.find(m=>m.id===d.designerId);
+                const personChip = (label, m) => m ? (
+                  <span key={label} title={label} style={{display:"flex",alignItems:"center",gap:4,fontSize:13,color:"#9ca3af",background:"#1f293780",borderRadius:5,padding:"2px 8px 2px 4px",whiteSpace:"nowrap"}}>
+                    <Av name={m.name} size={16}/>{m.name}
+                  </span>
+                ) : null;
                 return (
-                  <div key={`${p.id}-${d.id}`} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:8,overflow:"hidden"}}>
-                    <div onClick={()=>toggleExpanded(d.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",cursor:"pointer"}}>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:16,fontWeight:700,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title||"Untitled"}</div>
-                        <div style={{display:"flex",gap:8,marginTop:3,alignItems:"center",flexWrap:"wrap"}}>
-                          <span style={{background:statusColor+"20",color:statusColor,borderRadius:99,padding:"1px 8px",fontSize:12,fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>{d.status}</span>
-                          <button onClick={e=>{e.stopPropagation();onOpenProject(p);}} style={{background:"none",border:"none",padding:0,cursor:"pointer",fontSize:13,color:"#818cf8"}}>{p.name}</button>
-                          {d.type&&<span style={{fontSize:13,color:"#6b7280"}}>{d.type}</span>}
-                          <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW} small/>
-                        </div>
-                      </div>
-                      <button onClick={e=>{e.stopPropagation();removeFromWR(p.id,d.id,round.id);}}
-                        title="Remove from Work Review"
-                        style={{background:"#ef444415",border:"1px solid #ef444430",borderRadius:5,color:"#f87171",padding:"3px 10px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0}}>
-                        Remove
+                  <div key={`${p.id}-${d.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",background:"#111827",border:"1px solid #1f2937",borderRadius:8,flexWrap:"wrap"}}>
+                    <div style={{minWidth:0,flex:"1 1 220px"}}>
+                      <button onClick={()=>onOpenProject(p,"deliverables",d.id)}
+                        style={{background:"none",border:"none",padding:0,cursor:"pointer",fontSize:16,fontWeight:700,color:"#e2e8f0",textAlign:"left",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block",maxWidth:"100%"}}>
+                        {d.title||"Untitled"}
                       </button>
-                      <span style={{color:"#8e97a6",fontSize:14,flexShrink:0}}>{isExp?"▲":"▼"}</span>
+                      <button onClick={()=>onOpenProject(p)} style={{background:"none",border:"none",padding:0,cursor:"pointer",fontSize:13,color:"#818cf8"}}>{p.name}</button>
                     </div>
-                    {isExp&&(
-                      <div onClick={e=>e.stopPropagation()} style={{borderTop:"1px solid #1f2937"}}>
-                        <DeliverableDetailModal del={d} projectId={p.id} team={team} allProjects={projects}
-                          onUpdateDel={onUpdateDel} onDeleteDel={onDeleteDel} onUpdateProject={onUpdateProject}
-                          project={p} talentRoster={talentRoster}/>
-                      </div>
-                    )}
+                    <DelStatusSel status={d.status} onChange={v=>onUpdateDel(p.id,d.id,"status",v)} xs/>
+                    {personChip("Producer",producer)}
+                    {personChip("Editor",editor)}
+                    {personChip("Animator",animator)}
+                    {personChip("Designer",designer)}
+                    <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW} small/>
+                    <button onClick={()=>removeFromWR(p.id,d.id,round.id)}
+                      title="Remove from Work Review"
+                      style={{background:"#ef444415",border:"1px solid #ef444430",borderRadius:5,color:"#f87171",padding:"3px 10px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0}}>
+                      Remove
+                    </button>
                   </div>
                 );
               })}
@@ -17982,7 +18038,7 @@ const CallSheetModal = ({production, project, team, talentRoster=[], onClose, on
   );
 };
 
-const ProductionCard = ({production, idx, projectId, allProductions, allProjectDels, team, studioBookings, mediaCards, allProjects=[], presets=[], setupTypes=[], onAddSetupType, talentRoster=[], onUpdateTalentRoster, onUpdate, onDelete, onDuplicate, onSavePreset, onLoadPreset, onAddDeliverable, onDeleteDeliverable, onSendForApproval, onUnapprove, furnitureList=[], propsList=[], screenContentOptions={}, gearList=[], vendorCompanies=["AbelCine","Crews Control"], addVendorCompany}) => {
+const ProductionCard = ({production, idx, projectId, allProductions, allProjectDels, team, studioBookings, mediaCards, allProjects=[], presets=[], setupTypes=[], onAddSetupType, talentRoster=[], onUpdateTalentRoster, onUpdate, onDelete, onDuplicate, onSavePreset, onLoadPreset, onAddDeliverable, onDeleteDeliverable, onSendForApproval, onUnapprove, furnitureList=[], propsList=[], screenContentOptions={}, gearList=[], vendorCompanies=["AbelCine","Crews Control"], addVendorCompany, lists={}}) => {
   const [exp, setExp] = useState(!production.startTime);
   const [delOpen, setDelOpen] = useState(false);
   const [newDelTitle, setNewDelTitle] = useState("");
@@ -18284,11 +18340,7 @@ const ProductionCard = ({production, idx, projectId, allProductions, allProjectD
   const [customPresetName, setCustomPresetName] = useState("");
   useEffect(()=>{ setCustomPresetName(""); }, [_activeId]);
 
-  const CREW_ROLES = isBroadcast
-    ? ["Live Director","Technical Director","Broadcast Coordinator","Camera Op","Audio Tech","Lighting Director","Producer","Project Manager","Video Engineer","V1","EVS Operator","Replay Operator","Graphics Operator",
-       "DP","Audio Op with Kit","Assistant Camera","Production Assistant","Drone Operator with gear","Media Manager","DIT","Teleprompter Op","SM","A2","A1","Playback Operator"]
-    : ["Producer","Director","DP","Gaffer","Camera Op","Sound Mixer","Hair and Makeup","Production Assistant","Assistant Camera",
-       "Audio Op with Kit","Drone Operator with gear","Media Manager","DIT","Teleprompter Op","SM","A2","V1","A1","Playback Operator"];
+  const CREW_ROLES = [...(isBroadcast ? (lists.crewRolesBroadcast||CREW_ROLES_BROADCAST_DEFAULT) : (lists.crewRoles||CREW_ROLES_DEFAULT))].sort((a,b)=>a.localeCompare(b));
 
   const cs = {background:"#0f172a",border:"1px solid #1f2937",borderRadius:9,padding:"12px 14px"};
 
@@ -18997,7 +19049,7 @@ const ProductionCard = ({production, idx, projectId, allProductions, allProjectD
 
 // ─── Production Section ───────────────────────────────────────────────────────
 // ─── Production Section — lifecycle-staged ────────────────────────────────────
-const ProductionSection = ({productions=[], projectDeliverables=[], onUpdate, onAddToMainDels, onAddIngestDate, team, studioBookings, mediaCards, onUpdateStudioBookings, allProjects=[], projectId=null, projectAssignees={}, setupTypes=[], onAddSetupType, talentRoster=[], onUpdateTalentRoster, furnitureList=[], propsList=[], screenContentOptions={}, gearList=[], appPresets=[], onSaveAppPresets, vendorCompanies=["AbelCine","Crews Control"], addVendorCompany}) => {
+const ProductionSection = ({productions=[], projectDeliverables=[], onUpdate, onAddToMainDels, onAddIngestDate, team, studioBookings, mediaCards, onUpdateStudioBookings, allProjects=[], projectId=null, projectAssignees={}, setupTypes=[], onAddSetupType, talentRoster=[], onUpdateTalentRoster, furnitureList=[], propsList=[], screenContentOptions={}, gearList=[], appPresets=[], onSaveAppPresets, vendorCompanies=["AbelCine","Crews Control"], addVendorCompany, lists={}}) => {
   const [showAdd, setShowAdd] = useState(false);
   const [newType, setNewType] = useState("Content Shoot");
   const [addFormOpen, setAddFormOpen] = useState(false);
@@ -19273,6 +19325,7 @@ const ProductionSection = ({productions=[], projectDeliverables=[], onUpdate, on
                   gearList={gearList}
                   vendorCompanies={vendorCompanies}
                   addVendorCompany={addVendorCompany}
+                  lists={lists}
                 />
               ))}
             </div>
@@ -22699,7 +22752,7 @@ const projCalPackDay = events => {
 // removing deliverables, going to a linked page, etc.) lives in the click
 // modal instead, since a hover surface that expects clicks to add/remove
 // things is easy to trigger by accident.
-const CalEventHoverCard = ({ev, project, team=[], talentRoster=[], x, y, onMouseEnter, onMouseLeave, onOpen}) => {
+const CalEventHoverCard = ({ev, project, team=[], talentRoster=[], workReviewSessions=[], x, y, onMouseEnter, onMouseLeave, onOpen}) => {
   if(!ev) return null;
   const meta = PROJ_CAL_TYPE_META[ev.type];
   const members = ev._members || [ev];
@@ -22753,9 +22806,17 @@ const CalEventHoverCard = ({ev, project, team=[], talentRoster=[], x, y, onMouse
     );
   } else if(ev.type==="round"||ev.type==="workreview") {
     const reviewers = members[0]?.reviewers || [];
+    const wrSession = ev.type==="workreview" ? workReviewSessions.find(s=>s.id===members[0]?.groupId) : null;
     body = (
       <>
         {F("Reviewers", reviewers.length?reviewers.join(", "):"None set")}
+        {wrSession?.location&&F("Location", wrSession.location)}
+        {wrSession?.zoomLink&&(
+          <div style={{marginTop:6}}>
+            <div style={{fontSize:11,color:"#6b7280",textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:"'Barlow Condensed',sans-serif"}}>Zoom</div>
+            <a href={wrSession.zoomLink} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{fontSize:14,color:"#818cf8"}}>Join link ↗</a>
+          </div>
+        )}
         <div style={{marginTop:8}}>
           <div style={{fontSize:11,color:"#6b7280",textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:4}}>Deliverables</div>
           <div style={{display:"flex",flexDirection:"column",gap:3,maxHeight:110,overflowY:"auto"}}>
@@ -22895,6 +22956,9 @@ const ProjectCalendarWeek = ({weekStart, events, hourPx, onCommitMove, onEventCl
           {hourMarks.map(h=>(
             <div key={h} style={{position:"absolute",left:0,right:0,top:hToY(h),height:1,background:"#1f2937"}}/>
           ))}
+          {hourMarks.slice(0,-1).map(h=>(
+            <div key={h+".5"} style={{position:"absolute",left:0,right:0,top:hToY(h+0.5),height:0,borderTop:"1px dotted #1f293760"}}/>
+          ))}
           {/* Vertical day-column dividers */}
           {[1,2,3,4,5,6].map(i=>(
             <div key={i} style={{position:"absolute",left:`${(i/7)*100}%`,top:0,bottom:0,width:1,background:"#1f2937"}}/>
@@ -23023,6 +23087,8 @@ const ProjectCalendarMonth = ({calY, calM, events, stripH, onCommitMove, onEvent
   },[timed, drag]);
 
   const hourMarks = []; for(let h=PROJ_CAL_MONTH_START_H; h<=PROJ_CAL_MONTH_END_H; h+=2) hourMarks.push(h);
+  const fullHourMarks = []; for(let h=PROJ_CAL_MONTH_START_H; h<=PROJ_CAL_MONTH_END_H; h++) fullHourMarks.push(h);
+  const halfHourMarks = fullHourMarks.slice(0,-1).map(h=>h+0.5);
 
   // Weeks are rendered explicitly (rather than one flat 7-col grid) so each
   // row can carry its own hour-of-day gutter, like Week view's left column.
@@ -23079,8 +23145,11 @@ const ProjectCalendarMonth = ({calY, calM, events, stripH, onCommitMove, onEvent
                 </div>
                 <div ref={el=>{ if(el) stripRefs.current[ds]=el; else delete stripRefs.current[ds]; }}
                   style={{position:"relative",flex:1,minHeight:stripH,borderTop:"1px solid #1f293780"}}>
-                  {hourMarks.map(h=>(
+                  {fullHourMarks.map(h=>(
                     <div key={h} style={{position:"absolute",left:0,right:0,top:hToY(h),height:1,background:"#1f293750"}}/>
+                  ))}
+                  {halfHourMarks.map(h=>(
+                    <div key={h} style={{position:"absolute",left:0,right:0,top:hToY(h),height:0,borderTop:"1px dotted #1f293735"}}/>
                   ))}
                   {dayTimedEvs.map(ev=>{
                     const isDragging = drag?.ev.id===ev.id;
@@ -23189,10 +23258,20 @@ const ProjectCalendar = ({project, allProjects=[], team=[], talentRoster=[], onO
     // once you've actually attached something.
     const attachedSessionIds = new Set();
     (project.deliverables||[]).forEach(d=>(d.rounds||[]).forEach(r=>{ if(r.isWorkReview&&r.workReviewSessionId) attachedSessionIds.add(r.workReviewSessionId); }));
+    // Extra safety net alongside the session-id check above: legacy rounds
+    // (created before workReviewSessionId existed) won't be in
+    // attachedSessionIds even though this project already has a real,
+    // non-ghost Work Review chip at that exact slot — so also dedupe by
+    // date+time to avoid ever showing a faded ghost right next to a solid
+    // real event for what is, from this project's perspective, the same
+    // meeting.
+    const attachedWRSlots = new Set(evs.filter(e=>e.type==="workreview").map(e=>`${e.date}|${e.time}`));
     const nowFullISO = new Date().toISOString().slice(0,16);
     (workReviewSessions||[]).forEach(s=>{
       if(attachedSessionIds.has(s.id) || s.datetime<nowFullISO) return;
-      evs.push({id:`ghost-wr-${s.id}`, type:"workreview", date:s.datetime.slice(0,10), time:s.datetime.slice(11,16)||"14:00", hasTime:true,
+      const gTime = s.datetime.slice(11,16)||"14:00";
+      if(attachedWRSlots.has(`${s.datetime.slice(0,10)}|${gTime}`)) return;
+      evs.push({id:`ghost-wr-${s.id}`, type:"workreview", date:s.datetime.slice(0,10), time:gTime, hasTime:true,
         label:"Work Review", status:"", color:PROJ_CAL_TYPE_META.workreview.color,
         ref:null, groupId:null, _ghost:true, _ghostSessionId:s.id, durationH:PROJ_CAL_NOMINAL_DUR.workreview});
     });
@@ -23528,7 +23607,7 @@ const ProjectCalendar = ({project, allProjects=[], team=[], talentRoster=[], onO
       )}
 
       {hoverEv&&(
-        <CalEventHoverCard ev={hoverEv.ev} project={project} team={team} talentRoster={talentRoster}
+        <CalEventHoverCard ev={hoverEv.ev} project={project} team={team} talentRoster={talentRoster} workReviewSessions={workReviewSessions}
           x={hoverEv.x} y={hoverEv.y} onMouseEnter={handleCardEnter} onMouseLeave={handleCardLeave} onOpen={handleCardOpen}/>
       )}
 
@@ -23555,10 +23634,21 @@ const ProjectCalendar = ({project, allProjects=[], team=[], talentRoster=[], onO
             {(editingEv.type==="round"||editingEv.type==="workreview")&&(()=>{
               const attachedIds = editingMembers.map(m=>m.ref?.delId).filter(Boolean);
               const candidates = (project.deliverables||[]).filter(d=>!attachedIds.includes(d.id));
+              const wrSession = editingEv.type==="workreview" ? workReviewSessions.find(s=>s.id===editingMembers[0]?.groupId) : null;
               return (
                 <div style={{marginBottom:14}}>
                   <div style={{fontSize:12,color:"#8e97a6",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Reviewers</div>
                   <div style={{fontSize:14,color:"#e2e8f0",marginBottom:10}}>{(editingMembers[0].reviewers||[]).join(", ")||"None set"}</div>
+                  {wrSession&&(
+                    <>
+                      <div style={{fontSize:12,color:"#8e97a6",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Location</div>
+                      <input value={wrSession.location||""} onChange={e=>updateWorkReviewSession(wrSession.id,{location:e.target.value})} placeholder="e.g. Conference Room B"
+                        style={{width:"100%",background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:14,marginBottom:10,outline:"none"}}/>
+                      <div style={{fontSize:12,color:"#8e97a6",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Zoom Link</div>
+                      <input value={wrSession.zoomLink||""} onChange={e=>updateWorkReviewSession(wrSession.id,{zoomLink:e.target.value})} placeholder="https://zoom.us/j/…"
+                        style={{width:"100%",background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:14,marginBottom:10,outline:"none"}}/>
+                    </>
+                  )}
                   <div style={{fontSize:12,color:"#8e97a6",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Deliverables</div>
                   <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:6}}>
                     {editingMembers.map(m=>(
@@ -25450,6 +25540,8 @@ const AdminListsTab = ({lists, onUpdateLists}) => {
     workstreams=WORKSTREAMS, businessUnits=BUSINESS_UNITS, productionTypes=PRODUCTION_TYPES,
     deliverableStatuses=[...DELIVERABLE_STATUSES],
     animBatchStatuses=[...ANIM_ROUND_STATUSES],
+    crewRoles=[...CREW_ROLES_DEFAULT],
+    crewRolesBroadcast=[...CREW_ROLES_BROADCAST_DEFAULT],
   } = lists;
 
   const [ws,  setWS]  = useState(()=>[...workstreams]);
@@ -25457,25 +25549,28 @@ const AdminListsTab = ({lists, onUpdateLists}) => {
   const [pt,  setPT]  = useState(()=>[...productionTypes]);
   const [ds,  setDS]  = useState(()=>[...deliverableStatuses]);
   const [abs, setABS] = useState(()=>[...animBatchStatuses]);
+  const [cr,  setCR]  = useState(()=>[...crewRoles]);
+  const [crb, setCRB] = useState(()=>[...crewRolesBroadcast]);
   const [newWS, setNewWS] = useState(""); const [newBU, setNewBU] = useState("");
   const [newPT, setNewPT] = useState(""); const [newDS, setNewDS] = useState("");
   const [newABS, setNewABS] = useState("");
+  const [newCR, setNewCR] = useState(""); const [newCRB, setNewCRB] = useState("");
 
-  const save = (nextWS, nextBU, nextPT, nextDS, nextABS) =>
-    onUpdateLists({workstreams:nextWS, businessUnits:nextBU, productionTypes:nextPT, deliverableStatuses:nextDS, animBatchStatuses:nextABS});
+  const save = (nextWS, nextBU, nextPT, nextDS, nextABS, nextCR, nextCRB) =>
+    onUpdateLists({workstreams:nextWS, businessUnits:nextBU, productionTypes:nextPT, deliverableStatuses:nextDS, animBatchStatuses:nextABS, crewRoles:nextCR, crewRolesBroadcast:nextCRB});
 
   const addItem = (list, setList, val, setNew, field) => {
     const v = val.trim(); if(!v||list.includes(v)) return;
     const next = [...list, v]; setList(next); setNew("");
-    const args = {ws,bu,pt,ds,abs};
+    const args = {ws,bu,pt,ds,abs,cr,crb};
     args[field] = next;
-    save(args.ws, args.bu, args.pt, args.ds, args.abs);
+    save(args.ws, args.bu, args.pt, args.ds, args.abs, args.cr, args.crb);
   };
   const removeItem = (list, setList, item, field) => {
     const next = list.filter(x=>x!==item); setList(next);
-    const args = {ws,bu,pt,ds,abs};
+    const args = {ws,bu,pt,ds,abs,cr,crb};
     args[field] = next;
-    save(args.ws, args.bu, args.pt, args.ds, args.abs);
+    save(args.ws, args.bu, args.pt, args.ds, args.abs, args.cr, args.crb);
   };
 
   return (
@@ -25502,6 +25597,14 @@ const AdminListsTab = ({lists, onUpdateLists}) => {
           <div style={{fontSize:13,fontWeight:800,color:"#6b7280",textTransform:"uppercase",letterSpacing:"0.1em",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:4}}>Animation Metadata</div>
           <AdminListSection title="Animation Batch Status" icon="✨" items={abs} newVal={newABS} setNew={setNewABS} chipColor="#f9a8d4"
             onAdd={()=>addItem(abs,setABS,newABS,setNewABS,"abs")} onRemove={item=>removeItem(abs,setABS,item,"abs")}/>
+        </div>
+        <div>
+          <div style={{fontSize:13,fontWeight:800,color:"#6b7280",textTransform:"uppercase",letterSpacing:"0.1em",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:4}}>Production Crew Roles</div>
+          <div style={{fontSize:14,color:"#6b7280",marginBottom:10}}>Options shown in a production's Internal/External crew role dropdowns. Always displayed alphabetically regardless of the order added here.</div>
+          <AdminListSection title="Crew Roles" icon="🎥" items={cr} newVal={newCR} setNew={setNewCR} chipColor="#22c55e"
+            onAdd={()=>addItem(cr,setCR,newCR,setNewCR,"cr")} onRemove={item=>removeItem(cr,setCR,item,"cr")}/>
+          <AdminListSection title="Crew Roles — Broadcast" icon="📡" items={crb} newVal={newCRB} setNew={setNewCRB} chipColor="#0ea5e9"
+            onAdd={()=>addItem(crb,setCRB,newCRB,setNewCRB,"crb")} onRemove={item=>removeItem(crb,setCRB,item,"crb")}/>
         </div>
       </div>
     </div>
@@ -28060,7 +28163,7 @@ function App() {
             other view keeps the standard cap. */}
         <div style={{maxWidth:view==="pipeline"?2000:1600,margin:(activeSidebarWidth||pushOffset)?"0":"0 auto",padding:"20px 24px"}}>
           <StatsBar projects={allProjects} team={allTeam} setView={v=>{setView(v);if(v!=="projects")setStatsFilter(null);}} onOpenProject={openProject} onSetStatsFilter={setStatsFilter} workReviewSessions={workReviewSessions}/>
-          {view==="workReview"&&<WorkReviewView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} workReviewSessions={workReviewSessions}/>}
+          {view==="workReview"&&<WorkReviewView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} workReviewSessions={workReviewSessions} updateWorkReviewSession={updateWorkReviewSession}/>}
           {view==="pipeline"&&<PipelineView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject}/>}
           {view==="animations"&&<AnimationView allProjects={allProjects} team={allTeam} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="intake"&&<IntakeView
@@ -28120,7 +28223,7 @@ function App() {
 
         {liveSelected&&(
           <ProjectOverviewErrorBoundary key={liveSelected.id} onClose={()=>setSelected(null)}>
-            <ProjectOverview project={liveSelected} team={allTeam} allProjects={allProjects} onClose={()=>setSelected(null)} onUpdateDel={updateDel} onAddDel={addDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} initialTab={initialTab?.tab} initialShootId={initialTab?.itemId} initialItemId={initialTab?.itemId} studioBookings={allStudioBookings} mediaCards={mediaCards} setupTypes={setupTypes} onAddSetupType={addSetupType} talentRoster={talentRoster} onUpdateTalentRoster={saveTalentRoster} nudges={nudges} onAddNudge={addNudge} furnitureList={furnitureList} propsList={propsList} screenContentOptions={screenContentOptions} gearList={gearList} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} appPresets={appPresets} onSaveAppPresets={saveAppPresets} vendorCompanies={vendorCompanies} addVendorCompany={addVendorCompany} intakes={intakes} becRequests={becRequests} canAccessBudget={canAccessTab("budget")} reviewerNames={reviewerNames} addReviewerName={addReviewerName} workReviewSessions={workReviewSessions} addWorkReviewSession={addWorkReviewSession} updateWorkReviewSession={updateWorkReviewSession}/>
+            <ProjectOverview project={liveSelected} team={allTeam} allProjects={allProjects} onClose={()=>setSelected(null)} onUpdateDel={updateDel} onAddDel={addDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} initialTab={initialTab?.tab} initialShootId={initialTab?.itemId} initialItemId={initialTab?.itemId} studioBookings={allStudioBookings} mediaCards={mediaCards} setupTypes={setupTypes} onAddSetupType={addSetupType} talentRoster={talentRoster} onUpdateTalentRoster={saveTalentRoster} nudges={nudges} onAddNudge={addNudge} furnitureList={furnitureList} propsList={propsList} screenContentOptions={screenContentOptions} gearList={gearList} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} appPresets={appPresets} onSaveAppPresets={saveAppPresets} vendorCompanies={vendorCompanies} addVendorCompany={addVendorCompany} intakes={intakes} becRequests={becRequests} canAccessBudget={canAccessTab("budget")} reviewerNames={reviewerNames} addReviewerName={addReviewerName} workReviewSessions={workReviewSessions} addWorkReviewSession={addWorkReviewSession} updateWorkReviewSession={updateWorkReviewSession} lists={lists}/>
           </ProjectOverviewErrorBoundary>
         )}
         {addingProject&&<AddProjectModal team={allTeam} existingProjects={allProjects} onClose={()=>setAddingProject(false)} onAdd={addProject}/>}
