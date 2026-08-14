@@ -5786,22 +5786,23 @@ const BriefSummarizer = ({lp, onUpdateProject, projectId}) => {
   const summarize = async () => {
     setLoading(true); setError("");
     const content = lp.briefNotes || "Project brief document attached.";
-    const prompt = `You are a post-production project manager assistant. Summarize the following project brief into one clear, digestible paragraph (max 60 words) that captures: the client/project name, the deliverables needed, key deadlines or requirements, and the tone/goal of the campaign. Be direct and specific.
+    const prompt = `Summarize the following project brief into one clear, digestible paragraph (max 60 words) that captures: the client/project name, the deliverables needed, key deadlines or requirements, and the tone/goal of the campaign. Be direct and specific.
 
 Project name: ${lp.name}
 Brief content: ${content}`;
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          model:"claude-sonnet-4-20250514",
-          max_tokens:150,
-          messages:[{role:"user",content:prompt}]
-        })
+      // Calls the "agent" Supabase Edge Function rather than Anthropic
+      // directly, same as StudioAgent — the real API key lives server-side
+      // as an Edge Function secret, never in this browser-visible bundle.
+      if(!sb) throw new Error("Backend not configured");
+      const { data, error } = await sb.functions.invoke("agent", {
+        body: {
+          system: "You are a post-production project manager assistant.",
+          messages: [{role:"user", content:prompt}],
+        },
       });
-      const data = await res.json();
-      const summary = data.content?.[0]?.text || "Could not generate summary.";
+      if(error) throw error;
+      const summary = data.content?.map(c=>c.text||"").join("").trim() || "Could not generate summary.";
       onUpdateProject(projectId,"briefNotes",summary);
     } catch(e) {
       setError("Failed to summarize — check connection.");
@@ -14359,11 +14360,20 @@ const CalEventDrawer = ({item, projects, team, onClose, onUpdateProject, onOpenP
   const generateAISummary = async () => {
     if(!proj) return;
     setAiLoading(true);
-    const prompt = `You are a post-production project manager. Write a 2-sentence summary of this campaign that captures: client/project name, type of content, key deadlines and current status. Be concise and specific.\n\nProject: ${proj.name}\nStatus: ${proj.status}\nWorkstream: ${proj.workstream||"—"}\nBusiness Unit: ${proj.businessUnit||"—"}\nDeadline: ${proj.deadline||"TBD"}\nBrief notes: ${proj.briefNotes||"No brief yet."}\nDeliverables: ${(proj.deliverables||[]).map(d=>d.title).join(", ")||"None yet."}`;
+    const prompt = `Write a 2-sentence summary of this campaign that captures: client/project name, type of content, key deadlines and current status. Be concise and specific.\n\nProject: ${proj.name}\nStatus: ${proj.status}\nWorkstream: ${proj.workstream||"—"}\nBusiness Unit: ${proj.businessUnit||"—"}\nDeadline: ${proj.deadline||"TBD"}\nBrief notes: ${proj.briefNotes||"No brief yet."}\nDeliverables: ${(proj.deliverables||[]).map(d=>d.title).join(", ")||"None yet."}`;
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:120,messages:[{role:"user",content:prompt}]})});
-      const data = await res.json();
-      const summary = data.content?.[0]?.text || "";
+      // Calls the "agent" Supabase Edge Function rather than Anthropic
+      // directly, same as StudioAgent — the real API key lives server-side
+      // as an Edge Function secret, never in this browser-visible bundle.
+      if(!sb) throw new Error("Backend not configured");
+      const { data, error } = await sb.functions.invoke("agent", {
+        body: {
+          system: "You are a post-production project manager.",
+          messages: [{role:"user", content:prompt}],
+        },
+      });
+      if(error) throw error;
+      const summary = data.content?.map(c=>c.text||"").join("").trim() || "";
       setAiSummary(summary);
       if(onUpdateProject && proj) onUpdateProject(proj.id,"briefSummary",summary);
     } catch(e){ setAiSummary("Could not generate summary."); }
@@ -17671,30 +17681,62 @@ const CallSheetModal = ({production, project, team, talentRoster=[], onClose, on
   // Wrap every setter to also trigger a save
   const mk = setter => v => { setter(v); triggerSave(); };
 
-  // ── Weather/Sunrise fetch via Anthropic API + web_search ───────────────────
+  // ── Weather/Sunrise fetch via Open-Meteo ────────────────────────────────────
+  // Was previously a direct browser fetch to api.anthropic.com with no auth
+  // headers and an invalid model id ("claude-sonnet-4-6") — that endpoint
+  // requires a server-side API key and doesn't allow browser CORS at all, so
+  // it never actually returned data once deployed outside the Claude
+  // Artifacts sandbox (where such calls are transparently proxied). Open-Meteo
+  // is a free, keyless, CORS-enabled weather API that works directly from a
+  // static site's browser fetch, so it replaces the LLM lookup entirely.
+  // Coordinates are fixed to Manhattan, matching this call sheet's existing
+  // "New York City (Manhattan)" assumption.
+  const CS_WEATHER_CODES = {
+    0:"Clear", 1:"Mostly Clear", 2:"Partly Cloudy", 3:"Overcast",
+    45:"Fog", 48:"Freezing Fog",
+    51:"Light Drizzle", 53:"Drizzle", 55:"Heavy Drizzle", 56:"Freezing Drizzle", 57:"Freezing Drizzle",
+    61:"Light Rain", 63:"Rain", 65:"Heavy Rain", 66:"Freezing Rain", 67:"Freezing Rain",
+    71:"Light Snow", 73:"Snow", 75:"Heavy Snow", 77:"Snow Grains",
+    80:"Light Showers", 81:"Showers", 82:"Heavy Showers",
+    85:"Snow Showers", 86:"Heavy Snow Showers",
+    95:"Thunderstorm", 96:"Thunderstorm w/ Hail", 99:"Severe Thunderstorm",
+  };
+  // "2026-08-14T06:14" (local, per the timezone param) → "6:14A"
+  const fmtCSHourMin = iso => {
+    const m = (iso||"").match(/T(\d{2}):(\d{2})/);
+    if(!m) return "";
+    let h = parseInt(m[1],10); const mi = m[2];
+    const ap = h<12?"A":"P";
+    h = h%12; if(h===0) h=12;
+    return `${h}:${mi}${ap}`;
+  };
   const fetchWeather = async () => {
     setFetching(true); setFetchErr("");
-    const dateStr = production.startTime ? new Date(production.startTime).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"}) : new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"});
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model:"claude-sonnet-4-6", max_tokens:400,
-          system:"You are a weather lookup assistant. Use web search to find real sunrise, sunset, weather for the requested date and city. Respond ONLY with valid JSON: {\"sunrise\":\"7:14A\",\"sunset\":\"6:06P\",\"high\":\"80\",\"low\":\"58\",\"conditions\":\"Sunny\"}. No markdown, no explanation.",
-          messages:[{role:"user", content:`Sunrise time, sunset time, weather high temp, low temp, and conditions for ${dateStr} in New York City (Manhattan). Search for the real forecast.`}],
-          tools:[{"type":"web_search_20250305","name":"web_search"}],
-        }),
-      });
+      const shootDate = production.startTime ? production.startTime.slice(0,10) : new Date().toISOString().slice(0,10);
+      const daysOut = Math.round((new Date(shootDate+"T00:00") - new Date(new Date().toISOString().slice(0,10)+"T00:00")) / 86400000);
+      // Open-Meteo's standard forecast only covers ~16 days out (and a
+      // couple days back); outside that window there's nothing real to
+      // show, so say so plainly rather than fabricating a forecast.
+      if(daysOut>15 || daysOut<-2){
+        setFetchErr(daysOut>15 ? "Forecast not available yet — try again closer to the shoot date, or enter manually." : "Forecast no longer available for this past date — enter manually.");
+        setFetching(false);
+        return;
+      }
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=40.7831&longitude=-73.9712&daily=temperature_2m_max,temperature_2m_min,weathercode,sunrise,sunset&temperature_unit=fahrenheit&timezone=America%2FNew_York&start_date=${shootDate}&end_date=${shootDate}`;
+      const res = await fetch(url);
+      if(!res.ok) throw new Error("weather fetch failed");
       const data = await res.json();
-      const text = (data.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("").trim();
-      const jsonStr = text.replace(/```json|```/g,"").trim();
-      const parsed = JSON.parse(jsonStr);
+      const d = data.daily;
+      if(!d?.time?.length) throw new Error("no forecast data");
+      const high = Math.round(d.temperature_2m_max[0]);
+      const low = Math.round(d.temperature_2m_min[0]);
+      const conditions = CS_WEATHER_CODES[d.weathercode[0]] || "—";
       // Capture new values locally before setting state, so the immediate
       // onSave call below uses the fresh data rather than stale closures.
-      const newSunrise  = parsed.sunrise  || sunrise;
-      const newSunset   = parsed.sunset   || sunset;
-      const newWeather  = (parsed.high&&parsed.low&&parsed.conditions)
-        ? `${parsed.high}° H | ${parsed.low}° L\n${parsed.conditions}` : weather;
+      const newSunrise = fmtCSHourMin(d.sunrise[0]);
+      const newSunset  = fmtCSHourMin(d.sunset[0]);
+      const newWeather = `${high}° H | ${low}° L\n${conditions}`;
       setSunrise(newSunrise);
       setSunset(newSunset);
       setWeather(newWeather);
@@ -21933,12 +21975,13 @@ const StudioDisplayBoard = ({allBookings, team}) => {
 // Can read all app state and propose structured updates with user confirmation.
 
 // ─── My View — Daily Rundown Chat ─────────────────────────────────────────────
-// A per-person chat embedded on every My View page. The first time someone
-// opens their page on a given calendar day, it auto-generates a short,
-// prioritized rundown of what's in flight for them specifically — then stays
-// open for follow-up questions, using the same real Anthropic API call
-// StudioAgent already uses, just with a person-scoped system prompt instead
-// of the whole-studio one.
+// A per-person chat embedded on every My View page. Click "Generate Today's
+// Rundown" for a short, prioritized summary of what's in flight for them
+// specifically — then stays open for follow-up questions. Calls the "agent"
+// Supabase Edge Function (same one StudioAgent uses) with a person-scoped
+// system prompt instead of the whole-studio one. Deliberately NOT
+// auto-triggered on page load — each rundown/follow-up is a real API call
+// that costs credits, so generation only happens on an explicit click.
 const RUNDOWN_STORAGE_PREFIX = "posttrack-rundown-";
 
 const buildRundownSystemPrompt = (member, projects, outstandingTasks) => {
@@ -22006,16 +22049,18 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[], minHeight
     setLoading(true);
     const kickoff = {role:"user", content:"Give me my morning rundown for today.", msgId:uid(), hidden:true};
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model:"claude-sonnet-4-6", max_tokens:600,
+      // Calls the "agent" Supabase Edge Function rather than Anthropic
+      // directly, same as StudioAgent — the real API key lives server-side
+      // as an Edge Function secret, never in this browser-visible bundle.
+      if(!sb) throw new Error("Backend not configured");
+      const { data, error } = await sb.functions.invoke("agent", {
+        body: {
           system: buildRundownSystemPrompt(member, projects, outstandingTasks),
           messages: [{role:"user", content:kickoff.content}],
-        }),
+        },
       });
-      const data = await res.json();
-      const text = data.content?.map(c=>c.text||"").join("") || "Couldn't generate your rundown right now — try refreshing.";
+      if(error) throw error;
+      const text = data.content?.map(c=>c.text||"").join("") || "Couldn't generate your rundown right now — try again.";
       const newMsgs = [kickoff, {role:"assistant", content:text, msgId:uid(), isRundown:true}];
       setMsgs(newMsgs); setRundownDate(todayKey); persist(newMsgs, todayKey);
     } catch(e) {
@@ -22025,12 +22070,6 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[], minHeight
     setLoading(false);
   };
 
-  // Auto-generate once loaded, only if today's rundown doesn't exist yet.
-  useEffect(()=>{
-    if(!loaded || rundownDate===todayKey) return;
-    generateRundown();
-  },[loaded, rundownDate, todayKey, member.id]);
-
   const send = async () => {
     const txt = input.trim();
     if(!txt||loading) return;
@@ -22039,15 +22078,17 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[], minHeight
     setMsgs(newMsgs);
     setLoading(true);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model:"claude-sonnet-4-6", max_tokens:800,
+      // Calls the "agent" Supabase Edge Function rather than Anthropic
+      // directly, same as StudioAgent — the real API key lives server-side
+      // as an Edge Function secret, never in this browser-visible bundle.
+      if(!sb) throw new Error("Backend not configured");
+      const { data, error } = await sb.functions.invoke("agent", {
+        body: {
           system: buildRundownSystemPrompt(member, projects, outstandingTasks)+"\n\nYou already gave today's rundown above. Now answer this follow-up question conversationally, using the same context.",
           messages: newMsgs.map(m=>({role:m.role, content:m.content})),
-        }),
+        },
       });
-      const data = await res.json();
+      if(error) throw error;
       const reply = data.content?.map(c=>c.text||"").join("") || "Sorry, I couldn't get a response.";
       const finalMsgs = [...newMsgs, {role:"assistant", content:reply, msgId:uid()}];
       setMsgs(finalMsgs); persist(finalMsgs, rundownDate||todayKey);
@@ -22068,7 +22109,7 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[], minHeight
         <div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>✦</div>
         <div>
           <div style={{fontWeight:900,fontSize:18,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif"}}>Morning Rundown</div>
-          <div style={{fontSize:13,color: "#8e97a6"}}>Refreshes automatically each day — ask follow-ups any time</div>
+          <div style={{fontSize:13,color: "#8e97a6"}}>Click to generate — ask follow-ups any time</div>
         </div>
         {loading&&!visibleMsgs.length&&(
           <div style={{marginLeft:"auto",display:"flex",gap:5}}>
@@ -22078,6 +22119,15 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[], minHeight
       </div>
 
       <div ref={msgListRef} style={{marginBottom:10,flex:"1 1 auto",minHeight:0,overflowY:"auto"}}>
+        {loaded&&!loading&&visibleMsgs.length===0&&(
+          <div style={{textAlign:"center",padding:"20px 10px"}}>
+            <div style={{fontSize:14,color:"#6b7280",marginBottom:10}}>Get a quick, prioritized rundown of what's in flight for you today.</div>
+            <button onClick={generateRundown}
+              style={{background:"#6366f118",border:"1px solid #6366f140",borderRadius:8,color:"#818cf8",padding:"8px 16px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>
+              ✦ Generate Today's Rundown
+            </button>
+          </div>
+        )}
         {visibleMsgs.map((m,i)=>{
           const isUser = m.role==="user";
           return (

@@ -3967,22 +3967,20 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       setLoading(true);
       setError("");
       const content = lp.briefNotes || "Project brief document attached.";
-      const prompt = `You are a post-production project manager assistant. Summarize the following project brief into one clear, digestible paragraph (max 60 words) that captures: the client/project name, the deliverables needed, key deadlines or requirements, and the tone/goal of the campaign. Be direct and specific.
+      const prompt = `Summarize the following project brief into one clear, digestible paragraph (max 60 words) that captures: the client/project name, the deliverables needed, key deadlines or requirements, and the tone/goal of the campaign. Be direct and specific.
 
 Project name: ${lp.name}
 Brief content: ${content}`;
       try {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
-            max_tokens: 150,
+        if (!sb) throw new Error("Backend not configured");
+        const { data, error: error2 } = await sb.functions.invoke("agent", {
+          body: {
+            system: "You are a post-production project manager assistant.",
             messages: [{ role: "user", content: prompt }]
-          })
+          }
         });
-        const data = await res.json();
-        const summary = data.content?.[0]?.text || "Could not generate summary.";
+        if (error2) throw error2;
+        const summary = data.content?.map((c) => c.text || "").join("").trim() || "Could not generate summary.";
         onUpdateProject(projectId, "briefNotes", summary);
       } catch (e) {
         setError("Failed to summarize \u2014 check connection.");
@@ -9602,7 +9600,7 @@ Brief content: ${content}`;
     const generateAISummary = async () => {
       if (!proj) return;
       setAiLoading(true);
-      const prompt = `You are a post-production project manager. Write a 2-sentence summary of this campaign that captures: client/project name, type of content, key deadlines and current status. Be concise and specific.
+      const prompt = `Write a 2-sentence summary of this campaign that captures: client/project name, type of content, key deadlines and current status. Be concise and specific.
 
 Project: ${proj.name}
 Status: ${proj.status}
@@ -9612,9 +9610,15 @@ Deadline: ${proj.deadline || "TBD"}
 Brief notes: ${proj.briefNotes || "No brief yet."}
 Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "None yet."}`;
       try {
-        const res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 120, messages: [{ role: "user", content: prompt }] }) });
-        const data = await res.json();
-        const summary = data.content?.[0]?.text || "";
+        if (!sb) throw new Error("Backend not configured");
+        const { data, error } = await sb.functions.invoke("agent", {
+          body: {
+            system: "You are a post-production project manager.",
+            messages: [{ role: "user", content: prompt }]
+          }
+        });
+        if (error) throw error;
+        const summary = data.content?.map((c) => c.text || "").join("").trim() || "";
         setAiSummary(summary);
         if (onUpdateProject && proj) onUpdateProject(proj.id, "briefSummary", summary);
       } catch (e) {
@@ -11851,30 +11855,70 @@ Please confirm availability and booking status for each item above, and let us k
       setter(v);
       triggerSave();
     };
+    const CS_WEATHER_CODES = {
+      0: "Clear",
+      1: "Mostly Clear",
+      2: "Partly Cloudy",
+      3: "Overcast",
+      45: "Fog",
+      48: "Freezing Fog",
+      51: "Light Drizzle",
+      53: "Drizzle",
+      55: "Heavy Drizzle",
+      56: "Freezing Drizzle",
+      57: "Freezing Drizzle",
+      61: "Light Rain",
+      63: "Rain",
+      65: "Heavy Rain",
+      66: "Freezing Rain",
+      67: "Freezing Rain",
+      71: "Light Snow",
+      73: "Snow",
+      75: "Heavy Snow",
+      77: "Snow Grains",
+      80: "Light Showers",
+      81: "Showers",
+      82: "Heavy Showers",
+      85: "Snow Showers",
+      86: "Heavy Snow Showers",
+      95: "Thunderstorm",
+      96: "Thunderstorm w/ Hail",
+      99: "Severe Thunderstorm"
+    };
+    const fmtCSHourMin = (iso) => {
+      const m = (iso || "").match(/T(\d{2}):(\d{2})/);
+      if (!m) return "";
+      let h = parseInt(m[1], 10);
+      const mi = m[2];
+      const ap = h < 12 ? "A" : "P";
+      h = h % 12;
+      if (h === 0) h = 12;
+      return `${h}:${mi}${ap}`;
+    };
     const fetchWeather = async () => {
       setFetching(true);
       setFetchErr("");
-      const dateStr = production.startTime ? new Date(production.startTime).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : (/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
       try {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-6",
-            max_tokens: 400,
-            system: 'You are a weather lookup assistant. Use web search to find real sunrise, sunset, weather for the requested date and city. Respond ONLY with valid JSON: {"sunrise":"7:14A","sunset":"6:06P","high":"80","low":"58","conditions":"Sunny"}. No markdown, no explanation.',
-            messages: [{ role: "user", content: `Sunrise time, sunset time, weather high temp, low temp, and conditions for ${dateStr} in New York City (Manhattan). Search for the real forecast.` }],
-            tools: [{ "type": "web_search_20250305", "name": "web_search" }]
-          })
-        });
+        const shootDate = production.startTime ? production.startTime.slice(0, 10) : (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+        const daysOut = Math.round((/* @__PURE__ */ new Date(shootDate + "T00:00") - /* @__PURE__ */ new Date((/* @__PURE__ */ new Date()).toISOString().slice(0, 10) + "T00:00")) / 864e5);
+        if (daysOut > 15 || daysOut < -2) {
+          setFetchErr(daysOut > 15 ? "Forecast not available yet \u2014 try again closer to the shoot date, or enter manually." : "Forecast no longer available for this past date \u2014 enter manually.");
+          setFetching(false);
+          return;
+        }
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=40.7831&longitude=-73.9712&daily=temperature_2m_max,temperature_2m_min,weathercode,sunrise,sunset&temperature_unit=fahrenheit&timezone=America%2FNew_York&start_date=${shootDate}&end_date=${shootDate}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("weather fetch failed");
         const data = await res.json();
-        const text = (data.content || []).filter((c) => c.type === "text").map((c) => c.text).join("").trim();
-        const jsonStr = text.replace(/```json|```/g, "").trim();
-        const parsed = JSON.parse(jsonStr);
-        const newSunrise = parsed.sunrise || sunrise;
-        const newSunset = parsed.sunset || sunset;
-        const newWeather = parsed.high && parsed.low && parsed.conditions ? `${parsed.high}\xB0 H | ${parsed.low}\xB0 L
-${parsed.conditions}` : weather;
+        const d = data.daily;
+        if (!d?.time?.length) throw new Error("no forecast data");
+        const high = Math.round(d.temperature_2m_max[0]);
+        const low = Math.round(d.temperature_2m_min[0]);
+        const conditions = CS_WEATHER_CODES[d.weathercode[0]] || "\u2014";
+        const newSunrise = fmtCSHourMin(d.sunrise[0]);
+        const newSunset = fmtCSHourMin(d.sunset[0]);
+        const newWeather = `${high}\xB0 H | ${low}\xB0 L
+${conditions}`;
         setSunrise(newSunrise);
         setSunset(newSunset);
         setWeather(newWeather);
@@ -14704,18 +14748,15 @@ Today's date: ${(/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { weekd
       setLoading(true);
       const kickoff = { role: "user", content: "Give me my morning rundown for today.", msgId: uid(), hidden: true };
       try {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-6",
-            max_tokens: 600,
+        if (!sb) throw new Error("Backend not configured");
+        const { data, error } = await sb.functions.invoke("agent", {
+          body: {
             system: buildRundownSystemPrompt(member, projects, outstandingTasks),
             messages: [{ role: "user", content: kickoff.content }]
-          })
+          }
         });
-        const data = await res.json();
-        const text = data.content?.map((c) => c.text || "").join("") || "Couldn't generate your rundown right now \u2014 try refreshing.";
+        if (error) throw error;
+        const text = data.content?.map((c) => c.text || "").join("") || "Couldn't generate your rundown right now \u2014 try again.";
         const newMsgs = [kickoff, { role: "assistant", content: text, msgId: uid(), isRundown: true }];
         setMsgs(newMsgs);
         setRundownDate(todayKey);
@@ -14728,10 +14769,6 @@ Today's date: ${(/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { weekd
       }
       setLoading(false);
     };
-    (0, import_react.useEffect)(() => {
-      if (!loaded || rundownDate === todayKey) return;
-      generateRundown();
-    }, [loaded, rundownDate, todayKey, member.id]);
     const send = async () => {
       const txt = input.trim();
       if (!txt || loading) return;
@@ -14740,17 +14777,14 @@ Today's date: ${(/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { weekd
       setMsgs(newMsgs);
       setLoading(true);
       try {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-6",
-            max_tokens: 800,
+        if (!sb) throw new Error("Backend not configured");
+        const { data, error } = await sb.functions.invoke("agent", {
+          body: {
             system: buildRundownSystemPrompt(member, projects, outstandingTasks) + "\n\nYou already gave today's rundown above. Now answer this follow-up question conversationally, using the same context.",
             messages: newMsgs.map((m) => ({ role: m.role, content: m.content }))
-          })
+          }
         });
-        const data = await res.json();
+        if (error) throw error;
         const reply = data.content?.map((c) => c.text || "").join("") || "Sorry, I couldn't get a response.";
         const finalMsgs = [...newMsgs, { role: "assistant", content: reply, msgId: uid() }];
         setMsgs(finalMsgs);
@@ -14765,7 +14799,14 @@ Today's date: ${(/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { weekd
       setLoading(false);
     };
     const visibleMsgs = msgs.filter((m) => !m.hidden);
-    return /* @__PURE__ */ React.createElement("div", { style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 18px", display: "flex", flexDirection: "column", minHeight, flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 } }, "\u2726"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 18, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, "Morning Rundown"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6" } }, "Refreshes automatically each day \u2014 ask follow-ups any time")), loading && !visibleMsgs.length && /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", display: "flex", gap: 5 } }, [0, 0.2, 0.4].map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { width: 6, height: 6, borderRadius: "50%", background: "#6366f1", animation: `pulse 1.2s ${d}s infinite` } })))), /* @__PURE__ */ React.createElement("div", { ref: msgListRef, style: { marginBottom: 10, flex: "1 1 auto", minHeight: 0, overflowY: "auto" } }, visibleMsgs.map((m, i) => {
+    return /* @__PURE__ */ React.createElement("div", { style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 18px", display: "flex", flexDirection: "column", minHeight, flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 } }, "\u2726"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 18, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, "Morning Rundown"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6" } }, "Click to generate \u2014 ask follow-ups any time")), loading && !visibleMsgs.length && /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", display: "flex", gap: 5 } }, [0, 0.2, 0.4].map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { width: 6, height: 6, borderRadius: "50%", background: "#6366f1", animation: `pulse 1.2s ${d}s infinite` } })))), /* @__PURE__ */ React.createElement("div", { ref: msgListRef, style: { marginBottom: 10, flex: "1 1 auto", minHeight: 0, overflowY: "auto" } }, loaded && !loading && visibleMsgs.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "20px 10px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#6b7280", marginBottom: 10 } }, "Get a quick, prioritized rundown of what's in flight for you today."), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: generateRundown,
+        style: { background: "#6366f118", border: "1px solid #6366f140", borderRadius: 8, color: "#818cf8", padding: "8px 16px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" }
+      },
+      "\u2726 Generate Today's Rundown"
+    )), visibleMsgs.map((m, i) => {
       const isUser = m.role === "user";
       return /* @__PURE__ */ React.createElement("div", { key: m.msgId || i, style: { display: "flex", flexDirection: "column", alignItems: isUser ? "flex-end" : "flex-start", marginBottom: 10 } }, !isUser && m.isRundown && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#818cf8", fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "\u2600\uFE0F Today's Rundown"), /* @__PURE__ */ React.createElement("div", { style: {
         maxWidth: "92%",
