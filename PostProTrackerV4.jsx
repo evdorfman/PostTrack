@@ -4557,20 +4557,29 @@ const AddReviewRoundModal = ({project, onUpdateDel, reviewerNames=[], addReviewe
 // cross-project list (`workReviewSessions`) rather than per-project data.
 // Pick an existing upcoming session (or create one), adjust its reviewers,
 // and attach any of this project's deliverables to it.
-const AddWorkReviewRoundModal = ({project, allProjects=[], onUpdateDel, workReviewSessions=[], addWorkReviewSession, updateWorkReviewSession, reviewerNames=[], addReviewerName, initialDate, onClose}) => {
-  const [sessionId,setSessionId] = useState("");
-  const [creatingNew,setCreatingNew] = useState(!!initialDate);
+const WORK_REVIEW_NEW_VALUE = "__new__";
+
+const AddWorkReviewRoundModal = ({project, allProjects=[], onUpdateDel, workReviewSessions=[], addWorkReviewSession, updateWorkReviewSession, reviewerNames=[], addReviewerName, initialDate, initialSessionId, onClose}) => {
+  const [choice,setChoice] = useState(initialDate ? WORK_REVIEW_NEW_VALUE : (initialSessionId || ""));
   const [newDatetime,setNewDatetime] = useState(initialDate?`${initialDate}T14:00`:"");
   const [newLocation,setNewLocation] = useState("");
+  const [newReviewers,setNewReviewers] = useState([]);
   const [selectedIds,setSelectedIds] = useState([]);
 
   const nowISO = new Date().toISOString().slice(0,16);
   const upcoming = useMemo(()=>
-    (workReviewSessions||[]).filter(s=>s.datetime>=nowISO.slice(0,10)).sort((a,b)=>a.datetime.localeCompare(b.datetime))
-  ,[workReviewSessions]);
-  const session = upcoming.find(s=>s.id===sessionId) || (workReviewSessions||[]).find(s=>s.id===sessionId);
+    (workReviewSessions||[]).filter(s=>s.datetime>=nowISO).sort((a,b)=>a.datetime.localeCompare(b.datetime))
+  ,[workReviewSessions, nowISO]);
 
-  // Deliverables (from ANY project) already attached to this session
+  const isNew = choice===WORK_REVIEW_NEW_VALUE;
+  const session = !isNew ? upcoming.find(s=>s.id===choice) : null;
+
+  // Deliverable selection doesn't carry over across a session switch — a
+  // deliverable already attached to one session shouldn't silently get
+  // queued for a different one.
+  useEffect(()=>{ setSelectedIds([]); },[choice]);
+
+  // Deliverables (from ANY project, including this one) already attached to this session
   const attachedElsewhere = useMemo(()=>{
     if(!session) return [];
     const list = [];
@@ -4581,26 +4590,21 @@ const AddWorkReviewRoundModal = ({project, allProjects=[], onUpdateDel, workRevi
   },[session, allProjects]);
 
   const deliverables = project.deliverables||[];
-  const alreadyAttachedIds = deliverables.filter(d=>(d.rounds||[]).some(r=>r.workReviewSessionId===session?.id)).map(d=>d.id);
-  const canSubmit = !!session && selectedIds.length>0;
-
-  const createSession = () => {
-    if(!newDatetime) return;
-    const s = addWorkReviewSession({datetime:newDatetime, location:newLocation.trim()});
-    setSessionId(s.id);
-    setCreatingNew(false);
-    setNewDatetime(""); setNewLocation("");
-  };
+  const alreadyAttachedIds = session ? deliverables.filter(d=>(d.rounds||[]).some(r=>r.workReviewSessionId===session.id)).map(d=>d.id) : [];
+  const canSubmit = (isNew ? !!newDatetime : !!session) && selectedIds.length>0;
 
   const submit = () => {
     if(!canSubmit) return;
-    selectedIds.forEach(delId=>{
+    const targetSession = isNew
+      ? addWorkReviewSession({datetime:newDatetime, location:newLocation.trim(), reviewers:[...newReviewers]})
+      : session;
+    selectedIds.filter(id=>!alreadyAttachedIds.includes(id)).forEach(delId=>{
       const del = deliverables.find(d=>d.id===delId);
       if(!del) return;
       const newRound = {
         id: uid(), label: "Work Review",
-        deadline: session.datetime, reviewers:[...(session.reviewers||[])], status: ROUND_STATUSES[0], notes:"",
-        reviewRoundId: null, isWorkReview: true, workReviewSessionId: session.id, workReviewLocation: session.location||"",
+        deadline: targetSession.datetime, reviewers:[...(targetSession.reviewers||[])], status: ROUND_STATUSES[0], notes:"",
+        reviewRoundId: null, isWorkReview: true, workReviewSessionId: targetSession.id, workReviewLocation: targetSession.location||"",
       };
       onUpdateDel(project.id, delId, "rounds", [...(del.rounds||[]), newRound]);
     });
@@ -4613,33 +4617,33 @@ const AddWorkReviewRoundModal = ({project, allProjects=[], onUpdateDel, workRevi
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
         <div>
           <FLabel>Work Review Session</FLabel>
-          {!creatingNew?(
-            <div style={{display:"flex",gap:8}}>
-              <Sel value={sessionId} onChange={e=>setSessionId(e.target.value)} style={{flex:1}}>
-                <option value="">— select upcoming Work Review —</option>
-                {upcoming.map(s=>(
-                  <option key={s.id} value={s.id}>{fmtDT(s.datetime)}{s.location?` · ${s.location}`:""}</option>
-                ))}
-              </Sel>
-              <Btn small onClick={()=>setCreatingNew(true)}>+ New Session</Btn>
-            </div>
-          ):(
-            <div style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:8,padding:12,display:"flex",flexDirection:"column",gap:8}}>
-              <DateTimePicker value={newDatetime} onChange={setNewDatetime} label="Session date/time"/>
-              <Inp value={newLocation} onChange={e=>setNewLocation(e.target.value)} placeholder="Location (e.g. Conference Room B)"/>
-              <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-                <Btn variant="ghost" small onClick={()=>setCreatingNew(false)}>Cancel</Btn>
-                <Btn small onClick={createSession} disabled={!newDatetime}>Create Session</Btn>
-              </div>
-            </div>
-          )}
+          <Sel value={choice} onChange={e=>setChoice(e.target.value)}>
+            <option value="">— select —</option>
+            <option value={WORK_REVIEW_NEW_VALUE}>➕ New Work Review</option>
+            {upcoming.map(s=>(
+              <option key={s.id} value={s.id}>{fmtDT(s.datetime)}{s.location?` · ${s.location}`:""}</option>
+            ))}
+          </Sel>
         </div>
 
-        {session&&(
+        {choice&&(
           <>
             <div>
-              <FLabel>Reviewers for this Session</FLabel>
-              <ReviewerTagInput value={session.reviewers||[]} onChange={list=>updateWorkReviewSession(session.id,{reviewers:list})}
+              <FLabel>Date &amp; Time</FLabel>
+              {isNew
+                ? <DateTimePicker value={newDatetime} onChange={setNewDatetime} label="Work Review date/time"/>
+                : <DateTimePicker value={session?.datetime||""} onChange={v=>updateWorkReviewSession(session.id,{datetime:v})} label="Work Review date/time"/>}
+            </div>
+            {isNew&&(
+              <div>
+                <FLabel>Location <span style={{fontWeight:400,textTransform:"none",letterSpacing:0,color:"#4b5563"}}>(optional)</span></FLabel>
+                <Inp value={newLocation} onChange={e=>setNewLocation(e.target.value)} placeholder="e.g. Conference Room B"/>
+              </div>
+            )}
+            <div>
+              <FLabel>Reviewers <span style={{fontWeight:400,textTransform:"none",letterSpacing:0,color:"#4b5563"}}>(optional)</span></FLabel>
+              <ReviewerTagInput value={isNew?newReviewers:(session?.reviewers||[])}
+                onChange={list=>isNew?setNewReviewers(list):updateWorkReviewSession(session.id,{reviewers:list})}
                 suggestions={reviewerNames} onAddSuggestion={addReviewerName} listId="add-work-review-reviewers"/>
             </div>
             {attachedElsewhere.length>0&&(
@@ -4647,7 +4651,7 @@ const AddWorkReviewRoundModal = ({project, allProjects=[], onUpdateDel, workRevi
                 <FLabel>Already Screening at this Session</FLabel>
                 <div style={{display:"flex",flexDirection:"column",gap:4}}>
                   {attachedElsewhere.map(({del,project:p})=>(
-                    <div key={del.id} style={{fontSize:14,color:"#9ca3af",background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,padding:"5px 10px"}}>
+                    <div key={`${p.id}-${del.id}`} style={{fontSize:14,color:"#9ca3af",background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,padding:"5px 10px"}}>
                       {del.title||"Untitled"} <span style={{color:"#4b5563"}}>· {p.name}</span>
                     </div>
                   ))}
@@ -6779,7 +6783,7 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
           </div>
           {/* Tab bar */}
           <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
-            {[["overview","Overview"],["calendar","📅 Project Cal"],["production","Production"],["ingest","Media Ingest"],["animation","✨ Animation"],["deliverables","Deliverables"],["budget","Budget"],["closeout","Close Out"]]
+            {[["overview","Overview"],["calendar","Project Cal"],["production","Production"],["ingest","Media Ingest"],["animation","Animation"],["deliverables","Deliverables"],["budget","Budget"],["closeout","Close Out"]]
               .filter(([id])=>id!=="budget"||canAccessBudget)
               .map(([id,label])=>(
               <button key={id} style={tabS(activeTab===id)} onClick={()=>{setActiveTab(id);setActiveDelModal(null);}}>{label}</button>
@@ -7066,7 +7070,7 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
           )}
 
           {/* ── PROJECT CALENDAR TAB ── */}
-          {activeTab==="calendar"&&<ProjectCalendar project={lp} allProjects={allProjects} onUpdateProject={onUpdateProject} onUpdateDel={onUpdateDel}
+          {activeTab==="calendar"&&<ProjectCalendar project={lp} allProjects={allProjects} team={team} talentRoster={talentRoster} onOpenProductionTab={()=>setActiveTab("production")} onUpdateProject={onUpdateProject} onUpdateDel={onUpdateDel}
             reviewerNames={reviewerNames} addReviewerName={addReviewerName} workReviewSessions={workReviewSessions} addWorkReviewSession={addWorkReviewSession} updateWorkReviewSession={updateWorkReviewSession}/>}
 
           {/* ── DELIVERABLES TAB ── */}
@@ -7116,8 +7120,14 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                   <div style={{fontSize:14,fontWeight:800,color: "#8e97a6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif"}}>Review Rounds</div>
                   <div style={{display:"flex",gap:8}}>
-                    <Btn small variant="ghost" onClick={()=>setShowAddReviewRound(true)}>+ Add a Review Round</Btn>
-                    <Btn small variant="ghost" onClick={()=>setShowAddWorkReview(true)}>+ Add a Work Review Round</Btn>
+                    <button onClick={()=>setShowAddReviewRound(true)}
+                      style={{background:"#111827",border:"1px solid #1f2937",borderRadius:8,color:"#818cf8",padding:"7px 14px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",whiteSpace:"nowrap"}}>
+                      + Add a Review Round
+                    </button>
+                    <button onClick={()=>setShowAddWorkReview(true)}
+                      style={{background:"#111827",border:"1px solid #1f2937",borderRadius:8,color:"#818cf8",padding:"7px 14px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",whiteSpace:"nowrap"}}>
+                      + Add a Work Review Round
+                    </button>
                   </div>
                 </div>
                 <ProjectReviewRoundsList project={lp} onUpdateDel={onUpdateDel} reviewerNames={reviewerNames} addReviewerName={addReviewerName}/>
@@ -13934,7 +13944,9 @@ const StatsBar = ({projects, team, setView, onOpenProject, onSetStatsFilter, wor
   );
 
   // 3. Deliverables queued for an upcoming Work Review session
-  const upcomingWRSessionIds = new Set((workReviewSessions||[]).filter(s=>s.datetime>=now.toISOString().slice(0,16)).map(s=>s.id));
+  const upcomingWRSessions = (workReviewSessions||[]).filter(s=>s.datetime>=now.toISOString().slice(0,16)).sort((a,b)=>a.datetime.localeCompare(b.datetime));
+  const upcomingWRSessionIds = new Set(upcomingWRSessions.map(s=>s.id));
+  const nextWRSession = upcomingWRSessions[0]||null;
   const workReviewCount = projects.reduce((sum,p)=>
     sum + (p.deliverables||[]).filter(d=>(d.rounds||[]).some(r=>r.workReviewSessionId&&upcomingWRSessionIds.has(r.workReviewSessionId))).length
   ,0);
@@ -13986,7 +13998,7 @@ const StatsBar = ({projects, team, setView, onOpenProject, onSetStatsFilter, wor
     {
       value: workReviewCount,
       label: "Work Review",
-      sub: "queued, upcoming",
+      sub: nextWRSession ? `next ${fmtDate(nextWRSession.datetime)}` : "none scheduled",
       color: "#f59e0b",
       onClick: ()=>setView("workReview"),
     },
@@ -18270,8 +18282,10 @@ const ProductionCard = ({production, idx, projectId, allProductions, allProjectD
   useEffect(()=>{ setCustomPresetName(""); }, [_activeId]);
 
   const CREW_ROLES = isBroadcast
-    ? ["Live Director","Technical Director","Broadcast Coordinator","Camera Op","Audio Tech","Lighting Director","Producer","Project Manager","Video Engineer","V1","EVS Operator","Replay Operator","Graphics Operator"]
-    : ["Producer","Director","DP","Gaffer","Camera Op","Sound Mixer","Hair and Makeup","Production Assistant","Assistant Camera"];
+    ? ["Live Director","Technical Director","Broadcast Coordinator","Camera Op","Audio Tech","Lighting Director","Producer","Project Manager","Video Engineer","V1","EVS Operator","Replay Operator","Graphics Operator",
+       "DP","Audio Op with Kit","Assistant Camera","Production Assistant","Drone Operator with gear","Media Manager","DIT","Teleprompter Op","SM","A2","A1","Playback Operator"]
+    : ["Producer","Director","DP","Gaffer","Camera Op","Sound Mixer","Hair and Makeup","Production Assistant","Assistant Camera",
+       "Audio Op with Kit","Drone Operator with gear","Media Manager","DIT","Teleprompter Op","SM","A2","V1","A1","Playback Operator"];
 
   const cs = {background:"#0f172a",border:"1px solid #1f2937",borderRadius:9,padding:"12px 14px"};
 
@@ -22637,17 +22651,131 @@ const PROJ_CAL_TYPE_META = {
   ingest:      {icon:"💾",label:"Ingest",         color:"#06b6d4"},
 };
 
-const PROJ_CAL_WEEK_START_H = 7, PROJ_CAL_WEEK_END_H = 20, PROJ_CAL_HOUR_PX = 44;
+const PROJ_CAL_MONTH_START_H = 7, PROJ_CAL_MONTH_END_H = 20;
+const PROJ_CAL_DAY_START_H = 0, PROJ_CAL_DAY_END_H = 24, PROJ_CAL_HOUR_PX = 44;
 const projCalSnapQ = h => Math.round(h*4)/4;
 const projCalHhmmToH = t => { const p=(t||"09:00").split(":").map(Number); return p[0]+p[1]/60; };
 const projCalHToHhmm = h => { const hh=Math.max(0,Math.min(23,Math.floor(h))), mm=Math.round((h-Math.floor(h))*60)%60; return `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`; };
 
-// ─── Project Calendar — Week view: an hourly work-hours grid so events can be
-// dragged to a precise time of day (not just a day), in addition to Month
-// view's day-granularity drag. Drag position is tracked locally and only
-// committed (via onCommitMove) on release, so a drag gesture doesn't spam
-// the backend with a write per pointermove.
-const ProjectCalendarWeek = ({weekStart, events, onCommitMove, onEventClick, canEdit}) => {
+// ─── Hover info card — shown when hovering a calendar event. Read-only detail
+// for most types; Review Round / Work Review show reviewers and let you
+// add/remove deliverables from the group right there (hover-intent kept open
+// via onMouseEnter/onMouseLeave on the card itself, mirroring the trigger).
+const CalEventHoverCard = ({ev, project, allProjects=[], team=[], talentRoster=[], onUpdateDel, x, y, onMouseEnter, onMouseLeave}) => {
+  if(!ev) return null;
+  const meta = PROJ_CAL_TYPE_META[ev.type];
+  const members = ev._members || [ev];
+  const w = 300;
+  const left = Math.min(x+14, (typeof window!=="undefined"?window.innerWidth:1200)-w-16);
+  const top = Math.min(y+14, (typeof window!=="undefined"?window.innerHeight:800)-320);
+
+  const removeMember = m => {
+    const del = (project.deliverables||[]).find(d=>d.id===m.ref?.delId);
+    if(!del) return;
+    const newRounds = (del.rounds||[]).filter((_,i)=>i!==m.ref.roundIdx);
+    onUpdateDel(project.id, del.id, "rounds", newRounds);
+  };
+  const addMember = delId => {
+    const del = (project.deliverables||[]).find(d=>d.id===delId);
+    const template = members[0];
+    if(!del || !template) return;
+    const newRound = {
+      id: uid(), label: template.type==="workreview" ? "Work Review" : `Round ${(del.rounds||[]).length+1}`,
+      deadline: `${template.date}T${template.time}`, reviewers:[...(template.reviewers||[])], status: ROUND_STATUSES[0], notes:"",
+      reviewRoundId: template.groupId && template.type==="round" ? template.groupId : null,
+      isWorkReview: template.type==="workreview", workReviewSessionId: template.type==="workreview" ? template.groupId : null,
+    };
+    onUpdateDel(project.id, del.id, "rounds", [...(del.rounds||[]), newRound]);
+  };
+
+  const F = (label,val) => val!=null && val!=="" ? (
+    <div style={{marginTop:6}}>
+      <div style={{fontSize:11,color:"#6b7280",textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:"'Barlow Condensed',sans-serif"}}>{label}</div>
+      <div style={{fontSize:14,color:"#e2e8f0"}}>{val}</div>
+    </div>
+  ) : null;
+
+  let body = null;
+  if(ev.type==="production") {
+    const prod = (project.productions||[]).find(p=>p.id===ev.ref?.id);
+    const talentNames = (prod?.talent||[]).map(id=>talentRoster.find(t=>t.id===id)?.name).filter(Boolean);
+    body = (
+      <>
+        {F("Location", prod?.location||"—")}
+        {F("Talent", talentNames.length?talentNames.join(", "):"None booked")}
+        {F("Status", prod?.status||"—")}
+      </>
+    );
+  } else if(ev.type==="poststart") {
+    const editorIds = project.assignees?.["Editor"]||[];
+    const editorNames = editorIds.map(id=>team.find(m=>m.id===id)?.name).filter(Boolean);
+    body = (
+      <>
+        {F("Deliverables", (project.deliverables||[]).length)}
+        {F("Editor Assigned", editorNames.length?editorNames.join(", "):"Unassigned")}
+      </>
+    );
+  } else if(ev.type==="deliverable") {
+    const del = (project.deliverables||[]).find(d=>d.id===ev.ref?.id);
+    body = (
+      <>
+        {F("Status", del?.status||"—")}
+        {F("Editor", team.find(m=>m.id===del?.editorId)?.name||"Unassigned")}
+      </>
+    );
+  } else if(ev.type==="ingest") {
+    const ing = (project.ingestDates||[]).find(i=>i.id===ev.ref?.id);
+    body = (
+      <>
+        {F("Notes", ing?.notes||"No notes")}
+        {F("Call Sheet", ing?.callSheet?"Attached":"None attached")}
+      </>
+    );
+  } else if(ev.type==="round"||ev.type==="workreview") {
+    const reviewers = members[0]?.reviewers || [];
+    const attachedIds = members.map(m=>m.ref?.delId).filter(Boolean);
+    const candidates = (project.deliverables||[]).filter(d=>!attachedIds.includes(d.id));
+    body = (
+      <>
+        {F("Reviewers", reviewers.length?reviewers.join(", "):"None set")}
+        <div style={{marginTop:8}}>
+          <div style={{fontSize:11,color:"#6b7280",textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:4}}>Deliverables</div>
+          <div style={{display:"flex",flexDirection:"column",gap:3,maxHeight:110,overflowY:"auto"}}>
+            {members.map(m=>(
+              <div key={m.id} style={{display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontSize:13,color:"#e2e8f0",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.delTitle}</span>
+                {onUpdateDel&&<button onClick={()=>removeMember(m)} style={{background:"none",border:"none",color:"#6b7280",cursor:"pointer",fontSize:15,lineHeight:1,padding:0}}>×</button>}
+              </div>
+            ))}
+          </div>
+          {onUpdateDel&&candidates.length>0&&(
+            <select defaultValue="" onChange={e=>{ if(e.target.value){ addMember(e.target.value); e.target.value=""; } }}
+              style={{marginTop:6,width:"100%",background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:5,color:"#9ca3af",padding:"4px 6px",fontSize:12,outline:"none"}}>
+              <option value="">+ Add deliverable…</option>
+              {candidates.map(d=><option key={d.id} value={d.id}>{d.title||"Untitled"}</option>)}
+            </select>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <div onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} onClick={e=>e.stopPropagation()}
+      style={{position:"fixed",left,top,width:w,zIndex:970,background:"#0d1117",border:`1px solid ${ev.color}50`,borderRadius:10,padding:"12px 14px",boxShadow:"0 12px 32px #000b"}}>
+      <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.02em"}}>{meta?.icon} {ev._ghost?"Work Review (none from this project — click to add)":ev.label}</div>
+      {body}
+    </div>
+  );
+};
+
+// ─── Project Calendar — Week view: an hourly full-day grid (remote shoots can
+// run very early/late) so events can be dragged to a precise time of day,
+// not just a day. Drag position is tracked locally and only committed (via
+// onCommitMove) on release, so a drag gesture doesn't spam the backend with
+// a write per pointermove. Production events aren't draggable — moving a
+// shoot belongs on the Production tab, not a calendar nudge.
+const ProjectCalendarWeek = ({weekStart, events, onCommitMove, onEventClick, onEventEnter, onEventLeave, onProductionDragBlocked, canEdit}) => {
   const gridRef = useRef();
   const [drag, setDrag] = useState(null);
   const dragRef = useRef(null);
@@ -22658,13 +22786,15 @@ const ProjectCalendarWeek = ({weekStart, events, onCommitMove, onEventClick, can
   const dayStrs = days.map(d=>d.toISOString().slice(0,10));
   const timed  = events.filter(e=>e.hasTime);
   const allDay = events.filter(e=>!e.hasTime);
-  const hToY = h => (h-PROJ_CAL_WEEK_START_H)*PROJ_CAL_HOUR_PX;
-  const yToH = y => projCalSnapQ(Math.max(PROJ_CAL_WEEK_START_H,Math.min(PROJ_CAL_WEEK_END_H-0.25, PROJ_CAL_WEEK_START_H+y/PROJ_CAL_HOUR_PX)));
-  const gridHeight = hToY(PROJ_CAL_WEEK_END_H);
-  const hourMarks = []; for(let h=PROJ_CAL_WEEK_START_H; h<=PROJ_CAL_WEEK_END_H; h++) hourMarks.push(h);
+  const hToY = h => (h-PROJ_CAL_DAY_START_H)*PROJ_CAL_HOUR_PX;
+  const yToH = y => projCalSnapQ(Math.max(PROJ_CAL_DAY_START_H,Math.min(PROJ_CAL_DAY_END_H-0.25, PROJ_CAL_DAY_START_H+y/PROJ_CAL_HOUR_PX)));
+  const gridHeight = hToY(PROJ_CAL_DAY_END_H);
+  const hourMarks = []; for(let h=PROJ_CAL_DAY_START_H; h<=PROJ_CAL_DAY_END_H; h++) hourMarks.push(h);
 
   const startDrag = (e, ev) => {
     if(!canEdit) return;
+    if(ev.ref?.kind==="production"){ onProductionDragBlocked?.(ev); return; }
+    if(ev._ghost) return; // ghost events aren't editable until you attach a deliverable
     e.preventDefault(); e.stopPropagation();
     setDrag({ev, dayIdx:dayStrs.indexOf(ev.date), hour:projCalHhmmToH(ev.time)});
   };
@@ -22704,7 +22834,8 @@ const ProjectCalendarWeek = ({weekStart, events, onCommitMove, onEventClick, can
               {allDay.filter(ev=>ev.date===ds).map(ev=>{
                 const meta = PROJ_CAL_TYPE_META[ev.type];
                 return (
-                  <div key={ev.id} onClick={()=>handleClick(ev)} title={ev.label}
+                  <div key={ev.id} onClick={()=>handleClick(ev)}
+                    onMouseEnter={e=>onEventEnter?.(ev,e.clientX,e.clientY)} onMouseLeave={onEventLeave}
                     style={{background:ev.color+"25",borderLeft:`2px solid ${ev.color}`,borderRadius:"0 3px 3px 0",padding:"1px 4px",fontSize:11,color:ev.color,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:canEdit?"pointer":"default"}}>
                     {meta.icon} {ev.label}
                   </div>
@@ -22733,9 +22864,13 @@ const ProjectCalendarWeek = ({weekStart, events, onCommitMove, onEventClick, can
             <div key={h} style={{position:"absolute",top:hToY(h)-6,right:6,fontSize:11,color:"#4b5563"}}>{fmtH(h)}</div>
           ))}
         </div>
-        <div ref={gridRef} style={{position:"relative",height:gridHeight,background:"#111827",borderRadius:6}}>
+        <div ref={gridRef} style={{position:"relative",height:gridHeight,background:"#111827",borderRadius:6,overflow:"hidden"}}>
           {hourMarks.map(h=>(
             <div key={h} style={{position:"absolute",left:0,right:0,top:hToY(h),height:1,background:"#1f2937"}}/>
+          ))}
+          {/* Vertical day-column dividers */}
+          {[1,2,3,4,5,6].map(i=>(
+            <div key={i} style={{position:"absolute",left:`${(i/7)*100}%`,top:0,bottom:0,width:1,background:"#1f2937"}}/>
           ))}
           {timed.map(ev=>{
             const isDragging = drag?.ev.id===ev.id;
@@ -22743,15 +22878,18 @@ const ProjectCalendarWeek = ({weekStart, events, onCommitMove, onEventClick, can
             const hour = isDragging ? drag.hour : projCalHhmmToH(ev.time);
             if(dayIdx<0) return null;
             const meta = PROJ_CAL_TYPE_META[ev.type];
+            const isProd = ev.ref?.kind==="production";
             return (
               <div key={ev.id}
                 onPointerDown={e=>startDrag(e,ev)}
                 onClick={()=>handleClick(ev)}
+                onMouseEnter={e=>onEventEnter?.(ev,e.clientX,e.clientY)} onMouseLeave={onEventLeave}
                 title={`${ev.label}${ev.status?" — "+ev.status:""} · ${projCalHToHhmm(hour)}`}
                 style={{position:"absolute",left:`${(dayIdx/7)*100}%`,width:`calc(${100/7}% - 3px)`,top:hToY(hour),height:22,
-                  background:ev.color+(isDragging?"40":"28"),border:`1.5px solid ${ev.color}${isDragging?"ee":"88"}`,borderRadius:4,
+                  background:ev.color+(isDragging?"40":(ev._ghost?"12":"28")),border:`1.5px solid ${ev.color}${isDragging?"ee":(ev._ghost?"55":"88")}`,borderRadius:4,
+                  borderStyle:ev._ghost?"dashed":"solid",opacity:ev._ghost?0.75:1,
                   padding:"1px 4px",fontSize:11,color:ev.color,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
-                  cursor:canEdit?"grab":"default",zIndex:isDragging?10:2,boxSizing:"border-box",touchAction:"none"}}>
+                  cursor:canEdit?(isProd?"pointer":"grab"):"default",zIndex:isDragging?10:2,boxSizing:"border-box",touchAction:"none"}}>
                 {meta.icon} {ev.label}
               </div>
             );
@@ -22765,16 +22903,17 @@ const ProjectCalendarWeek = ({weekStart, events, onCommitMove, onEventClick, can
 const PROJ_CAL_MONTH_HEADER_H = 40, PROJ_CAL_MONTH_STRIP_H = 160;
 
 // ─── Project Calendar — Month view: taller day cells with an hour strip
-// (7am–8pm, like Week view) so timed events show roughly where in the day
-// they land, and can be dragged — across days AND to a new time of day in
-// one gesture — instead of the old day-swap-only drag. Hit-testing is done
-// against each day's own hour-strip DOM node (not grid math) so it stays
-// correct regardless of how many week-rows the month needs.
-const ProjectCalendarMonth = ({calY, calM, events, onCommitMove, onEventClick, onDayContextMenu, canEdit}) => {
+// (7am–8pm) so timed events show roughly where in the day they land, and can
+// be dragged — across days AND to a new time of day in one gesture — instead
+// of the old day-swap-only drag. Hit-testing is done against each day's own
+// hour-strip DOM node (not grid math) so it stays correct regardless of how
+// many week-rows the month needs. Production events aren't draggable.
+const ProjectCalendarMonth = ({calY, calM, events, onCommitMove, onEventClick, onDayContextMenu, onEventEnter, onEventLeave, onProductionDragBlocked, canEdit}) => {
   const stripRefs = useRef({});
   const [drag, setDrag] = useState(null); // {ev, date, hour}
   const dragRef = useRef(null);
   const justDraggedRef = useRef(false);
+  const [hoveredDate, setHoveredDate] = useState(null);
   useEffect(()=>{ dragRef.current = drag; },[drag]);
 
   const pad = n => String(n).padStart(2,"0");
@@ -22784,8 +22923,8 @@ const ProjectCalendarMonth = ({calY, calM, events, onCommitMove, onEventClick, o
 
   const timed = events.filter(e=>e.hasTime);
   const allDay = events.filter(e=>!e.hasTime);
-  const hToY = h => ((h-PROJ_CAL_WEEK_START_H)/(PROJ_CAL_WEEK_END_H-PROJ_CAL_WEEK_START_H))*PROJ_CAL_MONTH_STRIP_H;
-  const yToH = (y,stripH) => projCalSnapQ(Math.max(PROJ_CAL_WEEK_START_H,Math.min(PROJ_CAL_WEEK_END_H-0.25, PROJ_CAL_WEEK_START_H+(y/stripH)*(PROJ_CAL_WEEK_END_H-PROJ_CAL_WEEK_START_H))));
+  const hToY = h => ((h-PROJ_CAL_MONTH_START_H)/(PROJ_CAL_MONTH_END_H-PROJ_CAL_MONTH_START_H))*PROJ_CAL_MONTH_STRIP_H;
+  const yToH = (y,stripH) => projCalSnapQ(Math.max(PROJ_CAL_MONTH_START_H,Math.min(PROJ_CAL_MONTH_END_H-0.25, PROJ_CAL_MONTH_START_H+(y/stripH)*(PROJ_CAL_MONTH_END_H-PROJ_CAL_MONTH_START_H))));
 
   const timedByDate = useMemo(()=>{
     const m = {};
@@ -22803,6 +22942,8 @@ const ProjectCalendarMonth = ({calY, calM, events, onCommitMove, onEventClick, o
 
   const startDrag = (e, ev) => {
     if(!canEdit) return;
+    if(ev.ref?.kind==="production"){ onProductionDragBlocked?.(ev); return; }
+    if(ev._ghost) return; // ghost events aren't editable until you attach a deliverable
     e.preventDefault(); e.stopPropagation();
     setDrag({ev, date:ev.date, hour:projCalHhmmToH(ev.time)});
   };
@@ -22836,71 +22977,97 @@ const ProjectCalendarMonth = ({calY, calM, events, onCommitMove, onEventClick, o
     onEventClick(ev);
   };
 
-  const hourMarks = []; for(let h=PROJ_CAL_WEEK_START_H; h<=PROJ_CAL_WEEK_END_H; h+=3) hourMarks.push(h);
+  const hourMarks = []; for(let h=PROJ_CAL_MONTH_START_H; h<=PROJ_CAL_MONTH_END_H; h+=3) hourMarks.push(h);
+
+  // Weeks are rendered explicitly (rather than one flat 7-col grid) so each
+  // row can carry its own hour-of-day gutter, like Week view's left column.
+  const cells = [
+    ...Array.from({length:firstDow},()=>null),
+    ...Array.from({length:daysInMonth},(_,i)=>i+1),
+  ];
+  while(cells.length%7!==0) cells.push(null);
+  const weeks = [];
+  for(let i=0;i<cells.length;i+=7) weeks.push(cells.slice(i,i+7));
 
   return (
     <>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(0,1fr))",gap:2,marginBottom:2}}>
+      <div style={{display:"grid",gridTemplateColumns:"32px repeat(7,minmax(0,1fr))",gap:2,marginBottom:2}}>
+        <div/>
         {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>(
           <div key={d} style={{textAlign:"center",fontSize:13,fontWeight:700,color:"#838ba0",padding:"3px 0",fontFamily:"'Barlow Condensed',sans-serif"}}>{d}</div>
         ))}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(0,1fr))",gap:2}}>
-        {Array.from({length:firstDow}).map((_,i)=><div key={`e${i}`}/>)}
-        {Array.from({length:daysInMonth},(_,i)=>i+1).map(day=>{
-          const ds = `${calY}-${pad(calM+1)}-${pad(day)}`;
-          const isToday = ds===todayStr;
-          const dayAllEvs = allDayByDate[ds]||[];
-          const dayTimedEvs = timedByDate[ds]||[];
-          return (
-            <div key={day}
-              onContextMenu={canEdit?e=>{e.preventDefault(); onDayContextMenu(ds, e.clientX, e.clientY);}:undefined}
-              style={{background:isToday?"#6366f115":"#111827",border:`1px solid ${isToday?"#6366f1":"#1f2937"}`,borderRadius:6,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-              <div style={{padding:"3px 5px 0",display:"flex",flexDirection:"column",gap:2,minHeight:PROJ_CAL_MONTH_HEADER_H}}>
-                <div style={{fontSize:13,fontWeight:isToday?800:400,color:isToday?"#818cf8":"#6b7280",textAlign:"right",lineHeight:1.2}}>{day}</div>
-                {dayAllEvs.slice(0,2).map(ev=>{
-                  const meta = PROJ_CAL_TYPE_META[ev.type];
-                  return (
-                    <div key={ev.id} onClick={()=>handleClick(ev)} title={ev._tooltip||ev.label}
-                      style={{background:ev.color+"25",borderLeft:`2px solid ${ev.color}`,borderRadius:"0 3px 3px 0",padding:"0 4px",fontSize:10,color:ev.color,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:canEdit?"pointer":"default"}}>
-                      {meta.icon} {ev.label}
-                    </div>
-                  );
-                })}
-                {dayAllEvs.length>2&&<div style={{fontSize:10,color:"#838ba0"}}>+{dayAllEvs.length-2} more</div>}
+      {weeks.map((week,wi)=>(
+        <div key={wi} style={{display:"grid",gridTemplateColumns:"32px repeat(7,minmax(0,1fr))",gap:2,marginBottom:2}}>
+          {/* Hour-of-day gutter for this week row */}
+          <div style={{position:"relative",height:PROJ_CAL_MONTH_HEADER_H+PROJ_CAL_MONTH_STRIP_H}}>
+            {hourMarks.map(h=>(
+              <div key={h} style={{position:"absolute",top:PROJ_CAL_MONTH_HEADER_H+hToY(h)-5,right:2,fontSize:9,color:"#4b5563",whiteSpace:"nowrap"}}>{fmtH(h).replace(":00","").replace(" ","")}</div>
+            ))}
+          </div>
+          {week.map((day,di)=>{
+            if(day==null) return <div key={di}/>;
+            const ds = `${calY}-${pad(calM+1)}-${pad(day)}`;
+            const isToday = ds===todayStr;
+            const isHovered = hoveredDate===ds;
+            const dayAllEvs = allDayByDate[ds]||[];
+            const dayTimedEvs = timedByDate[ds]||[];
+            return (
+              <div key={ds}
+                onContextMenu={canEdit?e=>{e.preventDefault(); onDayContextMenu(ds, e.clientX, e.clientY);}:undefined}
+                onMouseEnter={()=>setHoveredDate(ds)} onMouseLeave={()=>setHoveredDate(h=>h===ds?null:h)}
+                style={{background:isToday?"#6366f115":(isHovered?"#1f293780":"#111827"),
+                  border:`1px solid ${isToday?"#6366f1":(isHovered?"#374151":"#1f2937")}`,borderRadius:6,overflow:"hidden",display:"flex",flexDirection:"column",transition:"background 0.1s,border-color 0.1s"}}>
+                <div style={{padding:"3px 5px 0",display:"flex",flexDirection:"column",gap:2,minHeight:PROJ_CAL_MONTH_HEADER_H}}>
+                  <div style={{fontSize:13,fontWeight:isToday?800:400,color:isToday?"#818cf8":"#6b7280",textAlign:"right",lineHeight:1.2}}>{day}</div>
+                  {dayAllEvs.slice(0,2).map(ev=>{
+                    const meta = PROJ_CAL_TYPE_META[ev.type];
+                    return (
+                      <div key={ev.id} onClick={()=>handleClick(ev)}
+                        onMouseEnter={e=>onEventEnter?.(ev,e.clientX,e.clientY)} onMouseLeave={onEventLeave}
+                        style={{background:ev.color+"25",borderLeft:`2px solid ${ev.color}`,borderRadius:"0 3px 3px 0",padding:"0 4px",fontSize:10,color:ev.color,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:canEdit?"pointer":"default"}}>
+                        {meta.icon} {ev.label}
+                      </div>
+                    );
+                  })}
+                  {dayAllEvs.length>2&&<div style={{fontSize:10,color:"#838ba0"}}>+{dayAllEvs.length-2} more</div>}
+                </div>
+                <div ref={el=>{ if(el) stripRefs.current[ds]=el; else delete stripRefs.current[ds]; }}
+                  style={{position:"relative",flex:1,minHeight:PROJ_CAL_MONTH_STRIP_H,borderTop:"1px solid #1f293780"}}>
+                  {hourMarks.map(h=>(
+                    <div key={h} style={{position:"absolute",left:0,right:0,top:hToY(h),height:1,background:"#1f293750"}}/>
+                  ))}
+                  {dayTimedEvs.map(ev=>{
+                    const isDragging = drag?.ev.id===ev.id;
+                    const hour = isDragging ? drag.hour : projCalHhmmToH(ev.time);
+                    const meta = PROJ_CAL_TYPE_META[ev.type];
+                    const isProd = ev.ref?.kind==="production";
+                    return (
+                      <div key={ev.id}
+                        onPointerDown={e=>startDrag(e,ev)}
+                        onClick={()=>handleClick(ev)}
+                        onMouseEnter={e=>onEventEnter?.(ev,e.clientX,e.clientY)} onMouseLeave={onEventLeave}
+                        title={`${ev._tooltip||ev.label}${ev.status?" — "+ev.status:""} · ${projCalHToHhmm(hour)}`}
+                        style={{position:"absolute",left:2,right:2,top:hToY(hour),height:13,
+                          background:ev.color+(isDragging?"45":(ev._ghost?"12":"2a")),border:`1px solid ${ev.color}${isDragging?"ee":(ev._ghost?"55":"99")}`,borderRadius:3,
+                          borderStyle:ev._ghost?"dashed":"solid",opacity:ev._ghost?0.75:1,
+                          padding:"0 3px",fontSize:9,lineHeight:"11px",color:ev.color,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+                          cursor:canEdit?(isProd?"pointer":"grab"):"default",zIndex:isDragging?10:2,touchAction:"none"}}>
+                        {meta.icon} {ev.label}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <div ref={el=>{ if(el) stripRefs.current[ds]=el; else delete stripRefs.current[ds]; }}
-                style={{position:"relative",flex:1,minHeight:PROJ_CAL_MONTH_STRIP_H,borderTop:"1px solid #1f293780"}}>
-                {hourMarks.map(h=>(
-                  <div key={h} style={{position:"absolute",left:0,right:0,top:hToY(h),height:1,background:"#1f293750"}}/>
-                ))}
-                {dayTimedEvs.map(ev=>{
-                  const isDragging = drag?.ev.id===ev.id;
-                  const hour = isDragging ? drag.hour : projCalHhmmToH(ev.time);
-                  const meta = PROJ_CAL_TYPE_META[ev.type];
-                  return (
-                    <div key={ev.id}
-                      onPointerDown={e=>startDrag(e,ev)}
-                      onClick={()=>handleClick(ev)}
-                      title={`${ev._tooltip||ev.label}${ev.status?" — "+ev.status:""} · ${projCalHToHhmm(hour)}`}
-                      style={{position:"absolute",left:2,right:2,top:hToY(hour),height:13,
-                        background:ev.color+(isDragging?"45":"2a"),border:`1px solid ${ev.color}${isDragging?"ee":"99"}`,borderRadius:3,
-                        padding:"0 3px",fontSize:9,lineHeight:"11px",color:ev.color,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
-                        cursor:canEdit?"grab":"default",zIndex:isDragging?10:2,touchAction:"none"}}>
-                      {meta.icon} {ev.label}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      ))}
     </>
   );
 };
 
-const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel, reviewerNames=[], addReviewerName, workReviewSessions=[], addWorkReviewSession, updateWorkReviewSession}) => {
+const ProjectCalendar = ({project, allProjects=[], team=[], talentRoster=[], onOpenProductionTab, onUpdateProject, onUpdateDel, reviewerNames=[], addReviewerName, workReviewSessions=[], addWorkReviewSession, updateWorkReviewSession}) => {
   const today = new Date();
   const [calY, setCalY] = useState(today.getFullYear());
   const [calM, setCalM] = useState(today.getMonth());
@@ -22912,6 +23079,12 @@ const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel,
   const [showAddWorkReview, setShowAddWorkReview] = useState(false);
   const [modalInitialDate, setModalInitialDate] = useState(null);
   const [contextMenu, setContextMenu] = useState(null); // {date,x,y}
+  const [modalInitialSessionId, setModalInitialSessionId] = useState(null);
+  const [prodBlockedEv, setProdBlockedEv] = useState(null);
+  const [hoverEv, setHoverEv] = useState(null); // {ev,x,y}
+  const hoverTimerRef = useRef(null);
+  const [undoStack, setUndoStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
   const canEdit = !!(onUpdateProject && onUpdateDel);
 
   const allEvents = useMemo(()=>{
@@ -22938,7 +23111,7 @@ const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel,
           label:`${d.title} · ${r.label}`, status:r.status,
           color: isWR ? PROJ_CAL_TYPE_META.workreview.color : (RCOLOR[r.status]||PROJ_CAL_TYPE_META.round.color),
           ref:{kind:"round", delId:d.id, roundIdx:ri},
-          groupId: isWR ? r.workReviewSessionId : (r.reviewRoundId||null), delTitle: d.title});
+          groupId: isWR ? r.workReviewSessionId : (r.reviewRoundId||null), delTitle: d.title, reviewers: r.reviewers||[]});
       });
     });
     (project.ingestDates||[]).forEach(ing=>{
@@ -22947,8 +23120,21 @@ const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel,
         label:ing.notes||"Media Ingest", status:"Ingest", color:PROJ_CAL_TYPE_META.ingest.color,
         ref:{kind:"ingest", id:ing.id}});
     });
+    // Work Review sessions this project has NOT yet put any deliverable into
+    // — shown as a faded "ghost" event so you can see (and join) sessions
+    // other projects are already using, without them cluttering the view
+    // once you've actually attached something.
+    const attachedSessionIds = new Set();
+    (project.deliverables||[]).forEach(d=>(d.rounds||[]).forEach(r=>{ if(r.isWorkReview&&r.workReviewSessionId) attachedSessionIds.add(r.workReviewSessionId); }));
+    const nowFullISO = new Date().toISOString().slice(0,16);
+    (workReviewSessions||[]).forEach(s=>{
+      if(attachedSessionIds.has(s.id) || s.datetime<nowFullISO) return;
+      evs.push({id:`ghost-wr-${s.id}`, type:"workreview", date:s.datetime.slice(0,10), time:s.datetime.slice(11,16)||"14:00", hasTime:true,
+        label:"Work Review", status:"", color:PROJ_CAL_TYPE_META.workreview.color,
+        ref:null, groupId:null, _ghost:true, _ghostSessionId:s.id});
+    });
     return evs;
-  },[project]);
+  },[project, workReviewSessions]);
 
   const visibleEvents = useMemo(()=>allEvents.filter(ev=>filters[ev.type]),[allEvents,filters]);
 
@@ -23018,7 +23204,88 @@ const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel,
     });
   };
 
+  // Undo/redo — captures each affected field's prior value before a
+  // date/time change is applied, so it can be restored exactly.
+  const captureSnapshot = ev => {
+    const members = ev._members || [ev];
+    return members.map(m=>{
+      if(m.type==="poststart") return {kind:"poststart", prev:project.postStartDate};
+      const ref = m.ref;
+      if(!ref) return null;
+      if(ref.kind==="production") {
+        const prod = (project.productions||[]).find(p=>p.id===ref.id);
+        return prod ? {kind:"production", id:ref.id, prevStart:prod.startTime, prevEnd:prod.endTime} : null;
+      }
+      if(ref.kind==="deliverable") {
+        const del = (project.deliverables||[]).find(d=>d.id===ref.id);
+        return del ? {kind:"deliverable", id:ref.id, prev:del.deadline} : null;
+      }
+      if(ref.kind==="round") {
+        const del = (project.deliverables||[]).find(d=>d.id===ref.delId);
+        const r = del?.rounds?.[ref.roundIdx];
+        return r ? {kind:"round", delId:ref.delId, roundIdx:ref.roundIdx, prev:r.deadline} : null;
+      }
+      if(ref.kind==="ingest") {
+        const ing = (project.ingestDates||[]).find(i=>i.id===ref.id);
+        return ing ? {kind:"ingest", id:ref.id, prev:ing.datetime} : null;
+      }
+      return null;
+    }).filter(Boolean);
+  };
+  const restoreSnapshot = snap => {
+    snap.forEach(s=>{
+      if(s.kind==="poststart") onUpdateProject(project.id,"postStartDate",s.prev);
+      else if(s.kind==="production") {
+        const newProds = (project.productions||[]).map(p=>p.id===s.id?{...p,startTime:s.prevStart,endTime:s.prevEnd}:p);
+        onUpdateProject(project.id,"productions",newProds);
+      } else if(s.kind==="deliverable") onUpdateDel(project.id,s.id,"deadline",s.prev);
+      else if(s.kind==="round") {
+        const del = (project.deliverables||[]).find(d=>d.id===s.delId);
+        if(!del) return;
+        const newRounds = (del.rounds||[]).map((r,i)=>i===s.roundIdx?{...r,deadline:s.prev}:r);
+        onUpdateDel(project.id, s.delId, "rounds", newRounds);
+      } else if(s.kind==="ingest") {
+        const newIngests = (project.ingestDates||[]).map(i=>i.id===s.id?{...i,datetime:s.prev}:i);
+        onUpdateProject(project.id,"ingestDates",newIngests);
+      }
+    });
+  };
+  const commitDateChange = (ev, newDate, newTime) => {
+    const snapshot = captureSnapshot(ev);
+    applyDateChange(ev, newDate, newTime);
+    setUndoStack(s=>[...s, {snapshot, redo:{ev,newDate,newTime}}]);
+    setRedoStack([]);
+  };
+  const undo = () => setUndoStack(s=>{
+    if(!s.length) return s;
+    const last = s[s.length-1];
+    restoreSnapshot(last.snapshot);
+    setRedoStack(r=>[...r,last]);
+    return s.slice(0,-1);
+  });
+  const redo = () => setRedoStack(r=>{
+    if(!r.length) return r;
+    const last = r[r.length-1];
+    applyDateChange(last.redo.ev, last.redo.newDate, last.redo.newTime);
+    setUndoStack(s=>[...s,last]);
+    return r.slice(0,-1);
+  });
+
   const openEditEvent = ev => setEditEvent({id:ev.id, label:ev.label, date:ev.date, time:ev.time||"", hasTime:ev.hasTime});
+
+  // Ghost Work Review events open the composer pre-selecting that session;
+  // Productions are locked from calendar rescheduling entirely (see the
+  // confirm dialog below) — everything else opens the normal edit popover.
+  const handleEventClick = ev => {
+    if(ev._ghost){ setModalInitialSessionId(ev._ghostSessionId); setShowAddWorkReview(true); return; }
+    if(ev.ref?.kind==="production"){ setProdBlockedEv(ev); return; }
+    openEditEvent(ev);
+  };
+
+  const handleEventEnter = (ev,x,y) => { if(hoverTimerRef.current) clearTimeout(hoverTimerRef.current); setHoverEv({ev,x,y}); };
+  const handleEventLeave = () => { hoverTimerRef.current = setTimeout(()=>setHoverEv(null), 200); };
+  const handleCardEnter = () => { if(hoverTimerRef.current) clearTimeout(hoverTimerRef.current); };
+  const handleCardLeave = () => { hoverTimerRef.current = setTimeout(()=>setHoverEv(null), 200); };
 
   const shiftWeek = delta => setWeekStart(w=>{ const n=new Date(w); n.setDate(n.getDate()+delta*7); return n; });
 
@@ -23054,6 +23321,14 @@ const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel,
               </button>
             ))}
           </div>
+          {canEdit&&(
+            <div style={{display:"flex",background:"#111827",border:"1px solid #1f2937",borderRadius:8,overflow:"hidden"}}>
+              <button onClick={undo} disabled={!undoStack.length} title="Undo"
+                style={{background:"transparent",border:"none",borderRight:"1px solid #1f2937",color:undoStack.length?"#9ca3af":"#374151",padding:"6px 12px",fontSize:14,cursor:undoStack.length?"pointer":"default"}}>↺ Undo</button>
+              <button onClick={redo} disabled={!redoStack.length} title="Redo"
+                style={{background:"transparent",border:"none",color:redoStack.length?"#9ca3af":"#374151",padding:"6px 12px",fontSize:14,cursor:redoStack.length?"pointer":"default"}}>↻ Redo</button>
+            </div>
+          )}
           {canEdit&&<>
             <Btn small variant="ghost" onClick={()=>setShowAddReviewRound(true)}>+ Review Round</Btn>
             <Btn small variant="ghost" onClick={()=>setShowAddWorkReview(true)}>+ Work Review</Btn>
@@ -23075,19 +23350,28 @@ const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel,
           );
         })}
         {canEdit&&<div style={{fontSize:12,color:"#4b5563",marginLeft:"auto",alignSelf:"center"}}>
-          {viewMode==="month" ? "Drag an event to reschedule its date or time · right-click a day to add a round" : "Drag an event to change its time · click to fine-tune"}
+          {viewMode==="month" ? "Drag an event to reschedule · right-click a day to add a round · Productions link to the Production tab" : "Drag an event to change its time · click to fine-tune"}
         </div>}
       </div>
 
       {viewMode==="week"?(
         <ProjectCalendarWeek weekStart={weekStart} events={groupedEvents} canEdit={canEdit}
-          onCommitMove={(ev,newDate,newTime)=>applyDateChange(ev,newDate,newTime)}
-          onEventClick={openEditEvent}/>
+          onCommitMove={commitDateChange}
+          onEventClick={handleEventClick}
+          onEventEnter={handleEventEnter} onEventLeave={handleEventLeave}
+          onProductionDragBlocked={ev=>setProdBlockedEv(ev)}/>
       ):(
         <ProjectCalendarMonth calY={calY} calM={calM} events={groupedEvents} canEdit={canEdit}
-          onCommitMove={(ev,newDate,newTime)=>applyDateChange(ev,newDate,newTime)}
-          onEventClick={openEditEvent}
+          onCommitMove={commitDateChange}
+          onEventClick={handleEventClick}
+          onEventEnter={handleEventEnter} onEventLeave={handleEventLeave}
+          onProductionDragBlocked={ev=>setProdBlockedEv(ev)}
           onDayContextMenu={openDayContextMenu}/>
+      )}
+
+      {hoverEv&&(
+        <CalEventHoverCard ev={hoverEv.ev} project={project} allProjects={allProjects} team={team} talentRoster={talentRoster}
+          onUpdateDel={onUpdateDel} x={hoverEv.x} y={hoverEv.y} onMouseEnter={handleCardEnter} onMouseLeave={handleCardLeave}/>
       )}
 
       {/* Edit popover — date only; time is set by dragging the event itself */}
@@ -23102,11 +23386,27 @@ const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel,
             <div style={{display:"flex",gap:8,marginTop:6}}>
               <button onClick={()=>{
                   const ev = groupedEvents.find(x=>x.id===editEvent.id);
-                  applyDateChange(ev, editEvent.date, editEvent.time);
+                  commitDateChange(ev, editEvent.date, editEvent.time);
                   setEditEvent(null);
                 }}
                 style={{flex:1,background:"#6366f1",border:"none",borderRadius:6,color:"#fff",padding:"8px 0",fontSize:14,fontWeight:700,cursor:"pointer"}}>Save</button>
               <button onClick={()=>setEditEvent(null)}
+                style={{flex:1,background:"#1f2937",border:"none",borderRadius:6,color:"#9ca3af",padding:"8px 0",fontSize:14,fontWeight:700,cursor:"pointer"}}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Production drag/click is blocked — reschedule from the Production tab instead */}
+      {prodBlockedEv&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setProdBlockedEv(null)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#0f172a",border:"1px solid #1f2937",borderRadius:10,padding:20,width:320}}>
+            <div style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:8,fontFamily:"'Barlow Condensed',sans-serif"}}>Reschedule this Production?</div>
+            <div style={{fontSize:14,color:"#9ca3af",marginBottom:16}}>Productions can't be moved from the calendar. Update <b style={{color:"#e2e8f0"}}>{prodBlockedEv.label}</b> from the Production tab instead.</div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>{ onOpenProductionTab?.(); setProdBlockedEv(null); }}
+                style={{flex:1,background:"#6366f1",border:"none",borderRadius:6,color:"#fff",padding:"8px 0",fontSize:14,fontWeight:700,cursor:"pointer"}}>Open Production Tab</button>
+              <button onClick={()=>setProdBlockedEv(null)}
                 style={{flex:1,background:"#1f2937",border:"none",borderRadius:6,color:"#9ca3af",padding:"8px 0",fontSize:14,fontWeight:700,cursor:"pointer"}}>Cancel</button>
             </div>
           </div>
@@ -23139,7 +23439,8 @@ const ProjectCalendar = ({project, allProjects=[], onUpdateProject, onUpdateDel,
         <AddWorkReviewRoundModal project={project} allProjects={allProjects} onUpdateDel={onUpdateDel}
           workReviewSessions={workReviewSessions} addWorkReviewSession={addWorkReviewSession} updateWorkReviewSession={updateWorkReviewSession}
           reviewerNames={reviewerNames} addReviewerName={addReviewerName}
-          initialDate={modalInitialDate} onClose={()=>{setShowAddWorkReview(false);setModalInitialDate(null);}}/>
+          initialDate={modalInitialDate} initialSessionId={modalInitialSessionId}
+          onClose={()=>{setShowAddWorkReview(false);setModalInitialDate(null);setModalInitialSessionId(null);}}/>
       )}
     </div>
   );
