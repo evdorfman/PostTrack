@@ -15446,13 +15446,16 @@ const ProductionScheduleEditor = ({schedule=[], productionType, startTime, endTi
 
   const lastSyncedStart = useRef(startTime);
   const lastSyncedEnd   = useRef(endTime);
+  const lastSyncedShootStart = useRef(null);
   useEffect(()=>{
     if(!isTable || schedule.length===0) return;
     const startChanged = startTime !== lastSyncedStart.current;
     const endChanged   = endTime   !== lastSyncedEnd.current;
-    if(!startChanged && !endChanged) return;
+    const primaryShoot = (secondaryLocations||[]).find(l=>l._isPrimaryShoot);
+    const shootChanged = (primaryShoot?.startTime||null) !== lastSyncedShootStart.current;
     lastSyncedStart.current = startTime;
     lastSyncedEnd.current   = endTime;
+    lastSyncedShootStart.current = primaryShoot?.startTime||null;
     const fmtT = iso => {
       if(!iso) return "";
       const m = iso.match(/T(\d{2}):(\d{2})/);
@@ -15464,18 +15467,25 @@ const ProductionScheduleEditor = ({schedule=[], productionType, startTime, endTi
     const callStr = fmtT(startTime);
     const wrapStr = fmtT(endTime);
     const breakdownStr = oneHourBefore(wrapStr);
+    const shootStr = fmtT(primaryShoot?.startTime||"");
+    // Beyond reacting to a genuine change, also backfill any row that's
+    // simply still blank while a real value now exists for it — a
+    // schedule built via "Build from Booking" before the production's own
+    // start/end/Primary-Shoot times were entered stays blank forever
+    // otherwise, since this effect's own "did it change" baseline resets
+    // to whatever the props already are on every fresh mount (reopening
+    // this section, a page reload), never detecting the mismatch between
+    // an already-blank saved row and an already-known-good time source.
     const updated = schedule.map((item,i) => {
-      // Row 0 (Crew Call) and 1 (Set Up): sync only if not manually overridden
-      if((i===0||i===1) && startChanged && !item._manualTime) return {...item, time:callStr};
-      // Last row (Wrap): sync only if not manually overridden
-      if(i===schedule.length-1 && endChanged && !item._manualTime) return {...item, time:wrapStr};
-      // Breakdown row: keep 1 hour before Wrap whenever endTime changes
-      if(endChanged && item.task==="Breakdown" && !item._manualTime && breakdownStr)
-        return {...item, time:breakdownStr};
+      if(item._manualTime) return item;
+      if((i===0||i===1) && callStr && (startChanged||!item.time)) return {...item, time:callStr};
+      if(i===schedule.length-1 && wrapStr && (endChanged||!item.time)) return {...item, time:wrapStr};
+      if(item.task==="Breakdown" && breakdownStr && (endChanged||!item.time)) return {...item, time:breakdownStr};
+      if(item.task==="Primary Shoot" && shootStr && (shootChanged||!item.time)) return {...item, time:shootStr};
       return item;
     });
     if(JSON.stringify(updated)!==JSON.stringify(schedule)) onUpdate(updated);
-  },[startTime, endTime]); // eslint-disable-line
+  },[startTime, endTime, secondaryLocations]); // eslint-disable-line
 
   // Sync secondary locations into schedule — upsert rows tagged with loc.id
   useEffect(()=>{
@@ -18173,7 +18183,7 @@ const CallSheetModal = ({production, project, team, talentRoster=[], onClose, on
                 <tbody>
                   {editSched.map((item,i)=>(
                     <tr key={i} style={{background:i%2===0?"#fff":"#fafafa"}}>
-                      <td style={{...cs.cell,width:60}}><EditInp val={item.time||""} onChange={v=>{setEditSched(prev=>prev.map((r,j)=>j===i?{...r,time:v}:r)); triggerSave();}}/></td>
+                      <td style={{...cs.cell,width:76,whiteSpace:"nowrap"}}><EditInp val={item.time||""} onChange={v=>{setEditSched(prev=>prev.map((r,j)=>j===i?{...r,time:v}:r)); triggerSave();}}/></td>
                       <td style={cs.cell}><EditInp val={item.task||item.label||""} onChange={v=>{setEditSched(prev=>prev.map((r,j)=>j===i?{...r,task:v}:r)); triggerSave();}}/></td>
                       <td style={{...cs.cell,width:100}}><EditInp val={item.location||""} onChange={v=>{setEditSched(prev=>prev.map((r,j)=>j===i?{...r,location:v}:r)); triggerSave();}}/></td>
                       <td style={cs.cell}><EditInp val={item.notes||""} onChange={v=>{setEditSched(prev=>prev.map((r,j)=>j===i?{...r,notes:v}:r)); triggerSave();}}/></td>
