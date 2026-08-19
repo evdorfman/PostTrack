@@ -15566,7 +15566,7 @@ const ProductionScheduleEditor = ({schedule=[], productionType, startTime, endTi
   };
   const delRow = idx => onUpdate(schedule.filter((_,i)=>i!==idx));
 
-  const TIME_OPTIONS = ["—","5:00 AM","5:30 AM","6:00 AM","6:30 AM","7:00 AM","7:30 AM","8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM","6:30 PM","7:00 PM","7:30 PM","8:00 PM","8:30 PM","9:00 PM","10:00 PM","11:00 PM","12:00 AM"];
+  const TIME_OPTIONS = ["—","5:00 AM","5:30 AM","6:00 AM","6:30 AM","7:00 AM","7:30 AM","8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM","6:30 PM","7:00 PM","7:30 PM","8:00 PM","8:30 PM","9:00 PM","9:30 PM","10:00 PM","10:30 PM","11:00 PM","11:30 PM","12:00 AM"];
 
   // Parse "10:30 AM" → minutes-since-midnight for bounding and sorting
   const parseTStr = t => {
@@ -16516,7 +16516,7 @@ const SetupInstanceCard = ({
   const parseTStr2 = t => { const m=(t||"").match(/(\d+):(\d+)\s*(AM|PM)/i); if(!m) return null; let [,h,mi,ap]=m; h=parseInt(h); mi=parseInt(mi); if(/pm/i.test(ap)&&h!==12) h+=12; if(/am/i.test(ap)&&h===12) h=0; return h*60+mi; };
   const isoToMins2 = iso => { const m=(iso||"").match(/T(\d{2}):(\d{2})/); if(!m) return null; return +m[1]*60 + +m[2]; };
   const sMins2 = isoToMins2(productionStartTime), eMins2 = isoToMins2(productionEndTime);
-  const ALL_CREW_TIMES = ["5:00 AM","5:30 AM","6:00 AM","6:30 AM","7:00 AM","7:30 AM","8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM","6:30 PM","7:00 PM","7:30 PM","8:00 PM"];
+  const ALL_CREW_TIMES = ["5:00 AM","5:30 AM","6:00 AM","6:30 AM","7:00 AM","7:30 AM","8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM","6:30 PM","7:00 PM","7:30 PM","8:00 PM","8:30 PM","9:00 PM","9:30 PM","10:00 PM","10:30 PM","11:00 PM","11:30 PM","12:00 AM"];
   const BOUNDED_CREW_TIMES = ALL_CREW_TIMES;
   const updField = (f,v) => onUpdateSetup({...setup,[f]:v,_isCustom:true});
 
@@ -17425,7 +17425,14 @@ const SecPanel = ({icon, label, summary, summaryEmpty, open, onOpen, onClose, ba
 // MUST be defined at module level — if defined inside CallSheetModal's render
 // function React sees a new component type on every state change and unmounts/
 // remounts the element, killing focus after each keystroke.
-const CS_INP_BASE = {background:"transparent", border:"none", outline:"none", width:"100%", fontSize:13, fontFamily:"Arial,sans-serif", color:"inherit", resize:"none", padding:0};
+// color is explicit (not "inherit") and colorScheme is forced to "light" —
+// mobile browsers (Chrome/Safari) auto-apply dark-mode adjustments to real
+// <input>/<textarea> form controls based on the OS theme, even when an
+// ancestor sets a black text color the control would otherwise inherit.
+// Without this, the call sheet's editable fields render washed-out/pale
+// against its white paper background on a phone in dark mode, while plain
+// (non-input) text on the same sheet renders normally.
+const CS_INP_BASE = {background:"transparent", border:"none", outline:"none", width:"100%", fontSize:13, fontFamily:"Arial,sans-serif", color:"#000", colorScheme:"light", resize:"none", padding:0};
 const CallSheetEditInp = ({val, onChange, multi=false, style={}}) => multi
   ? <textarea value={val} onChange={e=>onChange(e.target.value)} rows={2} style={{...CS_INP_BASE, ...style}}/>
   : <input    value={val} onChange={e=>onChange(e.target.value)} style={{...CS_INP_BASE, ...style}}/>;
@@ -18006,9 +18013,9 @@ const CallSheetModal = ({production, project, team, talentRoster=[], onClose, on
     subhdr:  {background:"#000", color:"#fff", fontWeight:700, padding:"5px 8px", fontSize:13},
     redhdr:  {background:"#c00", color:"#fff", fontWeight:700, textAlign:"center", padding:"5px 8px", fontSize:13, letterSpacing:"0.05em"},
     yellow:  {background:"#FFD700", fontWeight:700, textAlign:"center", padding:"5px 8px", fontSize:13},
-    cell:    {border:"1px solid #555", padding:"5px 8px", fontSize:13, verticalAlign:"top", wordBreak:"break-word"},
-    label:   {border:"1px solid #555", padding:"5px 8px", fontSize:13, fontWeight:700, background:"#f5f5f5", textAlign:"right", verticalAlign:"middle", whiteSpace:"nowrap"},
-    th:      {border:"1px solid #555", padding:"5px 8px", fontSize:13, fontWeight:700, background:"#e8e8e8"},
+    cell:    {border:"1px solid #555", padding:"5px 8px", fontSize:13, verticalAlign:"top", wordBreak:"break-word", color:"#000"},
+    label:   {border:"1px solid #555", padding:"5px 8px", fontSize:13, fontWeight:700, background:"#f5f5f5", textAlign:"right", verticalAlign:"middle", whiteSpace:"nowrap", color:"#000"},
+    th:      {border:"1px solid #555", padding:"5px 8px", fontSize:13, fontWeight:700, background:"#e8e8e8", color:"#000"},
   };
   const tblStyle = {width:"100%", borderCollapse:"collapse", border:"1px solid #555"};
 
@@ -18043,7 +18050,7 @@ const CallSheetModal = ({production, project, team, talentRoster=[], onClose, on
         {fetchErr&&<div className="cs-no-print" style={{background:"#f59e0b20",color:"#f59e0b",padding:"6px 16px",fontSize:13,flexShrink:0}}>{fetchErr}</div>}
         {/* Scrollable call sheet body — id used by print CSS to isolate this content */}
         <div id="cs-printable-content" style={{overflowY:"auto",flex:1,padding:"20px",background:"#f8f8f8"}}>
-          <div style={{background:"#fff",maxWidth:820,margin:"0 auto",fontFamily:"Arial,sans-serif",fontSize:"10.8pt",color:"#000",boxShadow:"0 4px 24px rgba(0,0,0,0.15)"}}>
+          <div style={{background:"#fff",maxWidth:820,margin:"0 auto",fontFamily:"Arial,sans-serif",fontSize:"10.8pt",color:"#000",colorScheme:"light",boxShadow:"0 4px 24px rgba(0,0,0,0.15)"}}>
 
             {/* ── HEADER ── */}
             <div style={cs.hdr}>BLACKSTONE PRODUCTION CALL SHEET</div>
@@ -18276,7 +18283,7 @@ const ProductionCard = ({production, idx, projectId, allProductions, allProjectD
   const pendingApproval = normalizeStage(production.status) === "Tentative";
 
   // Derive call/wrap time for each crew member — must use EXACT same ID format as schedule editor
-  const TIME_ORDER = ["5:00 AM","5:30 AM","6:00 AM","6:30 AM","7:00 AM","7:30 AM","8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM","6:30 PM","7:00 PM","7:30 PM","8:00 PM","8:30 PM","9:00 PM","10:00 PM","11:00 PM","12:00 AM"];
+  const TIME_ORDER = ["5:00 AM","5:30 AM","6:00 AM","6:30 AM","7:00 AM","7:30 AM","8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM","12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM","4:30 PM","5:00 PM","5:30 PM","6:00 PM","6:30 PM","7:00 PM","7:30 PM","8:00 PM","8:30 PM","9:00 PM","9:30 PM","10:00 PM","10:30 PM","11:00 PM","11:30 PM","12:00 AM"];
 
   // Build allCrew the same way as ProductionScheduleEditor does
   const schedAllCrew = [
@@ -22115,6 +22122,16 @@ const MyViewChat = ({member, projects, team, onOpenProject, nudges=[], minHeight
           <div style={{marginLeft:"auto",display:"flex",gap:5}}>
             {[0,0.2,0.4].map((d,i)=><div key={i} style={{width:6,height:6,borderRadius:"50%",background:"#6366f1",animation:`pulse 1.2s ${d}s infinite`}}/>)}
           </div>
+        )}
+        {/* Always available, not just on the empty-state — covers anyone
+            whose cache still holds a stale failure from before this was
+            fixed to require a click, or who simply wants a fresh one. */}
+        {loaded&&visibleMsgs.length>0&&(
+          <button onClick={generateRundown} disabled={loading}
+            title="Regenerate today's rundown"
+            style={{marginLeft:"auto",background:"none",border:"1px solid #374151",borderRadius:6,color:loading?"#4b5563":"#9ca3af",padding:"4px 10px",fontSize:12,fontWeight:700,cursor:loading?"not-allowed":"pointer",flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>
+            ↻ Regenerate
+          </button>
         )}
       </div>
 
