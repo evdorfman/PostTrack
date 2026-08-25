@@ -5556,16 +5556,13 @@ const IngestFullFields = ({ig, update, editableLocation=true, showCallSheet=fals
       </div>
       {(ig.mediaRows||[]).length===0&&<div style={{fontSize:14,color: "#838ba0"}}>Click + Add Row to log each card or drive.</div>}
       {(ig.mediaRows||[]).map((row,ri)=>(
-        <div key={row.id||ri} style={{display:"grid",gridTemplateColumns:"100px 1fr 1fr auto",gap:6,alignItems:"center"}}>
-          <Inp value={row.cardLabel||""} onChange={e=>update("mediaRows",(ig.mediaRows||[]).map((r,i)=>i!==ri?r:{...r,cardLabel:e.target.value}))} placeholder="Card/drive…" style={{fontSize:14}}/>
-          <Sel value={row.numFiles||""} onChange={e=>update("mediaRows",(ig.mediaRows||[]).map((r,i)=>i!==ri?r:{...r,numFiles:e.target.value}))} style={{fontSize:14,padding:"5px 7px"}}>
-            <option value="">Files…</option>
-            {["1–10","11–50","51–100","101–250","251–500","500+"].map(v=><option key={v}>{v}</option>)}
+        <div key={row.id||ri} style={{display:"grid",gridTemplateColumns:"1.3fr 1fr 1fr auto",gap:6,alignItems:"center"}}>
+          <Sel value={row.cardLabel||""} onChange={e=>update("mediaRows",(ig.mediaRows||[]).map((r,i)=>i!==ri?r:{...r,cardLabel:e.target.value}))} style={{fontSize:14,padding:"5px 7px"}}>
+            <option value="">Card/drive…</option>
+            {MEDIA_CATEGORIES.map(v=><option key={v}>{v}</option>)}
           </Sel>
-          <Sel value={row.gbPerCard||""} onChange={e=>update("mediaRows",(ig.mediaRows||[]).map((r,i)=>i!==ri?r:{...r,gbPerCard:e.target.value}))} style={{fontSize:14,padding:"5px 7px"}}>
-            <option value="">GB…</option>
-            {["<1 GB","1–4 GB","4–16 GB","16–64 GB","64–128 GB","128–256 GB","256+ GB"].map(v=><option key={v}>{v}</option>)}
-          </Sel>
+          <Inp type="number" value={row.numFiles||""} onChange={e=>update("mediaRows",(ig.mediaRows||[]).map((r,i)=>i!==ri?r:{...r,numFiles:e.target.value}))} placeholder="Files" style={{fontSize:14}}/>
+          <Inp type="number" step="0.01" value={row.gbPerCard||""} onChange={e=>update("mediaRows",(ig.mediaRows||[]).map((r,i)=>i!==ri?r:{...r,gbPerCard:e.target.value}))} placeholder="GB" style={{fontSize:14}}/>
           <button onClick={()=>update("mediaRows",(ig.mediaRows||[]).filter((_,i)=>i!==ri))} style={{background:"none",border:"none",color: "#8e97a6",cursor:"pointer",fontSize:19}}>×</button>
         </div>
       ))}
@@ -5577,6 +5574,94 @@ const IngestFullFields = ({ig, update, editableLocation=true, showCallSheet=fals
       </LW>
     )}
   </div>
+  );
+};
+
+// One card in the per-project Ingest tab — a top-level component (not
+// defined inside IngestTabContent) so its identity stays stable across
+// re-renders. Defining it inline there used to give React a brand-new
+// component function every render, which made it unmount+remount the whole
+// card (including whatever input inside IngestFullFields currently had
+// focus) after every single keystroke — the "only one key at a time before
+// having to click back in" bug. Everything it used to close over is now
+// passed in as a prop instead.
+const IngestCard = ({ig, metaOpen, onToggleMeta, onDelete, update, reviewLinksForIg, reassignOptionsForIg,
+  onAddReviewLink, onDeleteReviewLink, onReassignReviewLink,
+  team, allProjects, lp, onUpdateDel, onDeleteDel, onUpdateProject, talentRoster}) => {
+  const prodStatusColor = ig.productionStatus ? (PROD_STATUS_COLOR[ig.productionStatus]||"#6b7280") : null;
+  return (
+    <div style={{background:"#111827",border:`1px solid ${ig.source!=="manual"?"#3b82f630":"#374151"}`,borderRadius:12,overflow:"hidden"}}>
+      {/* Header row — click anywhere to expand/collapse */}
+      <div onClick={onToggleMeta} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px",borderBottom:metaOpen||ig.source==="manual"?"1px solid #1f2937":"none",cursor:"pointer"}}>
+        <span style={{fontSize:11,color:"#6b7280",display:"inline-block",transform:metaOpen?"rotate(90deg)":"none",flexShrink:0}}>▶</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,color:"#6b7280",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.05em",marginBottom:2}}>
+            {ig.ingestName}
+          </div>
+          <div style={{fontWeight:700,fontSize:18,color:ig.datetime?"#e2e8f0":"#4b5563"}}>
+            {ig.datetime?fmtDT(ig.datetime):"No time set"}
+          </div>
+          {ig.source!=="manual"
+            ?<div style={{display:"flex",alignItems:"center",gap:6,marginTop:2,flexWrap:"wrap"}}>
+              <span style={{fontSize:14,color:"#3b82f6"}}>🎬 {ig.shootTitle}</span>
+              {ig.productionStatus&&(
+                <span style={{fontSize:13,fontWeight:700,color:prodStatusColor,background:prodStatusColor+"18",borderRadius:5,padding:"1px 7px",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>
+                  {ig.productionStatus}
+                </span>
+              )}
+            </div>
+            :<div style={{display:"flex",alignItems:"center",gap:6,marginTop:2}}>
+              <span style={{fontSize:14,color: "#9ca3af"}}>Manual entry</span>
+              {ig._fromPreset&&<Chip label="Internal Planning" color="#8b5cf6" xs/>}
+            </div>}
+        </div>
+        {/* Status dropdown */}
+        <select value={ig.status||"Not Received"} onClick={e=>e.stopPropagation()} onChange={e=>update("status",e.target.value)}
+          style={{background:{
+            "Not Received":"#ef444418","Media Received":"#3b82f618",
+            "Media Processing":"#f59e0b18","Media Ingested":"#10b98118"
+          }[ig.status||"Not Received"]||"#1f2937",
+          border:`1px solid ${{
+            "Not Received":"#ef444440","Media Received":"#3b82f640",
+            "Media Processing":"#f59e0b40","Media Ingested":"#10b98140"
+          }[ig.status||"Not Received"]||"#374151"}`,
+          borderRadius:6,color:{
+            "Not Received":"#ef4444","Media Received":"#60a5fa",
+            "Media Processing":"#f59e0b","Media Ingested":"#10b981"
+          }[ig.status||"Not Received"]||"#9ca3af",
+          padding:"4px 8px",fontSize:14,outline:"none",fontWeight:700}}>
+          {INGEST_STATUS_OPTS.map(s=><option key={s} style={{background:"#0d1117",color:"#e2e8f0"}}>{s}</option>)}
+        </select>
+        {ig.source==="manual"&&(
+          <button onClick={e=>{e.stopPropagation();onDelete();}} style={{background:"none",border:"none",color: "#8e97a6",cursor:"pointer",fontSize:22,lineHeight:1}}>×</button>
+        )}
+      </div>
+
+      {/* Expanded details — same full field set as the cross-project Ingest tracking sheet */}
+      {metaOpen&&(
+        <div style={{padding:"12px 16px"}}>
+          {ig.source==="manual"&&(
+            <LW label="Expected Arrival Time" style={{marginBottom:10}}>
+              <DateTimePicker value={ig.datetime||""} onChange={v=>update("datetime",v)} label="Set arrival time"/>
+            </LW>
+          )}
+          {/* Transcript / Review Link flags — read-only here, set from the Production tab's rich ingest workflow */}
+          {ig.source==="production"&&(ig.transcriptNeeded||ig.reviewLinkNeeded)&&(
+            <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:10}}>
+              {ig.transcriptNeeded&&<div style={{fontSize:13,color:"#f59e0b",fontWeight:700}}>✓ Transcript Needed</div>}
+              {ig.reviewLinkNeeded&&<div style={{fontSize:13,color:"#3b82f6",fontWeight:700}}>✓ Review Link Needed</div>}
+            </div>
+          )}
+          <IngestFullFields ig={ig} update={update} editableLocation={ig.source==="manual"} showCallSheet={ig.source==="manual"} showStatus={false}
+            reviewLinks={reviewLinksForIg} onAddReviewLink={onAddReviewLink}
+            onDeleteReviewLink={onDeleteReviewLink}
+            onReassignReviewLink={onReassignReviewLink}
+            reassignOptions={reassignOptionsForIg}
+            team={team} allProjects={allProjects} project={lp}
+            onUpdateDel={onUpdateDel} onDeleteDel={onDeleteDel} onUpdateProject={onUpdateProject} talentRoster={talentRoster}/>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -5635,14 +5720,13 @@ const IngestTabContent = ({lp, team, allProjects, addIngest, delIngest, updInges
     if(patch.productions) onUpdateProject(lp.id,"productions",patch.productions);
   };
 
-  const IngestCard = ({ig, i}) => {
-    const metaOpen = expandedMeta[ig.id];
-    const toggleMeta = () => setExpandedMeta(m=>({...m,[ig.id]:!m[ig.id]}));
+  // Per-ig props for the extracted IngestCard component — shared by both
+  // the "From Productions" and "Manual Entries" lists below.
+  const renderCard = ig => {
+    const igKey = ingestKeyOf(ig);
     // Production-sourced cards write into that production's ingest object;
     // everything else writes into the manual ingestDates entry.
     const update = (f,v) => ig.source==="production" ? updProductionIngest(ig.productionRef,f,v) : updIngest(ig.id,f,v);
-    const prodStatusColor = ig.productionStatus ? (PROD_STATUS_COLOR[ig.productionStatus]||"#6b7280") : null;
-    const igKey = ingestKeyOf(ig);
     const reviewLinksForIg = resolveLinkedReviewLinks(lp.deliverables, ig);
     const reassignOptionsForIg = allIngests
       .filter(x=>x.source!=="shoot" && ingestKeyOf(x)!==igKey)
@@ -5662,78 +5746,14 @@ const IngestTabContent = ({lp, team, allProjects, addIngest, delIngest, updInges
       onDeleteDel(lp.id, delId);
     };
     return (
-      <div style={{background:"#111827",border:`1px solid ${ig.source!=="manual"?"#3b82f630":"#374151"}`,borderRadius:12,overflow:"hidden"}}>
-        {/* Header row — click anywhere to expand/collapse */}
-        <div onClick={toggleMeta} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px",borderBottom:metaOpen||ig.source==="manual"?"1px solid #1f2937":"none",cursor:"pointer"}}>
-          <span style={{fontSize:11,color:"#6b7280",display:"inline-block",transform:metaOpen?"rotate(90deg)":"none",flexShrink:0}}>▶</span>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:13,color:"#6b7280",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.05em",marginBottom:2}}>
-              {ig.ingestName}
-            </div>
-            <div style={{fontWeight:700,fontSize:18,color:ig.datetime?"#e2e8f0":"#4b5563"}}>
-              {ig.datetime?fmtDT(ig.datetime):"No time set"}
-            </div>
-            {ig.source!=="manual"
-              ?<div style={{display:"flex",alignItems:"center",gap:6,marginTop:2,flexWrap:"wrap"}}>
-                <span style={{fontSize:14,color:"#3b82f6"}}>🎬 {ig.shootTitle}</span>
-                {ig.productionStatus&&(
-                  <span style={{fontSize:13,fontWeight:700,color:prodStatusColor,background:prodStatusColor+"18",borderRadius:5,padding:"1px 7px",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>
-                    {ig.productionStatus}
-                  </span>
-                )}
-              </div>
-              :<div style={{display:"flex",alignItems:"center",gap:6,marginTop:2}}>
-                <span style={{fontSize:14,color: "#9ca3af"}}>Manual entry</span>
-                {ig._fromPreset&&<Chip label="Internal Planning" color="#8b5cf6" xs/>}
-              </div>}
-          </div>
-          {/* Status dropdown */}
-          <select value={ig.status||"Not Received"} onClick={e=>e.stopPropagation()} onChange={e=>update("status",e.target.value)}
-            style={{background:{
-              "Not Received":"#ef444418","Media Received":"#3b82f618",
-              "Media Processing":"#f59e0b18","Media Ingested":"#10b98118"
-            }[ig.status||"Not Received"]||"#1f2937",
-            border:`1px solid ${{
-              "Not Received":"#ef444440","Media Received":"#3b82f640",
-              "Media Processing":"#f59e0b40","Media Ingested":"#10b98140"
-            }[ig.status||"Not Received"]||"#374151"}`,
-            borderRadius:6,color:{
-              "Not Received":"#ef4444","Media Received":"#60a5fa",
-              "Media Processing":"#f59e0b","Media Ingested":"#10b981"
-            }[ig.status||"Not Received"]||"#9ca3af",
-            padding:"4px 8px",fontSize:14,outline:"none",fontWeight:700}}>
-            {INGEST_STATUS_OPTS.map(s=><option key={s} style={{background:"#0d1117",color:"#e2e8f0"}}>{s}</option>)}
-          </select>
-          {ig.source==="manual"&&(
-            <button onClick={e=>{e.stopPropagation();delIngest(ig.id);}} style={{background:"none",border:"none",color: "#8e97a6",cursor:"pointer",fontSize:22,lineHeight:1}}>×</button>
-          )}
-        </div>
-
-        {/* Expanded details — same full field set as the cross-project Ingest tracking sheet */}
-        {metaOpen&&(
-          <div style={{padding:"12px 16px"}}>
-            {ig.source==="manual"&&(
-              <LW label="Expected Arrival Time" style={{marginBottom:10}}>
-                <DateTimePicker value={ig.datetime||""} onChange={v=>update("datetime",v)} label="Set arrival time"/>
-              </LW>
-            )}
-            {/* Transcript / Review Link flags — read-only here, set from the Production tab's rich ingest workflow */}
-            {ig.source==="production"&&(ig.transcriptNeeded||ig.reviewLinkNeeded)&&(
-              <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:10}}>
-                {ig.transcriptNeeded&&<div style={{fontSize:13,color:"#f59e0b",fontWeight:700}}>✓ Transcript Needed</div>}
-                {ig.reviewLinkNeeded&&<div style={{fontSize:13,color:"#3b82f6",fontWeight:700}}>✓ Review Link Needed</div>}
-              </div>
-            )}
-            <IngestFullFields ig={ig} update={update} editableLocation={ig.source==="manual"} showCallSheet={ig.source==="manual"} showStatus={false}
-              reviewLinks={reviewLinksForIg} onAddReviewLink={addReviewLinkToIngest}
-              onDeleteReviewLink={deleteReviewLink}
-              onReassignReviewLink={(delId,toKey)=>reassignReviewLink(delId,igKey,toKey)}
-              reassignOptions={reassignOptionsForIg}
-              team={team} allProjects={allProjects} project={lp}
-              onUpdateDel={onUpdateDel} onDeleteDel={onDeleteDel} onUpdateProject={onUpdateProject} talentRoster={talentRoster}/>
-          </div>
-        )}
-      </div>
+      <IngestCard key={ig.id} ig={ig}
+        metaOpen={!!expandedMeta[ig.id]} onToggleMeta={()=>setExpandedMeta(m=>({...m,[ig.id]:!m[ig.id]}))}
+        onDelete={()=>delIngest(ig.id)}
+        update={update} reviewLinksForIg={reviewLinksForIg} reassignOptionsForIg={reassignOptionsForIg}
+        onAddReviewLink={addReviewLinkToIngest} onDeleteReviewLink={deleteReviewLink}
+        onReassignReviewLink={(delId,toKey)=>reassignReviewLink(delId,igKey,toKey)}
+        team={team} allProjects={allProjects} lp={lp}
+        onUpdateDel={onUpdateDel} onDeleteDel={onDeleteDel} onUpdateProject={onUpdateProject} talentRoster={talentRoster}/>
     );
   };
 
@@ -5747,7 +5767,7 @@ const IngestTabContent = ({lp, team, allProjects, addIngest, delIngest, updInges
         <div>
           <div style={{fontSize:14,fontWeight:800,color:"#3b82f6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:8}}>📥 From Productions</div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {shootIngests.map((ig,i)=><IngestCard key={ig.id} ig={ig} i={i}/>)}
+            {shootIngests.map(renderCard)}
           </div>
         </div>
       )}
@@ -5757,7 +5777,7 @@ const IngestTabContent = ({lp, team, allProjects, addIngest, delIngest, updInges
         <div>
           <div style={{fontSize:14,fontWeight:800,color:"#9ca3af",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:8}}>Manual Entries</div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {manualIngests.map((ig,i)=><IngestCard key={ig.id} ig={ig} i={i}/>)}
+            {manualIngests.map(renderCard)}
           </div>
         </div>
       )}
@@ -15447,15 +15467,18 @@ const ProductionScheduleEditor = ({schedule=[], productionType, startTime, endTi
   const lastSyncedStart = useRef(startTime);
   const lastSyncedEnd   = useRef(endTime);
   const lastSyncedShootStart = useRef(null);
+  const lastSyncedShootLoc   = useRef(null);
   useEffect(()=>{
     if(!isTable || schedule.length===0) return;
     const startChanged = startTime !== lastSyncedStart.current;
     const endChanged   = endTime   !== lastSyncedEnd.current;
     const primaryShoot = (secondaryLocations||[]).find(l=>l._isPrimaryShoot);
     const shootChanged = (primaryShoot?.startTime||null) !== lastSyncedShootStart.current;
+    const shootLocChanged = (primaryShoot?.location||null) !== lastSyncedShootLoc.current;
     lastSyncedStart.current = startTime;
     lastSyncedEnd.current   = endTime;
     lastSyncedShootStart.current = primaryShoot?.startTime||null;
+    lastSyncedShootLoc.current   = primaryShoot?.location||null;
     const fmtT = iso => {
       if(!iso) return "";
       const m = iso.match(/T(\d{2}):(\d{2})/);
@@ -15468,6 +15491,7 @@ const ProductionScheduleEditor = ({schedule=[], productionType, startTime, endTi
     const wrapStr = fmtT(endTime);
     const breakdownStr = oneHourBefore(wrapStr);
     const shootStr = fmtT(primaryShoot?.startTime||"");
+    const shootLoc = primaryShoot?.location||"";
     // Beyond reacting to a genuine change, also backfill any row that's
     // simply still blank while a real value now exists for it — a
     // schedule built via "Build from Booking" before the production's own
@@ -15477,6 +15501,9 @@ const ProductionScheduleEditor = ({schedule=[], productionType, startTime, endTi
     // this section, a page reload), never detecting the mismatch between
     // an already-blank saved row and an already-known-good time source.
     const updated = schedule.map((item,i) => {
+      if(item.task==="Primary Shoot" && shootLoc && (shootLocChanged||!item.location)) {
+        item = {...item, location:shootLoc};
+      }
       if(item._manualTime) return item;
       if((i===0||i===1) && callStr && (startChanged||!item.time)) return {...item, time:callStr};
       if(i===schedule.length-1 && wrapStr && (endChanged||!item.time)) return {...item, time:wrapStr};
@@ -15501,6 +15528,14 @@ const ProductionScheduleEditor = ({schedule=[], productionType, startTime, endTi
     let s = [...schedule];
     const wrapIdx = s.length - 1;
     secondaryLocations.forEach(loc=>{
+      // Primary Shoot is a plain "Primary Shoot" row from buildFromBooking()
+      // with no _locId — it's owned entirely by the sync effect above (time
+      // and location). Letting it fall through here would tag-mismatch
+      // against that untagged row (this loop keys off _locId, which the
+      // Primary Shoot row never has) and insert a second, differently
+      // labeled "Primary Shoot — <location>" row instead of ever finding
+      // the real one.
+      if(loc._isPrimaryShoot) return;
       if(!loc.type || (!loc.startTime && !loc.endTime && !loc.location)) return;
       const existIdx = s.findIndex(r=>r._locId===loc.id);
       const task = loc.type==="Hair & Makeup" ? `Hair & Makeup${loc.location?" — "+loc.location:""}` :
@@ -17650,6 +17685,67 @@ const CallSheetModal = ({production, project, team, talentRoster=[], onClose, on
       return at-bt;
     });
   })();
+
+  // ── Page 2: Setup Information ────────────────────────────────────────────
+  // Gear/media/furniture/props live at the PRODUCTION level (shared across
+  // every attached Setup — see SetupInstanceCard, whose equipmentIds/
+  // externalGear/mediaCardIds/furnitureIds/propIds props all read from
+  // `production.*`), so they're computed once here rather than per setup.
+  // Recording specs, audio capture, screen content, photos, and notes DO
+  // belong to each individual Setup, so those are broken out per setup —
+  // one block each, per how the call sheet is meant to page.
+  const pageTwoGear = (() => {
+    const intGear = (production.equipmentIds||[]).map(id=>{
+      const g = gearList.find(x=>String(x.id)===String(id));
+      return g ? g.name : `Item ${id}`;
+    });
+    const extGear = (production.externalGear||[]).map(g=>({name:g.name||"", qty:g.qty, source:g.source||""}));
+    const mediaNms = (production.mediaCardIds||[]).map(id=>{
+      const m = mediaCards.find(x=>String(x.id)===String(id));
+      return m ? m.name : `Card ${id}`;
+    });
+    const furnNms = (production.furnitureIds||[]).map(id=>{
+      const f = furnitureList.find(x=>String(x.id)===String(id)); return f?f.name:id;
+    });
+    const propNms = (production.propIds||[]).map(id=>{
+      const p = propsList.find(x=>String(x.id)===String(id)); return p?p.name:id;
+    });
+    return {intGear, extGear, mediaNms, furnNms, propNms};
+  })();
+
+  const pageTwoSetups = (production.setups||[]).map((setup,si) => {
+    const rs = setup.recordingSpecs || {};
+    const ac = rs.audioCapture || {};
+    const audioItems = [
+      ac.lavalier && `Wireless Lavalier ×${ac.lavalier}`,
+      ac.shotgun && `Shotgun ×${ac.shotgun}`,
+      ac.desktopPodcast && `Desktop Podcast ×${ac.desktopPodcast}`,
+      ac.handheld && `Wireless Handheld ×${ac.handheld}`,
+      ac.cStands && `C-Stands w/ Boom ×${ac.cStands}`,
+      ac.tripodBoom && `Tripod Boom ×${ac.tripodBoom}`,
+      ac.desktopBoom && `Desktop Boom Arms ×${ac.desktopBoom}`,
+      ac.ifb && `IFB ×${ac.ifb}`,
+      ac.commsBeltpack && `Comms Beltpack ×${ac.commsBeltpack}`,
+      ac.programMix && "Program Mix", ac.isoRecordings && "ISO Recordings",
+      ac.backupRecording && "Backup", ac.computerPlayback && "Computer PB",
+      ac.mobilePlayback && "Mobile PB", ac.videoPlayback && "Video PB",
+    ].filter(Boolean);
+    const sc = setup.screenContent || {};
+    const screenItems = [];
+    (sc.windowWall||[]).forEach(id=>{const o=(screenContentOptions.windowWall||[]).find(x=>x.id===id); if(o) screenItems.push(`Window Wall: ${o.name}`);});
+    (sc.vpWall||[]).forEach(id=>{const o=(screenContentOptions.vpWall||[]).find(x=>x.id===id); if(o) screenItems.push(`VP Wall: ${o.name}`);});
+    (sc.frameTv||[]).forEach(id=>{const o=(screenContentOptions.frameTv||[]).find(x=>x.id===id); if(o) screenItems.push(`Frame TV: ${o.name}`);});
+    return {
+      id: setup.id, index: si, name: setup.name || `Setup ${si+1}`,
+      quality: rs.quality||"", qualityOther: rs.qualityOther||"",
+      aspectRatio: rs.aspectRatio||"", aspectRatioOther: rs.aspectRatioOther||"",
+      frameRate: rs.frameRate||"", frameRateOther: rs.frameRateOther||"",
+      audioItems, screenItems, notes: setup.notes||"",
+      floorplanPhotoKey: setup.floorplanPhotoKey||null,
+      refPhotoKeys: setup.refPhotoKeys||[],
+    };
+  });
+
   const EditInp = CallSheetEditInp; // alias for brevity throughout the JSX below
 
   // ── Editable state ──────────────────────────────────────────────────────────
@@ -17839,104 +17935,27 @@ const CallSheetModal = ({production, project, team, talentRoster=[], onClose, on
       </tr>`).join("") :
       Array.from({length:3}).map(()=>`<tr><td colspan="5" style="${cellS};height:60px"></td></tr>`).join("");
 
-    // ── Page 2: Setup Information ──────────────────────────────────────────────
-    // Use the first setup for setup-specific fields; production-level gear always shown
-    const setups = production.setups || [];
-    const setup = setups[0] || {};
-    const rs = setup.recordingSpecs || {};
-
-    // Recording specs
-    const rsRows = [
-      `<tr><td style="${labelS}">Quality</td><td style="${cellS}">${rs.quality||"—"}${rs.quality==="Other"&&rs.qualityOther?` (${rs.qualityOther})`:""}</td><td style="${labelS}">Aspect Ratio</td><td style="${cellS}">${rs.aspectRatio||"—"}${rs.aspectRatio==="Other"&&rs.aspectRatioOther?` (${rs.aspectRatioOther})`:""}</td></tr>`,
-      `<tr><td style="${labelS}">Frame Rate</td><td style="${cellS}">${rs.frameRate||"—"}${rs.frameRate==="Other"&&rs.frameRateOther?` (${rs.frameRateOther})`:""}</td><td style="${labelS}">Audio</td><td style="${cellS}">See Audio Capture below</td></tr>`,
-    ].join("");
-
-    // Internal gear
-    const intGear = (production.equipmentIds||[]).map(id=>{
-      const g = gearList.find(x=>String(x.id)===String(id));
-      return g ? g.name : `Item ${id}`;
-    });
-    const intGearHtml = intGear.length
-      ? intGear.map(g=>`<tr><td style="${cellS}" colspan="2">${g}</td></tr>`).join("")
+    // ── Page 2+: Setup Information ───────────────────────────────────────────
+    // Gear/media/furniture/props are shared production-wide (see pageTwoGear
+    // above), shown once; each attached Setup then gets its own full block
+    // (recording specs, audio capture, screen content, photos, notes).
+    const intGearHtml = pageTwoGear.intGear.length
+      ? pageTwoGear.intGear.map(g=>`<tr><td style="${cellS}" colspan="2">${g}</td></tr>`).join("")
       : `<tr><td style="${cellS};color:#aaa" colspan="2">None</td></tr>`;
-
-    // External gear
-    const extGear = production.externalGear || [];
-    const extGearHtml = extGear.length
-      ? extGear.map(g=>`<tr><td style="${cellS}">${g.name||"—"}</td><td style="${cellS}">${g.qty!=null?`×${g.qty} `:""} ${g.source||""}</td></tr>`).join("")
+    const extGearHtml = pageTwoGear.extGear.length
+      ? pageTwoGear.extGear.map(g=>`<tr><td style="${cellS}">${g.name||"—"}</td><td style="${cellS}">${g.qty!=null?`×${g.qty} `:""} ${g.source||""}</td></tr>`).join("")
       : `<tr><td style="${cellS};color:#aaa" colspan="2">None</td></tr>`;
-
-    // Media cards
-    const mediaNms = (production.mediaCardIds||[]).map(id=>{
-      const m = mediaCards.find(x=>String(x.id)===String(id));
-      return m ? m.name : `Card ${id}`;
-    });
-    const mediaHtml = mediaNms.length
-      ? mediaNms.map(m=>`<tr><td style="${cellS}" colspan="2">${m}</td></tr>`).join("")
+    const mediaHtml = pageTwoGear.mediaNms.length
+      ? pageTwoGear.mediaNms.map(m=>`<tr><td style="${cellS}" colspan="2">${m}</td></tr>`).join("")
       : `<tr><td style="${cellS};color:#aaa" colspan="2">None</td></tr>`;
+    const furnPropsHtml = [
+        ...pageTwoGear.furnNms.map(n=>`<tr><td style="${labelS}">Furniture</td><td style="${cellS}" colspan="3">${n}</td></tr>`),
+        ...pageTwoGear.propNms.map(n=>`<tr><td style="${labelS}">Prop</td><td style="${cellS}" colspan="3">${n}</td></tr>`),
+      ].join("") || `<tr><td style="${cellS};color:#aaa" colspan="4">None</td></tr>`;
 
-    // Furniture & Props (from first setup)
-    const furnNms = (setup.furnitureIds||[]).map(id=>{
-      const f = furnitureList.find(x=>String(x.id)===String(id)); return f?f.name:id;
-    });
-    const propNms = (setup.propIds||[]).map(id=>{
-      const p = propsList.find(x=>String(x.id)===String(id)); return p?p.name:id;
-    });
-    const furnPropsHtml = [...furnNms.map(n=>`<tr><td style="${labelS}">Furniture</td><td style="${cellS}" colspan="3">${n}</td></tr>`), ...propNms.map(n=>`<tr><td style="${labelS}">Prop</td><td style="${cellS}" colspan="3">${n}</td></tr>`)].join("")
-      || `<tr><td style="${cellS};color:#aaa" colspan="4">None</td></tr>`;
-
-    // Audio capture (from first setup's recordingSpecs)
-    const ac = rs.audioCapture || {};
-    const acLines = [];
-    if(ac.lavalier) acLines.push(`Wireless Lavalier ×${ac.lavalier}`);
-    if(ac.shotgun) acLines.push(`Shotgun ×${ac.shotgun}`);
-    if(ac.desktopPodcast) acLines.push(`Desktop Podcast ×${ac.desktopPodcast}`);
-    if(ac.handheld) acLines.push(`Wireless Handheld ×${ac.handheld}`);
-    if(ac.cStands) acLines.push(`C-Stands w/ Boom ×${ac.cStands}`);
-    if(ac.tripodBoom) acLines.push(`Tripod Boom ×${ac.tripodBoom}`);
-    if(ac.desktopBoom) acLines.push(`Desktop Boom Arms ×${ac.desktopBoom}`);
-    if(ac.ifb) acLines.push(`IFB ×${ac.ifb}`);
-    if(ac.commsBeltpack) acLines.push(`Comms Beltpack ×${ac.commsBeltpack}`);
-    const acChecks=[ac.programMix&&"Program Mix",ac.isoRecordings&&"ISO Recordings",ac.backupRecording&&"Backup",ac.computerPlayback&&"Computer PB",ac.mobilePlayback&&"Mobile PB",ac.videoPlayback&&"Video PB"].filter(Boolean);
-    const acAll=[...acLines,...acChecks];
-    const acHtml=acAll.length
-      ?`<tr><td style="${cellS}" colspan="4">${acAll.join("&nbsp; | &nbsp;")}</td></tr>`
-      :`<tr><td style="${cellS};color:#aaa" colspan="4">None configured</td></tr>`;
-
-    // Screen content (from first setup)
-    const sc = setup.screenContent || {};
-    const scLines=[];
-    (sc.windowWall||[]).forEach(id=>{const o=(screenContentOptions.windowWall||[]).find(x=>x.id===id);if(o)scLines.push(`Window Wall: ${o.name}`);});
-    (sc.vpWall||[]).forEach(id=>{const o=(screenContentOptions.vpWall||[]).find(x=>x.id===id);if(o)scLines.push(`VP Wall: ${o.name}`);});
-    (sc.frameTv||[]).forEach(id=>{const o=(screenContentOptions.frameTv||[]).find(x=>x.id===id);if(o)scLines.push(`Frame TV: ${o.name}`);});
-    const scHtml=scLines.length
-      ?`<tr><td style="${cellS}" colspan="4">${scLines.join("&nbsp; | &nbsp;")}</td></tr>`
-      :`<tr><td style="${cellS};color:#aaa" colspan="4">None</td></tr>`;
-
-    // Setup notes
-    const notesHtml=setup.notes
-      ?`<tr><td style="${cellS};white-space:pre-wrap" colspan="4">${setup.notes}</td></tr>`
-      :`<tr><td style="${cellS};color:#aaa" colspan="4">—</td></tr>`;
-
-    // Photos
-    const fpImg=setup.floorplanPhotoKey
-      ?`<div style="margin-bottom:12px"><div style="${subhdrS}">FLOORPLAN</div><img src="${setup.floorplanPhotoKey}" style="max-width:100%;max-height:320px;object-fit:contain;border:1px solid #ddd;display:block;margin-top:4px"/></div>`
-      :"";
-    const refImgs=(setup.refPhotoKeys||[]).length
-      ?`<div style="margin-bottom:12px"><div style="${subhdrS}">REFERENCE PHOTOS</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">${(setup.refPhotoKeys||[]).map(k=>`<img src="${k}" style="height:160px;width:auto;max-width:220px;object-fit:cover;border:1px solid #ddd"/>`).join("")}</div></div>`
-      :"";
-
-    const setupNameLine = setup.name ? ` — ${setup.name}` : setups.length>1?` — Setup 1 of ${setups.length}`:"";
-
-    const page2 = `<div style="page-break-before:always">
+    const gearPage = `<div style="page-break-before:always">
       <div style="margin-bottom:6px">
-        <table style="${tblS}">
-          <tr><td colspan="4" style="${hdrS}">SETUP INFORMATION${setupNameLine}</td></tr>
-        </table>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
-        <div><div style="${subhdrS}">RECORDING SPECS</div><table style="${tblS}"><tbody>${rsRows}</tbody></table></div>
-        <div><div style="${subhdrS}">AUDIO CAPTURE</div><table style="${tblS}"><tbody>${acHtml}</tbody></table></div>
+        <table style="${tblS}"><tr><td colspan="4" style="${hdrS}">GEAR &amp; MEDIA</td></tr></table>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
         <div><div style="${subhdrS}">INTERNAL GEAR</div><table style="${tblS}"><tbody>${intGearHtml}</tbody></table></div>
@@ -17946,10 +17965,56 @@ const CallSheetModal = ({production, project, team, talentRoster=[], onClose, on
         <div><div style="${subhdrS}">MEDIA CARDS &amp; DRIVES</div><table style="${tblS}"><tbody>${mediaHtml}</tbody></table></div>
         <div><div style="${subhdrS}">FURNITURE &amp; PROPS</div><table style="${tblS}"><tbody>${furnPropsHtml}</tbody></table></div>
       </div>
-      <div style="margin-bottom:6px"><div style="${subhdrS}">SCREEN CONTENT</div><table style="${tblS}"><tbody>${scHtml}</tbody></table></div>
-      <div style="margin-bottom:6px"><div style="${subhdrS}">SETUP NOTES</div><table style="${tblS}"><tbody>${notesHtml}</tbody></table></div>
-      <div style="margin-top:10px">${fpImg}${refImgs}</div>
     </div>`;
+
+    const setupPages = pageTwoSetups.map(s => {
+      const rsRows = [
+        `<tr><td style="${labelS}">Quality</td><td style="${cellS}">${s.quality||"—"}${s.quality==="Other"&&s.qualityOther?` (${s.qualityOther})`:""}</td><td style="${labelS}">Aspect Ratio</td><td style="${cellS}">${s.aspectRatio||"—"}${s.aspectRatio==="Other"&&s.aspectRatioOther?` (${s.aspectRatioOther})`:""}</td></tr>`,
+        `<tr><td style="${labelS}">Frame Rate</td><td style="${cellS}">${s.frameRate||"—"}${s.frameRate==="Other"&&s.frameRateOther?` (${s.frameRateOther})`:""}</td><td style="${labelS}">Audio</td><td style="${cellS}">See Audio Capture below</td></tr>`,
+      ].join("");
+      const acHtml = s.audioItems.length
+        ? `<tr><td style="${cellS}" colspan="4">${s.audioItems.join("&nbsp; | &nbsp;")}</td></tr>`
+        : `<tr><td style="${cellS};color:#aaa" colspan="4">None configured</td></tr>`;
+      const scHtml = s.screenItems.length
+        ? `<tr><td style="${cellS}" colspan="4">${s.screenItems.join("&nbsp; | &nbsp;")}</td></tr>`
+        : `<tr><td style="${cellS};color:#aaa" colspan="4">None</td></tr>`;
+      const notesHtml = s.notes
+        ? `<tr><td style="${cellS};white-space:pre-wrap" colspan="4">${s.notes}</td></tr>`
+        : `<tr><td style="${cellS};color:#aaa" colspan="4">—</td></tr>`;
+
+      // Photos are stored by key (e.g. "setup-photo:abc123"), not the actual
+      // image data — resolve each key to its cached data URL (populated by
+      // the SetupPhotoThumb components rendered in the live page 2 preview
+      // below) so the printed page embeds a real image rather than a broken
+      // reference to the storage key itself.
+      const fpUrl = s.floorplanPhotoKey ? setupPhotoCache.get(s.floorplanPhotoKey) : null;
+      const fpImg = fpUrl
+        ? `<div style="margin-bottom:12px"><div style="${subhdrS}">FLOORPLAN</div><img src="${fpUrl}" style="max-width:100%;max-height:320px;object-fit:contain;border:1px solid #ddd;display:block;margin-top:4px"/></div>`
+        : "";
+      const refUrls = s.refPhotoKeys.map(k=>setupPhotoCache.get(k)).filter(Boolean);
+      const refImgs = refUrls.length
+        ? `<div style="margin-bottom:12px"><div style="${subhdrS}">REFERENCE PHOTOS</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">${refUrls.map(u=>`<img src="${u}" style="height:160px;width:auto;max-width:220px;object-fit:cover;border:1px solid #ddd"/>`).join("")}</div></div>`
+        : "";
+
+      const setupNameLine = ` — ${s.name}${pageTwoSetups.length>1?` (${s.index+1} of ${pageTwoSetups.length})`:""}`;
+
+      return `<div style="page-break-before:always">
+        <div style="margin-bottom:6px">
+          <table style="${tblS}">
+            <tr><td colspan="4" style="${hdrS}">SETUP INFORMATION${setupNameLine}</td></tr>
+          </table>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
+          <div><div style="${subhdrS}">RECORDING SPECS</div><table style="${tblS}"><tbody>${rsRows}</tbody></table></div>
+          <div><div style="${subhdrS}">AUDIO CAPTURE</div><table style="${tblS}"><tbody>${acHtml}</tbody></table></div>
+        </div>
+        <div style="margin-bottom:6px"><div style="${subhdrS}">SCREEN CONTENT</div><table style="${tblS}"><tbody>${scHtml}</tbody></table></div>
+        <div style="margin-bottom:6px"><div style="${subhdrS}">SETUP NOTES</div><table style="${tblS}"><tbody>${notesHtml}</tbody></table></div>
+        <div style="margin-top:10px">${fpImg}${refImgs}</div>
+      </div>`;
+    }).join("");
+
+    const page2 = gearPage + setupPages;
 
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
       <title>Call Sheet — ${projName||"Production"}</title>
@@ -18223,6 +18288,111 @@ const CallSheetModal = ({production, project, team, talentRoster=[], onClose, on
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* ── PAGE 2: SETUP INFORMATION ── */}
+            <div style={{marginTop:24, paddingTop:20, borderTop:"3px dashed #ccc"}}>
+              <div style={{textAlign:"center", fontSize:12, color:"#999", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:10}}>— Page 2 —</div>
+
+              {/* Gear & Media — shared across every setup on this production */}
+              <div style={{marginBottom:6}}>
+                <table style={tblStyle}><tbody><tr><td colSpan={4} style={cs.hdr}>GEAR &amp; MEDIA</td></tr></tbody></table>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:6}}>
+                <div>
+                  <div style={cs.subhdr}>INTERNAL GEAR</div>
+                  <table style={tblStyle}><tbody>
+                    {pageTwoGear.intGear.length
+                      ? pageTwoGear.intGear.map((g,i)=><tr key={i}><td style={cs.cell} colSpan={2}>{g}</td></tr>)
+                      : <tr><td style={{...cs.cell,color:"#aaa"}} colSpan={2}>None</td></tr>}
+                  </tbody></table>
+                </div>
+                <div>
+                  <div style={cs.subhdr}>EXTERNAL GEAR</div>
+                  <table style={tblStyle}><tbody>
+                    {pageTwoGear.extGear.length
+                      ? pageTwoGear.extGear.map((g,i)=><tr key={i}><td style={cs.cell}>{g.name||"—"}</td><td style={cs.cell}>{g.qty!=null?`×${g.qty} `:""} {g.source||""}</td></tr>)
+                      : <tr><td style={{...cs.cell,color:"#aaa"}} colSpan={2}>None</td></tr>}
+                  </tbody></table>
+                </div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:6}}>
+                <div>
+                  <div style={cs.subhdr}>MEDIA CARDS &amp; DRIVES</div>
+                  <table style={tblStyle}><tbody>
+                    {pageTwoGear.mediaNms.length
+                      ? pageTwoGear.mediaNms.map((m,i)=><tr key={i}><td style={cs.cell} colSpan={2}>{m}</td></tr>)
+                      : <tr><td style={{...cs.cell,color:"#aaa"}} colSpan={2}>None</td></tr>}
+                  </tbody></table>
+                </div>
+                <div>
+                  <div style={cs.subhdr}>FURNITURE &amp; PROPS</div>
+                  <table style={tblStyle}><tbody>
+                    {(pageTwoGear.furnNms.length+pageTwoGear.propNms.length)>0 ? (
+                      <>
+                        {pageTwoGear.furnNms.map((n,i)=><tr key={`f${i}`}><td style={cs.label}>Furniture</td><td style={cs.cell} colSpan={3}>{n}</td></tr>)}
+                        {pageTwoGear.propNms.map((n,i)=><tr key={`p${i}`}><td style={cs.label}>Prop</td><td style={cs.cell} colSpan={3}>{n}</td></tr>)}
+                      </>
+                    ) : <tr><td style={{...cs.cell,color:"#aaa"}} colSpan={4}>None</td></tr>}
+                  </tbody></table>
+                </div>
+              </div>
+
+              {/* One full block per attached Setup */}
+              {pageTwoSetups.length===0 ? (
+                <div style={{...cs.cell, color:"#aaa", textAlign:"center", padding:20, border:"1px dashed #ccc"}}>No setups attached to this production yet.</div>
+              ) : pageTwoSetups.map(s=>(
+                <div key={s.id} style={{marginTop:16, paddingTop:12, borderTop:"1px dashed #ccc"}}>
+                  <table style={tblStyle}><tbody>
+                    <tr><td colSpan={4} style={cs.hdr}>SETUP INFORMATION — {s.name}{pageTwoSetups.length>1?` (${s.index+1} of ${pageTwoSetups.length})`:""}</td></tr>
+                  </tbody></table>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,margin:"6px 0"}}>
+                    <div>
+                      <div style={cs.subhdr}>RECORDING SPECS</div>
+                      <table style={tblStyle}><tbody>
+                        <tr><td style={cs.label}>Quality</td><td style={cs.cell}>{s.quality||"—"}{s.quality==="Other"&&s.qualityOther?` (${s.qualityOther})`:""}</td><td style={cs.label}>Aspect Ratio</td><td style={cs.cell}>{s.aspectRatio||"—"}{s.aspectRatio==="Other"&&s.aspectRatioOther?` (${s.aspectRatioOther})`:""}</td></tr>
+                        <tr><td style={cs.label}>Frame Rate</td><td style={cs.cell}>{s.frameRate||"—"}{s.frameRate==="Other"&&s.frameRateOther?` (${s.frameRateOther})`:""}</td><td style={cs.label}>Audio</td><td style={cs.cell}>See Audio Capture</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <div style={cs.subhdr}>AUDIO CAPTURE</div>
+                      <table style={tblStyle}><tbody>
+                        <tr><td style={cs.cell} colSpan={4}>{s.audioItems.length ? s.audioItems.join(" | ") : <span style={{color:"#aaa"}}>None configured</span>}</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <div style={{marginBottom:6}}>
+                    <div style={cs.subhdr}>SCREEN CONTENT</div>
+                    <table style={tblStyle}><tbody>
+                      <tr><td style={cs.cell} colSpan={4}>{s.screenItems.length ? s.screenItems.join(" | ") : <span style={{color:"#aaa"}}>None</span>}</td></tr>
+                    </tbody></table>
+                  </div>
+                  <div style={{marginBottom:6}}>
+                    <div style={cs.subhdr}>SETUP NOTES</div>
+                    <table style={tblStyle}><tbody>
+                      <tr><td style={{...cs.cell,whiteSpace:"pre-wrap"}} colSpan={4}>{s.notes || <span style={{color:"#aaa"}}>—</span>}</td></tr>
+                    </tbody></table>
+                  </div>
+                  {(s.floorplanPhotoKey || s.refPhotoKeys.length>0) && (
+                    <div style={{display:"flex",gap:16,flexWrap:"wrap",marginTop:10}}>
+                      {s.floorplanPhotoKey && (
+                        <div>
+                          <div style={cs.subhdr}>FLOORPLAN</div>
+                          <div style={{marginTop:4}}><SetupPhotoThumb photoKey={s.floorplanPhotoKey} size={160}/></div>
+                        </div>
+                      )}
+                      {s.refPhotoKeys.length>0 && (
+                        <div style={{flex:1,minWidth:200}}>
+                          <div style={cs.subhdr}>REFERENCE PHOTOS</div>
+                          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
+                            {s.refPhotoKeys.map(k=><SetupPhotoThumb key={k} photoKey={k} size={100}/>)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
 
           </div>

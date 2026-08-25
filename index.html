@@ -3827,7 +3827,86 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         style: { fontSize: 13, color: "#06b6d4", textDecoration: "none", fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", border: "1px solid #06b6d440", borderRadius: 4, padding: "2px 7px", flexShrink: 0, whiteSpace: "nowrap" }
       },
       "Open \u2197"
-    ), /* @__PURE__ */ React.createElement("button", { onClick: () => update("trintLinks", (ig.trintLinks || []).filter((_, i) => i !== ti)), style: { background: "none", border: "none", color: "#8e97a6", cursor: "pointer", fontSize: 19, flexShrink: 0 } }, "\xD7")))), /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 9, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" } }, "Media Info"), /* @__PURE__ */ React.createElement(Btn, { small: true, onClick: () => update("mediaRows", [...ig.mediaRows || [], { id: uid(), cardLabel: "", numFiles: "", gbPerCard: "" }]) }, "+ Add Row")), (ig.mediaRows || []).length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#838ba0" } }, "Click + Add Row to log each card or drive."), (ig.mediaRows || []).map((row, ri) => /* @__PURE__ */ React.createElement("div", { key: row.id || ri, style: { display: "grid", gridTemplateColumns: "100px 1fr 1fr auto", gap: 6, alignItems: "center" } }, /* @__PURE__ */ React.createElement(Inp, { value: row.cardLabel || "", onChange: (e) => update("mediaRows", (ig.mediaRows || []).map((r, i) => i !== ri ? r : { ...r, cardLabel: e.target.value })), placeholder: "Card/drive\u2026", style: { fontSize: 14 } }), /* @__PURE__ */ React.createElement(Sel, { value: row.numFiles || "", onChange: (e) => update("mediaRows", (ig.mediaRows || []).map((r, i) => i !== ri ? r : { ...r, numFiles: e.target.value })), style: { fontSize: 14, padding: "5px 7px" } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Files\u2026"), ["1\u201310", "11\u201350", "51\u2013100", "101\u2013250", "251\u2013500", "500+"].map((v) => /* @__PURE__ */ React.createElement("option", { key: v }, v))), /* @__PURE__ */ React.createElement(Sel, { value: row.gbPerCard || "", onChange: (e) => update("mediaRows", (ig.mediaRows || []).map((r, i) => i !== ri ? r : { ...r, gbPerCard: e.target.value })), style: { fontSize: 14, padding: "5px 7px" } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "GB\u2026"), ["<1 GB", "1\u20134 GB", "4\u201316 GB", "16\u201364 GB", "64\u2013128 GB", "128\u2013256 GB", "256+ GB"].map((v) => /* @__PURE__ */ React.createElement("option", { key: v }, v))), /* @__PURE__ */ React.createElement("button", { onClick: () => update("mediaRows", (ig.mediaRows || []).filter((_, i) => i !== ri)), style: { background: "none", border: "none", color: "#8e97a6", cursor: "pointer", fontSize: 19 } }, "\xD7")))), showCallSheet && /* @__PURE__ */ React.createElement(LW, { label: "Call Sheet" }, /* @__PURE__ */ React.createElement(FileAttach, { label: "Attach Call Sheet", attached: ig.callSheet, onAttach: (f) => update("callSheet", f), onRemove: () => update("callSheet", null) })));
+    ), /* @__PURE__ */ React.createElement("button", { onClick: () => update("trintLinks", (ig.trintLinks || []).filter((_, i) => i !== ti)), style: { background: "none", border: "none", color: "#8e97a6", cursor: "pointer", fontSize: 19, flexShrink: 0 } }, "\xD7")))), /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 9, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" } }, "Media Info"), /* @__PURE__ */ React.createElement(Btn, { small: true, onClick: () => update("mediaRows", [...ig.mediaRows || [], { id: uid(), cardLabel: "", numFiles: "", gbPerCard: "" }]) }, "+ Add Row")), (ig.mediaRows || []).length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#838ba0" } }, "Click + Add Row to log each card or drive."), (ig.mediaRows || []).map((row, ri) => /* @__PURE__ */ React.createElement("div", { key: row.id || ri, style: { display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr auto", gap: 6, alignItems: "center" } }, /* @__PURE__ */ React.createElement(Sel, { value: row.cardLabel || "", onChange: (e) => update("mediaRows", (ig.mediaRows || []).map((r, i) => i !== ri ? r : { ...r, cardLabel: e.target.value })), style: { fontSize: 14, padding: "5px 7px" } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Card/drive\u2026"), MEDIA_CATEGORIES.map((v) => /* @__PURE__ */ React.createElement("option", { key: v }, v))), /* @__PURE__ */ React.createElement(Inp, { type: "number", value: row.numFiles || "", onChange: (e) => update("mediaRows", (ig.mediaRows || []).map((r, i) => i !== ri ? r : { ...r, numFiles: e.target.value })), placeholder: "Files", style: { fontSize: 14 } }), /* @__PURE__ */ React.createElement(Inp, { type: "number", step: "0.01", value: row.gbPerCard || "", onChange: (e) => update("mediaRows", (ig.mediaRows || []).map((r, i) => i !== ri ? r : { ...r, gbPerCard: e.target.value })), placeholder: "GB", style: { fontSize: 14 } }), /* @__PURE__ */ React.createElement("button", { onClick: () => update("mediaRows", (ig.mediaRows || []).filter((_, i) => i !== ri)), style: { background: "none", border: "none", color: "#8e97a6", cursor: "pointer", fontSize: 19 } }, "\xD7")))), showCallSheet && /* @__PURE__ */ React.createElement(LW, { label: "Call Sheet" }, /* @__PURE__ */ React.createElement(FileAttach, { label: "Attach Call Sheet", attached: ig.callSheet, onAttach: (f) => update("callSheet", f), onRemove: () => update("callSheet", null) })));
+  };
+  var IngestCard = ({
+    ig,
+    metaOpen,
+    onToggleMeta,
+    onDelete,
+    update,
+    reviewLinksForIg,
+    reassignOptionsForIg,
+    onAddReviewLink,
+    onDeleteReviewLink,
+    onReassignReviewLink,
+    team,
+    allProjects,
+    lp,
+    onUpdateDel,
+    onDeleteDel,
+    onUpdateProject,
+    talentRoster
+  }) => {
+    const prodStatusColor = ig.productionStatus ? PROD_STATUS_COLOR[ig.productionStatus] || "#6b7280" : null;
+    return /* @__PURE__ */ React.createElement("div", { style: { background: "#111827", border: `1px solid ${ig.source !== "manual" ? "#3b82f630" : "#374151"}`, borderRadius: 12, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { onClick: onToggleMeta, style: { display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: metaOpen || ig.source === "manual" ? "1px solid #1f2937" : "none", cursor: "pointer" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#6b7280", display: "inline-block", transform: metaOpen ? "rotate(90deg)" : "none", flexShrink: 0 } }, "\u25B6"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.05em", marginBottom: 2 } }, ig.ingestName), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 18, color: ig.datetime ? "#e2e8f0" : "#4b5563" } }, ig.datetime ? fmtDT(ig.datetime) : "No time set"), ig.source !== "manual" ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#3b82f6" } }, "\u{1F3AC} ", ig.shootTitle), ig.productionStatus && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: prodStatusColor, background: prodStatusColor + "18", borderRadius: 5, padding: "1px 7px", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" } }, ig.productionStatus)) : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#9ca3af" } }, "Manual entry"), ig._fromPreset && /* @__PURE__ */ React.createElement(Chip, { label: "Internal Planning", color: "#8b5cf6", xs: true }))), /* @__PURE__ */ React.createElement(
+      "select",
+      {
+        value: ig.status || "Not Received",
+        onClick: (e) => e.stopPropagation(),
+        onChange: (e) => update("status", e.target.value),
+        style: {
+          background: {
+            "Not Received": "#ef444418",
+            "Media Received": "#3b82f618",
+            "Media Processing": "#f59e0b18",
+            "Media Ingested": "#10b98118"
+          }[ig.status || "Not Received"] || "#1f2937",
+          border: `1px solid ${{
+            "Not Received": "#ef444440",
+            "Media Received": "#3b82f640",
+            "Media Processing": "#f59e0b40",
+            "Media Ingested": "#10b98140"
+          }[ig.status || "Not Received"] || "#374151"}`,
+          borderRadius: 6,
+          color: {
+            "Not Received": "#ef4444",
+            "Media Received": "#60a5fa",
+            "Media Processing": "#f59e0b",
+            "Media Ingested": "#10b981"
+          }[ig.status || "Not Received"] || "#9ca3af",
+          padding: "4px 8px",
+          fontSize: 14,
+          outline: "none",
+          fontWeight: 700
+        }
+      },
+      INGEST_STATUS_OPTS.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, style: { background: "#0d1117", color: "#e2e8f0" } }, s))
+    ), ig.source === "manual" && /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
+      e.stopPropagation();
+      onDelete();
+    }, style: { background: "none", border: "none", color: "#8e97a6", cursor: "pointer", fontSize: 22, lineHeight: 1 } }, "\xD7")), metaOpen && /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 16px" } }, ig.source === "manual" && /* @__PURE__ */ React.createElement(LW, { label: "Expected Arrival Time", style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: ig.datetime || "", onChange: (v) => update("datetime", v), label: "Set arrival time" })), ig.source === "production" && (ig.transcriptNeeded || ig.reviewLinkNeeded) && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 10 } }, ig.transcriptNeeded && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#f59e0b", fontWeight: 700 } }, "\u2713 Transcript Needed"), ig.reviewLinkNeeded && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#3b82f6", fontWeight: 700 } }, "\u2713 Review Link Needed")), /* @__PURE__ */ React.createElement(
+      IngestFullFields,
+      {
+        ig,
+        update,
+        editableLocation: ig.source === "manual",
+        showCallSheet: ig.source === "manual",
+        showStatus: false,
+        reviewLinks: reviewLinksForIg,
+        onAddReviewLink,
+        onDeleteReviewLink,
+        onReassignReviewLink,
+        reassignOptions: reassignOptionsForIg,
+        team,
+        allProjects,
+        project: lp,
+        onUpdateDel,
+        onDeleteDel,
+        onUpdateProject,
+        talentRoster
+      }
+    )));
   };
   var IngestTabContent = ({ lp, team, allProjects, addIngest, delIngest, updIngest, updProductionIngest, onUpdateMamLink, onUpdateTrintLink, onAddReviewLink, onUpdateDel, onDeleteDel, onUpdateProject, talentRoster = [] }) => {
     const rawIngests = [
@@ -3879,12 +3958,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       if (patch.ingestDates) onUpdateProject(lp.id, "ingestDates", patch.ingestDates);
       if (patch.productions) onUpdateProject(lp.id, "productions", patch.productions);
     };
-    const IngestCard = ({ ig, i }) => {
-      const metaOpen = expandedMeta[ig.id];
-      const toggleMeta = () => setExpandedMeta((m) => ({ ...m, [ig.id]: !m[ig.id] }));
-      const update = (f, v) => ig.source === "production" ? updProductionIngest(ig.productionRef, f, v) : updIngest(ig.id, f, v);
-      const prodStatusColor = ig.productionStatus ? PROD_STATUS_COLOR[ig.productionStatus] || "#6b7280" : null;
+    const renderCard = (ig) => {
       const igKey = ingestKeyOf(ig);
+      const update = (f, v) => ig.source === "production" ? updProductionIngest(ig.productionRef, f, v) : updIngest(ig.id, f, v);
       const reviewLinksForIg = resolveLinkedReviewLinks(lp.deliverables, ig);
       const reassignOptionsForIg = allIngests.filter((x) => x.source !== "shoot" && ingestKeyOf(x) !== igKey).map((x) => ({ key: ingestKeyOf(x), label: x.ingestName }));
       const addReviewLinkToIngest = () => {
@@ -3898,66 +3974,31 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         update(field, value);
         onDeleteDel(lp.id, delId);
       };
-      return /* @__PURE__ */ React.createElement("div", { style: { background: "#111827", border: `1px solid ${ig.source !== "manual" ? "#3b82f630" : "#374151"}`, borderRadius: 12, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { onClick: toggleMeta, style: { display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: metaOpen || ig.source === "manual" ? "1px solid #1f2937" : "none", cursor: "pointer" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#6b7280", display: "inline-block", transform: metaOpen ? "rotate(90deg)" : "none", flexShrink: 0 } }, "\u25B6"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.05em", marginBottom: 2 } }, ig.ingestName), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 18, color: ig.datetime ? "#e2e8f0" : "#4b5563" } }, ig.datetime ? fmtDT(ig.datetime) : "No time set"), ig.source !== "manual" ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#3b82f6" } }, "\u{1F3AC} ", ig.shootTitle), ig.productionStatus && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: prodStatusColor, background: prodStatusColor + "18", borderRadius: 5, padding: "1px 7px", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" } }, ig.productionStatus)) : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#9ca3af" } }, "Manual entry"), ig._fromPreset && /* @__PURE__ */ React.createElement(Chip, { label: "Internal Planning", color: "#8b5cf6", xs: true }))), /* @__PURE__ */ React.createElement(
-        "select",
+      return /* @__PURE__ */ React.createElement(
+        IngestCard,
         {
-          value: ig.status || "Not Received",
-          onClick: (e) => e.stopPropagation(),
-          onChange: (e) => update("status", e.target.value),
-          style: {
-            background: {
-              "Not Received": "#ef444418",
-              "Media Received": "#3b82f618",
-              "Media Processing": "#f59e0b18",
-              "Media Ingested": "#10b98118"
-            }[ig.status || "Not Received"] || "#1f2937",
-            border: `1px solid ${{
-              "Not Received": "#ef444440",
-              "Media Received": "#3b82f640",
-              "Media Processing": "#f59e0b40",
-              "Media Ingested": "#10b98140"
-            }[ig.status || "Not Received"] || "#374151"}`,
-            borderRadius: 6,
-            color: {
-              "Not Received": "#ef4444",
-              "Media Received": "#60a5fa",
-              "Media Processing": "#f59e0b",
-              "Media Ingested": "#10b981"
-            }[ig.status || "Not Received"] || "#9ca3af",
-            padding: "4px 8px",
-            fontSize: 14,
-            outline: "none",
-            fontWeight: 700
-          }
-        },
-        INGEST_STATUS_OPTS.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, style: { background: "#0d1117", color: "#e2e8f0" } }, s))
-      ), ig.source === "manual" && /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
-        e.stopPropagation();
-        delIngest(ig.id);
-      }, style: { background: "none", border: "none", color: "#8e97a6", cursor: "pointer", fontSize: 22, lineHeight: 1 } }, "\xD7")), metaOpen && /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 16px" } }, ig.source === "manual" && /* @__PURE__ */ React.createElement(LW, { label: "Expected Arrival Time", style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: ig.datetime || "", onChange: (v) => update("datetime", v), label: "Set arrival time" })), ig.source === "production" && (ig.transcriptNeeded || ig.reviewLinkNeeded) && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 10 } }, ig.transcriptNeeded && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#f59e0b", fontWeight: 700 } }, "\u2713 Transcript Needed"), ig.reviewLinkNeeded && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#3b82f6", fontWeight: 700 } }, "\u2713 Review Link Needed")), /* @__PURE__ */ React.createElement(
-        IngestFullFields,
-        {
+          key: ig.id,
           ig,
+          metaOpen: !!expandedMeta[ig.id],
+          onToggleMeta: () => setExpandedMeta((m) => ({ ...m, [ig.id]: !m[ig.id] })),
+          onDelete: () => delIngest(ig.id),
           update,
-          editableLocation: ig.source === "manual",
-          showCallSheet: ig.source === "manual",
-          showStatus: false,
-          reviewLinks: reviewLinksForIg,
+          reviewLinksForIg,
+          reassignOptionsForIg,
           onAddReviewLink: addReviewLinkToIngest,
           onDeleteReviewLink: deleteReviewLink,
           onReassignReviewLink: (delId, toKey) => reassignReviewLink(delId, igKey, toKey),
-          reassignOptions: reassignOptionsForIg,
           team,
           allProjects,
-          project: lp,
+          lp,
           onUpdateDel,
           onDeleteDel,
           onUpdateProject,
           talentRoster
         }
-      )));
+      );
     };
-    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } }, /* @__PURE__ */ React.createElement(ProjectMediaInfo, { lp, onUpdateMamLink, onUpdateTrintLink }), /* @__PURE__ */ React.createElement(IngestMiniCal, { lp, team }), shootIngests.length > 0 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#3b82f6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 8 } }, "\u{1F4E5} From Productions"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, shootIngests.map((ig, i) => /* @__PURE__ */ React.createElement(IngestCard, { key: ig.id, ig, i })))), manualIngests.length > 0 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#9ca3af", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 8 } }, "Manual Entries"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, manualIngests.map((ig, i) => /* @__PURE__ */ React.createElement(IngestCard, { key: ig.id, ig, i })))), allIngests.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "32px 0", color: "#838ba0", fontSize: 19 } }, "No ingest dates yet. Set ingest times in the Production tab for each shoot."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement(Btn, { onClick: addIngest }, "+ Add Manual Ingest")));
+    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } }, /* @__PURE__ */ React.createElement(ProjectMediaInfo, { lp, onUpdateMamLink, onUpdateTrintLink }), /* @__PURE__ */ React.createElement(IngestMiniCal, { lp, team }), shootIngests.length > 0 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#3b82f6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 8 } }, "\u{1F4E5} From Productions"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, shootIngests.map(renderCard))), manualIngests.length > 0 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#9ca3af", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 8 } }, "Manual Entries"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, manualIngests.map(renderCard))), allIngests.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "32px 0", color: "#838ba0", fontSize: 19 } }, "No ingest dates yet. Set ingest times in the Production tab for each shoot."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement(Btn, { onClick: addIngest }, "+ Add Manual Ingest")));
   };
   var BriefSummarizer = ({ lp, onUpdateProject, projectId }) => {
     const [loading, setLoading] = (0, import_react.useState)(false);
@@ -10287,15 +10328,18 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     const lastSyncedStart = (0, import_react.useRef)(startTime);
     const lastSyncedEnd = (0, import_react.useRef)(endTime);
     const lastSyncedShootStart = (0, import_react.useRef)(null);
+    const lastSyncedShootLoc = (0, import_react.useRef)(null);
     (0, import_react.useEffect)(() => {
       if (!isTable || schedule.length === 0) return;
       const startChanged = startTime !== lastSyncedStart.current;
       const endChanged = endTime !== lastSyncedEnd.current;
       const primaryShoot = (secondaryLocations || []).find((l) => l._isPrimaryShoot);
       const shootChanged = (primaryShoot?.startTime || null) !== lastSyncedShootStart.current;
+      const shootLocChanged = (primaryShoot?.location || null) !== lastSyncedShootLoc.current;
       lastSyncedStart.current = startTime;
       lastSyncedEnd.current = endTime;
       lastSyncedShootStart.current = primaryShoot?.startTime || null;
+      lastSyncedShootLoc.current = primaryShoot?.location || null;
       const fmtT = (iso) => {
         if (!iso) return "";
         const m = iso.match(/T(\d{2}):(\d{2})/);
@@ -10308,7 +10352,11 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
       const wrapStr = fmtT(endTime);
       const breakdownStr = oneHourBefore(wrapStr);
       const shootStr = fmtT(primaryShoot?.startTime || "");
+      const shootLoc = primaryShoot?.location || "";
       const updated = schedule.map((item, i) => {
+        if (item.task === "Primary Shoot" && shootLoc && (shootLocChanged || !item.location)) {
+          item = { ...item, location: shootLoc };
+        }
         if (item._manualTime) return item;
         if ((i === 0 || i === 1) && callStr && (startChanged || !item.time)) return { ...item, time: callStr };
         if (i === schedule.length - 1 && wrapStr && (endChanged || !item.time)) return { ...item, time: wrapStr };
@@ -10331,6 +10379,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
       let s = [...schedule];
       const wrapIdx = s.length - 1;
       secondaryLocations.forEach((loc) => {
+        if (loc._isPrimaryShoot) return;
         if (!loc.type || !loc.startTime && !loc.endTime && !loc.location) return;
         const existIdx = s.findIndex((r) => r._locId === loc.id);
         const task = loc.type === "Hair & Makeup" ? `Hair & Makeup${loc.location ? " \u2014 " + loc.location : ""}` : loc.type === "Green Room" ? `Green Room${loc.location ? " \u2014 " + loc.location : ""}` : loc.type === "Second Shoot" ? `Second Shoot${loc.location ? " \u2014 " + loc.location : ""}` : loc.type === "Wardrobe" ? `Wardrobe${loc.location ? " \u2014 " + loc.location : ""}` : loc.type === "Holding" ? `Holding${loc.location ? " \u2014 " + loc.location : ""}` : `${loc.type}${loc.location ? " \u2014 " + loc.location : ""}`;
@@ -11809,6 +11858,77 @@ Please confirm availability and booking status for each item above, and let us k
         return at - bt;
       });
     })();
+    const pageTwoGear = (() => {
+      const intGear = (production.equipmentIds || []).map((id) => {
+        const g = gearList.find((x) => String(x.id) === String(id));
+        return g ? g.name : `Item ${id}`;
+      });
+      const extGear = (production.externalGear || []).map((g) => ({ name: g.name || "", qty: g.qty, source: g.source || "" }));
+      const mediaNms = (production.mediaCardIds || []).map((id) => {
+        const m = mediaCards.find((x) => String(x.id) === String(id));
+        return m ? m.name : `Card ${id}`;
+      });
+      const furnNms = (production.furnitureIds || []).map((id) => {
+        const f = furnitureList.find((x) => String(x.id) === String(id));
+        return f ? f.name : id;
+      });
+      const propNms = (production.propIds || []).map((id) => {
+        const p = propsList.find((x) => String(x.id) === String(id));
+        return p ? p.name : id;
+      });
+      return { intGear, extGear, mediaNms, furnNms, propNms };
+    })();
+    const pageTwoSetups = (production.setups || []).map((setup, si) => {
+      const rs = setup.recordingSpecs || {};
+      const ac = rs.audioCapture || {};
+      const audioItems = [
+        ac.lavalier && `Wireless Lavalier \xD7${ac.lavalier}`,
+        ac.shotgun && `Shotgun \xD7${ac.shotgun}`,
+        ac.desktopPodcast && `Desktop Podcast \xD7${ac.desktopPodcast}`,
+        ac.handheld && `Wireless Handheld \xD7${ac.handheld}`,
+        ac.cStands && `C-Stands w/ Boom \xD7${ac.cStands}`,
+        ac.tripodBoom && `Tripod Boom \xD7${ac.tripodBoom}`,
+        ac.desktopBoom && `Desktop Boom Arms \xD7${ac.desktopBoom}`,
+        ac.ifb && `IFB \xD7${ac.ifb}`,
+        ac.commsBeltpack && `Comms Beltpack \xD7${ac.commsBeltpack}`,
+        ac.programMix && "Program Mix",
+        ac.isoRecordings && "ISO Recordings",
+        ac.backupRecording && "Backup",
+        ac.computerPlayback && "Computer PB",
+        ac.mobilePlayback && "Mobile PB",
+        ac.videoPlayback && "Video PB"
+      ].filter(Boolean);
+      const sc = setup.screenContent || {};
+      const screenItems = [];
+      (sc.windowWall || []).forEach((id) => {
+        const o = (screenContentOptions.windowWall || []).find((x) => x.id === id);
+        if (o) screenItems.push(`Window Wall: ${o.name}`);
+      });
+      (sc.vpWall || []).forEach((id) => {
+        const o = (screenContentOptions.vpWall || []).find((x) => x.id === id);
+        if (o) screenItems.push(`VP Wall: ${o.name}`);
+      });
+      (sc.frameTv || []).forEach((id) => {
+        const o = (screenContentOptions.frameTv || []).find((x) => x.id === id);
+        if (o) screenItems.push(`Frame TV: ${o.name}`);
+      });
+      return {
+        id: setup.id,
+        index: si,
+        name: setup.name || `Setup ${si + 1}`,
+        quality: rs.quality || "",
+        qualityOther: rs.qualityOther || "",
+        aspectRatio: rs.aspectRatio || "",
+        aspectRatioOther: rs.aspectRatioOther || "",
+        frameRate: rs.frameRate || "",
+        frameRateOther: rs.frameRateOther || "",
+        audioItems,
+        screenItems,
+        notes: setup.notes || "",
+        floorplanPhotoKey: setup.floorplanPhotoKey || null,
+        refPhotoKeys: setup.refPhotoKeys || []
+      };
+    });
     const EditInp = CallSheetEditInp;
     const [crewCall, setCrewCall] = (0, import_react.useState)(() => getCrewCallDisplay());
     const [date, setDate] = (0, import_react.useState)(() => saved?.date ?? getDateDisplay());
@@ -11991,76 +12111,16 @@ ${conditions}`;
         <td style="${cellS}">${t.bio || ""}</td>
         <td style="${cellS}"></td>
       </tr>`).join("") : Array.from({ length: 3 }).map(() => `<tr><td colspan="5" style="${cellS};height:60px"></td></tr>`).join("");
-      const setups = production.setups || [];
-      const setup = setups[0] || {};
-      const rs = setup.recordingSpecs || {};
-      const rsRows = [
-        `<tr><td style="${labelS}">Quality</td><td style="${cellS}">${rs.quality || "\u2014"}${rs.quality === "Other" && rs.qualityOther ? ` (${rs.qualityOther})` : ""}</td><td style="${labelS}">Aspect Ratio</td><td style="${cellS}">${rs.aspectRatio || "\u2014"}${rs.aspectRatio === "Other" && rs.aspectRatioOther ? ` (${rs.aspectRatioOther})` : ""}</td></tr>`,
-        `<tr><td style="${labelS}">Frame Rate</td><td style="${cellS}">${rs.frameRate || "\u2014"}${rs.frameRate === "Other" && rs.frameRateOther ? ` (${rs.frameRateOther})` : ""}</td><td style="${labelS}">Audio</td><td style="${cellS}">See Audio Capture below</td></tr>`
-      ].join("");
-      const intGear = (production.equipmentIds || []).map((id) => {
-        const g = gearList.find((x) => String(x.id) === String(id));
-        return g ? g.name : `Item ${id}`;
-      });
-      const intGearHtml = intGear.length ? intGear.map((g) => `<tr><td style="${cellS}" colspan="2">${g}</td></tr>`).join("") : `<tr><td style="${cellS};color:#aaa" colspan="2">None</td></tr>`;
-      const extGear = production.externalGear || [];
-      const extGearHtml = extGear.length ? extGear.map((g) => `<tr><td style="${cellS}">${g.name || "\u2014"}</td><td style="${cellS}">${g.qty != null ? `\xD7${g.qty} ` : ""} ${g.source || ""}</td></tr>`).join("") : `<tr><td style="${cellS};color:#aaa" colspan="2">None</td></tr>`;
-      const mediaNms = (production.mediaCardIds || []).map((id) => {
-        const m = mediaCards.find((x) => String(x.id) === String(id));
-        return m ? m.name : `Card ${id}`;
-      });
-      const mediaHtml = mediaNms.length ? mediaNms.map((m) => `<tr><td style="${cellS}" colspan="2">${m}</td></tr>`).join("") : `<tr><td style="${cellS};color:#aaa" colspan="2">None</td></tr>`;
-      const furnNms = (setup.furnitureIds || []).map((id) => {
-        const f = furnitureList.find((x) => String(x.id) === String(id));
-        return f ? f.name : id;
-      });
-      const propNms = (setup.propIds || []).map((id) => {
-        const p = propsList.find((x) => String(x.id) === String(id));
-        return p ? p.name : id;
-      });
-      const furnPropsHtml = [...furnNms.map((n) => `<tr><td style="${labelS}">Furniture</td><td style="${cellS}" colspan="3">${n}</td></tr>`), ...propNms.map((n) => `<tr><td style="${labelS}">Prop</td><td style="${cellS}" colspan="3">${n}</td></tr>`)].join("") || `<tr><td style="${cellS};color:#aaa" colspan="4">None</td></tr>`;
-      const ac = rs.audioCapture || {};
-      const acLines = [];
-      if (ac.lavalier) acLines.push(`Wireless Lavalier \xD7${ac.lavalier}`);
-      if (ac.shotgun) acLines.push(`Shotgun \xD7${ac.shotgun}`);
-      if (ac.desktopPodcast) acLines.push(`Desktop Podcast \xD7${ac.desktopPodcast}`);
-      if (ac.handheld) acLines.push(`Wireless Handheld \xD7${ac.handheld}`);
-      if (ac.cStands) acLines.push(`C-Stands w/ Boom \xD7${ac.cStands}`);
-      if (ac.tripodBoom) acLines.push(`Tripod Boom \xD7${ac.tripodBoom}`);
-      if (ac.desktopBoom) acLines.push(`Desktop Boom Arms \xD7${ac.desktopBoom}`);
-      if (ac.ifb) acLines.push(`IFB \xD7${ac.ifb}`);
-      if (ac.commsBeltpack) acLines.push(`Comms Beltpack \xD7${ac.commsBeltpack}`);
-      const acChecks = [ac.programMix && "Program Mix", ac.isoRecordings && "ISO Recordings", ac.backupRecording && "Backup", ac.computerPlayback && "Computer PB", ac.mobilePlayback && "Mobile PB", ac.videoPlayback && "Video PB"].filter(Boolean);
-      const acAll = [...acLines, ...acChecks];
-      const acHtml = acAll.length ? `<tr><td style="${cellS}" colspan="4">${acAll.join("&nbsp; | &nbsp;")}</td></tr>` : `<tr><td style="${cellS};color:#aaa" colspan="4">None configured</td></tr>`;
-      const sc = setup.screenContent || {};
-      const scLines = [];
-      (sc.windowWall || []).forEach((id) => {
-        const o = (screenContentOptions.windowWall || []).find((x) => x.id === id);
-        if (o) scLines.push(`Window Wall: ${o.name}`);
-      });
-      (sc.vpWall || []).forEach((id) => {
-        const o = (screenContentOptions.vpWall || []).find((x) => x.id === id);
-        if (o) scLines.push(`VP Wall: ${o.name}`);
-      });
-      (sc.frameTv || []).forEach((id) => {
-        const o = (screenContentOptions.frameTv || []).find((x) => x.id === id);
-        if (o) scLines.push(`Frame TV: ${o.name}`);
-      });
-      const scHtml = scLines.length ? `<tr><td style="${cellS}" colspan="4">${scLines.join("&nbsp; | &nbsp;")}</td></tr>` : `<tr><td style="${cellS};color:#aaa" colspan="4">None</td></tr>`;
-      const notesHtml = setup.notes ? `<tr><td style="${cellS};white-space:pre-wrap" colspan="4">${setup.notes}</td></tr>` : `<tr><td style="${cellS};color:#aaa" colspan="4">\u2014</td></tr>`;
-      const fpImg = setup.floorplanPhotoKey ? `<div style="margin-bottom:12px"><div style="${subhdrS}">FLOORPLAN</div><img src="${setup.floorplanPhotoKey}" style="max-width:100%;max-height:320px;object-fit:contain;border:1px solid #ddd;display:block;margin-top:4px"/></div>` : "";
-      const refImgs = (setup.refPhotoKeys || []).length ? `<div style="margin-bottom:12px"><div style="${subhdrS}">REFERENCE PHOTOS</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">${(setup.refPhotoKeys || []).map((k) => `<img src="${k}" style="height:160px;width:auto;max-width:220px;object-fit:cover;border:1px solid #ddd"/>`).join("")}</div></div>` : "";
-      const setupNameLine = setup.name ? ` \u2014 ${setup.name}` : setups.length > 1 ? ` \u2014 Setup 1 of ${setups.length}` : "";
-      const page2 = `<div style="page-break-before:always">
+      const intGearHtml = pageTwoGear.intGear.length ? pageTwoGear.intGear.map((g) => `<tr><td style="${cellS}" colspan="2">${g}</td></tr>`).join("") : `<tr><td style="${cellS};color:#aaa" colspan="2">None</td></tr>`;
+      const extGearHtml = pageTwoGear.extGear.length ? pageTwoGear.extGear.map((g) => `<tr><td style="${cellS}">${g.name || "\u2014"}</td><td style="${cellS}">${g.qty != null ? `\xD7${g.qty} ` : ""} ${g.source || ""}</td></tr>`).join("") : `<tr><td style="${cellS};color:#aaa" colspan="2">None</td></tr>`;
+      const mediaHtml = pageTwoGear.mediaNms.length ? pageTwoGear.mediaNms.map((m) => `<tr><td style="${cellS}" colspan="2">${m}</td></tr>`).join("") : `<tr><td style="${cellS};color:#aaa" colspan="2">None</td></tr>`;
+      const furnPropsHtml = [
+        ...pageTwoGear.furnNms.map((n) => `<tr><td style="${labelS}">Furniture</td><td style="${cellS}" colspan="3">${n}</td></tr>`),
+        ...pageTwoGear.propNms.map((n) => `<tr><td style="${labelS}">Prop</td><td style="${cellS}" colspan="3">${n}</td></tr>`)
+      ].join("") || `<tr><td style="${cellS};color:#aaa" colspan="4">None</td></tr>`;
+      const gearPage = `<div style="page-break-before:always">
       <div style="margin-bottom:6px">
-        <table style="${tblS}">
-          <tr><td colspan="4" style="${hdrS}">SETUP INFORMATION${setupNameLine}</td></tr>
-        </table>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
-        <div><div style="${subhdrS}">RECORDING SPECS</div><table style="${tblS}"><tbody>${rsRows}</tbody></table></div>
-        <div><div style="${subhdrS}">AUDIO CAPTURE</div><table style="${tblS}"><tbody>${acHtml}</tbody></table></div>
+        <table style="${tblS}"><tr><td colspan="4" style="${hdrS}">GEAR &amp; MEDIA</td></tr></table>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
         <div><div style="${subhdrS}">INTERNAL GEAR</div><table style="${tblS}"><tbody>${intGearHtml}</tbody></table></div>
@@ -12070,10 +12130,36 @@ ${conditions}`;
         <div><div style="${subhdrS}">MEDIA CARDS &amp; DRIVES</div><table style="${tblS}"><tbody>${mediaHtml}</tbody></table></div>
         <div><div style="${subhdrS}">FURNITURE &amp; PROPS</div><table style="${tblS}"><tbody>${furnPropsHtml}</tbody></table></div>
       </div>
-      <div style="margin-bottom:6px"><div style="${subhdrS}">SCREEN CONTENT</div><table style="${tblS}"><tbody>${scHtml}</tbody></table></div>
-      <div style="margin-bottom:6px"><div style="${subhdrS}">SETUP NOTES</div><table style="${tblS}"><tbody>${notesHtml}</tbody></table></div>
-      <div style="margin-top:10px">${fpImg}${refImgs}</div>
     </div>`;
+      const setupPages = pageTwoSetups.map((s) => {
+        const rsRows = [
+          `<tr><td style="${labelS}">Quality</td><td style="${cellS}">${s.quality || "\u2014"}${s.quality === "Other" && s.qualityOther ? ` (${s.qualityOther})` : ""}</td><td style="${labelS}">Aspect Ratio</td><td style="${cellS}">${s.aspectRatio || "\u2014"}${s.aspectRatio === "Other" && s.aspectRatioOther ? ` (${s.aspectRatioOther})` : ""}</td></tr>`,
+          `<tr><td style="${labelS}">Frame Rate</td><td style="${cellS}">${s.frameRate || "\u2014"}${s.frameRate === "Other" && s.frameRateOther ? ` (${s.frameRateOther})` : ""}</td><td style="${labelS}">Audio</td><td style="${cellS}">See Audio Capture below</td></tr>`
+        ].join("");
+        const acHtml = s.audioItems.length ? `<tr><td style="${cellS}" colspan="4">${s.audioItems.join("&nbsp; | &nbsp;")}</td></tr>` : `<tr><td style="${cellS};color:#aaa" colspan="4">None configured</td></tr>`;
+        const scHtml = s.screenItems.length ? `<tr><td style="${cellS}" colspan="4">${s.screenItems.join("&nbsp; | &nbsp;")}</td></tr>` : `<tr><td style="${cellS};color:#aaa" colspan="4">None</td></tr>`;
+        const notesHtml = s.notes ? `<tr><td style="${cellS};white-space:pre-wrap" colspan="4">${s.notes}</td></tr>` : `<tr><td style="${cellS};color:#aaa" colspan="4">\u2014</td></tr>`;
+        const fpUrl = s.floorplanPhotoKey ? setupPhotoCache.get(s.floorplanPhotoKey) : null;
+        const fpImg = fpUrl ? `<div style="margin-bottom:12px"><div style="${subhdrS}">FLOORPLAN</div><img src="${fpUrl}" style="max-width:100%;max-height:320px;object-fit:contain;border:1px solid #ddd;display:block;margin-top:4px"/></div>` : "";
+        const refUrls = s.refPhotoKeys.map((k) => setupPhotoCache.get(k)).filter(Boolean);
+        const refImgs = refUrls.length ? `<div style="margin-bottom:12px"><div style="${subhdrS}">REFERENCE PHOTOS</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">${refUrls.map((u) => `<img src="${u}" style="height:160px;width:auto;max-width:220px;object-fit:cover;border:1px solid #ddd"/>`).join("")}</div></div>` : "";
+        const setupNameLine = ` \u2014 ${s.name}${pageTwoSetups.length > 1 ? ` (${s.index + 1} of ${pageTwoSetups.length})` : ""}`;
+        return `<div style="page-break-before:always">
+        <div style="margin-bottom:6px">
+          <table style="${tblS}">
+            <tr><td colspan="4" style="${hdrS}">SETUP INFORMATION${setupNameLine}</td></tr>
+          </table>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
+          <div><div style="${subhdrS}">RECORDING SPECS</div><table style="${tblS}"><tbody>${rsRows}</tbody></table></div>
+          <div><div style="${subhdrS}">AUDIO CAPTURE</div><table style="${tblS}"><tbody>${acHtml}</tbody></table></div>
+        </div>
+        <div style="margin-bottom:6px"><div style="${subhdrS}">SCREEN CONTENT</div><table style="${tblS}"><tbody>${scHtml}</tbody></table></div>
+        <div style="margin-bottom:6px"><div style="${subhdrS}">SETUP NOTES</div><table style="${tblS}"><tbody>${notesHtml}</tbody></table></div>
+        <div style="margin-top:10px">${fpImg}${refImgs}</div>
+      </div>`;
+      }).join("");
+      const page2 = gearPage + setupPages;
       const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
       <title>Call Sheet \u2014 ${projName || "Production"}</title>
       <style>body{font-family:Arial,sans-serif;font-size:9pt;color:#000;background:#fff;margin:20px;}
@@ -12205,7 +12291,7 @@ ${conditions}`;
     } })), /* @__PURE__ */ React.createElement("td", { style: cs.cell }, /* @__PURE__ */ React.createElement(EditInp, { val: item.notes || "", onChange: (v) => {
       setEditSched((prev) => prev.map((r, j) => j === i ? { ...r, notes: v } : r));
       triggerSave();
-    } })))), Array.from({ length: Math.max(0, 8 - editSched.length) }).map((_, i) => /* @__PURE__ */ React.createElement("tr", { key: `se${i}` }, /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, height: 20 }, colSpan: 4 })))))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: cs.subhdr }, "TALENT"), /* @__PURE__ */ React.createElement("table", { style: tblStyle }, /* @__PURE__ */ React.createElement("tbody", null, talentRows.length > 0 ? talentRows.map((t, i) => /* @__PURE__ */ React.createElement("tr", { key: t.id, style: { background: i % 2 === 0 ? "#fff" : "#fafafa" } }, /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, width: 70, textAlign: "center" } }, t.photoKey ? /* @__PURE__ */ React.createElement(SetupPhotoThumb, { photoKey: t.photoKey, size: 56 }) : /* @__PURE__ */ React.createElement("div", { style: { width: 56, height: 56, borderRadius: "50%", background: "#e8e8e8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, margin: "0 auto", fontWeight: 800, color: "#888" } }, t.name.split(" ").map((n) => n[0]).join("").slice(0, 2))), /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, fontWeight: 700 } }, t.name), /* @__PURE__ */ React.createElement("td", { style: cs.cell }, t.category || ""), /* @__PURE__ */ React.createElement("td", { style: cs.cell }, t.bio || ""), /* @__PURE__ */ React.createElement("td", { style: cs.cell }))) : /* @__PURE__ */ React.createElement(React.Fragment, null, Array.from({ length: 3 }).map((_, i) => /* @__PURE__ */ React.createElement("tr", { key: i }, /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, height: 60 }, colSpan: 5 })))))))))));
+    } })))), Array.from({ length: Math.max(0, 8 - editSched.length) }).map((_, i) => /* @__PURE__ */ React.createElement("tr", { key: `se${i}` }, /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, height: 20 }, colSpan: 4 })))))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: cs.subhdr }, "TALENT"), /* @__PURE__ */ React.createElement("table", { style: tblStyle }, /* @__PURE__ */ React.createElement("tbody", null, talentRows.length > 0 ? talentRows.map((t, i) => /* @__PURE__ */ React.createElement("tr", { key: t.id, style: { background: i % 2 === 0 ? "#fff" : "#fafafa" } }, /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, width: 70, textAlign: "center" } }, t.photoKey ? /* @__PURE__ */ React.createElement(SetupPhotoThumb, { photoKey: t.photoKey, size: 56 }) : /* @__PURE__ */ React.createElement("div", { style: { width: 56, height: 56, borderRadius: "50%", background: "#e8e8e8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, margin: "0 auto", fontWeight: 800, color: "#888" } }, t.name.split(" ").map((n) => n[0]).join("").slice(0, 2))), /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, fontWeight: 700 } }, t.name), /* @__PURE__ */ React.createElement("td", { style: cs.cell }, t.category || ""), /* @__PURE__ */ React.createElement("td", { style: cs.cell }, t.bio || ""), /* @__PURE__ */ React.createElement("td", { style: cs.cell }))) : /* @__PURE__ */ React.createElement(React.Fragment, null, Array.from({ length: 3 }).map((_, i) => /* @__PURE__ */ React.createElement("tr", { key: i }, /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, height: 60 }, colSpan: 5 }))))))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 24, paddingTop: 20, borderTop: "3px dashed #ccc" } }, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", fontSize: 12, color: "#999", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 } }, "\u2014 Page 2 \u2014"), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 6 } }, /* @__PURE__ */ React.createElement("table", { style: tblStyle }, /* @__PURE__ */ React.createElement("tbody", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { colSpan: 4, style: cs.hdr }, "GEAR & MEDIA"))))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: cs.subhdr }, "INTERNAL GEAR"), /* @__PURE__ */ React.createElement("table", { style: tblStyle }, /* @__PURE__ */ React.createElement("tbody", null, pageTwoGear.intGear.length ? pageTwoGear.intGear.map((g, i) => /* @__PURE__ */ React.createElement("tr", { key: i }, /* @__PURE__ */ React.createElement("td", { style: cs.cell, colSpan: 2 }, g))) : /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, color: "#aaa" }, colSpan: 2 }, "None"))))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: cs.subhdr }, "EXTERNAL GEAR"), /* @__PURE__ */ React.createElement("table", { style: tblStyle }, /* @__PURE__ */ React.createElement("tbody", null, pageTwoGear.extGear.length ? pageTwoGear.extGear.map((g, i) => /* @__PURE__ */ React.createElement("tr", { key: i }, /* @__PURE__ */ React.createElement("td", { style: cs.cell }, g.name || "\u2014"), /* @__PURE__ */ React.createElement("td", { style: cs.cell }, g.qty != null ? `\xD7${g.qty} ` : "", " ", g.source || ""))) : /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, color: "#aaa" }, colSpan: 2 }, "None")))))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: cs.subhdr }, "MEDIA CARDS & DRIVES"), /* @__PURE__ */ React.createElement("table", { style: tblStyle }, /* @__PURE__ */ React.createElement("tbody", null, pageTwoGear.mediaNms.length ? pageTwoGear.mediaNms.map((m, i) => /* @__PURE__ */ React.createElement("tr", { key: i }, /* @__PURE__ */ React.createElement("td", { style: cs.cell, colSpan: 2 }, m))) : /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, color: "#aaa" }, colSpan: 2 }, "None"))))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: cs.subhdr }, "FURNITURE & PROPS"), /* @__PURE__ */ React.createElement("table", { style: tblStyle }, /* @__PURE__ */ React.createElement("tbody", null, pageTwoGear.furnNms.length + pageTwoGear.propNms.length > 0 ? /* @__PURE__ */ React.createElement(React.Fragment, null, pageTwoGear.furnNms.map((n, i) => /* @__PURE__ */ React.createElement("tr", { key: `f${i}` }, /* @__PURE__ */ React.createElement("td", { style: cs.label }, "Furniture"), /* @__PURE__ */ React.createElement("td", { style: cs.cell, colSpan: 3 }, n))), pageTwoGear.propNms.map((n, i) => /* @__PURE__ */ React.createElement("tr", { key: `p${i}` }, /* @__PURE__ */ React.createElement("td", { style: cs.label }, "Prop"), /* @__PURE__ */ React.createElement("td", { style: cs.cell, colSpan: 3 }, n)))) : /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, color: "#aaa" }, colSpan: 4 }, "None")))))), pageTwoSetups.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { ...cs.cell, color: "#aaa", textAlign: "center", padding: 20, border: "1px dashed #ccc" } }, "No setups attached to this production yet.") : pageTwoSetups.map((s) => /* @__PURE__ */ React.createElement("div", { key: s.id, style: { marginTop: 16, paddingTop: 12, borderTop: "1px dashed #ccc" } }, /* @__PURE__ */ React.createElement("table", { style: tblStyle }, /* @__PURE__ */ React.createElement("tbody", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { colSpan: 4, style: cs.hdr }, "SETUP INFORMATION \u2014 ", s.name, pageTwoSetups.length > 1 ? ` (${s.index + 1} of ${pageTwoSetups.length})` : "")))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, margin: "6px 0" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: cs.subhdr }, "RECORDING SPECS"), /* @__PURE__ */ React.createElement("table", { style: tblStyle }, /* @__PURE__ */ React.createElement("tbody", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { style: cs.label }, "Quality"), /* @__PURE__ */ React.createElement("td", { style: cs.cell }, s.quality || "\u2014", s.quality === "Other" && s.qualityOther ? ` (${s.qualityOther})` : ""), /* @__PURE__ */ React.createElement("td", { style: cs.label }, "Aspect Ratio"), /* @__PURE__ */ React.createElement("td", { style: cs.cell }, s.aspectRatio || "\u2014", s.aspectRatio === "Other" && s.aspectRatioOther ? ` (${s.aspectRatioOther})` : "")), /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { style: cs.label }, "Frame Rate"), /* @__PURE__ */ React.createElement("td", { style: cs.cell }, s.frameRate || "\u2014", s.frameRate === "Other" && s.frameRateOther ? ` (${s.frameRateOther})` : ""), /* @__PURE__ */ React.createElement("td", { style: cs.label }, "Audio"), /* @__PURE__ */ React.createElement("td", { style: cs.cell }, "See Audio Capture"))))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: cs.subhdr }, "AUDIO CAPTURE"), /* @__PURE__ */ React.createElement("table", { style: tblStyle }, /* @__PURE__ */ React.createElement("tbody", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { style: cs.cell, colSpan: 4 }, s.audioItems.length ? s.audioItems.join(" | ") : /* @__PURE__ */ React.createElement("span", { style: { color: "#aaa" } }, "None configured"))))))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: cs.subhdr }, "SCREEN CONTENT"), /* @__PURE__ */ React.createElement("table", { style: tblStyle }, /* @__PURE__ */ React.createElement("tbody", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { style: cs.cell, colSpan: 4 }, s.screenItems.length ? s.screenItems.join(" | ") : /* @__PURE__ */ React.createElement("span", { style: { color: "#aaa" } }, "None")))))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: cs.subhdr }, "SETUP NOTES"), /* @__PURE__ */ React.createElement("table", { style: tblStyle }, /* @__PURE__ */ React.createElement("tbody", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { style: { ...cs.cell, whiteSpace: "pre-wrap" }, colSpan: 4 }, s.notes || /* @__PURE__ */ React.createElement("span", { style: { color: "#aaa" } }, "\u2014")))))), (s.floorplanPhotoKey || s.refPhotoKeys.length > 0) && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, flexWrap: "wrap", marginTop: 10 } }, s.floorplanPhotoKey && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: cs.subhdr }, "FLOORPLAN"), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 4 } }, /* @__PURE__ */ React.createElement(SetupPhotoThumb, { photoKey: s.floorplanPhotoKey, size: 160 }))), s.refPhotoKeys.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 200 } }, /* @__PURE__ */ React.createElement("div", { style: cs.subhdr }, "REFERENCE PHOTOS"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 } }, s.refPhotoKeys.map((k) => /* @__PURE__ */ React.createElement(SetupPhotoThumb, { key: k, photoKey: k, size: 100 }))))))))))));
   };
   var ProductionCard = ({ production, idx, projectId, allProductions, allProjectDels, team, studioBookings, mediaCards, allProjects = [], presets = [], setupTypes = [], onAddSetupType, talentRoster = [], onUpdateTalentRoster, onUpdate, onDelete, onDuplicate, onSavePreset, onLoadPreset, onAddDeliverable, onDeleteDeliverable, onSendForApproval, onUnapprove, furnitureList = [], propsList = [], screenContentOptions = {}, gearList = [], vendorCompanies = ["AbelCine", "Crews Control"], addVendorCompany, lists = {} }) => {
     const [exp, setExp] = (0, import_react.useState)(!production.startTime);
