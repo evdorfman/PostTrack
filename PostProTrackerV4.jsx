@@ -27539,8 +27539,9 @@ const MfaEnrollScreen = ({onDone}) => {
             <div style={{fontSize:15,color:"#e2e8f0",marginBottom:10,lineHeight:1.5}}>
               1. Scan this with an authenticator app (Google Authenticator, Authy, 1Password, etc).
             </div>
-            <div style={{background:"#fff",borderRadius:10,padding:12,marginBottom:14,display:"flex",justifyContent:"center"}}
-              dangerouslySetInnerHTML={{__html:qr}}/>
+            <div style={{background:"#fff",borderRadius:10,padding:12,marginBottom:14,display:"flex",justifyContent:"center"}}>
+              <img src={qr} alt="Scan with your authenticator app" style={{maxWidth:"100%",height:"auto"}}/>
+            </div>
             <div style={{fontSize:13,color:"#9ca3af",marginBottom:16,lineHeight:1.5}}>
               Can't scan? Enter this code manually: <span style={{color:"#818cf8",fontFamily:"monospace",wordBreak:"break-all"}}>{secret}</span>
             </div>
