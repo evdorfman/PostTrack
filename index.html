@@ -2555,6 +2555,45 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const ap = hh < 12 ? "AM" : "PM", h12 = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
     return `${h12}:${String(mm).padStart(2, "0")} ${ap}`;
   };
+  var BOOKABLE_STUDIOS = ["Studio A", "Studio B", "Lobby 43", "BEC"];
+  var findStudioAvailability = ({ studios, startDate, endDate, durationHours, busyByStudio, now: now2 = /* @__PURE__ */ new Date() }) => {
+    const results = [];
+    const durMs = Math.max(durationHours, 0.25) * 36e5;
+    const cursorDay = new Date(startDate);
+    cursorDay.setHours(0, 0, 0, 0);
+    const lastDay = new Date(endDate);
+    lastDay.setHours(0, 0, 0, 0);
+    while (cursorDay <= lastDay) {
+      const dayStart = new Date(cursorDay);
+      dayStart.setHours(TIMELINE_START_H, 0, 0, 0);
+      const dayEnd = new Date(cursorDay);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+      dayEnd.setHours(0, 0, 0, 0);
+      const searchFrom = dayStart < now2 ? now2 : dayStart;
+      studios.forEach((studio) => {
+        const busy = (busyByStudio[studio] || []).filter((b) => b.end > dayStart && b.start < dayEnd).sort((a, b) => a.start - b.start);
+        const merged = [];
+        busy.forEach((b) => {
+          const last = merged[merged.length - 1];
+          if (last && b.start <= last.end) {
+            if (b.end > last.end) last.end = b.end;
+          } else merged.push({ start: b.start, end: b.end });
+        });
+        let cursor = searchFrom > dayStart ? searchFrom : dayStart;
+        merged.forEach((b) => {
+          if (b.start > cursor && b.start - cursor >= durMs) {
+            results.push({ studio, date: new Date(cursorDay), freeStart: new Date(cursor), freeEnd: new Date(b.start) });
+          }
+          if (b.end > cursor) cursor = b.end;
+        });
+        if (dayEnd - cursor >= durMs) {
+          results.push({ studio, date: new Date(cursorDay), freeStart: new Date(cursor), freeEnd: new Date(dayEnd) });
+        }
+      });
+      cursorDay.setDate(cursorDay.getDate() + 1);
+    }
+    return results;
+  };
   var _TICKS = Array.from({ length: TIMELINE_END_H - TIMELINE_START_H + 1 }, (_, i) => i + TIMELINE_START_H);
   var TimelineRuler = ({ hToPercent }) => /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: 20, marginBottom: 2, userSelect: "none" } }, _TICKS.map((h) => /* @__PURE__ */ React.createElement("div", { key: h, style: { position: "absolute", left: `${hToPercent(h)}%`, transform: "translateX(-50%)", fontSize: 13, color: h % 6 === 0 ? "#6b7280" : "#374151", fontFamily: "'Barlow Condensed',sans-serif", whiteSpace: "nowrap" } }, h === TIMELINE_START_H || h === TIMELINE_END_H || h % 3 === 0 ? fmtH(h) : "\xB7")), _TICKS.map((h) => /* @__PURE__ */ React.createElement("div", { key: "g" + h, style: { position: "absolute", left: `${hToPercent(h)}%`, top: 14, bottom: -999, width: 1, background: h % 6 === 0 ? "#1f2937" : "#111827", pointerEvents: "none" } })));
   var BookingBlock = ({ b, locIdx, expanded, draggingLocIdx, otherBookings, hToPercent, onDragStart }) => {
@@ -3100,6 +3139,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   var SetupPhotoThumb = ({ photoKey, size = 64, onRemove, label }) => {
     const [src, setSrc] = (0, import_react.useState)(() => setupPhotoCache.get(photoKey) || null);
     const [errored, setErrored] = (0, import_react.useState)(false);
+    const [lightbox, setLightbox] = (0, import_react.useState)(false);
     (0, import_react.useEffect)(() => {
       if (!photoKey) return;
       if (setupPhotoCache.has(photoKey)) {
@@ -3121,7 +3161,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       };
     }, [photoKey]);
     if (!photoKey) return null;
-    return /* @__PURE__ */ React.createElement("div", { style: { position: "relative", width: size, height: size, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { width: size, height: size, borderRadius: 8, overflow: "hidden", border: "1px solid #1f2937", background: "#0a0f1a", display: "flex", alignItems: "center", justifyContent: "center" } }, src ? /* @__PURE__ */ React.createElement("img", { src, alt: label || "", style: { width: "100%", height: "100%", objectFit: "cover" } }) : errored ? /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontSize: 13 } }, "missing") : /* @__PURE__ */ React.createElement("span", { style: { color: "#838ba0", fontSize: 13 } }, "\u2026")), onRemove && /* @__PURE__ */ React.createElement("button", { onClick: onRemove, style: { position: "absolute", top: -6, right: -6, background: "#1f2937", border: "1px solid #374151", borderRadius: "50%", width: 18, height: 18, color: "#9ca3af", fontSize: 13, cursor: "pointer", lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" } }, "\xD7"));
+    return /* @__PURE__ */ React.createElement("div", { style: { position: "relative", width: size, height: size, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { onClick: () => src && setLightbox(true), style: { width: size, height: size, borderRadius: 8, overflow: "hidden", border: "1px solid #1f2937", background: "#0a0f1a", display: "flex", alignItems: "center", justifyContent: "center", cursor: src ? "zoom-in" : "default" } }, src ? /* @__PURE__ */ React.createElement("img", { src, alt: label || "", style: { width: "100%", height: "100%", objectFit: "cover" } }) : errored ? /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontSize: 13 } }, "missing") : /* @__PURE__ */ React.createElement("span", { style: { color: "#838ba0", fontSize: 13 } }, "\u2026")), onRemove && /* @__PURE__ */ React.createElement("button", { onClick: onRemove, style: { position: "absolute", top: -6, right: -6, background: "#1f2937", border: "1px solid #374151", borderRadius: "50%", width: 18, height: 18, color: "#9ca3af", fontSize: 13, cursor: "pointer", lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" } }, "\xD7"), lightbox && src && /* @__PURE__ */ React.createElement("div", { onClick: () => setLightbox(false), style: { position: "fixed", inset: 0, zIndex: 6e3, background: "rgba(0,0,0,0.88)", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, cursor: "zoom-out" } }, /* @__PURE__ */ React.createElement("img", { src, alt: label || "", style: { maxWidth: "90vw", maxHeight: "90vh", objectFit: "contain", borderRadius: 8, boxShadow: "0 24px 80px #000c" } }), /* @__PURE__ */ React.createElement("button", { onClick: () => setLightbox(false), style: { position: "fixed", top: 20, right: 24, background: "#1f2937", border: "1px solid #374151", borderRadius: "50%", width: 36, height: 36, color: "#e2e8f0", fontSize: 19, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" } }, "\xD7")));
   };
   var SetupPhotoUploadButton = ({ label, multiple = false, onUploaded, size = 64 }) => {
     const ref = (0, import_react.useRef)();
@@ -11247,15 +11287,15 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     const colLbl = { fontSize: 13, fontWeight: 700, color: "#8e97a6", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.06em", marginBottom: 5 };
     const noop = () => ({ call: null, wrap: null });
     const getCT = getCrewTimes || noop, getST = getSpaceCallTime || noop;
-    return /* @__PURE__ */ React.createElement("div", { style: { border: "1px solid #1f2937", borderRadius: 8, overflow: "hidden", background: "#0a0f1a" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 240px", overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12, padding: "12px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: colLbl }, "Floorplan"), setup.floorplanPhotoKey ? /* @__PURE__ */ React.createElement(SetupPhotoThumb, { photoKey: setup.floorplanPhotoKey, size: 88, onRemove: () => updField("floorplanPhotoKey", null) }) : /* @__PURE__ */ React.createElement(SetupPhotoUploadButton, { label: "Add Floorplan", size: 88, onUploaded: (k) => updField("floorplanPhotoKey", k) })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: colLbl }, "Reference Photos"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } }, (setup.refPhotoKeys || []).map((k) => /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { style: { border: "1px solid #1f2937", borderRadius: 8, overflow: "hidden", background: "#0a0f1a" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 240px", overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12, padding: "12px 14px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: colLbl }, "Floorplan"), setup.floorplanPhotoKey ? /* @__PURE__ */ React.createElement(SetupPhotoThumb, { photoKey: setup.floorplanPhotoKey, size: 160, onRemove: () => updField("floorplanPhotoKey", null) }) : /* @__PURE__ */ React.createElement(SetupPhotoUploadButton, { label: "Add Floorplan", size: 160, onUploaded: (k) => updField("floorplanPhotoKey", k) })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: colLbl }, "Reference Photos"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, (setup.refPhotoKeys || []).map((k) => /* @__PURE__ */ React.createElement(
       SetupPhotoThumb,
       {
         key: k,
         photoKey: k,
-        size: 64,
+        size: 160,
         onRemove: () => updField("refPhotoKeys", (setup.refPhotoKeys || []).filter((x) => x !== k))
       }
-    )), /* @__PURE__ */ React.createElement(SetupPhotoUploadButton, { label: "Add", multiple: true, size: 64, onUploaded: (k) => updField("refPhotoKeys", [...setup.refPhotoKeys || [], k]) })))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid #1f2937", paddingTop: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { ...colLbl, marginBottom: 0 } }, "Crew \u2014 Internal"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, roleListToggle, /* @__PURE__ */ React.createElement(Btn, { small: true, onClick: addCrewInt }, "+ Add"))), crewInternal.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0" } }, "No internal crew."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5 } }, crewInternal.map((c) => {
+    )), /* @__PURE__ */ React.createElement(SetupPhotoUploadButton, { label: "Add", multiple: true, size: 160, onUploaded: (k) => updField("refPhotoKeys", [...setup.refPhotoKeys || [], k]) })))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid #1f2937", paddingTop: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { ...colLbl, marginBottom: 0 } }, "Crew \u2014 Internal"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, roleListToggle, /* @__PURE__ */ React.createElement(Btn, { small: true, onClick: addCrewInt }, "+ Add"))), crewInternal.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0" } }, "No internal crew."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5 } }, crewInternal.map((c) => {
       const m = team.find((x) => x.id === c.memberId);
       const crewId = `i-${c.id || m?.id || c.memberId}`;
       const schedT = getCT(crewId);
@@ -14361,6 +14401,274 @@ ${conditions}`;
       }
     )), filtered.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 40, color: "#838ba0" } }, "No tracked team members match this filter."))));
   };
+  var BookSlotModal = ({ row, durationHours, talentIds = [], talentRoster = [], projects = [], onClose, onConfirm }) => {
+    const durMs = Math.max(+durationHours || 1, 0.25) * 36e5;
+    const startOptions = (0, import_react.useMemo)(() => {
+      const opts = [];
+      const latest = new Date(row.freeEnd.getTime() - durMs);
+      let t = new Date(row.freeStart);
+      while (t <= latest) {
+        opts.push(new Date(t));
+        t = new Date(t.getTime() + 30 * 6e4);
+      }
+      if (opts.length === 0) opts.push(new Date(row.freeStart));
+      return opts;
+    }, [row, durMs]);
+    const [startIdx, setStartIdx] = (0, import_react.useState)(0);
+    const [projectId, setProjectId] = (0, import_react.useState)("");
+    const [type, setType] = (0, import_react.useState)(PRODUCTION_TYPES[0]);
+    const [title, setTitle] = (0, import_react.useState)("");
+    const [pickedTalent, setPickedTalent] = (0, import_react.useState)(talentIds);
+    const [showTalentPicker, setShowTalentPicker] = (0, import_react.useState)(false);
+    const fmtOpt = (d) => {
+      const h = d.getHours(), m = d.getMinutes(), ap = h < 12 ? "AM" : "PM", h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      return `${h12}:${String(m).padStart(2, "0")} ${ap}`;
+    };
+    const sortedProjects = (0, import_react.useMemo)(() => [...projects].sort((a, b) => (a.name || "").localeCompare(b.name || "")), [projects]);
+    return /* @__PURE__ */ React.createElement(Modal, { onClose, maxWidth: 480 }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 4 } }, "Book This Slot"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#9ca3af", marginBottom: 18 } }, row.studio, " \u2014 ", row.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement(LW, { label: "Project *" }, /* @__PURE__ */ React.createElement(Sel, { value: projectId, onChange: (e) => setProjectId(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Select a project\u2026"), sortedProjects.map((p) => /* @__PURE__ */ React.createElement("option", { key: p.id, value: p.id }, p.name)))), /* @__PURE__ */ React.createElement(LW, { label: "Production Type" }, /* @__PURE__ */ React.createElement(Sel, { value: type, onChange: (e) => setType(e.target.value) }, PRODUCTION_TYPES.map((t) => /* @__PURE__ */ React.createElement("option", { key: t }, t)))), /* @__PURE__ */ React.createElement(LW, { label: "Title (optional)" }, /* @__PURE__ */ React.createElement(Inp, { value: title, onChange: (e) => setTitle(e.target.value), placeholder: "e.g. Client Interview" })), /* @__PURE__ */ React.createElement(LW, { label: "Start Time" }, /* @__PURE__ */ React.createElement(Sel, { value: startIdx, onChange: (e) => setStartIdx(+e.target.value) }, startOptions.map((d, i) => /* @__PURE__ */ React.createElement("option", { key: i, value: i }, fmtOpt(d), " \u2013 ", fmtOpt(new Date(d.getTime() + durMs)))))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 } }, "Talent"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 } }, pickedTalent.map((id) => {
+      const t = talentRoster.find((x) => x.id === id);
+      return t ? /* @__PURE__ */ React.createElement(Chip, { key: id, label: t.name, color: "#f59e0b", xs: true }) : null;
+    }), pickedTalent.length === 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#4b5563", fontStyle: "italic" } }, "None selected")), /* @__PURE__ */ React.createElement(Btn, { small: true, onClick: () => setShowTalentPicker(true) }, pickedTalent.length ? "Edit Talent" : "+ Add Talent"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 22, borderTop: "1px solid #1f2937", paddingTop: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: onClose, style: { background: "transparent", border: "1px solid #1f2937", borderRadius: 8, color: "#6b7280", padding: "9px 16px", fontSize: 15, fontWeight: 700, cursor: "pointer" } }, "Cancel"), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => projectId && onConfirm({ projectId, type, title, startDate: startOptions[startIdx], talent: pickedTalent }),
+        disabled: !projectId,
+        style: { background: projectId ? "#6366f1" : "#1f2937", border: "none", borderRadius: 8, color: projectId ? "#fff" : "#4b5563", padding: "9px 20px", fontSize: 15, fontWeight: 800, cursor: projectId ? "pointer" : "not-allowed" }
+      },
+      "Create Production"
+    )), showTalentPicker && /* @__PURE__ */ React.createElement(
+      TalentPicker,
+      {
+        talentRoster,
+        selectedIds: pickedTalent,
+        onConfirm: (ids) => {
+          setPickedTalent(ids);
+          setShowTalentPicker(false);
+        },
+        onClose: () => setShowTalentPicker(false)
+      }
+    ));
+  };
+  var StudioSchedulerTab = ({ projects, allBookings, talentRoster = [], onUpdateProject, onOpenProject }) => {
+    const [durationHours, setDurationHours] = (0, import_react.useState)(5);
+    const [rangeMode, setRangeMode] = (0, import_react.useState)("next14");
+    const [customStart, setCustomStart] = (0, import_react.useState)("");
+    const [customEnd, setCustomEnd] = (0, import_react.useState)("");
+    const [preferredStudio, setPreferredStudio] = (0, import_react.useState)("");
+    const [talentIds, setTalentIds] = (0, import_react.useState)([]);
+    const [showTalentPicker, setShowTalentPicker] = (0, import_react.useState)(false);
+    const [bookingRow, setBookingRow] = (0, import_react.useState)(null);
+    const [copied, setCopied] = (0, import_react.useState)(false);
+    const RANGE_PRESETS = [
+      { id: "next7", label: "Next 7 Days" },
+      { id: "next14", label: "Next 2 Weeks" },
+      { id: "next30", label: "Next 30 Days" },
+      { id: "thisMonth", label: "This Month" },
+      { id: "nextMonth", label: "Next Month" },
+      { id: "custom", label: "Custom Range" }
+    ];
+    const { rangeStart, rangeEnd } = (0, import_react.useMemo)(() => {
+      const today = /* @__PURE__ */ new Date();
+      today.setHours(0, 0, 0, 0);
+      if (rangeMode === "custom") {
+        const s = customStart ? /* @__PURE__ */ new Date(customStart + "T00:00") : today;
+        const e2 = customEnd ? /* @__PURE__ */ new Date(customEnd + "T00:00") : s;
+        return { rangeStart: s, rangeEnd: e2 < s ? s : e2 };
+      }
+      if (rangeMode === "thisMonth") {
+        const s = new Date(today.getFullYear(), today.getMonth(), 1);
+        const e2 = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        return { rangeStart: s < today ? today : s, rangeEnd: e2 };
+      }
+      if (rangeMode === "nextMonth") {
+        const s = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+        const e2 = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+        return { rangeStart: s, rangeEnd: e2 };
+      }
+      const days = { next7: 7, next14: 14, next30: 30 }[rangeMode] || 14;
+      const e = new Date(today);
+      e.setDate(e.getDate() + days - 1);
+      return { rangeStart: today, rangeEnd: e };
+    }, [rangeMode, customStart, customEnd]);
+    const busyByStudio = (0, import_react.useMemo)(() => {
+      const map = {};
+      BOOKABLE_STUDIOS.forEach((s) => map[s] = []);
+      (allBookings || []).forEach((b) => {
+        if (!BOOKABLE_STUDIOS.includes(b.location)) return;
+        if (b.bookingStatus === "Cancelled") return;
+        if (!b.startTime) return;
+        const start = new Date(b.startTime);
+        const end = b.endTime ? new Date(b.endTime) : new Date(start.getTime() + 36e5);
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+        map[b.location].push({ start, end, title: b.title || "", projectName: b.projectName || "", bookingStatus: b.bookingStatus });
+      });
+      return map;
+    }, [allBookings]);
+    const allResults = (0, import_react.useMemo)(() => findStudioAvailability({
+      studios: BOOKABLE_STUDIOS,
+      startDate: rangeStart,
+      endDate: rangeEnd,
+      durationHours: +durationHours || 1,
+      busyByStudio
+    }), [rangeStart, rangeEnd, durationHours, busyByStudio]);
+    const preferredResults = preferredStudio ? allResults.filter((r) => r.studio === preferredStudio) : allResults;
+    const usedFallback = !!preferredStudio && preferredResults.length === 0 && allResults.length > 0;
+    const displayResults = preferredStudio && preferredResults.length > 0 ? preferredResults : allResults;
+    const conflictList = (0, import_react.useMemo)(() => {
+      if (displayResults.length > 0) return [];
+      const studios = preferredStudio ? [preferredStudio] : BOOKABLE_STUDIOS;
+      const rangeEndExclusive = new Date(rangeEnd.getTime() + 864e5);
+      return (allBookings || []).filter((b) => studios.includes(b.location) && b.bookingStatus !== "Cancelled" && b.startTime).filter((b) => {
+        const s = new Date(b.startTime), e = b.endTime ? new Date(b.endTime) : s;
+        return s < rangeEndExclusive && e > rangeStart;
+      }).sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+    }, [displayResults, allBookings, preferredStudio, rangeStart, rangeEnd]);
+    const grouped = (0, import_react.useMemo)(() => {
+      const byStudio = {};
+      displayResults.forEach((r) => {
+        (byStudio[r.studio] = byStudio[r.studio] || []).push(r);
+      });
+      Object.values(byStudio).forEach((list) => list.sort((a, b) => a.freeStart - b.freeStart));
+      return byStudio;
+    }, [displayResults]);
+    const fmtClock = (d) => {
+      const h = d.getHours(), m = d.getMinutes(), ap = h < 12 ? "AM" : "PM", h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      return `${h12}:${String(m).padStart(2, "0")} ${ap}`;
+    };
+    const fmtDayLbl = (d) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    const copyResults = () => {
+      const lines = [];
+      BOOKABLE_STUDIOS.forEach((studio) => {
+        const rows = grouped[studio];
+        if (!rows || !rows.length) return;
+        lines.push(`${studio.toUpperCase()} \u2014 available for a ${durationHours}-hour booking:`);
+        rows.forEach((r) => lines.push(`\u2022 ${fmtDayLbl(r.date)}: ${fmtClock(r.freeStart)} \u2013 ${fmtClock(r.freeEnd)}`));
+        lines.push("");
+      });
+      const text = lines.join("\n").trim();
+      if (!text) return;
+      navigator.clipboard?.writeText(text).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2e3);
+      }).catch(() => {
+      });
+    };
+    const doBook = ({ projectId, type, title, startDate, talent }) => {
+      const project = projects.find((p2) => p2.id === projectId);
+      if (!project || !bookingRow) return;
+      const p = (n) => String(n).padStart(2, "0");
+      const toLocalISO = (d) => `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+      const endDate = new Date(startDate.getTime() + Math.max(+durationHours || 1, 0.25) * 36e5);
+      const newProd = {
+        id: uid(),
+        type,
+        title: title || "",
+        status: "Planning",
+        startTime: toLocalISO(startDate),
+        endTime: toLocalISO(endDate),
+        location: bookingRow.studio,
+        crewCallTime: "",
+        notes: "",
+        feedsIntoId: null,
+        playbackDeliverableId: null,
+        playbackAssets: [],
+        assetRequests: [],
+        equipmentIds: [],
+        externalGear: [],
+        mediaCardIds: [],
+        crewInternal: [],
+        crewExternal: [],
+        schedule: [],
+        ingest: {
+          datetime: "",
+          notes: "",
+          transcriptNeeded: false,
+          reviewLinkNeeded: false,
+          recurringOrOnce: "",
+          sessionCount: "",
+          reviewLinkType: "",
+          reviewLinkCount: "",
+          reviewWatermark: false,
+          brightcoveNeeded: false,
+          brightcovePW: false,
+          reviewLinkDelIds: []
+        },
+        deliverables: [],
+        talent: talent || []
+      };
+      onUpdateProject(projectId, "productions", [...project.productions || [], newProd]);
+      setBookingRow(null);
+      onOpenProject && onOpenProject(project);
+    };
+    const lbl = { fontSize: 13, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 6, display: "block" };
+    const inp = { background: "#0a0f1a", border: "1px solid #374151", borderRadius: 8, color: "#f1f5f9", padding: "8px 12px", fontSize: 16, outline: "none", fontFamily: "'DM Sans',sans-serif", colorScheme: "dark" };
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, padding: 20, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 19, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 } }, "Find Studio Availability"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "140px 1fr 1fr", gap: 14, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Length (hours)"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "number",
+        min: 0.5,
+        max: 16,
+        step: 0.5,
+        value: durationHours,
+        onChange: (e) => setDurationHours(e.target.value),
+        style: { ...inp, width: "100%" }
+      }
+    )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Studio Preference"), /* @__PURE__ */ React.createElement("select", { value: preferredStudio, onChange: (e) => setPreferredStudio(e.target.value), style: { ...inp, width: "100%", cursor: "pointer" } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Any studio"), BOOKABLE_STUDIOS.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, value: s }, s)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Talent (optional)"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } }, talentIds.map((id) => {
+      const t = talentRoster.find((x) => x.id === id);
+      return t ? /* @__PURE__ */ React.createElement("span", { key: id, style: { display: "inline-flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(Chip, { label: t.name, color: "#f59e0b", xs: true }), /* @__PURE__ */ React.createElement("button", { onClick: () => setTalentIds((ids) => ids.filter((x) => x !== id)), style: { background: "none", border: "none", color: "#8e97a6", cursor: "pointer", fontSize: 15, lineHeight: 1, padding: 0 } }, "\xD7")) : null;
+    }), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setShowTalentPicker(true),
+        style: { background: "none", border: "1px dashed #374151", borderRadius: 6, color: "#818cf8", padding: "4px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer" }
+      },
+      "+ Add"
+    )))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Window"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" } }, RANGE_PRESETS.map((r) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: r.id,
+        onClick: () => setRangeMode(r.id),
+        style: { background: rangeMode === r.id ? "#6366f1" : "#1f2937", border: "none", borderRadius: 7, color: rangeMode === r.id ? "#fff" : "#9ca3af", padding: "6px 14px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" }
+      },
+      r.label
+    )), rangeMode === "custom" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("input", { type: "date", value: customStart, onChange: (e) => setCustomStart(e.target.value), style: inp }), /* @__PURE__ */ React.createElement("span", { style: { color: "#6b7280" } }, "to"), /* @__PURE__ */ React.createElement("input", { type: "date", value: customEnd, onChange: (e) => setCustomEnd(e.target.value), style: inp }))))), usedFallback && /* @__PURE__ */ React.createElement("div", { style: { background: "#f59e0b18", border: "1px solid #f59e0b40", borderRadius: 8, padding: "10px 14px", color: "#f59e0b", fontSize: 15, marginBottom: 16 } }, "No availability at ", /* @__PURE__ */ React.createElement("b", null, preferredStudio), " in this window \u2014 showing every studio instead."), displayResults.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 10 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: copyResults,
+        style: { background: copied ? "#10b981" : "#1f2937", border: "1px solid #374151", borderRadius: 7, color: copied ? "#fff" : "#9ca3af", padding: "6px 14px", fontSize: 14, fontWeight: 700, cursor: "pointer" }
+      },
+      copied ? "\u2713 Copied!" : "\u{1F4CB} Copy Results"
+    )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } }, BOOKABLE_STUDIOS.filter((s) => grouped[s]?.length).map((studio) => /* @__PURE__ */ React.createElement("div", { key: studio, style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#111827", padding: "10px 16px", fontSize: 16, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, studio, " ", /* @__PURE__ */ React.createElement("span", { style: { color: "#6b7280", fontWeight: 700 } }, "(", grouped[studio].length, " open window", grouped[studio].length !== 1 ? "s" : "", ")")), /* @__PURE__ */ React.createElement("div", null, grouped[studio].map((r, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 16px", borderTop: i > 0 ? "1px solid #1f2937" : "none" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#e2e8f0" } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700 } }, fmtDayLbl(r.date)), /* @__PURE__ */ React.createElement("span", { style: { color: "#9ca3af" } }, " \u2014 ", fmtClock(r.freeStart), " \u2013 ", fmtClock(r.freeEnd))), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setBookingRow(r),
+        style: { background: "#6366f115", border: "1px solid #6366f140", borderRadius: 6, color: "#818cf8", padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" }
+      },
+      "Book This Slot \u2192"
+    )))))))), displayResults.length === 0 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "20px 0", color: "#9ca3af", fontSize: 16 } }, "No ", durationHours, "-hour block open anywhere", preferredStudio ? ` at ${preferredStudio}` : "", " in this window."), conflictList.length > 0 ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#e2e8f0", marginBottom: 10 } }, "Here's what's already booked during that window \u2014 one of these might be able to move:"), /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, overflow: "hidden" } }, conflictList.map((b, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderTop: i > 0 ? "1px solid #1f2937" : "none", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { background: (BKSTATUS_COLOR[b.bookingStatus] || "#6b7280") + "22", color: BKSTATUS_COLOR[b.bookingStatus] || "#6b7280", borderRadius: 5, padding: "2px 8px", fontSize: 12, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, b.bookingStatus || "Tentative"), /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, color: "#f1f5f9", fontSize: 15 } }, b.location), /* @__PURE__ */ React.createElement("span", { style: { color: "#9ca3af", fontSize: 15 } }, new Date(b.startTime).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }), " ", fmtClock(new Date(b.startTime)), b.endTime ? ` \u2013 ${fmtClock(new Date(b.endTime))}` : ""), /* @__PURE__ */ React.createElement("span", { style: { color: "#e2e8f0", fontSize: 15, flex: 1, minWidth: 120 } }, b.title || b.productionType || "Untitled"), /* @__PURE__ */ React.createElement("span", { style: { color: "#6b7280", fontSize: 14 } }, b.projectName || ""))))) : /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#4b5563", fontSize: 15 } }, "Nothing's booked there either \u2014 try a shorter length or a wider window.")), showTalentPicker && /* @__PURE__ */ React.createElement(
+      TalentPicker,
+      {
+        talentRoster,
+        selectedIds: talentIds,
+        onConfirm: (ids) => {
+          setTalentIds(ids);
+          setShowTalentPicker(false);
+        },
+        onClose: () => setShowTalentPicker(false)
+      }
+    ), bookingRow && /* @__PURE__ */ React.createElement(
+      BookSlotModal,
+      {
+        row: bookingRow,
+        durationHours,
+        talentIds,
+        talentRoster,
+        projects,
+        onClose: () => setBookingRow(null),
+        onConfirm: doBook
+      }
+    ));
+  };
   var StudioTab = ({ projects, studioBookings, onUpdateStudioBookings, team, onOpenProject, talentRoster = [], onUpdateProject, mediaCards = [], sidebarSlotNode, onSidebarWidthChange }) => {
     const [subView, setSubView] = (0, import_react.useState)("bookings");
     const [statusHistoryOpen, setStatusHistoryOpen] = (0, import_react.useState)(false);
@@ -14403,14 +14711,14 @@ ${conditions}`;
     }, [studioBookings, projects]);
     const subS = (a) => ({ padding: "6px 18px", borderRadius: 7, fontWeight: 800, fontSize: 16, cursor: "pointer", border: "none", background: a ? "#6366f1" : "transparent", color: a ? "#fff" : "#6b7280", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.07em", textTransform: "uppercase" });
     const sidebarWidth = statusHistoryOpen ? 400 : 0;
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 2, marginBottom: 20, borderBottom: "1px solid #1f2937", paddingBottom: 12, alignItems: "center" } }, [["bookings", "\u{1F4CB} Bookings"], ["calendar", "\u{1F4C5} Calendar"], ["equipment", "\u{1F392} Equipment"], ["display", "\u{1F4FA} Display Board"]].map(([id, label]) => /* @__PURE__ */ React.createElement("button", { key: id, style: subS(subView === id), onClick: () => setSubView(id) }, label)), /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 2, marginBottom: 20, borderBottom: "1px solid #1f2937", paddingBottom: 12, alignItems: "center" } }, [["bookings", "\u{1F4CB} Bookings"], ["calendar", "\u{1F4C5} Calendar"], ["scheduler", "\u{1F5D3} Scheduler"], ["equipment", "\u{1F392} Equipment"], ["display", "\u{1F4FA} Display Board"]].map(([id, label]) => /* @__PURE__ */ React.createElement("button", { key: id, style: subS(subView === id), onClick: () => setSubView(id) }, label)), /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => setStatusHistoryOpen(true),
         style: { marginLeft: "auto", background: "transparent", border: "1px solid #1f2937", borderRadius: 7, color: "#6b7280", padding: "6px 14px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }
       },
       "\u{1F553} Status History"
-    )), subView === "bookings" && /* @__PURE__ */ React.createElement(StudioBookingsList, { allBookings, projects, team, studioBookings, onUpdateStudioBookings, onOpenProject, onUpdateProject }), subView === "calendar" && /* @__PURE__ */ React.createElement(StudioCalendar, { allBookings, team, projects, onOpenProject, talentRoster }), subView === "equipment" && /* @__PURE__ */ React.createElement(StudioEquipmentTab, { mediaCards }), subView === "display" && /* @__PURE__ */ React.createElement(StudioDisplayBoard, { allBookings, team })), /* @__PURE__ */ React.createElement(SidebarPortal, { width: sidebarWidth, slotNode: sidebarSlotNode, onWidthChange: onSidebarWidthChange }, statusHistoryOpen && /* @__PURE__ */ React.createElement(HistoryFeedContent, { title: "Production Status History", buildQuery: (q) => q.eq("entity_type", "production").eq("action", "status_changed"), onClose: () => setStatusHistoryOpen(false) })));
+    )), subView === "bookings" && /* @__PURE__ */ React.createElement(StudioBookingsList, { allBookings, projects, team, studioBookings, onUpdateStudioBookings, onOpenProject, onUpdateProject }), subView === "calendar" && /* @__PURE__ */ React.createElement(StudioCalendar, { allBookings, team, projects, onOpenProject, talentRoster }), subView === "scheduler" && /* @__PURE__ */ React.createElement(StudioSchedulerTab, { projects, allBookings, talentRoster, onUpdateProject, onOpenProject }), subView === "equipment" && /* @__PURE__ */ React.createElement(StudioEquipmentTab, { mediaCards }), subView === "display" && /* @__PURE__ */ React.createElement(StudioDisplayBoard, { allBookings, team })), /* @__PURE__ */ React.createElement(SidebarPortal, { width: sidebarWidth, slotNode: sidebarSlotNode, onWidthChange: onSidebarWidthChange }, statusHistoryOpen && /* @__PURE__ */ React.createElement(HistoryFeedContent, { title: "Production Status History", buildQuery: (q) => q.eq("entity_type", "production").eq("action", "status_changed"), onClose: () => setStatusHistoryOpen(false) })));
   };
   var StudioBookingsList = ({ allBookings, projects, team, studioBookings, onUpdateStudioBookings, onOpenProject, onUpdateProject }) => {
     const [locFilter, setLocFilter] = (0, import_react.useState)("All");
@@ -18395,8 +18703,10 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     if (!/[A-Z]/.test(pw)) return "Password must include an uppercase letter.";
     if (!/[a-z]/.test(pw)) return "Password must include a lowercase letter.";
     if (!/[0-9]/.test(pw)) return "Password must include a number.";
+    if (!/[^A-Za-z0-9]/.test(pw)) return "Password must include a special character.";
     return null;
   };
+  var PASSWORD_REQUIREMENTS_HINT = "At least 8 characters, with an uppercase letter, a lowercase letter, a number, and a special character.";
   var AUTH_SCREEN_WRAP = { display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", minHeight: "100dvh", background: "#060a12", padding: 20 };
   var AUTH_CARD = { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 16, padding: 32, width: "100%", maxWidth: 380, boxShadow: "0 24px 80px #000c" };
   var AUTH_TITLE = { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 34, fontWeight: 900, color: "#f1f5f9", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 };
@@ -18539,7 +18849,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         onKeyDown: onEnter(signUp),
         autoComplete: "new-password"
       }
-    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280", marginBottom: 14, marginTop: -4 } }, "Needs an uppercase letter, a lowercase letter, and a number."), /* @__PURE__ */ React.createElement("button", { onClick: signUp, disabled: busy, style: AUTH_BUTTON(busy) }, busy ? "Creating account\u2026" : "Create Account \u2192"), err && /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 16, marginTop: 10, textAlign: "center" } }, err), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginTop: 18 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => switchMode("signin"), style: AUTH_LINK }, "Already have an account? Sign in"))));
+    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280", marginBottom: 14, marginTop: -4 } }, PASSWORD_REQUIREMENTS_HINT), /* @__PURE__ */ React.createElement("button", { onClick: signUp, disabled: busy, style: AUTH_BUTTON(busy) }, busy ? "Creating account\u2026" : "Create Account \u2192"), err && /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 16, marginTop: 10, textAlign: "center" } }, err), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginTop: 18 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => switchMode("signin"), style: AUTH_LINK }, "Already have an account? Sign in"))));
     return /* @__PURE__ */ React.createElement("div", { style: AUTH_SCREEN_WRAP }, /* @__PURE__ */ React.createElement("div", { style: AUTH_CARD }, /* @__PURE__ */ React.createElement("div", { style: AUTH_TITLE }, "PostTrack"), /* @__PURE__ */ React.createElement("div", { style: AUTH_SUB }, "Sign in with your team account"), /* @__PURE__ */ React.createElement("div", { style: AUTH_LABEL }, "Email"), /* @__PURE__ */ React.createElement(
       "input",
       {
@@ -18569,6 +18879,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [pw2, setPw2] = (0, import_react.useState)("");
     const [err, setErr] = (0, import_react.useState)("");
     const [busy, setBusy] = (0, import_react.useState)(false);
+    const [needsCode, setNeedsCode] = (0, import_react.useState)(false);
+    const [code, setCode] = (0, import_react.useState)("");
     const submit = async () => {
       if (!sb) {
         setErr("Backend is not configured.");
@@ -18585,6 +18897,12 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       }
       setBusy(true);
       setErr("");
+      const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aal?.nextLevel === "aal2" && aal?.currentLevel !== aal?.nextLevel) {
+        setBusy(false);
+        setNeedsCode(true);
+        return;
+      }
       const { error } = await sb.auth.updateUser({ password: pw });
       setBusy(false);
       if (error) {
@@ -18593,6 +18911,52 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       }
       onDone();
     };
+    const submitCode = async () => {
+      if (!code.trim()) {
+        setErr("Enter the 6-digit code from your authenticator app.");
+        return;
+      }
+      setBusy(true);
+      setErr("");
+      const { data: factors, error: listErr } = await sb.auth.mfa.listFactors();
+      const factor = (factors?.totp || []).find((f) => f.status === "verified");
+      if (listErr || !factor) {
+        setBusy(false);
+        setErr("No verified authenticator found on this account.");
+        return;
+      }
+      const { data: challenge, error: challengeErr } = await sb.auth.mfa.challenge({ factorId: factor.id });
+      if (challengeErr) {
+        setBusy(false);
+        setErr(challengeErr.message || "Could not verify that code.");
+        return;
+      }
+      const { error: verifyErr } = await sb.auth.mfa.verify({ factorId: factor.id, challengeId: challenge.id, code: code.trim() });
+      if (verifyErr) {
+        setBusy(false);
+        setErr("That code didn't match \u2014 try again.");
+        setCode("");
+        return;
+      }
+      const { error: updateErr } = await sb.auth.updateUser({ password: pw });
+      setBusy(false);
+      if (updateErr) {
+        setErr(updateErr.message || "Could not update password.");
+        return;
+      }
+      onDone();
+    };
+    if (needsCode) return /* @__PURE__ */ React.createElement("div", { style: AUTH_SCREEN_WRAP }, /* @__PURE__ */ React.createElement("div", { style: AUTH_CARD }, /* @__PURE__ */ React.createElement("div", { style: AUTH_TITLE }, "PostTrack"), /* @__PURE__ */ React.createElement("div", { style: AUTH_SUB }, "Enter the 6-digit code from your authenticator app to finish resetting your password"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        style: { ...AUTH_INPUT, textAlign: "center", fontSize: 24, letterSpacing: "0.3em" },
+        value: code,
+        onChange: (e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6)),
+        onKeyDown: (e) => e.key === "Enter" && submitCode(),
+        placeholder: "123456",
+        autoFocus: true
+      }
+    ), /* @__PURE__ */ React.createElement("button", { onClick: submitCode, disabled: busy, style: AUTH_BUTTON(busy) }, busy ? "Verifying\u2026" : "Verify & Save Password"), err && /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 16, marginTop: 10, textAlign: "center" } }, err)));
     return /* @__PURE__ */ React.createElement("div", { style: AUTH_SCREEN_WRAP }, /* @__PURE__ */ React.createElement("div", { style: AUTH_CARD }, /* @__PURE__ */ React.createElement("div", { style: AUTH_TITLE }, "PostTrack"), /* @__PURE__ */ React.createElement("div", { style: AUTH_SUB }, "Set a new password"), /* @__PURE__ */ React.createElement("div", { style: AUTH_LABEL }, "New Password"), /* @__PURE__ */ React.createElement(
       "input",
       {
@@ -18615,7 +18979,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         onKeyDown: (e) => e.key === "Enter" && submit(),
         autoComplete: "new-password"
       }
-    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280", marginBottom: 14, marginTop: -4 } }, "Needs an uppercase letter, a lowercase letter, and a number."), /* @__PURE__ */ React.createElement("button", { onClick: submit, disabled: busy, style: AUTH_BUTTON(busy) }, busy ? "Saving\u2026" : "Save Password \u2192"), err && /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 16, marginTop: 10, textAlign: "center" } }, err)));
+    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280", marginBottom: 14, marginTop: -4 } }, PASSWORD_REQUIREMENTS_HINT), /* @__PURE__ */ React.createElement("button", { onClick: submit, disabled: busy, style: AUTH_BUTTON(busy) }, busy ? "Saving\u2026" : "Save Password \u2192"), err && /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 16, marginTop: 10, textAlign: "center" } }, err)));
   };
   var OnboardingModal = ({ email, onSubmit, onSkip }) => {
     const [name, setName] = (0, import_react.useState)("");
@@ -18708,7 +19072,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       window.location.reload();
     };
     const [showPwForm, setShowPwForm] = (0, import_react.useState)(false);
-    const [currentPw, setCurrentPw] = (0, import_react.useState)("");
     const [newPw, setNewPw] = (0, import_react.useState)("");
     const [newPw2, setNewPw2] = (0, import_react.useState)("");
     const [pwBusy, setPwBusy] = (0, import_react.useState)(false);
@@ -18718,10 +19081,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       if (!sb) return;
       setPwErr("");
       setPwOk(false);
-      if (!currentPw) {
-        setPwErr("Enter your current password.");
-        return;
-      }
       const complexityErr = passwordComplexityError(newPw);
       if (complexityErr) {
         setPwErr(complexityErr);
@@ -18732,19 +19091,12 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         return;
       }
       setPwBusy(true);
-      const { error: reauthErr } = await sb.auth.signInWithPassword({ email: member.email, password: currentPw });
-      if (reauthErr) {
-        setPwBusy(false);
-        setPwErr("Current password is incorrect.");
-        return;
-      }
       const { error: updateErr } = await sb.auth.updateUser({ password: newPw });
       setPwBusy(false);
       if (updateErr) {
         setPwErr(updateErr.message || "Could not update password.");
         return;
       }
-      setCurrentPw("");
       setNewPw("");
       setNewPw2("");
       setShowPwForm(false);
@@ -18802,12 +19154,11 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         style: { background: "none", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "6px 12px", fontSize: 14, fontWeight: 700, cursor: "pointer", flexShrink: 0 }
       },
       "Change password\u2026"
-    )), pwOk && !showPwForm && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#10b981", marginTop: 6 } }, "Password updated."), showPwForm && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ React.createElement("input", { type: "password", value: currentPw, onChange: (e) => setCurrentPw(e.target.value), placeholder: "Current password", style: inp }), /* @__PURE__ */ React.createElement("input", { type: "password", value: newPw, onChange: (e) => setNewPw(e.target.value), placeholder: "New password", style: inp }), /* @__PURE__ */ React.createElement("input", { type: "password", value: newPw2, onChange: (e) => setNewPw2(e.target.value), placeholder: "Confirm new password", style: inp }), pwErr && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ef4444" } }, pwErr), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(
+    )), pwOk && !showPwForm && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#10b981", marginTop: 6 } }, "Password updated."), showPwForm && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ React.createElement("input", { type: "password", value: newPw, onChange: (e) => setNewPw(e.target.value), placeholder: "New password", style: inp }), /* @__PURE__ */ React.createElement("input", { type: "password", value: newPw2, onChange: (e) => setNewPw2(e.target.value), placeholder: "Confirm new password", style: inp }), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280", marginTop: -4 } }, PASSWORD_REQUIREMENTS_HINT), pwErr && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ef4444" } }, pwErr), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => {
           setShowPwForm(false);
-          setCurrentPw("");
           setNewPw("");
           setNewPw2("");
           setPwErr("");

@@ -2938,6 +2938,54 @@ const fmtH = h => {
   return `${h12}:${String(mm).padStart(2,"0")} ${ap}`;
 };
 
+// ─── Studio Scheduler: pure availability search ────────────────────────────
+// Rooms an actual Production can be booked into — excludes HMU/Green
+// Room/PCR, which are auxiliary spaces tied to a primary shoot rather than
+// bookable on their own.
+const BOOKABLE_STUDIOS = ["Studio A","Studio B","Lobby 43","BEC"];
+
+// For each (day, studio) in [startDate,endDate], finds every contiguous free
+// window within the studio's business day (TIMELINE_START_H–TIMELINE_END_H)
+// that's at least `durationHours` long, given already-booked time ranges per
+// studio. No turnaround buffer is applied between back-to-back bookings —
+// zero gap counts as available. Returns one row per qualifying window (not
+// one row per possible start time within it), so a single long free stretch
+// is a single result.
+const findStudioAvailability = ({studios, startDate, endDate, durationHours, busyByStudio, now=new Date()}) => {
+  const results = [];
+  const durMs = Math.max(durationHours,0.25)*3600000;
+  const cursorDay = new Date(startDate); cursorDay.setHours(0,0,0,0);
+  const lastDay = new Date(endDate); lastDay.setHours(0,0,0,0);
+  while(cursorDay<=lastDay){
+    const dayStart = new Date(cursorDay); dayStart.setHours(TIMELINE_START_H,0,0,0);
+    const dayEnd = new Date(cursorDay); dayEnd.setDate(dayEnd.getDate()+1); dayEnd.setHours(0,0,0,0);
+    const searchFrom = dayStart<now ? now : dayStart;
+    studios.forEach(studio=>{
+      const busy = (busyByStudio[studio]||[])
+        .filter(b=>b.end>dayStart && b.start<dayEnd)
+        .sort((a,b)=>a.start-b.start);
+      const merged = [];
+      busy.forEach(b=>{
+        const last = merged[merged.length-1];
+        if(last && b.start<=last.end) { if(b.end>last.end) last.end=b.end; }
+        else merged.push({start:b.start, end:b.end});
+      });
+      let cursor = searchFrom>dayStart ? searchFrom : dayStart;
+      merged.forEach(b=>{
+        if(b.start>cursor && (b.start-cursor)>=durMs){
+          results.push({studio, date:new Date(cursorDay), freeStart:new Date(cursor), freeEnd:new Date(b.start)});
+        }
+        if(b.end>cursor) cursor=b.end;
+      });
+      if(dayEnd-cursor>=durMs){
+        results.push({studio, date:new Date(cursorDay), freeStart:new Date(cursor), freeEnd:new Date(dayEnd)});
+      }
+    });
+    cursorDay.setDate(cursorDay.getDate()+1);
+  }
+  return results;
+};
+
 const _TICKS = Array.from({length: TIMELINE_END_H - TIMELINE_START_H + 1}, (_,i)=>i+TIMELINE_START_H);
 
 const TimelineRuler = ({hToPercent}) => (
@@ -4017,6 +4065,7 @@ const deleteSetupPhoto = key => { if(!key) return; setupPhotoCache.delete(key); 
 const SetupPhotoThumb = ({photoKey, size=64, onRemove, label}) => {
   const [src, setSrc] = useState(()=>setupPhotoCache.get(photoKey)||null);
   const [errored, setErrored] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
   useEffect(()=>{
     if(!photoKey) return;
     if(setupPhotoCache.has(photoKey)){ setSrc(setupPhotoCache.get(photoKey)); return; }
@@ -4031,12 +4080,18 @@ const SetupPhotoThumb = ({photoKey, size=64, onRemove, label}) => {
   if(!photoKey) return null;
   return (
     <div style={{position:"relative",width:size,height:size,flexShrink:0}}>
-      <div style={{width:size,height:size,borderRadius:8,overflow:"hidden",border:"1px solid #1f2937",background:"#0a0f1a",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div onClick={()=>src&&setLightbox(true)} style={{width:size,height:size,borderRadius:8,overflow:"hidden",border:"1px solid #1f2937",background:"#0a0f1a",display:"flex",alignItems:"center",justifyContent:"center",cursor:src?"zoom-in":"default"}}>
         {src ? <img src={src} alt={label||""} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
           : errored ? <span style={{color: "#8e97a6",fontSize:13}}>missing</span>
           : <span style={{color: "#838ba0",fontSize:13}}>…</span>}
       </div>
       {onRemove&&<button onClick={onRemove} style={{position:"absolute",top:-6,right:-6,background:"#1f2937",border:"1px solid #374151",borderRadius:"50%",width:18,height:18,color:"#9ca3af",fontSize:13,cursor:"pointer",lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>}
+      {lightbox && src && (
+        <div onClick={()=>setLightbox(false)} style={{position:"fixed",inset:0,zIndex:6000,background:"rgba(0,0,0,0.88)",display:"flex",alignItems:"center",justifyContent:"center",padding:32,cursor:"zoom-out"}}>
+          <img src={src} alt={label||""} style={{maxWidth:"90vw",maxHeight:"90vh",objectFit:"contain",borderRadius:8,boxShadow:"0 24px 80px #000c"}}/>
+          <button onClick={()=>setLightbox(false)} style={{position:"fixed",top:20,right:24,background:"#1f2937",border:"1px solid #374151",borderRadius:"50%",width:36,height:36,color:"#e2e8f0",fontSize:19,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+        </div>
+      )}
     </div>
   );
 };
@@ -16638,17 +16693,17 @@ const SetupInstanceCard = ({
           <div>
             <div style={colLbl}>Floorplan</div>
             {setup.floorplanPhotoKey
-              ? <SetupPhotoThumb photoKey={setup.floorplanPhotoKey} size={88} onRemove={()=>updField("floorplanPhotoKey",null)}/>
-              : <SetupPhotoUploadButton label="Add Floorplan" size={88} onUploaded={k=>updField("floorplanPhotoKey",k)}/>}
+              ? <SetupPhotoThumb photoKey={setup.floorplanPhotoKey} size={160} onRemove={()=>updField("floorplanPhotoKey",null)}/>
+              : <SetupPhotoUploadButton label="Add Floorplan" size={160} onUploaded={k=>updField("floorplanPhotoKey",k)}/>}
           </div>
           <div style={{flex:1,minWidth:0}}>
             <div style={colLbl}>Reference Photos</div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {(setup.refPhotoKeys||[]).map(k=>(
-                <SetupPhotoThumb key={k} photoKey={k} size={64}
+                <SetupPhotoThumb key={k} photoKey={k} size={160}
                   onRemove={()=>updField("refPhotoKeys",(setup.refPhotoKeys||[]).filter(x=>x!==k))}/>
               ))}
-              <SetupPhotoUploadButton label="Add" multiple size={64} onUploaded={k=>updField("refPhotoKeys",[...(setup.refPhotoKeys||[]),k])}/>
+              <SetupPhotoUploadButton label="Add" multiple size={160} onUploaded={k=>updField("refPhotoKeys",[...(setup.refPhotoKeys||[]),k])}/>
             </div>
           </div>
         </div>
@@ -21313,6 +21368,353 @@ const ResourceView = ({projects, team, studioBookings=[], resourceConfig, onUpda
   );
 };
 
+// ─── Book This Slot — creates a real Production from a found availability
+// window. Lives in a project (every Production must), so the PM picks which
+// one; start time defaults to the top of the window but can move anywhere
+// within it. Talent carried over from the Scheduler's search criteria
+// pre-fills here (per the brief: talent doesn't gate availability, it's
+// just meant to be easy to attach once a slot is actually booked) and stays
+// editable via the same TalentPicker used elsewhere in the app.
+const BookSlotModal = ({row, durationHours, talentIds=[], talentRoster=[], projects=[], onClose, onConfirm}) => {
+  const durMs = Math.max(+durationHours||1,0.25)*3600000;
+  const startOptions = useMemo(()=>{
+    const opts = [];
+    const latest = new Date(row.freeEnd.getTime()-durMs);
+    let t = new Date(row.freeStart);
+    while(t<=latest){ opts.push(new Date(t)); t=new Date(t.getTime()+30*60000); }
+    if(opts.length===0) opts.push(new Date(row.freeStart));
+    return opts;
+  },[row, durMs]);
+  const [startIdx, setStartIdx] = useState(0);
+  const [projectId, setProjectId] = useState("");
+  const [type, setType] = useState(PRODUCTION_TYPES[0]);
+  const [title, setTitle] = useState("");
+  const [pickedTalent, setPickedTalent] = useState(talentIds);
+  const [showTalentPicker, setShowTalentPicker] = useState(false);
+
+  const fmtOpt = d => { const h=d.getHours(), m=d.getMinutes(), ap=h<12?"AM":"PM", h12=h===0?12:h>12?h-12:h; return `${h12}:${String(m).padStart(2,"0")} ${ap}`; };
+  const sortedProjects = useMemo(()=>[...projects].sort((a,b)=>(a.name||"").localeCompare(b.name||"")),[projects]);
+
+  return (
+    <Modal onClose={onClose} maxWidth={480}>
+      <div style={{fontSize:22,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:4}}>Book This Slot</div>
+      <div style={{fontSize:15,color:"#9ca3af",marginBottom:18}}>
+        {row.studio} — {row.date.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        <LW label="Project *">
+          <Sel value={projectId} onChange={e=>setProjectId(e.target.value)}>
+            <option value="">Select a project…</option>
+            {sortedProjects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+          </Sel>
+        </LW>
+        <LW label="Production Type">
+          <Sel value={type} onChange={e=>setType(e.target.value)}>
+            {PRODUCTION_TYPES.map(t=><option key={t}>{t}</option>)}
+          </Sel>
+        </LW>
+        <LW label="Title (optional)">
+          <Inp value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Client Interview"/>
+        </LW>
+        <LW label="Start Time">
+          <Sel value={startIdx} onChange={e=>setStartIdx(+e.target.value)}>
+            {startOptions.map((d,i)=><option key={i} value={i}>{fmtOpt(d)} – {fmtOpt(new Date(d.getTime()+durMs))}</option>)}
+          </Sel>
+        </LW>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Talent</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}}>
+            {pickedTalent.map(id=>{
+              const t = talentRoster.find(x=>x.id===id);
+              return t ? <Chip key={id} label={t.name} color="#f59e0b" xs/> : null;
+            })}
+            {pickedTalent.length===0 && <span style={{fontSize:14,color:"#4b5563",fontStyle:"italic"}}>None selected</span>}
+          </div>
+          <Btn small onClick={()=>setShowTalentPicker(true)}>{pickedTalent.length?"Edit Talent":"+ Add Talent"}</Btn>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:22,borderTop:"1px solid #1f2937",paddingTop:16}}>
+        <button onClick={onClose} style={{background:"transparent",border:"1px solid #1f2937",borderRadius:8,color:"#6b7280",padding:"9px 16px",fontSize:15,fontWeight:700,cursor:"pointer"}}>Cancel</button>
+        <button onClick={()=>projectId&&onConfirm({projectId, type, title, startDate:startOptions[startIdx], talent:pickedTalent})} disabled={!projectId}
+          style={{background:projectId?"#6366f1":"#1f2937",border:"none",borderRadius:8,color:projectId?"#fff":"#4b5563",padding:"9px 20px",fontSize:15,fontWeight:800,cursor:projectId?"pointer":"not-allowed"}}>
+          Create Production
+        </button>
+      </div>
+      {showTalentPicker && (
+        <TalentPicker talentRoster={talentRoster} selectedIds={pickedTalent}
+          onConfirm={ids=>{setPickedTalent(ids);setShowTalentPicker(false);}} onClose={()=>setShowTalentPicker(false)}/>
+      )}
+    </Modal>
+  );
+};
+
+// ─── Studio Scheduler ───────────────────────────────────────────────────────
+// Helps a PM answer "when can I actually book this?" on the phone with a
+// client: give it a rough duration, a date window, and optionally a
+// preferred studio and talent, and it searches every bookable room's real
+// schedule for open stretches long enough to fit. Falls back to every studio
+// if the preferred one has nothing in range, and to a plain list of what's
+// already booked there if nothing fits anywhere — see findStudioAvailability.
+const StudioSchedulerTab = ({projects, allBookings, talentRoster=[], onUpdateProject, onOpenProject}) => {
+  const [durationHours, setDurationHours] = useState(5);
+  const [rangeMode, setRangeMode] = useState("next14");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [preferredStudio, setPreferredStudio] = useState("");
+  const [talentIds, setTalentIds] = useState([]);
+  const [showTalentPicker, setShowTalentPicker] = useState(false);
+  const [bookingRow, setBookingRow] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  const RANGE_PRESETS = [
+    {id:"next7",  label:"Next 7 Days"},
+    {id:"next14", label:"Next 2 Weeks"},
+    {id:"next30", label:"Next 30 Days"},
+    {id:"thisMonth", label:"This Month"},
+    {id:"nextMonth", label:"Next Month"},
+    {id:"custom", label:"Custom Range"},
+  ];
+
+  const {rangeStart, rangeEnd} = useMemo(()=>{
+    const today = new Date(); today.setHours(0,0,0,0);
+    if(rangeMode==="custom"){
+      const s = customStart ? new Date(customStart+"T00:00") : today;
+      const e = customEnd ? new Date(customEnd+"T00:00") : s;
+      return {rangeStart:s, rangeEnd:e<s?s:e};
+    }
+    if(rangeMode==="thisMonth"){
+      const s = new Date(today.getFullYear(), today.getMonth(), 1);
+      const e = new Date(today.getFullYear(), today.getMonth()+1, 0);
+      return {rangeStart: s<today?today:s, rangeEnd:e};
+    }
+    if(rangeMode==="nextMonth"){
+      const s = new Date(today.getFullYear(), today.getMonth()+1, 1);
+      const e = new Date(today.getFullYear(), today.getMonth()+2, 0);
+      return {rangeStart:s, rangeEnd:e};
+    }
+    const days = {next7:7, next14:14, next30:30}[rangeMode] || 14;
+    const e = new Date(today); e.setDate(e.getDate()+days-1);
+    return {rangeStart:today, rangeEnd:e};
+  },[rangeMode, customStart, customEnd]);
+
+  const busyByStudio = useMemo(()=>{
+    const map = {}; BOOKABLE_STUDIOS.forEach(s=>map[s]=[]);
+    (allBookings||[]).forEach(b=>{
+      if(!BOOKABLE_STUDIOS.includes(b.location)) return;
+      if(b.bookingStatus==="Cancelled") return;
+      if(!b.startTime) return;
+      const start = new Date(b.startTime);
+      const end = b.endTime ? new Date(b.endTime) : new Date(start.getTime()+3600000);
+      if(isNaN(start.getTime())||isNaN(end.getTime())) return;
+      map[b.location].push({start, end, title:b.title||"", projectName:b.projectName||"", bookingStatus:b.bookingStatus});
+    });
+    return map;
+  },[allBookings]);
+
+  const allResults = useMemo(()=>findStudioAvailability({
+    studios:BOOKABLE_STUDIOS, startDate:rangeStart, endDate:rangeEnd, durationHours:+durationHours||1, busyByStudio,
+  }),[rangeStart, rangeEnd, durationHours, busyByStudio]);
+
+  const preferredResults = preferredStudio ? allResults.filter(r=>r.studio===preferredStudio) : allResults;
+  const usedFallback = !!preferredStudio && preferredResults.length===0 && allResults.length>0;
+  const displayResults = (preferredStudio && preferredResults.length>0) ? preferredResults : allResults;
+
+  const conflictList = useMemo(()=>{
+    if(displayResults.length>0) return [];
+    const studios = preferredStudio ? [preferredStudio] : BOOKABLE_STUDIOS;
+    const rangeEndExclusive = new Date(rangeEnd.getTime()+86400000);
+    return (allBookings||[])
+      .filter(b=>studios.includes(b.location) && b.bookingStatus!=="Cancelled" && b.startTime)
+      .filter(b=>{
+        const s = new Date(b.startTime), e = b.endTime?new Date(b.endTime):s;
+        return s<rangeEndExclusive && e>rangeStart;
+      })
+      .sort((a,b)=>new Date(a.startTime)-new Date(b.startTime));
+  },[displayResults, allBookings, preferredStudio, rangeStart, rangeEnd]);
+
+  const grouped = useMemo(()=>{
+    const byStudio = {};
+    displayResults.forEach(r=>{ (byStudio[r.studio]=byStudio[r.studio]||[]).push(r); });
+    Object.values(byStudio).forEach(list=>list.sort((a,b)=>a.freeStart-b.freeStart));
+    return byStudio;
+  },[displayResults]);
+
+  const fmtClock = d => { const h=d.getHours(), m=d.getMinutes(), ap=h<12?"AM":"PM", h12=h===0?12:h>12?h-12:h; return `${h12}:${String(m).padStart(2,"0")} ${ap}`; };
+  const fmtDayLbl = d => d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+
+  const copyResults = () => {
+    const lines = [];
+    BOOKABLE_STUDIOS.forEach(studio=>{
+      const rows = grouped[studio];
+      if(!rows||!rows.length) return;
+      lines.push(`${studio.toUpperCase()} — available for a ${durationHours}-hour booking:`);
+      rows.forEach(r=>lines.push(`• ${fmtDayLbl(r.date)}: ${fmtClock(r.freeStart)} – ${fmtClock(r.freeEnd)}`));
+      lines.push("");
+    });
+    const text = lines.join("\n").trim();
+    if(!text) return;
+    navigator.clipboard?.writeText(text).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); }).catch(()=>{});
+  };
+
+  const doBook = ({projectId, type, title, startDate, talent}) => {
+    const project = projects.find(p=>p.id===projectId);
+    if(!project || !bookingRow) return;
+    const p = n=>String(n).padStart(2,"0");
+    const toLocalISO = d => `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+    const endDate = new Date(startDate.getTime()+Math.max(+durationHours||1,0.25)*3600000);
+    const newProd = {
+      id:uid(), type, title:title||"", status:"Planning",
+      startTime:toLocalISO(startDate), endTime:toLocalISO(endDate), location:bookingRow.studio, crewCallTime:"",
+      notes:"", feedsIntoId:null, playbackDeliverableId:null, playbackAssets:[], assetRequests:[],
+      equipmentIds:[], externalGear:[], mediaCardIds:[], crewInternal:[], crewExternal:[], schedule:[],
+      ingest:{datetime:"",notes:"",transcriptNeeded:false,reviewLinkNeeded:false,recurringOrOnce:"",sessionCount:"",
+              reviewLinkType:"",reviewLinkCount:"",reviewWatermark:false,brightcoveNeeded:false,brightcovePW:false,reviewLinkDelIds:[]},
+      deliverables:[], talent:talent||[],
+    };
+    onUpdateProject(projectId, "productions", [...(project.productions||[]), newProd]);
+    setBookingRow(null);
+    onOpenProject && onOpenProject(project);
+  };
+
+  const lbl = {fontSize:13,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.08em",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:6,display:"block"};
+  const inp = {background:"#0a0f1a",border:"1px solid #374151",borderRadius:8,color:"#f1f5f9",padding:"8px 12px",fontSize:16,outline:"none",fontFamily:"'DM Sans',sans-serif",colorScheme:"dark"};
+
+  return (
+    <div>
+      {/* ── Search criteria ── */}
+      <div style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:12,padding:20,marginBottom:20}}>
+        <div style={{fontSize:19,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:14}}>Find Studio Availability</div>
+        <div style={{display:"grid",gridTemplateColumns:"140px 1fr 1fr",gap:14,marginBottom:14}}>
+          <div>
+            <label style={lbl}>Length (hours)</label>
+            <input type="number" min={0.5} max={16} step={0.5} value={durationHours}
+              onChange={e=>setDurationHours(e.target.value)} style={{...inp,width:"100%"}}/>
+          </div>
+          <div>
+            <label style={lbl}>Studio Preference</label>
+            <select value={preferredStudio} onChange={e=>setPreferredStudio(e.target.value)} style={{...inp,width:"100%",cursor:"pointer"}}>
+              <option value="">Any studio</option>
+              {BOOKABLE_STUDIOS.map(s=><option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Talent (optional)</label>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+              {talentIds.map(id=>{
+                const t = talentRoster.find(x=>x.id===id);
+                return t ? (
+                  <span key={id} style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                    <Chip label={t.name} color="#f59e0b" xs/>
+                    <button onClick={()=>setTalentIds(ids=>ids.filter(x=>x!==id))} style={{background:"none",border:"none",color:"#8e97a6",cursor:"pointer",fontSize:15,lineHeight:1,padding:0}}>×</button>
+                  </span>
+                ) : null;
+              })}
+              <button onClick={()=>setShowTalentPicker(true)}
+                style={{background:"none",border:"1px dashed #374151",borderRadius:6,color:"#818cf8",padding:"4px 10px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                + Add
+              </button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label style={lbl}>Window</label>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+            {RANGE_PRESETS.map(r=>(
+              <button key={r.id} onClick={()=>setRangeMode(r.id)}
+                style={{background:rangeMode===r.id?"#6366f1":"#1f2937",border:"none",borderRadius:7,color:rangeMode===r.id?"#fff":"#9ca3af",padding:"6px 14px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>
+                {r.label}
+              </button>
+            ))}
+            {rangeMode==="custom" && (
+              <>
+                <input type="date" value={customStart} onChange={e=>setCustomStart(e.target.value)} style={inp}/>
+                <span style={{color:"#6b7280"}}>to</span>
+                <input type="date" value={customEnd} onChange={e=>setCustomEnd(e.target.value)} style={inp}/>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Results ── */}
+      {usedFallback && (
+        <div style={{background:"#f59e0b18",border:"1px solid #f59e0b40",borderRadius:8,padding:"10px 14px",color:"#f59e0b",fontSize:15,marginBottom:16}}>
+          No availability at <b>{preferredStudio}</b> in this window — showing every studio instead.
+        </div>
+      )}
+
+      {displayResults.length>0 && (
+        <>
+          <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
+            <button onClick={copyResults}
+              style={{background:copied?"#10b981":"#1f2937",border:"1px solid #374151",borderRadius:7,color:copied?"#fff":"#9ca3af",padding:"6px 14px",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+              {copied?"✓ Copied!":"📋 Copy Results"}
+            </button>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+            {BOOKABLE_STUDIOS.filter(s=>grouped[s]?.length).map(studio=>(
+              <div key={studio} style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:12,overflow:"hidden"}}>
+                <div style={{background:"#111827",padding:"10px 16px",fontSize:16,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>
+                  {studio} <span style={{color:"#6b7280",fontWeight:700}}>({grouped[studio].length} open window{grouped[studio].length!==1?"s":""})</span>
+                </div>
+                <div>
+                  {grouped[studio].map((r,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,padding:"10px 16px",borderTop:i>0?"1px solid #1f2937":"none"}}>
+                      <div style={{fontSize:16,color:"#e2e8f0"}}>
+                        <span style={{fontWeight:700}}>{fmtDayLbl(r.date)}</span>
+                        <span style={{color:"#9ca3af"}}> — {fmtClock(r.freeStart)} – {fmtClock(r.freeEnd)}</span>
+                      </div>
+                      <button onClick={()=>setBookingRow(r)}
+                        style={{background:"#6366f115",border:"1px solid #6366f140",borderRadius:6,color:"#818cf8",padding:"5px 12px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>
+                        Book This Slot →
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {displayResults.length===0 && (
+        <div>
+          <div style={{textAlign:"center",padding:"20px 0",color:"#9ca3af",fontSize:16}}>
+            No {durationHours}-hour block open anywhere{preferredStudio?` at ${preferredStudio}`:""} in this window.
+          </div>
+          {conflictList.length>0 ? (
+            <>
+              <div style={{fontSize:15,color:"#e2e8f0",marginBottom:10}}>Here's what's already booked during that window — one of these might be able to move:</div>
+              <div style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:12,overflow:"hidden"}}>
+                {conflictList.map((b,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 16px",borderTop:i>0?"1px solid #1f2937":"none",flexWrap:"wrap"}}>
+                    <span style={{background:(BKSTATUS_COLOR[b.bookingStatus]||"#6b7280")+"22",color:BKSTATUS_COLOR[b.bookingStatus]||"#6b7280",borderRadius:5,padding:"2px 8px",fontSize:12,fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>{b.bookingStatus||"Tentative"}</span>
+                    <span style={{fontWeight:700,color:"#f1f5f9",fontSize:15}}>{b.location}</span>
+                    <span style={{color:"#9ca3af",fontSize:15}}>{new Date(b.startTime).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})} {fmtClock(new Date(b.startTime))}{b.endTime?` – ${fmtClock(new Date(b.endTime))}`:""}</span>
+                    <span style={{color:"#e2e8f0",fontSize:15,flex:1,minWidth:120}}>{b.title||b.productionType||"Untitled"}</span>
+                    <span style={{color:"#6b7280",fontSize:14}}>{b.projectName||""}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div style={{textAlign:"center",color:"#4b5563",fontSize:15}}>Nothing's booked there either — try a shorter length or a wider window.</div>
+          )}
+        </div>
+      )}
+
+      {showTalentPicker && (
+        <TalentPicker talentRoster={talentRoster} selectedIds={talentIds}
+          onConfirm={ids=>{setTalentIds(ids);setShowTalentPicker(false);}} onClose={()=>setShowTalentPicker(false)}/>
+      )}
+      {bookingRow && (
+        <BookSlotModal row={bookingRow} durationHours={durationHours} talentIds={talentIds} talentRoster={talentRoster}
+          projects={projects} onClose={()=>setBookingRow(null)} onConfirm={doBook}/>
+      )}
+    </div>
+  );
+};
+
 const StudioTab = ({projects, studioBookings, onUpdateStudioBookings, team, onOpenProject, talentRoster=[], onUpdateProject, mediaCards=[], sidebarSlotNode, onSidebarWidthChange}) => {
   const [subView, setSubView] = useState("bookings");
   const [statusHistoryOpen, setStatusHistoryOpen] = useState(false);
@@ -21363,7 +21765,7 @@ const StudioTab = ({projects, studioBookings, onUpdateStudioBookings, team, onOp
     <>
     <div>
       <div style={{display:"flex",gap:2,marginBottom:20,borderBottom:"1px solid #1f2937",paddingBottom:12,alignItems:"center"}}>
-        {[["bookings","📋 Bookings"],["calendar","📅 Calendar"],["equipment","🎒 Equipment"],["display","📺 Display Board"]].map(([id,label])=>(
+        {[["bookings","📋 Bookings"],["calendar","📅 Calendar"],["scheduler","🗓 Scheduler"],["equipment","🎒 Equipment"],["display","📺 Display Board"]].map(([id,label])=>(
           <button key={id} style={subS(subView===id)} onClick={()=>setSubView(id)}>{label}</button>
         ))}
         <button onClick={()=>setStatusHistoryOpen(true)}
@@ -21373,6 +21775,7 @@ const StudioTab = ({projects, studioBookings, onUpdateStudioBookings, team, onOp
       </div>
       {subView==="bookings"  && <StudioBookingsList allBookings={allBookings} projects={projects} team={team} studioBookings={studioBookings} onUpdateStudioBookings={onUpdateStudioBookings} onOpenProject={onOpenProject} onUpdateProject={onUpdateProject}/>}
       {subView==="calendar"  && <StudioCalendar allBookings={allBookings} team={team} projects={projects} onOpenProject={onOpenProject} talentRoster={talentRoster}/>}
+      {subView==="scheduler" && <StudioSchedulerTab projects={projects} allBookings={allBookings} talentRoster={talentRoster} onUpdateProject={onUpdateProject} onOpenProject={onOpenProject}/>}
       {subView==="equipment" && <StudioEquipmentTab mediaCards={mediaCards}/>}
       {subView==="display"   && <StudioDisplayBoard allBookings={allBookings} team={team}/>}
     </div>
@@ -26951,8 +27354,10 @@ const passwordComplexityError = pw => {
   if(!/[A-Z]/.test(pw)) return "Password must include an uppercase letter.";
   if(!/[a-z]/.test(pw)) return "Password must include a lowercase letter.";
   if(!/[0-9]/.test(pw)) return "Password must include a number.";
+  if(!/[^A-Za-z0-9]/.test(pw)) return "Password must include a special character.";
   return null;
 };
+const PASSWORD_REQUIREMENTS_HINT = "At least 8 characters, with an uppercase letter, a lowercase letter, a number, and a special character.";
 
 const AUTH_SCREEN_WRAP = {display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',minHeight:'100dvh',background:'#060a12',padding:20};
 const AUTH_CARD = {background:'#0d1117',border:'1px solid #1f2937',borderRadius:16,padding:32,width:'100%',maxWidth:380,boxShadow:'0 24px 80px #000c'};
@@ -27085,7 +27490,7 @@ const SupabaseAuthGate = () => {
         <div style={AUTH_LABEL}>Confirm Password</div>
         <input style={AUTH_INPUT} type="password" value={pw2} placeholder="Re-enter password"
           onChange={e=>setPw2(e.target.value)} onKeyDown={onEnter(signUp)} autoComplete="new-password"/>
-        <div style={{fontSize:13,color:'#6b7280',marginBottom:14,marginTop:-4}}>Needs an uppercase letter, a lowercase letter, and a number.</div>
+        <div style={{fontSize:13,color:'#6b7280',marginBottom:14,marginTop:-4}}>{PASSWORD_REQUIREMENTS_HINT}</div>
         <button onClick={signUp} disabled={busy} style={AUTH_BUTTON(busy)}>{busy?'Creating account…':'Create Account →'}</button>
         {err&&<div style={{color:'#ef4444',fontSize:16,marginTop:10,textAlign:'center'}}>{err}</div>}
         <div style={{textAlign:'center',marginTop:18}}>
@@ -27128,17 +27533,58 @@ const SetNewPasswordScreen = ({onDone}) => {
   const [pw2,setPw2]=useState('');
   const [err,setErr]=useState('');
   const [busy,setBusy]=useState(false);
+  // A recovery session from the email link only ever reaches aal1 (password
+  // proof), never aal2 — but every account here has 2FA enabled, and
+  // Supabase refuses updateUser({password}) below aal2 once MFA is on.
+  // needsCode flips true the moment that becomes clear, and the same code
+  // challenge used at normal sign-in runs here too before retrying the update.
+  const [needsCode,setNeedsCode]=useState(false);
+  const [code,setCode]=useState('');
   const submit=async()=>{
     if(!sb){ setErr('Backend is not configured.'); return; }
     const complexityErr = passwordComplexityError(pw);
     if(complexityErr){ setErr(complexityErr); return; }
     if(pw!==pw2){ setErr("Passwords don't match."); return; }
     setBusy(true); setErr('');
+    const {data:aal} = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    if(aal?.nextLevel==="aal2" && aal?.currentLevel!==aal?.nextLevel){
+      setBusy(false);
+      setNeedsCode(true);
+      return;
+    }
     const {error} = await sb.auth.updateUser({password:pw});
     setBusy(false);
     if(error){ setErr(error.message||'Could not update password.'); return; }
     onDone();
   };
+  const submitCode=async()=>{
+    if(!code.trim()){ setErr('Enter the 6-digit code from your authenticator app.'); return; }
+    setBusy(true); setErr('');
+    const {data:factors,error:listErr} = await sb.auth.mfa.listFactors();
+    const factor = (factors?.totp||[]).find(f=>f.status==="verified");
+    if(listErr || !factor){ setBusy(false); setErr('No verified authenticator found on this account.'); return; }
+    const {data:challenge,error:challengeErr} = await sb.auth.mfa.challenge({factorId:factor.id});
+    if(challengeErr){ setBusy(false); setErr(challengeErr.message||'Could not verify that code.'); return; }
+    const {error:verifyErr} = await sb.auth.mfa.verify({factorId:factor.id, challengeId:challenge.id, code:code.trim()});
+    if(verifyErr){ setBusy(false); setErr("That code didn't match — try again."); setCode(''); return; }
+    const {error:updateErr} = await sb.auth.updateUser({password:pw});
+    setBusy(false);
+    if(updateErr){ setErr(updateErr.message||'Could not update password.'); return; }
+    onDone();
+  };
+  if(needsCode) return (
+    <div style={AUTH_SCREEN_WRAP}>
+      <div style={AUTH_CARD}>
+        <div style={AUTH_TITLE}>PostTrack</div>
+        <div style={AUTH_SUB}>Enter the 6-digit code from your authenticator app to finish resetting your password</div>
+        <input style={{...AUTH_INPUT, textAlign:'center', fontSize:24, letterSpacing:'0.3em'}} value={code}
+          onChange={e=>setCode(e.target.value.replace(/\D/g,'').slice(0,6))}
+          onKeyDown={e=>e.key==='Enter'&&submitCode()} placeholder="123456" autoFocus/>
+        <button onClick={submitCode} disabled={busy} style={AUTH_BUTTON(busy)}>{busy?'Verifying…':'Verify & Save Password'}</button>
+        {err&&<div style={{color:'#ef4444',fontSize:16,marginTop:10,textAlign:'center'}}>{err}</div>}
+      </div>
+    </div>
+  );
   return (
     <div style={AUTH_SCREEN_WRAP}>
       <div style={AUTH_CARD}>
@@ -27150,7 +27596,7 @@ const SetNewPasswordScreen = ({onDone}) => {
         <div style={AUTH_LABEL}>Confirm Password</div>
         <input style={AUTH_INPUT} type="password" value={pw2} placeholder="Re-enter password"
           onChange={e=>setPw2(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} autoComplete="new-password"/>
-        <div style={{fontSize:13,color:'#6b7280',marginBottom:14,marginTop:-4}}>Needs an uppercase letter, a lowercase letter, and a number.</div>
+        <div style={{fontSize:13,color:'#6b7280',marginBottom:14,marginTop:-4}}>{PASSWORD_REQUIREMENTS_HINT}</div>
         <button onClick={submit} disabled={busy} style={AUTH_BUTTON(busy)}>{busy?'Saving…':'Save Password →'}</button>
         {err&&<div style={{color:'#ef4444',fontSize:16,marginTop:10,textAlign:'center'}}>{err}</div>}
       </div>
@@ -27307,13 +27753,15 @@ const MyProfileModal = ({member, onSubmit, onClose}) => {
   };
 
   // ── Change password ───────────────────────────────────────────────────────
-  // Supabase's updateUser({password}) just needs the current session — it
-  // doesn't ask for the current password itself. Re-authenticating with it
-  // here first is a deliberate extra check, so someone at an unlocked,
-  // already-signed-in laptop can't silently take over the account by
-  // setting a new password without knowing the old one.
+  // Supabase requires an aal2 session (password + a passed MFA challenge —
+  // which every session in this app already is, since the App-level gate
+  // won't let anyone in without one) to update a password once MFA is
+  // enabled; it rejects the call otherwise. Re-authenticating with
+  // signInWithPassword() first (to double-check the "current" password)
+  // would mint a fresh aal1-only session and immediately break that
+  // requirement — so this relies solely on the session already being
+  // signed in at the required strength, same as Supabase's own guidance.
   const [showPwForm,setShowPwForm] = useState(false);
-  const [currentPw,setCurrentPw] = useState("");
   const [newPw,setNewPw] = useState("");
   const [newPw2,setNewPw2] = useState("");
   const [pwBusy,setPwBusy] = useState(false);
@@ -27322,17 +27770,14 @@ const MyProfileModal = ({member, onSubmit, onClose}) => {
   const changePassword = async () => {
     if(!sb) return;
     setPwErr(""); setPwOk(false);
-    if(!currentPw){ setPwErr("Enter your current password."); return; }
     const complexityErr = passwordComplexityError(newPw);
     if(complexityErr){ setPwErr(complexityErr); return; }
     if(newPw!==newPw2){ setPwErr("New passwords don't match."); return; }
     setPwBusy(true);
-    const {error:reauthErr} = await sb.auth.signInWithPassword({email:member.email, password:currentPw});
-    if(reauthErr){ setPwBusy(false); setPwErr("Current password is incorrect."); return; }
     const {error:updateErr} = await sb.auth.updateUser({password:newPw});
     setPwBusy(false);
     if(updateErr){ setPwErr(updateErr.message||"Could not update password."); return; }
-    setCurrentPw(""); setNewPw(""); setNewPw2(""); setShowPwForm(false); setPwOk(true);
+    setNewPw(""); setNewPw2(""); setShowPwForm(false); setPwOk(true);
   };
 
   const lbl={fontSize:13,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.08em",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:6,display:"block"};
@@ -27449,12 +27894,12 @@ const MyProfileModal = ({member, onSubmit, onClose}) => {
             {pwOk && !showPwForm && <div style={{fontSize:13,color:"#10b981",marginTop:6}}>Password updated.</div>}
             {showPwForm && (
               <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:8}}>
-                <input type="password" value={currentPw} onChange={e=>setCurrentPw(e.target.value)} placeholder="Current password" style={inp}/>
                 <input type="password" value={newPw} onChange={e=>setNewPw(e.target.value)} placeholder="New password" style={inp}/>
                 <input type="password" value={newPw2} onChange={e=>setNewPw2(e.target.value)} placeholder="Confirm new password" style={inp}/>
+                <div style={{fontSize:13,color:"#6b7280",marginTop:-4}}>{PASSWORD_REQUIREMENTS_HINT}</div>
                 {pwErr && <div style={{fontSize:13,color:"#ef4444"}}>{pwErr}</div>}
                 <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>{setShowPwForm(false);setCurrentPw("");setNewPw("");setNewPw2("");setPwErr("");}}
+                  <button onClick={()=>{setShowPwForm(false);setNewPw("");setNewPw2("");setPwErr("");}}
                     style={{background:"transparent",border:"1px solid #1f2937",borderRadius:7,color:"#6b7280",padding:"8px 14px",fontSize:14,fontWeight:700,cursor:"pointer"}}>
                     Cancel
                   </button>
