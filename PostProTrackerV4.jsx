@@ -22962,11 +22962,7 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
                   ) : (
                     <>
                       {/* Read-only view of the selected member — same layout as
-                          editing, styled as a "selected" state rather than a
-                          disabled/locked one. */}
-                      <div style={{display:"inline-flex",alignItems:"center",gap:6,marginBottom:12,padding:"4px 12px",background:"#6366f11a",border:"1px solid #6366f150",borderRadius:99,fontSize:13,fontWeight:700,color:"#818cf8",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.05em"}}>
-                        ✓ Selected — click Edit to make changes
-                      </div>
+                          editing, just without the badge that used to sit here. */}
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
                         {[["Name",m.name],["Email",m.email||"—"],["Phone",m.phone||"—"]].map(([l,v])=>(
                           <div key={l}>
@@ -27309,6 +27305,36 @@ const MyProfileModal = ({member, onSubmit, onClose}) => {
     // straight into the mandatory enroll screen for the new device.
     window.location.reload();
   };
+
+  // ── Change password ───────────────────────────────────────────────────────
+  // Supabase's updateUser({password}) just needs the current session — it
+  // doesn't ask for the current password itself. Re-authenticating with it
+  // here first is a deliberate extra check, so someone at an unlocked,
+  // already-signed-in laptop can't silently take over the account by
+  // setting a new password without knowing the old one.
+  const [showPwForm,setShowPwForm] = useState(false);
+  const [currentPw,setCurrentPw] = useState("");
+  const [newPw,setNewPw] = useState("");
+  const [newPw2,setNewPw2] = useState("");
+  const [pwBusy,setPwBusy] = useState(false);
+  const [pwErr,setPwErr] = useState("");
+  const [pwOk,setPwOk] = useState(false);
+  const changePassword = async () => {
+    if(!sb) return;
+    setPwErr(""); setPwOk(false);
+    if(!currentPw){ setPwErr("Enter your current password."); return; }
+    const complexityErr = passwordComplexityError(newPw);
+    if(complexityErr){ setPwErr(complexityErr); return; }
+    if(newPw!==newPw2){ setPwErr("New passwords don't match."); return; }
+    setPwBusy(true);
+    const {error:reauthErr} = await sb.auth.signInWithPassword({email:member.email, password:currentPw});
+    if(reauthErr){ setPwBusy(false); setPwErr("Current password is incorrect."); return; }
+    const {error:updateErr} = await sb.auth.updateUser({password:newPw});
+    setPwBusy(false);
+    if(updateErr){ setPwErr(updateErr.message||"Could not update password."); return; }
+    setCurrentPw(""); setNewPw(""); setNewPw2(""); setShowPwForm(false); setPwOk(true);
+  };
+
   const lbl={fontSize:13,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.08em",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:6,display:"block"};
   const inp={width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:8,color:"#f1f5f9",padding:"9px 12px",fontSize:17,outline:"none",fontFamily:"'DM Sans',sans-serif",colorScheme:"dark"};
   return (
@@ -27409,6 +27435,37 @@ const MyProfileModal = ({member, onSubmit, onClose}) => {
           </div>
           {mfaConfirm && <div style={{fontSize:13,color:"#9ca3af",marginTop:6,lineHeight:1.5}}>You'll be signed out of your current authenticator and asked to set up a new one immediately — only do this if you have a new device ready to scan a QR code with.</div>}
           {mfaErr && <div style={{fontSize:13,color:"#ef4444",marginTop:6}}>{mfaErr}</div>}
+
+          <div style={{borderTop:"1px solid #1f2937",marginTop:16,paddingTop:16}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+              <div style={{fontSize:15,color:"#e2e8f0"}}>Password</div>
+              {!showPwForm && (
+                <button onClick={()=>{setShowPwForm(true);setPwErr("");setPwOk(false);}}
+                  style={{background:"none",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"6px 12px",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0}}>
+                  Change password…
+                </button>
+              )}
+            </div>
+            {pwOk && !showPwForm && <div style={{fontSize:13,color:"#10b981",marginTop:6}}>Password updated.</div>}
+            {showPwForm && (
+              <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:8}}>
+                <input type="password" value={currentPw} onChange={e=>setCurrentPw(e.target.value)} placeholder="Current password" style={inp}/>
+                <input type="password" value={newPw} onChange={e=>setNewPw(e.target.value)} placeholder="New password" style={inp}/>
+                <input type="password" value={newPw2} onChange={e=>setNewPw2(e.target.value)} placeholder="Confirm new password" style={inp}/>
+                {pwErr && <div style={{fontSize:13,color:"#ef4444"}}>{pwErr}</div>}
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{setShowPwForm(false);setCurrentPw("");setNewPw("");setNewPw2("");setPwErr("");}}
+                    style={{background:"transparent",border:"1px solid #1f2937",borderRadius:7,color:"#6b7280",padding:"8px 14px",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                    Cancel
+                  </button>
+                  <button onClick={changePassword} disabled={pwBusy}
+                    style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"8px 14px",fontSize:14,fontWeight:800,cursor:pwBusy?"default":"pointer"}}>
+                    {pwBusy?"Updating…":"Update Password"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div style={{display:"flex",gap:10}}>
@@ -27503,7 +27560,11 @@ const MfaEnrollScreen = ({onDone}) => {
       const {data:existing} = await sb.auth.mfa.listFactors();
       const stale = (existing?.totp||[]).find(f=>f.status==="unverified");
       if(stale) await sb.auth.mfa.unenroll({factorId:stale.id});
-      const {data,error} = await sb.auth.mfa.enroll({factorType:"totp"});
+      // Without an explicit issuer, the authenticator app falls back to
+      // labeling the entry with whatever host the enroll() call was made
+      // from (e.g. "localhost" in dev, or the deployed origin) instead of
+      // a stable, recognizable name.
+      const {data,error} = await sb.auth.mfa.enroll({factorType:"totp", issuer:"PostTrack", friendlyName:"PostTrack"});
       if(cancelled) return;
       if(error){ setErr(error.message||"Could not start two-factor setup."); setLoading(false); return; }
       setFactorId(data.id);
