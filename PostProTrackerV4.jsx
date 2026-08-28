@@ -21375,54 +21375,107 @@ const ResourceView = ({projects, team, studioBookings=[], resourceConfig, onUpda
 // pre-fills here (per the brief: talent doesn't gate availability, it's
 // just meant to be easy to attach once a slot is actually booked) and stays
 // editable via the same TalentPicker used elsewhere in the app.
-const BookSlotModal = ({row, durationHours, talentIds=[], talentRoster=[], projects=[], onClose, onConfirm}) => {
-  const durMs = Math.max(+durationHours||1,0.25)*3600000;
-  const startOptions = useMemo(()=>{
+const BookSlotModal = ({row, talentRoster=[], projects=[], onClose, onConfirm}) => {
+  // Half-hour marks spanning the actual found window, shown as reference —
+  // start and end are each an independent required choice within it (no
+  // fixed-length pairing), so a PM can book anything from the whole window
+  // down to a short piece of it.
+  const timeOptions = useMemo(()=>{
     const opts = [];
-    const latest = new Date(row.freeEnd.getTime()-durMs);
     let t = new Date(row.freeStart);
-    while(t<=latest){ opts.push(new Date(t)); t=new Date(t.getTime()+30*60000); }
-    if(opts.length===0) opts.push(new Date(row.freeStart));
+    while(t<=row.freeEnd){ opts.push(new Date(t)); t=new Date(t.getTime()+30*60000); }
+    if(opts.length===0 || opts[opts.length-1].getTime()!==row.freeEnd.getTime()) opts.push(new Date(row.freeEnd));
     return opts;
-  },[row, durMs]);
-  const [startIdx, setStartIdx] = useState(0);
+  },[row]);
+
   const [projectId, setProjectId] = useState("");
+  const [projectSearch, setProjectSearch] = useState("");
+  const [projectSearchOpen, setProjectSearchOpen] = useState(false);
   const [type, setType] = useState(PRODUCTION_TYPES[0]);
   const [title, setTitle] = useState("");
-  const [pickedTalent, setPickedTalent] = useState(talentIds);
+  const [startIdx, setStartIdx] = useState("");
+  const [endIdx, setEndIdx] = useState("");
+  const [pickedTalent, setPickedTalent] = useState([]);
   const [showTalentPicker, setShowTalentPicker] = useState(false);
 
   const fmtOpt = d => { const h=d.getHours(), m=d.getMinutes(), ap=h<12?"AM":"PM", h12=h===0?12:h>12?h-12:h; return `${h12}:${String(m).padStart(2,"0")} ${ap}`; };
   const sortedProjects = useMemo(()=>[...projects].sort((a,b)=>(a.name||"").localeCompare(b.name||"")),[projects]);
+  const filteredProjects = useMemo(()=>
+    projectSearch ? sortedProjects.filter(p=>(p.name||"").toLowerCase().includes(projectSearch.toLowerCase())) : sortedProjects
+  ,[sortedProjects, projectSearch]);
+  const selectedProject = sortedProjects.find(p=>p.id===projectId);
+
+  const changeStart = v => {
+    setStartIdx(v);
+    if(v!=="" && endIdx!=="" && +endIdx<=+v) setEndIdx("");
+  };
+
+  const canSubmit = !!projectId && !!title.trim() && startIdx!=="" && endIdx!=="" && +endIdx>+startIdx;
+  const confirm = () => {
+    if(!canSubmit) return;
+    onConfirm({projectId, type, title:title.trim(), startDate:timeOptions[+startIdx], endDate:timeOptions[+endIdx], talent:pickedTalent});
+  };
 
   return (
     <Modal onClose={onClose} maxWidth={480}>
       <div style={{fontSize:22,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:4}}>Book This Slot</div>
-      <div style={{fontSize:15,color:"#9ca3af",marginBottom:18}}>
+      <div style={{fontSize:15,color:"#9ca3af",marginBottom:4}}>
         {row.studio} — {row.date.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}
       </div>
+      <div style={{fontSize:14,color:"#6b7280",marginBottom:18}}>
+        Available window: {fmtOpt(row.freeStart)} – {fmtOpt(row.freeEnd)}
+      </div>
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
-        <LW label="Project *">
-          <Sel value={projectId} onChange={e=>setProjectId(e.target.value)}>
-            <option value="">Select a project…</option>
-            {sortedProjects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-          </Sel>
-        </LW>
+        <div>
+          <label style={{fontSize:13,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6,display:"block"}}>Project *</label>
+          {selectedProject ? (
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#0a0f1a",border:"1px solid #374151",borderRadius:8,padding:"8px 12px"}}>
+              <span style={{color:"#f1f5f9",fontSize:16}}>{selectedProject.name}</span>
+              <button onClick={()=>{setProjectId("");setProjectSearch("");}} style={{background:"none",border:"none",color:"#818cf8",cursor:"pointer",fontSize:13,fontWeight:700}}>Change</button>
+            </div>
+          ) : (
+            <div style={{position:"relative"}}>
+              <Inp value={projectSearch} onChange={e=>{setProjectSearch(e.target.value);setProjectSearchOpen(true);}}
+                onFocus={()=>setProjectSearchOpen(true)} placeholder="Search projects…"/>
+              {projectSearchOpen && (
+                <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:10,background:"#0d1117",border:"1px solid #374151",borderRadius:8,marginTop:4,maxHeight:200,overflowY:"auto",boxShadow:"0 12px 32px #000a"}}>
+                  {filteredProjects.length===0 && <div style={{padding:"10px 12px",color:"#4b5563",fontSize:14}}>No projects match.</div>}
+                  {filteredProjects.map(p=>(
+                    <div key={p.id} onClick={()=>{setProjectId(p.id);setProjectSearch("");setProjectSearchOpen(false);}}
+                      style={{padding:"8px 12px",cursor:"pointer",fontSize:15,color:"#e2e8f0",borderBottom:"1px solid #1f2937"}}
+                      onMouseEnter={e=>e.currentTarget.style.background="#1f2937"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                      {p.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <LW label="Production Type">
           <Sel value={type} onChange={e=>setType(e.target.value)}>
             {PRODUCTION_TYPES.map(t=><option key={t}>{t}</option>)}
           </Sel>
         </LW>
-        <LW label="Title (optional)">
+        <LW label="Title *">
           <Inp value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Client Interview"/>
         </LW>
-        <LW label="Start Time">
-          <Sel value={startIdx} onChange={e=>setStartIdx(+e.target.value)}>
-            {startOptions.map((d,i)=><option key={i} value={i}>{fmtOpt(d)} – {fmtOpt(new Date(d.getTime()+durMs))}</option>)}
-          </Sel>
-        </LW>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <LW label="Start Time *">
+            <Sel value={startIdx} onChange={e=>changeStart(e.target.value)}>
+              <option value="">Select…</option>
+              {timeOptions.slice(0,-1).map((d,i)=><option key={i} value={i}>{fmtOpt(d)}</option>)}
+            </Sel>
+          </LW>
+          <LW label="End Time *">
+            <Sel value={endIdx} onChange={e=>setEndIdx(e.target.value)}>
+              <option value="">Select…</option>
+              {timeOptions.map((d,i)=> (startIdx===""||i>+startIdx) ? <option key={i} value={i}>{fmtOpt(d)}</option> : null)}
+            </Sel>
+          </LW>
+        </div>
         <div>
-          <div style={{fontSize:13,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Talent</div>
+          <div style={{fontSize:13,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Talent (optional)</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:6}}>
             {pickedTalent.map(id=>{
               const t = talentRoster.find(x=>x.id===id);
@@ -21435,8 +21488,8 @@ const BookSlotModal = ({row, durationHours, talentIds=[], talentRoster=[], proje
       </div>
       <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:22,borderTop:"1px solid #1f2937",paddingTop:16}}>
         <button onClick={onClose} style={{background:"transparent",border:"1px solid #1f2937",borderRadius:8,color:"#6b7280",padding:"9px 16px",fontSize:15,fontWeight:700,cursor:"pointer"}}>Cancel</button>
-        <button onClick={()=>projectId&&onConfirm({projectId, type, title, startDate:startOptions[startIdx], talent:pickedTalent})} disabled={!projectId}
-          style={{background:projectId?"#6366f1":"#1f2937",border:"none",borderRadius:8,color:projectId?"#fff":"#4b5563",padding:"9px 20px",fontSize:15,fontWeight:800,cursor:projectId?"pointer":"not-allowed"}}>
+        <button onClick={confirm} disabled={!canSubmit}
+          style={{background:canSubmit?"#6366f1":"#1f2937",border:"none",borderRadius:8,color:canSubmit?"#fff":"#4b5563",padding:"9px 20px",fontSize:15,fontWeight:800,cursor:canSubmit?"pointer":"not-allowed"}}>
           Create Production
         </button>
       </div>
@@ -21456,15 +21509,14 @@ const BookSlotModal = ({row, durationHours, talentIds=[], talentRoster=[], proje
 // if the preferred one has nothing in range, and to a plain list of what's
 // already booked there if nothing fits anywhere — see findStudioAvailability.
 const StudioSchedulerTab = ({projects, allBookings, talentRoster=[], onUpdateProject, onOpenProject}) => {
-  const [durationHours, setDurationHours] = useState(5);
+  const [durationHours, setDurationHours] = useState("");
   const [rangeMode, setRangeMode] = useState("next14");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
-  const [preferredStudio, setPreferredStudio] = useState("");
-  const [talentIds, setTalentIds] = useState([]);
-  const [showTalentPicker, setShowTalentPicker] = useState(false);
+  const [preferredStudios, setPreferredStudios] = useState([]);
   const [bookingRow, setBookingRow] = useState(null);
   const [copied, setCopied] = useState(false);
+  const toggleStudio = s => setPreferredStudios(prev=>prev.includes(s)?prev.filter(x=>x!==s):[...prev,s]);
 
   const RANGE_PRESETS = [
     {id:"next7",  label:"Next 7 Days"},
@@ -21511,17 +21563,20 @@ const StudioSchedulerTab = ({projects, allBookings, talentRoster=[], onUpdatePro
     return map;
   },[allBookings]);
 
-  const allResults = useMemo(()=>findStudioAvailability({
-    studios:BOOKABLE_STUDIOS, startDate:rangeStart, endDate:rangeEnd, durationHours:+durationHours||1, busyByStudio,
-  }),[rangeStart, rangeEnd, durationHours, busyByStudio]);
+  const parsedDuration = parseFloat(durationHours);
+  const hasValidDuration = !isNaN(parsedDuration) && parsedDuration>0;
 
-  const preferredResults = preferredStudio ? allResults.filter(r=>r.studio===preferredStudio) : allResults;
-  const usedFallback = !!preferredStudio && preferredResults.length===0 && allResults.length>0;
-  const displayResults = (preferredStudio && preferredResults.length>0) ? preferredResults : allResults;
+  const allResults = useMemo(()=>hasValidDuration ? findStudioAvailability({
+    studios:BOOKABLE_STUDIOS, startDate:rangeStart, endDate:rangeEnd, durationHours:parsedDuration, busyByStudio,
+  }) : [],[hasValidDuration, rangeStart, rangeEnd, parsedDuration, busyByStudio]);
+
+  const preferredResults = preferredStudios.length ? allResults.filter(r=>preferredStudios.includes(r.studio)) : allResults;
+  const usedFallback = preferredStudios.length>0 && preferredResults.length===0 && allResults.length>0;
+  const displayResults = (preferredStudios.length && preferredResults.length>0) ? preferredResults : allResults;
 
   const conflictList = useMemo(()=>{
-    if(displayResults.length>0) return [];
-    const studios = preferredStudio ? [preferredStudio] : BOOKABLE_STUDIOS;
+    if(!hasValidDuration || displayResults.length>0) return [];
+    const studios = preferredStudios.length ? preferredStudios : BOOKABLE_STUDIOS;
     const rangeEndExclusive = new Date(rangeEnd.getTime()+86400000);
     return (allBookings||[])
       .filter(b=>studios.includes(b.location) && b.bookingStatus!=="Cancelled" && b.startTime)
@@ -21530,7 +21585,7 @@ const StudioSchedulerTab = ({projects, allBookings, talentRoster=[], onUpdatePro
         return s<rangeEndExclusive && e>rangeStart;
       })
       .sort((a,b)=>new Date(a.startTime)-new Date(b.startTime));
-  },[displayResults, allBookings, preferredStudio, rangeStart, rangeEnd]);
+  },[hasValidDuration, displayResults, allBookings, preferredStudios, rangeStart, rangeEnd]);
 
   const grouped = useMemo(()=>{
     const byStudio = {};
@@ -21556,12 +21611,11 @@ const StudioSchedulerTab = ({projects, allBookings, talentRoster=[], onUpdatePro
     navigator.clipboard?.writeText(text).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); }).catch(()=>{});
   };
 
-  const doBook = ({projectId, type, title, startDate, talent}) => {
+  const doBook = ({projectId, type, title, startDate, endDate, talent}) => {
     const project = projects.find(p=>p.id===projectId);
     if(!project || !bookingRow) return;
     const p = n=>String(n).padStart(2,"0");
     const toLocalISO = d => `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-    const endDate = new Date(startDate.getTime()+Math.max(+durationHours||1,0.25)*3600000);
     const newProd = {
       id:uid(), type, title:title||"", status:"Planning",
       startTime:toLocalISO(startDate), endTime:toLocalISO(endDate), location:bookingRow.studio, crewCallTime:"",
@@ -21584,36 +21638,24 @@ const StudioSchedulerTab = ({projects, allBookings, talentRoster=[], onUpdatePro
       {/* ── Search criteria ── */}
       <div style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:12,padding:20,marginBottom:20}}>
         <div style={{fontSize:19,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:14}}>Find Studio Availability</div>
-        <div style={{display:"grid",gridTemplateColumns:"140px 1fr 1fr",gap:14,marginBottom:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"160px 1fr",gap:20,marginBottom:14}}>
           <div>
             <label style={lbl}>Length (hours)</label>
-            <input type="number" min={0.5} max={16} step={0.5} value={durationHours}
+            <input type="number" min={0.5} max={16} step={0.5} value={durationHours} placeholder="e.g. 5"
               onChange={e=>setDurationHours(e.target.value)} style={{...inp,width:"100%"}}/>
           </div>
           <div>
             <label style={lbl}>Studio Preference</label>
-            <select value={preferredStudio} onChange={e=>setPreferredStudio(e.target.value)} style={{...inp,width:"100%",cursor:"pointer"}}>
-              <option value="">Any studio</option>
-              {BOOKABLE_STUDIOS.map(s=><option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={lbl}>Talent (optional)</label>
-            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-              {talentIds.map(id=>{
-                const t = talentRoster.find(x=>x.id===id);
-                return t ? (
-                  <span key={id} style={{display:"inline-flex",alignItems:"center",gap:4}}>
-                    <Chip label={t.name} color="#f59e0b" xs/>
-                    <button onClick={()=>setTalentIds(ids=>ids.filter(x=>x!==id))} style={{background:"none",border:"none",color:"#8e97a6",cursor:"pointer",fontSize:15,lineHeight:1,padding:0}}>×</button>
-                  </span>
-                ) : null;
-              })}
-              <button onClick={()=>setShowTalentPicker(true)}
-                style={{background:"none",border:"1px dashed #374151",borderRadius:6,color:"#818cf8",padding:"4px 10px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-                + Add
-              </button>
+            <div style={{display:"flex",gap:14,flexWrap:"wrap",paddingTop:6}}>
+              {BOOKABLE_STUDIOS.map(s=>(
+                <label key={s} style={{display:"flex",alignItems:"center",gap:6,fontSize:15,color:"#e2e8f0",cursor:"pointer"}}>
+                  <input type="checkbox" checked={preferredStudios.includes(s)} onChange={()=>toggleStudio(s)}
+                    style={{width:16,height:16,accentColor:"#6366f1",cursor:"pointer"}}/>
+                  {s}
+                </label>
+              ))}
             </div>
+            <div style={{fontSize:13,color:"#4b5563",marginTop:4}}>{preferredStudios.length===0?"None checked = search every studio":"Only checked studios will be searched"}</div>
           </div>
         </div>
         <div>
@@ -21637,13 +21679,17 @@ const StudioSchedulerTab = ({projects, allBookings, talentRoster=[], onUpdatePro
       </div>
 
       {/* ── Results ── */}
-      {usedFallback && (
+      {!hasValidDuration && (
+        <div style={{textAlign:"center",padding:"20px 0",color:"#4b5563",fontSize:16}}>Enter a length to search.</div>
+      )}
+
+      {hasValidDuration && usedFallback && (
         <div style={{background:"#f59e0b18",border:"1px solid #f59e0b40",borderRadius:8,padding:"10px 14px",color:"#f59e0b",fontSize:15,marginBottom:16}}>
-          No availability at <b>{preferredStudio}</b> in this window — showing every studio instead.
+          No availability at <b>{preferredStudios.join(", ")}</b> in this window — showing every studio instead.
         </div>
       )}
 
-      {displayResults.length>0 && (
+      {hasValidDuration && displayResults.length>0 && (
         <>
           <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
             <button onClick={copyResults}
@@ -21677,10 +21723,10 @@ const StudioSchedulerTab = ({projects, allBookings, talentRoster=[], onUpdatePro
         </>
       )}
 
-      {displayResults.length===0 && (
+      {hasValidDuration && displayResults.length===0 && (
         <div>
           <div style={{textAlign:"center",padding:"20px 0",color:"#9ca3af",fontSize:16}}>
-            No {durationHours}-hour block open anywhere{preferredStudio?` at ${preferredStudio}`:""} in this window.
+            No {durationHours}-hour block open anywhere{preferredStudios.length?` at ${preferredStudios.join(", ")}`:""} in this window.
           </div>
           {conflictList.length>0 ? (
             <>
@@ -21703,12 +21749,8 @@ const StudioSchedulerTab = ({projects, allBookings, talentRoster=[], onUpdatePro
         </div>
       )}
 
-      {showTalentPicker && (
-        <TalentPicker talentRoster={talentRoster} selectedIds={talentIds}
-          onConfirm={ids=>{setTalentIds(ids);setShowTalentPicker(false);}} onClose={()=>setShowTalentPicker(false)}/>
-      )}
       {bookingRow && (
-        <BookSlotModal row={bookingRow} durationHours={durationHours} talentIds={talentIds} talentRoster={talentRoster}
+        <BookSlotModal row={bookingRow} talentRoster={talentRoster}
           projects={projects} onClose={()=>setBookingRow(null)} onConfirm={doBook}/>
       )}
     </div>

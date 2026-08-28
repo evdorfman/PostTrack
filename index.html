@@ -14401,39 +14401,82 @@ ${conditions}`;
       }
     )), filtered.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 40, color: "#838ba0" } }, "No tracked team members match this filter."))));
   };
-  var BookSlotModal = ({ row, durationHours, talentIds = [], talentRoster = [], projects = [], onClose, onConfirm }) => {
-    const durMs = Math.max(+durationHours || 1, 0.25) * 36e5;
-    const startOptions = (0, import_react.useMemo)(() => {
+  var BookSlotModal = ({ row, talentRoster = [], projects = [], onClose, onConfirm }) => {
+    const timeOptions = (0, import_react.useMemo)(() => {
       const opts = [];
-      const latest = new Date(row.freeEnd.getTime() - durMs);
       let t = new Date(row.freeStart);
-      while (t <= latest) {
+      while (t <= row.freeEnd) {
         opts.push(new Date(t));
         t = new Date(t.getTime() + 30 * 6e4);
       }
-      if (opts.length === 0) opts.push(new Date(row.freeStart));
+      if (opts.length === 0 || opts[opts.length - 1].getTime() !== row.freeEnd.getTime()) opts.push(new Date(row.freeEnd));
       return opts;
-    }, [row, durMs]);
-    const [startIdx, setStartIdx] = (0, import_react.useState)(0);
+    }, [row]);
     const [projectId, setProjectId] = (0, import_react.useState)("");
+    const [projectSearch, setProjectSearch] = (0, import_react.useState)("");
+    const [projectSearchOpen, setProjectSearchOpen] = (0, import_react.useState)(false);
     const [type, setType] = (0, import_react.useState)(PRODUCTION_TYPES[0]);
     const [title, setTitle] = (0, import_react.useState)("");
-    const [pickedTalent, setPickedTalent] = (0, import_react.useState)(talentIds);
+    const [startIdx, setStartIdx] = (0, import_react.useState)("");
+    const [endIdx, setEndIdx] = (0, import_react.useState)("");
+    const [pickedTalent, setPickedTalent] = (0, import_react.useState)([]);
     const [showTalentPicker, setShowTalentPicker] = (0, import_react.useState)(false);
     const fmtOpt = (d) => {
       const h = d.getHours(), m = d.getMinutes(), ap = h < 12 ? "AM" : "PM", h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
       return `${h12}:${String(m).padStart(2, "0")} ${ap}`;
     };
     const sortedProjects = (0, import_react.useMemo)(() => [...projects].sort((a, b) => (a.name || "").localeCompare(b.name || "")), [projects]);
-    return /* @__PURE__ */ React.createElement(Modal, { onClose, maxWidth: 480 }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 4 } }, "Book This Slot"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#9ca3af", marginBottom: 18 } }, row.studio, " \u2014 ", row.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement(LW, { label: "Project *" }, /* @__PURE__ */ React.createElement(Sel, { value: projectId, onChange: (e) => setProjectId(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Select a project\u2026"), sortedProjects.map((p) => /* @__PURE__ */ React.createElement("option", { key: p.id, value: p.id }, p.name)))), /* @__PURE__ */ React.createElement(LW, { label: "Production Type" }, /* @__PURE__ */ React.createElement(Sel, { value: type, onChange: (e) => setType(e.target.value) }, PRODUCTION_TYPES.map((t) => /* @__PURE__ */ React.createElement("option", { key: t }, t)))), /* @__PURE__ */ React.createElement(LW, { label: "Title (optional)" }, /* @__PURE__ */ React.createElement(Inp, { value: title, onChange: (e) => setTitle(e.target.value), placeholder: "e.g. Client Interview" })), /* @__PURE__ */ React.createElement(LW, { label: "Start Time" }, /* @__PURE__ */ React.createElement(Sel, { value: startIdx, onChange: (e) => setStartIdx(+e.target.value) }, startOptions.map((d, i) => /* @__PURE__ */ React.createElement("option", { key: i, value: i }, fmtOpt(d), " \u2013 ", fmtOpt(new Date(d.getTime() + durMs)))))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 } }, "Talent"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 } }, pickedTalent.map((id) => {
+    const filteredProjects = (0, import_react.useMemo)(
+      () => projectSearch ? sortedProjects.filter((p) => (p.name || "").toLowerCase().includes(projectSearch.toLowerCase())) : sortedProjects,
+      [sortedProjects, projectSearch]
+    );
+    const selectedProject = sortedProjects.find((p) => p.id === projectId);
+    const changeStart = (v) => {
+      setStartIdx(v);
+      if (v !== "" && endIdx !== "" && +endIdx <= +v) setEndIdx("");
+    };
+    const canSubmit = !!projectId && !!title.trim() && startIdx !== "" && endIdx !== "" && +endIdx > +startIdx;
+    const confirm = () => {
+      if (!canSubmit) return;
+      onConfirm({ projectId, type, title: title.trim(), startDate: timeOptions[+startIdx], endDate: timeOptions[+endIdx], talent: pickedTalent });
+    };
+    return /* @__PURE__ */ React.createElement(Modal, { onClose, maxWidth: 480 }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 4 } }, "Book This Slot"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#9ca3af", marginBottom: 4 } }, row.studio, " \u2014 ", row.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#6b7280", marginBottom: 18 } }, "Available window: ", fmtOpt(row.freeStart), " \u2013 ", fmtOpt(row.freeEnd)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: { fontSize: 13, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6, display: "block" } }, "Project *"), selectedProject ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0a0f1a", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#f1f5f9", fontSize: 16 } }, selectedProject.name), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+      setProjectId("");
+      setProjectSearch("");
+    }, style: { background: "none", border: "none", color: "#818cf8", cursor: "pointer", fontSize: 13, fontWeight: 700 } }, "Change")) : /* @__PURE__ */ React.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ React.createElement(
+      Inp,
+      {
+        value: projectSearch,
+        onChange: (e) => {
+          setProjectSearch(e.target.value);
+          setProjectSearchOpen(true);
+        },
+        onFocus: () => setProjectSearchOpen(true),
+        placeholder: "Search projects\u2026"
+      }
+    ), projectSearchOpen && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, background: "#0d1117", border: "1px solid #374151", borderRadius: 8, marginTop: 4, maxHeight: 200, overflowY: "auto", boxShadow: "0 12px 32px #000a" } }, filteredProjects.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 12px", color: "#4b5563", fontSize: 14 } }, "No projects match."), filteredProjects.map((p) => /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: p.id,
+        onClick: () => {
+          setProjectId(p.id);
+          setProjectSearch("");
+          setProjectSearchOpen(false);
+        },
+        style: { padding: "8px 12px", cursor: "pointer", fontSize: 15, color: "#e2e8f0", borderBottom: "1px solid #1f2937" },
+        onMouseEnter: (e) => e.currentTarget.style.background = "#1f2937",
+        onMouseLeave: (e) => e.currentTarget.style.background = "transparent"
+      },
+      p.name
+    ))))), /* @__PURE__ */ React.createElement(LW, { label: "Production Type" }, /* @__PURE__ */ React.createElement(Sel, { value: type, onChange: (e) => setType(e.target.value) }, PRODUCTION_TYPES.map((t) => /* @__PURE__ */ React.createElement("option", { key: t }, t)))), /* @__PURE__ */ React.createElement(LW, { label: "Title *" }, /* @__PURE__ */ React.createElement(Inp, { value: title, onChange: (e) => setTitle(e.target.value), placeholder: "e.g. Client Interview" })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement(LW, { label: "Start Time *" }, /* @__PURE__ */ React.createElement(Sel, { value: startIdx, onChange: (e) => changeStart(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Select\u2026"), timeOptions.slice(0, -1).map((d, i) => /* @__PURE__ */ React.createElement("option", { key: i, value: i }, fmtOpt(d))))), /* @__PURE__ */ React.createElement(LW, { label: "End Time *" }, /* @__PURE__ */ React.createElement(Sel, { value: endIdx, onChange: (e) => setEndIdx(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Select\u2026"), timeOptions.map((d, i) => startIdx === "" || i > +startIdx ? /* @__PURE__ */ React.createElement("option", { key: i, value: i }, fmtOpt(d)) : null)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 } }, "Talent (optional)"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 } }, pickedTalent.map((id) => {
       const t = talentRoster.find((x) => x.id === id);
       return t ? /* @__PURE__ */ React.createElement(Chip, { key: id, label: t.name, color: "#f59e0b", xs: true }) : null;
     }), pickedTalent.length === 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#4b5563", fontStyle: "italic" } }, "None selected")), /* @__PURE__ */ React.createElement(Btn, { small: true, onClick: () => setShowTalentPicker(true) }, pickedTalent.length ? "Edit Talent" : "+ Add Talent"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 22, borderTop: "1px solid #1f2937", paddingTop: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: onClose, style: { background: "transparent", border: "1px solid #1f2937", borderRadius: 8, color: "#6b7280", padding: "9px 16px", fontSize: 15, fontWeight: 700, cursor: "pointer" } }, "Cancel"), /* @__PURE__ */ React.createElement(
       "button",
       {
-        onClick: () => projectId && onConfirm({ projectId, type, title, startDate: startOptions[startIdx], talent: pickedTalent }),
-        disabled: !projectId,
-        style: { background: projectId ? "#6366f1" : "#1f2937", border: "none", borderRadius: 8, color: projectId ? "#fff" : "#4b5563", padding: "9px 20px", fontSize: 15, fontWeight: 800, cursor: projectId ? "pointer" : "not-allowed" }
+        onClick: confirm,
+        disabled: !canSubmit,
+        style: { background: canSubmit ? "#6366f1" : "#1f2937", border: "none", borderRadius: 8, color: canSubmit ? "#fff" : "#4b5563", padding: "9px 20px", fontSize: 15, fontWeight: 800, cursor: canSubmit ? "pointer" : "not-allowed" }
       },
       "Create Production"
     )), showTalentPicker && /* @__PURE__ */ React.createElement(
@@ -14450,15 +14493,14 @@ ${conditions}`;
     ));
   };
   var StudioSchedulerTab = ({ projects, allBookings, talentRoster = [], onUpdateProject, onOpenProject }) => {
-    const [durationHours, setDurationHours] = (0, import_react.useState)(5);
+    const [durationHours, setDurationHours] = (0, import_react.useState)("");
     const [rangeMode, setRangeMode] = (0, import_react.useState)("next14");
     const [customStart, setCustomStart] = (0, import_react.useState)("");
     const [customEnd, setCustomEnd] = (0, import_react.useState)("");
-    const [preferredStudio, setPreferredStudio] = (0, import_react.useState)("");
-    const [talentIds, setTalentIds] = (0, import_react.useState)([]);
-    const [showTalentPicker, setShowTalentPicker] = (0, import_react.useState)(false);
+    const [preferredStudios, setPreferredStudios] = (0, import_react.useState)([]);
     const [bookingRow, setBookingRow] = (0, import_react.useState)(null);
     const [copied, setCopied] = (0, import_react.useState)(false);
+    const toggleStudio = (s) => setPreferredStudios((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
     const RANGE_PRESETS = [
       { id: "next7", label: "Next 7 Days" },
       { id: "next14", label: "Next 2 Weeks" },
@@ -14504,25 +14546,27 @@ ${conditions}`;
       });
       return map;
     }, [allBookings]);
-    const allResults = (0, import_react.useMemo)(() => findStudioAvailability({
+    const parsedDuration = parseFloat(durationHours);
+    const hasValidDuration = !isNaN(parsedDuration) && parsedDuration > 0;
+    const allResults = (0, import_react.useMemo)(() => hasValidDuration ? findStudioAvailability({
       studios: BOOKABLE_STUDIOS,
       startDate: rangeStart,
       endDate: rangeEnd,
-      durationHours: +durationHours || 1,
+      durationHours: parsedDuration,
       busyByStudio
-    }), [rangeStart, rangeEnd, durationHours, busyByStudio]);
-    const preferredResults = preferredStudio ? allResults.filter((r) => r.studio === preferredStudio) : allResults;
-    const usedFallback = !!preferredStudio && preferredResults.length === 0 && allResults.length > 0;
-    const displayResults = preferredStudio && preferredResults.length > 0 ? preferredResults : allResults;
+    }) : [], [hasValidDuration, rangeStart, rangeEnd, parsedDuration, busyByStudio]);
+    const preferredResults = preferredStudios.length ? allResults.filter((r) => preferredStudios.includes(r.studio)) : allResults;
+    const usedFallback = preferredStudios.length > 0 && preferredResults.length === 0 && allResults.length > 0;
+    const displayResults = preferredStudios.length && preferredResults.length > 0 ? preferredResults : allResults;
     const conflictList = (0, import_react.useMemo)(() => {
-      if (displayResults.length > 0) return [];
-      const studios = preferredStudio ? [preferredStudio] : BOOKABLE_STUDIOS;
+      if (!hasValidDuration || displayResults.length > 0) return [];
+      const studios = preferredStudios.length ? preferredStudios : BOOKABLE_STUDIOS;
       const rangeEndExclusive = new Date(rangeEnd.getTime() + 864e5);
       return (allBookings || []).filter((b) => studios.includes(b.location) && b.bookingStatus !== "Cancelled" && b.startTime).filter((b) => {
         const s = new Date(b.startTime), e = b.endTime ? new Date(b.endTime) : s;
         return s < rangeEndExclusive && e > rangeStart;
       }).sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
-    }, [displayResults, allBookings, preferredStudio, rangeStart, rangeEnd]);
+    }, [hasValidDuration, displayResults, allBookings, preferredStudios, rangeStart, rangeEnd]);
     const grouped = (0, import_react.useMemo)(() => {
       const byStudio = {};
       displayResults.forEach((r) => {
@@ -14553,12 +14597,11 @@ ${conditions}`;
       }).catch(() => {
       });
     };
-    const doBook = ({ projectId, type, title, startDate, talent }) => {
+    const doBook = ({ projectId, type, title, startDate, endDate, talent }) => {
       const project = projects.find((p2) => p2.id === projectId);
       if (!project || !bookingRow) return;
       const p = (n) => String(n).padStart(2, "0");
       const toLocalISO = (d) => `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-      const endDate = new Date(startDate.getTime() + Math.max(+durationHours || 1, 0.25) * 36e5);
       const newProd = {
         id: uid(),
         type,
@@ -14602,7 +14645,7 @@ ${conditions}`;
     };
     const lbl = { fontSize: 13, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 6, display: "block" };
     const inp = { background: "#0a0f1a", border: "1px solid #374151", borderRadius: 8, color: "#f1f5f9", padding: "8px 12px", fontSize: 16, outline: "none", fontFamily: "'DM Sans',sans-serif", colorScheme: "dark" };
-    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, padding: 20, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 19, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 } }, "Find Studio Availability"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "140px 1fr 1fr", gap: 14, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Length (hours)"), /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, padding: 20, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 19, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 } }, "Find Studio Availability"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "160px 1fr", gap: 20, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Length (hours)"), /* @__PURE__ */ React.createElement(
       "input",
       {
         type: "number",
@@ -14610,20 +14653,19 @@ ${conditions}`;
         max: 16,
         step: 0.5,
         value: durationHours,
+        placeholder: "e.g. 5",
         onChange: (e) => setDurationHours(e.target.value),
         style: { ...inp, width: "100%" }
       }
-    )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Studio Preference"), /* @__PURE__ */ React.createElement("select", { value: preferredStudio, onChange: (e) => setPreferredStudio(e.target.value), style: { ...inp, width: "100%", cursor: "pointer" } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Any studio"), BOOKABLE_STUDIOS.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, value: s }, s)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Talent (optional)"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } }, talentIds.map((id) => {
-      const t = talentRoster.find((x) => x.id === id);
-      return t ? /* @__PURE__ */ React.createElement("span", { key: id, style: { display: "inline-flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(Chip, { label: t.name, color: "#f59e0b", xs: true }), /* @__PURE__ */ React.createElement("button", { onClick: () => setTalentIds((ids) => ids.filter((x) => x !== id)), style: { background: "none", border: "none", color: "#8e97a6", cursor: "pointer", fontSize: 15, lineHeight: 1, padding: 0 } }, "\xD7")) : null;
-    }), /* @__PURE__ */ React.createElement(
-      "button",
+    )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Studio Preference"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap", paddingTop: 6 } }, BOOKABLE_STUDIOS.map((s) => /* @__PURE__ */ React.createElement("label", { key: s, style: { display: "flex", alignItems: "center", gap: 6, fontSize: 15, color: "#e2e8f0", cursor: "pointer" } }, /* @__PURE__ */ React.createElement(
+      "input",
       {
-        onClick: () => setShowTalentPicker(true),
-        style: { background: "none", border: "1px dashed #374151", borderRadius: 6, color: "#818cf8", padding: "4px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer" }
-      },
-      "+ Add"
-    )))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Window"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" } }, RANGE_PRESETS.map((r) => /* @__PURE__ */ React.createElement(
+        type: "checkbox",
+        checked: preferredStudios.includes(s),
+        onChange: () => toggleStudio(s),
+        style: { width: 16, height: 16, accentColor: "#6366f1", cursor: "pointer" }
+      }
+    ), s))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#4b5563", marginTop: 4 } }, preferredStudios.length === 0 ? "None checked = search every studio" : "Only checked studios will be searched"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Window"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" } }, RANGE_PRESETS.map((r) => /* @__PURE__ */ React.createElement(
       "button",
       {
         key: r.id,
@@ -14631,7 +14673,7 @@ ${conditions}`;
         style: { background: rangeMode === r.id ? "#6366f1" : "#1f2937", border: "none", borderRadius: 7, color: rangeMode === r.id ? "#fff" : "#9ca3af", padding: "6px 14px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" }
       },
       r.label
-    )), rangeMode === "custom" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("input", { type: "date", value: customStart, onChange: (e) => setCustomStart(e.target.value), style: inp }), /* @__PURE__ */ React.createElement("span", { style: { color: "#6b7280" } }, "to"), /* @__PURE__ */ React.createElement("input", { type: "date", value: customEnd, onChange: (e) => setCustomEnd(e.target.value), style: inp }))))), usedFallback && /* @__PURE__ */ React.createElement("div", { style: { background: "#f59e0b18", border: "1px solid #f59e0b40", borderRadius: 8, padding: "10px 14px", color: "#f59e0b", fontSize: 15, marginBottom: 16 } }, "No availability at ", /* @__PURE__ */ React.createElement("b", null, preferredStudio), " in this window \u2014 showing every studio instead."), displayResults.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 10 } }, /* @__PURE__ */ React.createElement(
+    )), rangeMode === "custom" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("input", { type: "date", value: customStart, onChange: (e) => setCustomStart(e.target.value), style: inp }), /* @__PURE__ */ React.createElement("span", { style: { color: "#6b7280" } }, "to"), /* @__PURE__ */ React.createElement("input", { type: "date", value: customEnd, onChange: (e) => setCustomEnd(e.target.value), style: inp }))))), !hasValidDuration && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "20px 0", color: "#4b5563", fontSize: 16 } }, "Enter a length to search."), hasValidDuration && usedFallback && /* @__PURE__ */ React.createElement("div", { style: { background: "#f59e0b18", border: "1px solid #f59e0b40", borderRadius: 8, padding: "10px 14px", color: "#f59e0b", fontSize: 15, marginBottom: 16 } }, "No availability at ", /* @__PURE__ */ React.createElement("b", null, preferredStudios.join(", ")), " in this window \u2014 showing every studio instead."), hasValidDuration && displayResults.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 10 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: copyResults,
@@ -14645,23 +14687,10 @@ ${conditions}`;
         style: { background: "#6366f115", border: "1px solid #6366f140", borderRadius: 6, color: "#818cf8", padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" }
       },
       "Book This Slot \u2192"
-    )))))))), displayResults.length === 0 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "20px 0", color: "#9ca3af", fontSize: 16 } }, "No ", durationHours, "-hour block open anywhere", preferredStudio ? ` at ${preferredStudio}` : "", " in this window."), conflictList.length > 0 ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#e2e8f0", marginBottom: 10 } }, "Here's what's already booked during that window \u2014 one of these might be able to move:"), /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, overflow: "hidden" } }, conflictList.map((b, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderTop: i > 0 ? "1px solid #1f2937" : "none", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { background: (BKSTATUS_COLOR[b.bookingStatus] || "#6b7280") + "22", color: BKSTATUS_COLOR[b.bookingStatus] || "#6b7280", borderRadius: 5, padding: "2px 8px", fontSize: 12, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, b.bookingStatus || "Tentative"), /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, color: "#f1f5f9", fontSize: 15 } }, b.location), /* @__PURE__ */ React.createElement("span", { style: { color: "#9ca3af", fontSize: 15 } }, new Date(b.startTime).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }), " ", fmtClock(new Date(b.startTime)), b.endTime ? ` \u2013 ${fmtClock(new Date(b.endTime))}` : ""), /* @__PURE__ */ React.createElement("span", { style: { color: "#e2e8f0", fontSize: 15, flex: 1, minWidth: 120 } }, b.title || b.productionType || "Untitled"), /* @__PURE__ */ React.createElement("span", { style: { color: "#6b7280", fontSize: 14 } }, b.projectName || ""))))) : /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#4b5563", fontSize: 15 } }, "Nothing's booked there either \u2014 try a shorter length or a wider window.")), showTalentPicker && /* @__PURE__ */ React.createElement(
-      TalentPicker,
-      {
-        talentRoster,
-        selectedIds: talentIds,
-        onConfirm: (ids) => {
-          setTalentIds(ids);
-          setShowTalentPicker(false);
-        },
-        onClose: () => setShowTalentPicker(false)
-      }
-    ), bookingRow && /* @__PURE__ */ React.createElement(
+    )))))))), hasValidDuration && displayResults.length === 0 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "20px 0", color: "#9ca3af", fontSize: 16 } }, "No ", durationHours, "-hour block open anywhere", preferredStudios.length ? ` at ${preferredStudios.join(", ")}` : "", " in this window."), conflictList.length > 0 ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#e2e8f0", marginBottom: 10 } }, "Here's what's already booked during that window \u2014 one of these might be able to move:"), /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 12, overflow: "hidden" } }, conflictList.map((b, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderTop: i > 0 ? "1px solid #1f2937" : "none", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { background: (BKSTATUS_COLOR[b.bookingStatus] || "#6b7280") + "22", color: BKSTATUS_COLOR[b.bookingStatus] || "#6b7280", borderRadius: 5, padding: "2px 8px", fontSize: 12, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, b.bookingStatus || "Tentative"), /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, color: "#f1f5f9", fontSize: 15 } }, b.location), /* @__PURE__ */ React.createElement("span", { style: { color: "#9ca3af", fontSize: 15 } }, new Date(b.startTime).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }), " ", fmtClock(new Date(b.startTime)), b.endTime ? ` \u2013 ${fmtClock(new Date(b.endTime))}` : ""), /* @__PURE__ */ React.createElement("span", { style: { color: "#e2e8f0", fontSize: 15, flex: 1, minWidth: 120 } }, b.title || b.productionType || "Untitled"), /* @__PURE__ */ React.createElement("span", { style: { color: "#6b7280", fontSize: 14 } }, b.projectName || ""))))) : /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#4b5563", fontSize: 15 } }, "Nothing's booked there either \u2014 try a shorter length or a wider window.")), bookingRow && /* @__PURE__ */ React.createElement(
       BookSlotModal,
       {
         row: bookingRow,
-        durationHours,
-        talentIds,
         talentRoster,
         projects,
         onClose: () => setBookingRow(null),
