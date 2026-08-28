@@ -15270,6 +15270,26 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [draft, setDraft] = (0, import_react.useState)(null);
     const [showAdd, setShowAdd] = (0, import_react.useState)(false);
     const [newMember, setNewMember] = (0, import_react.useState)({ name: "", roles: [], department: "Production", employeeType: "Internal", available: true, email: "", phone: "", skills: [], workHours: { days: [1, 2, 3, 4, 5], start: 9, end: 17, timezone: "EST" }, color: null, isAdmin: false });
+    const [mfaResetId, setMfaResetId] = (0, import_react.useState)(null);
+    const [mfaResetMsg, setMfaResetMsg] = (0, import_react.useState)({});
+    const resetMemberMfa = async (m) => {
+      if (!sb || !m.authUserId) return;
+      setMfaResetId(m.id);
+      setMfaResetMsg((p) => ({ ...p, [m.id]: null }));
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        const { data, error } = await sb.functions.invoke("admin-reset-mfa", {
+          body: { targetUserId: m.authUserId },
+          headers: { Authorization: `Bearer ${session?.access_token}` }
+        });
+        if (error || data?.error) throw new Error(data?.error || error.message);
+        setMfaResetMsg((p) => ({ ...p, [m.id]: "ok" }));
+      } catch (e) {
+        setMfaResetMsg((p) => ({ ...p, [m.id]: e.message || "Reset failed" }));
+      } finally {
+        setMfaResetId(null);
+      }
+    };
     const filtered = team.filter(
       (m) => !search || m.name.toLowerCase().includes(search.toLowerCase()) || m.roles.some((r) => r.toLowerCase().includes(search.toLowerCase())) || m.department?.toLowerCase().includes(search.toLowerCase())
     );
@@ -15470,7 +15490,16 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           style: { background: draft.isAdmin ? "#f59e0b20" : "#0a0f1a", border: `1px solid ${draft.isAdmin ? "#f59e0b" : "#374151"}`, borderRadius: 6, color: draft.isAdmin ? "#f59e0b" : "#4b5563", padding: "6px 14px", fontSize: 14, fontWeight: 700, cursor: "pointer" }
         },
         draft.isAdmin ? "Admin" : "Member"
-      ))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Hours of Availability"), /* @__PURE__ */ React.createElement(WorkHoursPicker, { workHours: draft.workHours, onChange: (wh) => setDraft((p) => ({ ...p, workHours: wh })) })), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Skills"), /* @__PURE__ */ React.createElement(KeywordsEditor, { value: draft.skills || [], onChange: (v) => setDraft((p) => ({ ...p, skills: v })) })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement("button", { onClick: saveEdit, style: { background: "#6366f1", border: "none", borderRadius: 7, color: "#fff", padding: "6px 16px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "Save"), /* @__PURE__ */ React.createElement("button", { onClick: cancelEdit, style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "6px 14px", fontSize: 14, fontWeight: 700, cursor: "pointer" } }, "Cancel"))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 12, padding: "4px 12px", background: "#6366f11a", border: "1px solid #6366f150", borderRadius: 99, fontSize: 13, fontWeight: 700, color: "#818cf8", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" } }, "\u2713 Selected \u2014 click Edit to make changes"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 } }, [["Name", m.name], ["Email", m.email || "\u2014"], ["Phone", m.phone || "\u2014"]].map(([l, v]) => /* @__PURE__ */ React.createElement("div", { key: l }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 3, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, l), /* @__PURE__ */ React.createElement("div", { style: { width: "100%", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#9ca3af", padding: "6px 10px", fontSize: 14 } }, v)))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 } }, [["Department", m.department || "\u2014"], ["Employee Type", m.employeeType || "\u2014"], ["Available", m.available ? "Yes" : "No"]].map(([l, v]) => /* @__PURE__ */ React.createElement("div", { key: l }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 3, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, l), /* @__PURE__ */ React.createElement("div", { style: { width: "100%", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#9ca3af", padding: "6px 10px", fontSize: 14 } }, v)))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Roles"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, m.roles.length ? m.roles.map((r) => /* @__PURE__ */ React.createElement(Chip, { key: r, label: r, color: "#4b5563", xs: true })) : /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#4b5563", fontStyle: "italic" } }, "None set"))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Profile Color"), /* @__PURE__ */ React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: m.color || "#1f2937", border: "1px solid #374151" } })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 3, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Admin Access"), /* @__PURE__ */ React.createElement("div", { style: { width: "100%", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: m.isAdmin ? "#f59e0b" : "#9ca3af", padding: "6px 10px", fontSize: 14 } }, m.isAdmin ? "Admin" : "Member"))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Hours of Availability"), /* @__PURE__ */ React.createElement("div", { style: { width: "100%", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#9ca3af", padding: "6px 10px", fontSize: 14 } }, workHoursLabel)), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Skills"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, (m.skills || []).length ? m.skills.map((s) => /* @__PURE__ */ React.createElement(Chip, { key: s, label: s, color: "#4b5563", xs: true })) : /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#4b5563", fontStyle: "italic" } }, "None set"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => startEdit(m), style: { background: "#6366f1", border: "none", borderRadius: 7, color: "#fff", padding: "6px 16px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "\u270E Edit"), /* @__PURE__ */ React.createElement("button", { onClick: () => setConfirmDeleteId(m.id), style: { background: "none", border: "1px solid #ef444440", borderRadius: 7, color: "#ef4444", padding: "6px 14px", fontSize: 14, fontWeight: 700, cursor: "pointer" } }, "Remove")))));
+      ))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Hours of Availability"), /* @__PURE__ */ React.createElement(WorkHoursPicker, { workHours: draft.workHours, onChange: (wh) => setDraft((p) => ({ ...p, workHours: wh })) })), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Skills"), /* @__PURE__ */ React.createElement(KeywordsEditor, { value: draft.skills || [], onChange: (v) => setDraft((p) => ({ ...p, skills: v })) })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement("button", { onClick: saveEdit, style: { background: "#6366f1", border: "none", borderRadius: 7, color: "#fff", padding: "6px 16px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "Save"), /* @__PURE__ */ React.createElement("button", { onClick: cancelEdit, style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "6px 14px", fontSize: 14, fontWeight: 700, cursor: "pointer" } }, "Cancel"))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 12, padding: "4px 12px", background: "#6366f11a", border: "1px solid #6366f150", borderRadius: 99, fontSize: 13, fontWeight: 700, color: "#818cf8", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" } }, "\u2713 Selected \u2014 click Edit to make changes"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 } }, [["Name", m.name], ["Email", m.email || "\u2014"], ["Phone", m.phone || "\u2014"]].map(([l, v]) => /* @__PURE__ */ React.createElement("div", { key: l }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 3, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, l), /* @__PURE__ */ React.createElement("div", { style: { width: "100%", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#9ca3af", padding: "6px 10px", fontSize: 14 } }, v)))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 } }, [["Department", m.department || "\u2014"], ["Employee Type", m.employeeType || "\u2014"], ["Available", m.available ? "Yes" : "No"]].map(([l, v]) => /* @__PURE__ */ React.createElement("div", { key: l }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 3, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, l), /* @__PURE__ */ React.createElement("div", { style: { width: "100%", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#9ca3af", padding: "6px 10px", fontSize: 14 } }, v)))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Roles"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, m.roles.length ? m.roles.map((r) => /* @__PURE__ */ React.createElement(Chip, { key: r, label: r, color: "#4b5563", xs: true })) : /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#4b5563", fontStyle: "italic" } }, "None set"))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Profile Color"), /* @__PURE__ */ React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: m.color || "#1f2937", border: "1px solid #374151" } })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 3, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Admin Access"), /* @__PURE__ */ React.createElement("div", { style: { width: "100%", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: m.isAdmin ? "#f59e0b" : "#9ca3af", padding: "6px 10px", fontSize: 14 } }, m.isAdmin ? "Admin" : "Member"))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Hours of Availability"), /* @__PURE__ */ React.createElement("div", { style: { width: "100%", background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#9ca3af", padding: "6px 10px", fontSize: 14 } }, workHoursLabel)), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 4, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Skills"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, (m.skills || []).length ? m.skills.map((s) => /* @__PURE__ */ React.createElement(Chip, { key: s, label: s, color: "#4b5563", xs: true })) : /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#4b5563", fontStyle: "italic" } }, "None set"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("button", { onClick: () => startEdit(m), style: { background: "#6366f1", border: "none", borderRadius: 7, color: "#fff", padding: "6px 16px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "\u270E Edit"), /* @__PURE__ */ React.createElement("button", { onClick: () => setConfirmDeleteId(m.id), style: { background: "none", border: "1px solid #ef444440", borderRadius: 7, color: "#ef4444", padding: "6px 14px", fontSize: 14, fontWeight: 700, cursor: "pointer" } }, "Remove"), m.authUserId && /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => resetMemberMfa(m),
+          disabled: mfaResetId === m.id,
+          title: "Clears their two-factor authenticator, so they'll be prompted to set up a new one next sign-in \u2014 use when someone's locked out after losing their device.",
+          style: { background: "none", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "6px 12px", fontSize: 14, fontWeight: 700, cursor: mfaResetId === m.id ? "default" : "pointer" }
+        },
+        mfaResetId === m.id ? "Resetting\u2026" : "Reset 2FA"
+      ), mfaResetMsg[m.id] === "ok" && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#10b981" } }, "2FA cleared"), mfaResetMsg[m.id] && mfaResetMsg[m.id] !== "ok" && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#ef4444" } }, mfaResetMsg[m.id])))));
     })), confirmDeleteId != null && /* @__PURE__ */ React.createElement(Modal, { onClose: () => setConfirmDeleteId(null), maxWidth: 380 }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 20, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, "Remove Team Member?"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#9ca3af", marginBottom: 20 } }, "This will permanently remove ", team.find((m) => m.id === confirmDeleteId)?.name || "this member", " from the team roster."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setConfirmDeleteId(null), style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "8px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer" } }, "Cancel"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
       deleteM(confirmDeleteId);
       setConfirmDeleteId(null);
@@ -18662,6 +18691,22 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       if (!name.trim()) return;
       onSubmit({ name: name.trim(), department, employeeType, roles, workHours: { days, start: +start, end: +end, timezone }, skills, color });
     };
+    const [mfaConfirm, setMfaConfirm] = (0, import_react.useState)(false);
+    const [mfaBusy, setMfaBusy] = (0, import_react.useState)(false);
+    const [mfaErr, setMfaErr] = (0, import_react.useState)("");
+    const resetMfa = async () => {
+      if (!sb) return;
+      setMfaBusy(true);
+      setMfaErr("");
+      const { data, error } = await sb.auth.mfa.listFactors();
+      if (error) {
+        setMfaBusy(false);
+        setMfaErr(error.message || "Could not reset two-factor auth.");
+        return;
+      }
+      for (const f of data?.totp || []) await sb.auth.mfa.unenroll({ factorId: f.id });
+      window.location.reload();
+    };
     const lbl = { fontSize: 13, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 6, display: "block" };
     const inp = { width: "100%", background: "#0a0f1a", border: "1px solid #374151", borderRadius: 8, color: "#f1f5f9", padding: "9px 12px", fontSize: 17, outline: "none", fontFamily: "'DM Sans',sans-serif", colorScheme: "dark" };
     return /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 5e3, background: "#000c", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 16, padding: 32, width: "100%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 80px #000c" }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 29, fontWeight: 900, color: "#f1f5f9", textTransform: "uppercase", letterSpacing: "0.08em" } }, "My Profile"), /* @__PURE__ */ React.createElement("button", { onClick: onClose, style: { background: "#1f2937", border: "none", borderRadius: 6, color: "#9ca3af", width: 26, height: 26, cursor: "pointer", fontSize: 17 } }, "\xD7")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#9ca3af", marginBottom: 22, lineHeight: 1.5 } }, "Update the details the rest of the team sees about you."), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Name *"), /* @__PURE__ */ React.createElement("input", { style: inp, value: name, onChange: (e) => setName(e.target.value), placeholder: "Your full name" })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Department"), /* @__PURE__ */ React.createElement("select", { style: inp, value: department, onChange: (e) => setDepartment(e.target.value) }, DEPT_OPTIONS.map((d) => /* @__PURE__ */ React.createElement("option", { key: d }, d)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Employee Type"), /* @__PURE__ */ React.createElement("select", { style: inp, value: employeeType, onChange: (e) => setEmployeeType(e.target.value) }, EMP_TYPE_OPTIONS.map((t) => /* @__PURE__ */ React.createElement("option", { key: t }, t))))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Roles"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, ONBOARDING_ROLE_OPTIONS.map((r) => {
@@ -18688,7 +18733,22 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         },
         d
       );
-    })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } }, /* @__PURE__ */ React.createElement("select", { style: inp, value: start, onChange: (e) => setStart(e.target.value) }, Array.from({ length: 24 }, (_, h) => /* @__PURE__ */ React.createElement("option", { key: h, value: h }, h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`))), /* @__PURE__ */ React.createElement("select", { style: inp, value: end, onChange: (e) => setEnd(e.target.value) }, Array.from({ length: 24 }, (_, h) => /* @__PURE__ */ React.createElement("option", { key: h, value: h }, h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`))), /* @__PURE__ */ React.createElement("select", { style: inp, value: timezone, onChange: (e) => setTimezone(e.target.value) }, ["EST", "CST", "MST", "PST"].map((tz) => /* @__PURE__ */ React.createElement("option", { key: tz }, tz))))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Skills"), /* @__PURE__ */ React.createElement(KeywordsEditor, { value: skills, onChange: setSkills })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ React.createElement(
+    })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } }, /* @__PURE__ */ React.createElement("select", { style: inp, value: start, onChange: (e) => setStart(e.target.value) }, Array.from({ length: 24 }, (_, h) => /* @__PURE__ */ React.createElement("option", { key: h, value: h }, h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`))), /* @__PURE__ */ React.createElement("select", { style: inp, value: end, onChange: (e) => setEnd(e.target.value) }, Array.from({ length: 24 }, (_, h) => /* @__PURE__ */ React.createElement("option", { key: h, value: h }, h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`))), /* @__PURE__ */ React.createElement("select", { style: inp, value: timezone, onChange: (e) => setTimezone(e.target.value) }, ["EST", "CST", "MST", "PST"].map((tz) => /* @__PURE__ */ React.createElement("option", { key: tz }, tz))))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Skills"), /* @__PURE__ */ React.createElement(KeywordsEditor, { value: skills, onChange: setSkills })), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 22, borderTop: "1px solid #1f2937", paddingTop: 16 } }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Security"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#e2e8f0" } }, "Two-factor authentication is ", /* @__PURE__ */ React.createElement("span", { style: { color: "#10b981", fontWeight: 700 } }, "enabled")), !mfaConfirm ? /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setMfaConfirm(true),
+        style: { background: "none", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "6px 12px", fontSize: 14, fontWeight: 700, cursor: "pointer", flexShrink: 0 }
+      },
+      "Switch device\u2026"
+    ) : /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: resetMfa,
+        disabled: mfaBusy,
+        style: { background: "none", border: "1px solid #ef444450", borderRadius: 7, color: "#ef4444", padding: "6px 12px", fontSize: 14, fontWeight: 700, cursor: mfaBusy ? "default" : "pointer", flexShrink: 0 }
+      },
+      mfaBusy ? "Resetting\u2026" : "Confirm reset"
+    )), mfaConfirm && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af", marginTop: 6, lineHeight: 1.5 } }, "You'll be signed out of your current authenticator and asked to set up a new one immediately \u2014 only do this if you have a new device ready to scan a QR code with."), mfaErr && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ef4444", marginTop: 6 } }, mfaErr)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: onClose,
@@ -18728,6 +18788,139 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const actionColor = (a) => a === "created" ? "#10b981" : a === "deleted" ? "#ef4444" : a === "status_changed" ? "#f59e0b" : "#6366f1";
     return /* @__PURE__ */ React.createElement("div", { style: { width: "100%", height: "100%", background: "#0d1117", display: "grid", gridTemplateRows: "auto 1fr", overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "16px 20px", borderBottom: "1px solid #1f2937", background: "#111827", display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Barlow Condensed',sans-serif", fontSize: 22, fontWeight: 900, color: "#f1f5f9", textTransform: "uppercase", letterSpacing: "0.06em" } }, "\u{1F553} ", title), /* @__PURE__ */ React.createElement("button", { onClick: onClose, style: { background: "#1f2937", border: "none", borderRadius: 6, color: "#9ca3af", width: 28, height: 28, cursor: "pointer", fontSize: 19, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2715")), /* @__PURE__ */ React.createElement("div", { style: { overflowY: "scroll", WebkitOverflowScrolling: "touch", padding: 14 } }, loading && /* @__PURE__ */ React.createElement("div", { style: { color: "#4b5563", fontSize: 16, padding: 20, textAlign: "center" } }, "Loading\u2026"), !loading && !entries.length && /* @__PURE__ */ React.createElement("div", { style: { color: "#4b5563", fontSize: 16, padding: 20, textAlign: "center" } }, "No activity yet."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, entries.map((e) => /* @__PURE__ */ React.createElement("div", { key: e.id, style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 8, padding: "10px 12px", borderLeft: `3px solid ${actionColor(e.action)}` } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 3 } }, /* @__PURE__ */ React.createElement("span", { style: { background: actionColor(e.action) + "22", color: actionColor(e.action), borderRadius: 99, padding: "1px 8px", fontSize: 12, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, e.action.replace(/_/g, " ")), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#374151" } }, new Date(e.created_at).toLocaleString())), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#f1f5f9" } }, e.entity_label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af", marginTop: 2 } }, e.actor_name || e.actor_email || "Someone", e.detail ? ` \u2014 ${e.detail}` : ""))))));
   };
+  var MfaEnrollScreen = ({ onDone }) => {
+    const [factorId, setFactorId] = (0, import_react.useState)(null);
+    const [qr, setQr] = (0, import_react.useState)(null);
+    const [secret, setSecret] = (0, import_react.useState)("");
+    const [code, setCode] = (0, import_react.useState)("");
+    const [err, setErr] = (0, import_react.useState)("");
+    const [busy, setBusy] = (0, import_react.useState)(false);
+    const [loading, setLoading] = (0, import_react.useState)(true);
+    (0, import_react.useEffect)(() => {
+      let cancelled = false;
+      (async () => {
+        const { data: existing } = await sb.auth.mfa.listFactors();
+        const stale = (existing?.totp || []).find((f) => f.status === "unverified");
+        if (stale) await sb.auth.mfa.unenroll({ factorId: stale.id });
+        const { data, error } = await sb.auth.mfa.enroll({ factorType: "totp" });
+        if (cancelled) return;
+        if (error) {
+          setErr(error.message || "Could not start two-factor setup.");
+          setLoading(false);
+          return;
+        }
+        setFactorId(data.id);
+        setQr(data.totp.qr_code);
+        setSecret(data.totp.secret);
+        setLoading(false);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, []);
+    const verify = async () => {
+      if (!code.trim()) {
+        setErr("Enter the 6-digit code from your authenticator app.");
+        return;
+      }
+      setBusy(true);
+      setErr("");
+      const { data: challenge, error: challengeErr } = await sb.auth.mfa.challenge({ factorId });
+      if (challengeErr) {
+        setBusy(false);
+        setErr(challengeErr.message || "Could not verify that code.");
+        return;
+      }
+      const { error: verifyErr } = await sb.auth.mfa.verify({ factorId, challengeId: challenge.id, code: code.trim() });
+      setBusy(false);
+      if (verifyErr) {
+        setErr("That code didn't match \u2014 try again.");
+        setCode("");
+        return;
+      }
+      onDone();
+    };
+    return /* @__PURE__ */ React.createElement("div", { style: AUTH_SCREEN_WRAP }, /* @__PURE__ */ React.createElement("div", { style: { ...AUTH_CARD, maxWidth: 420 } }, /* @__PURE__ */ React.createElement("div", { style: AUTH_TITLE }, "PostTrack"), /* @__PURE__ */ React.createElement("div", { style: AUTH_SUB }, "Two-factor authentication is required on every account. Set it up to continue."), loading ? /* @__PURE__ */ React.createElement("div", { style: { color: "#9ca3af", fontSize: 16, padding: "20px 0" } }, "Preparing setup\u2026") : !factorId ? /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 15, marginBottom: 16 } }, err) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#e2e8f0", marginBottom: 10, lineHeight: 1.5 } }, "1. Scan this with an authenticator app (Google Authenticator, Authy, 1Password, etc)."), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        style: { background: "#fff", borderRadius: 10, padding: 12, marginBottom: 14, display: "flex", justifyContent: "center" },
+        dangerouslySetInnerHTML: { __html: qr }
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af", marginBottom: 16, lineHeight: 1.5 } }, "Can't scan? Enter this code manually: ", /* @__PURE__ */ React.createElement("span", { style: { color: "#818cf8", fontFamily: "monospace", wordBreak: "break-all" } }, secret)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#e2e8f0", marginBottom: 8 } }, "2. Enter the 6-digit code it shows:"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        value: code,
+        onChange: (e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6)),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") verify();
+        },
+        autoFocus: true,
+        placeholder: "123456",
+        style: { ...AUTH_INPUT, textAlign: "center", fontSize: 24, letterSpacing: "0.3em" }
+      }
+    ), err && /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 14, marginBottom: 12, marginTop: -6 } }, err), /* @__PURE__ */ React.createElement("button", { onClick: verify, disabled: busy, style: AUTH_BUTTON(busy) }, busy ? "Verifying\u2026" : "Verify & Continue")), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginTop: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => sb.auth.signOut(), style: AUTH_LINK }, "Sign out"))));
+  };
+  var MfaChallengeScreen = ({ onDone }) => {
+    const [factorId, setFactorId] = (0, import_react.useState)(null);
+    const [code, setCode] = (0, import_react.useState)("");
+    const [err, setErr] = (0, import_react.useState)("");
+    const [busy, setBusy] = (0, import_react.useState)(false);
+    const [loading, setLoading] = (0, import_react.useState)(true);
+    (0, import_react.useEffect)(() => {
+      let cancelled = false;
+      (async () => {
+        const { data, error } = await sb.auth.mfa.listFactors();
+        if (cancelled) return;
+        const factor = (data?.totp || []).find((f) => f.status === "verified");
+        if (error || !factor) {
+          setErr("No verified authenticator found on this account \u2014 sign out and back in, or contact an admin.");
+          setLoading(false);
+          return;
+        }
+        setFactorId(factor.id);
+        setLoading(false);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, []);
+    const verify = async () => {
+      if (!code.trim()) {
+        setErr("Enter the 6-digit code from your authenticator app.");
+        return;
+      }
+      setBusy(true);
+      setErr("");
+      const { data: challenge, error: challengeErr } = await sb.auth.mfa.challenge({ factorId });
+      if (challengeErr) {
+        setBusy(false);
+        setErr(challengeErr.message || "Could not verify that code.");
+        return;
+      }
+      const { error: verifyErr } = await sb.auth.mfa.verify({ factorId, challengeId: challenge.id, code: code.trim() });
+      setBusy(false);
+      if (verifyErr) {
+        setErr("That code didn't match \u2014 try again.");
+        setCode("");
+        return;
+      }
+      onDone();
+    };
+    return /* @__PURE__ */ React.createElement("div", { style: AUTH_SCREEN_WRAP }, /* @__PURE__ */ React.createElement("div", { style: AUTH_CARD }, /* @__PURE__ */ React.createElement("div", { style: AUTH_TITLE }, "PostTrack"), /* @__PURE__ */ React.createElement("div", { style: AUTH_SUB }, "Enter the 6-digit code from your authenticator app"), loading ? /* @__PURE__ */ React.createElement("div", { style: { color: "#9ca3af", fontSize: 16, padding: "20px 0" } }, "Checking your account\u2026") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        value: code,
+        onChange: (e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6)),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") verify();
+        },
+        autoFocus: true,
+        disabled: !factorId,
+        placeholder: "123456",
+        style: { ...AUTH_INPUT, textAlign: "center", fontSize: 24, letterSpacing: "0.3em" }
+      }
+    ), err && /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 14, marginBottom: 12, marginTop: -6 } }, err), /* @__PURE__ */ React.createElement("button", { onClick: verify, disabled: busy || !factorId, style: AUTH_BUTTON(busy) }, busy ? "Verifying\u2026" : "Verify")), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginTop: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => sb.auth.signOut(), style: AUTH_LINK }, "Sign out"))));
+  };
   function App() {
     const [authed, setAuthed] = (0, import_react.useState)(false);
     const [authChecked, setAuthChecked] = (0, import_react.useState)(false);
@@ -18747,6 +18940,32 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       });
       return () => sub?.subscription?.unsubscribe();
     }, []);
+    const [mfaChecked, setMfaChecked] = (0, import_react.useState)(false);
+    const [mfaStatus, setMfaStatus] = (0, import_react.useState)(null);
+    const checkMfaStatus = (0, import_react.useCallback)(async () => {
+      if (!sb) {
+        setMfaStatus("ok");
+        setMfaChecked(true);
+        return;
+      }
+      const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aal?.nextLevel === "aal2" && aal?.currentLevel !== aal?.nextLevel) {
+        setMfaStatus("needs-challenge");
+      } else {
+        const { data: factors } = await sb.auth.mfa.listFactors();
+        const hasVerified = (factors?.totp || []).some((f) => f.status === "verified");
+        setMfaStatus(hasVerified ? "ok" : "needs-enroll");
+      }
+      setMfaChecked(true);
+    }, []);
+    (0, import_react.useEffect)(() => {
+      if (!authed) {
+        setMfaChecked(false);
+        setMfaStatus(null);
+        return;
+      }
+      checkMfaStatus();
+    }, [authed, checkMfaStatus]);
     const [projects, setProjects] = (0, import_react.useState)(SEED_PROJECTS);
     const [studioBookings, setStudioBookings] = (0, import_react.useState)([]);
     const [mediaCards, setMediaCards] = (0, import_react.useState)(MEDIA_CARDS_SEED);
@@ -19805,6 +20024,9 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     if (!authChecked) return null;
     if (passwordRecovery) return React.createElement(SetNewPasswordScreen, { onDone: () => setPasswordRecovery(false) });
     if (!authed) return React.createElement(SupabaseAuthGate, null);
+    if (!mfaChecked) return null;
+    if (mfaStatus === "needs-enroll") return React.createElement(MfaEnrollScreen, { onDone: checkMfaStatus });
+    if (mfaStatus === "needs-challenge") return React.createElement(MfaChallengeScreen, { onDone: checkMfaStatus });
     return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("style", null, `@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap');*{box-sizing:border-box;margin:0;padding:0;}body{background:#080c14;}::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:#0f172a;}::-webkit-scrollbar-thumb{background:#374151;border-radius:99px;}select option{background:#0d1117;color:#e2e8f0;}`), /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100vh", background: "#080c14", fontFamily: "'DM Sans',sans-serif", color: "#e2e8f0", display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", borderBottom: "1px solid #1f2937", padding: "0 24px", position: "sticky", top: 0, zIndex: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1600, margin: "0 auto", display: "flex", alignItems: "center", gap: 14, height: 52 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setView("projects"), style: { fontWeight: 900, fontSize: 26, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", flexShrink: 0, letterSpacing: "-0.01em", background: "none", border: "none", cursor: "pointer", padding: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#6366f1" } }, "POST"), "TRACK"), /* @__PURE__ */ React.createElement("div", { style: { height: 16, width: 1, background: "#1f2937" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 2 } }, VIEWS.map((v) => /* @__PURE__ */ React.createElement("button", { key: v.id, style: tabS(view === v.id), onClick: () => setView(v.id) }, v.l))), view === "kanban" && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 2, background: "#0f172a", borderRadius: 7, padding: 3, border: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement("button", { style: { ...tabS(kanbanMode === "status"), background: kanbanMode === "status" ? "#1f2937" : "transparent", color: kanbanMode === "status" ? "#e2e8f0" : "#6b7280", fontSize: 14 }, onClick: () => setKanbanMode("status") }, "By Status"), /* @__PURE__ */ React.createElement("button", { style: { ...tabS(kanbanMode === "editor"), background: kanbanMode === "editor" ? "#1f2937" : "transparent", color: kanbanMode === "editor" ? "#e2e8f0" : "#6b7280", fontSize: 14 }, onClick: () => setKanbanMode("editor") }, "By Editor")), /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", display: "flex", gap: 7, alignItems: "center" } }, view === "kanban" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("input", { value: search, onChange: (e) => setSearch(e.target.value), placeholder: "Search...", style: { ...inp, width: 150 } }), /* @__PURE__ */ React.createElement("select", { value: filterStatus, onChange: (e) => setFilterStatus(e.target.value), style: inp }, /* @__PURE__ */ React.createElement("option", null, "All"), PROJECT_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s }, s)))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, borderLeft: "1px solid #1f2937", paddingLeft: 10 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "#4b5563", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" } }, "Test Data"), /* @__PURE__ */ React.createElement(
       "button",
       {

@@ -22683,6 +22683,33 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
   const [showAdd, setShowAdd]   = useState(false);
   const [newMember, setNewMember] = useState({name:"",roles:[],department:"Production",employeeType:"Internal",available:true,email:"",phone:"",skills:[],workHours:{days:[1,2,3,4,5],start:9,end:17,timezone:"EST"},color:null,isAdmin:false});
 
+  // 2FA is mandatory account-wide, so a lost/dead device locks someone out
+  // before they can ever reach their own My Profile reset — this is the only
+  // way back in for them. Needs the service-role key to clear another
+  // account's MFA factors, so it goes through the "admin-reset-mfa" Edge
+  // Function (see supabase/functions/admin-reset-mfa/index.ts) rather than
+  // a direct client call, which only ever has permission over its own factors.
+  const [mfaResetId, setMfaResetId] = useState(null); // memberId currently resetting
+  const [mfaResetMsg, setMfaResetMsg] = useState({}); // {[memberId]: "ok"|"error"}
+  const resetMemberMfa = async m => {
+    if(!sb || !m.authUserId) return;
+    setMfaResetId(m.id);
+    setMfaResetMsg(p=>({...p,[m.id]:null}));
+    try {
+      const {data:{session}} = await sb.auth.getSession();
+      const {data,error} = await sb.functions.invoke("admin-reset-mfa", {
+        body:{targetUserId:m.authUserId},
+        headers:{Authorization:`Bearer ${session?.access_token}`},
+      });
+      if(error||data?.error) throw new Error(data?.error||error.message);
+      setMfaResetMsg(p=>({...p,[m.id]:"ok"}));
+    } catch(e) {
+      setMfaResetMsg(p=>({...p,[m.id]:e.message||"Reset failed"}));
+    } finally {
+      setMfaResetId(null);
+    }
+  };
+
   const filtered = team.filter(m=>
     !search || m.name.toLowerCase().includes(search.toLowerCase()) ||
     m.roles.some(r=>r.toLowerCase().includes(search.toLowerCase())) ||
@@ -22982,9 +23009,18 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
                           {(m.skills||[]).length ? m.skills.map(s=><Chip key={s} label={s} color="#4b5563" xs/>) : <span style={{fontSize:14,color:"#4b5563",fontStyle:"italic"}}>None set</span>}
                         </div>
                       </div>
-                      <div style={{display:"flex",gap:6}}>
+                      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
                         <button onClick={()=>startEdit(m)} style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"6px 16px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>✎ Edit</button>
                         <button onClick={()=>setConfirmDeleteId(m.id)} style={{background:"none",border:"1px solid #ef444440",borderRadius:7,color:"#ef4444",padding:"6px 14px",fontSize:14,fontWeight:700,cursor:"pointer"}}>Remove</button>
+                        {m.authUserId && (
+                          <button onClick={()=>resetMemberMfa(m)} disabled={mfaResetId===m.id}
+                            title="Clears their two-factor authenticator, so they'll be prompted to set up a new one next sign-in — use when someone's locked out after losing their device."
+                            style={{background:"none",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"6px 12px",fontSize:14,fontWeight:700,cursor:mfaResetId===m.id?"default":"pointer"}}>
+                            {mfaResetId===m.id?"Resetting…":"Reset 2FA"}
+                          </button>
+                        )}
+                        {mfaResetMsg[m.id]==="ok" && <span style={{fontSize:13,color:"#10b981"}}>2FA cleared</span>}
+                        {mfaResetMsg[m.id] && mfaResetMsg[m.id]!=="ok" && <span style={{fontSize:13,color:"#ef4444"}}>{mfaResetMsg[m.id]}</span>}
                       </div>
                     </>
                   )}
@@ -27253,6 +27289,26 @@ const MyProfileModal = ({member, onSubmit, onClose}) => {
     if(!name.trim()) return;
     onSubmit({name:name.trim(),department,employeeType,roles,workHours:{days,start:+start,end:+end,timezone},skills,color});
   };
+
+  // ── Two-factor reset (self-service device swap) ──────────────────────────
+  // Since 2FA is mandatory rather than opt-in, there's no "disable" here —
+  // only "start over with a new device", for someone who got a new phone
+  // but still has their old one to pass this confirmation with. A lost/dead
+  // device (can't get past the sign-in code challenge at all to reach this
+  // screen) needs the Admin > Team reset instead.
+  const [mfaConfirm,setMfaConfirm] = useState(false);
+  const [mfaBusy,setMfaBusy] = useState(false);
+  const [mfaErr,setMfaErr] = useState("");
+  const resetMfa = async () => {
+    if(!sb) return;
+    setMfaBusy(true); setMfaErr("");
+    const {data,error} = await sb.auth.mfa.listFactors();
+    if(error){ setMfaBusy(false); setMfaErr(error.message||"Could not reset two-factor auth."); return; }
+    for(const f of (data?.totp||[])) await sb.auth.mfa.unenroll({factorId:f.id});
+    // Reload so the App-level MFA gate re-evaluates from scratch and routes
+    // straight into the mandatory enroll screen for the new device.
+    window.location.reload();
+  };
   const lbl={fontSize:13,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.08em",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:6,display:"block"};
   const inp={width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:8,color:"#f1f5f9",padding:"9px 12px",fontSize:17,outline:"none",fontFamily:"'DM Sans',sans-serif",colorScheme:"dark"};
   return (
@@ -27335,6 +27391,26 @@ const MyProfileModal = ({member, onSubmit, onClose}) => {
           <KeywordsEditor value={skills} onChange={setSkills}/>
         </div>
 
+        <div style={{marginBottom:22,borderTop:"1px solid #1f2937",paddingTop:16}}>
+          <label style={lbl}>Security</label>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+            <div style={{fontSize:15,color:"#e2e8f0"}}>Two-factor authentication is <span style={{color:"#10b981",fontWeight:700}}>enabled</span></div>
+            {!mfaConfirm ? (
+              <button onClick={()=>setMfaConfirm(true)}
+                style={{background:"none",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"6px 12px",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0}}>
+                Switch device…
+              </button>
+            ) : (
+              <button onClick={resetMfa} disabled={mfaBusy}
+                style={{background:"none",border:"1px solid #ef444450",borderRadius:7,color:"#ef4444",padding:"6px 12px",fontSize:14,fontWeight:700,cursor:mfaBusy?"default":"pointer",flexShrink:0}}>
+                {mfaBusy?"Resetting…":"Confirm reset"}
+              </button>
+            )}
+          </div>
+          {mfaConfirm && <div style={{fontSize:13,color:"#9ca3af",marginTop:6,lineHeight:1.5}}>You'll be signed out of your current authenticator and asked to set up a new one immediately — only do this if you have a new device ready to scan a QR code with.</div>}
+          {mfaErr && <div style={{fontSize:13,color:"#ef4444",marginTop:6}}>{mfaErr}</div>}
+        </div>
+
         <div style={{display:"flex",gap:10}}>
           <button onClick={onClose}
             style={{flex:"0 0 auto",background:"transparent",border:"1px solid #1f2937",borderRadius:10,color:"#6b7280",padding:"12px 18px",fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
@@ -27401,6 +27477,144 @@ const HistoryFeedContent = ({title, buildQuery, onClose}) => {
   );
 };
 
+// ── Mandatory two-factor auth gates ─────────────────────────────────────────
+// Two screens, both full-screen like SupabaseAuthGate/SetNewPasswordScreen:
+// MfaEnrollScreen for an account with no verified TOTP factor yet (first
+// time reaching this gate, or right after an admin/self reset), and
+// MfaChallengeScreen for an account that already has one but this browser
+// session hasn't cleared the code check yet (aal1, needs aal2). Neither has
+// a skip button — 2FA is required for every account, not opt-in.
+const MfaEnrollScreen = ({onDone}) => {
+  const [factorId,setFactorId] = useState(null);
+  const [qr,setQr] = useState(null);
+  const [secret,setSecret] = useState("");
+  const [code,setCode] = useState("");
+  const [err,setErr] = useState("");
+  const [busy,setBusy] = useState(false);
+  const [loading,setLoading] = useState(true);
+
+  useEffect(()=>{
+    let cancelled = false;
+    (async () => {
+      // Supabase only allows one unverified TOTP factor per account at a
+      // time — an abandoned prior attempt (closed the tab mid-setup) would
+      // otherwise block a fresh enroll() call here with "factor already
+      // exists", so clear any stale unverified factor first.
+      const {data:existing} = await sb.auth.mfa.listFactors();
+      const stale = (existing?.totp||[]).find(f=>f.status==="unverified");
+      if(stale) await sb.auth.mfa.unenroll({factorId:stale.id});
+      const {data,error} = await sb.auth.mfa.enroll({factorType:"totp"});
+      if(cancelled) return;
+      if(error){ setErr(error.message||"Could not start two-factor setup."); setLoading(false); return; }
+      setFactorId(data.id);
+      setQr(data.totp.qr_code);
+      setSecret(data.totp.secret);
+      setLoading(false);
+    })();
+    return ()=>{cancelled=true;};
+  },[]);
+
+  const verify = async () => {
+    if(!code.trim()){ setErr("Enter the 6-digit code from your authenticator app."); return; }
+    setBusy(true); setErr("");
+    const {data:challenge,error:challengeErr} = await sb.auth.mfa.challenge({factorId});
+    if(challengeErr){ setBusy(false); setErr(challengeErr.message||"Could not verify that code."); return; }
+    const {error:verifyErr} = await sb.auth.mfa.verify({factorId, challengeId:challenge.id, code:code.trim()});
+    setBusy(false);
+    if(verifyErr){ setErr("That code didn't match — try again."); setCode(""); return; }
+    onDone();
+  };
+
+  return (
+    <div style={AUTH_SCREEN_WRAP}>
+      <div style={{...AUTH_CARD, maxWidth:420}}>
+        <div style={AUTH_TITLE}>PostTrack</div>
+        <div style={AUTH_SUB}>Two-factor authentication is required on every account. Set it up to continue.</div>
+        {loading ? (
+          <div style={{color:"#9ca3af",fontSize:16,padding:"20px 0"}}>Preparing setup…</div>
+        ) : !factorId ? (
+          <div style={{color:"#ef4444",fontSize:15,marginBottom:16}}>{err}</div>
+        ) : (
+          <>
+            <div style={{fontSize:15,color:"#e2e8f0",marginBottom:10,lineHeight:1.5}}>
+              1. Scan this with an authenticator app (Google Authenticator, Authy, 1Password, etc).
+            </div>
+            <div style={{background:"#fff",borderRadius:10,padding:12,marginBottom:14,display:"flex",justifyContent:"center"}}
+              dangerouslySetInnerHTML={{__html:qr}}/>
+            <div style={{fontSize:13,color:"#9ca3af",marginBottom:16,lineHeight:1.5}}>
+              Can't scan? Enter this code manually: <span style={{color:"#818cf8",fontFamily:"monospace",wordBreak:"break-all"}}>{secret}</span>
+            </div>
+            <div style={{fontSize:15,color:"#e2e8f0",marginBottom:8}}>2. Enter the 6-digit code it shows:</div>
+            <input value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))}
+              onKeyDown={e=>{if(e.key==="Enter") verify();}} autoFocus
+              placeholder="123456" style={{...AUTH_INPUT, textAlign:"center", fontSize:24, letterSpacing:"0.3em"}}/>
+            {err && <div style={{color:"#ef4444",fontSize:14,marginBottom:12,marginTop:-6}}>{err}</div>}
+            <button onClick={verify} disabled={busy} style={AUTH_BUTTON(busy)}>{busy?"Verifying…":"Verify & Continue"}</button>
+          </>
+        )}
+        <div style={{textAlign:"center",marginTop:16}}>
+          <button onClick={()=>sb.auth.signOut()} style={AUTH_LINK}>Sign out</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const MfaChallengeScreen = ({onDone}) => {
+  const [factorId,setFactorId] = useState(null);
+  const [code,setCode] = useState("");
+  const [err,setErr] = useState("");
+  const [busy,setBusy] = useState(false);
+  const [loading,setLoading] = useState(true);
+
+  useEffect(()=>{
+    let cancelled = false;
+    (async () => {
+      const {data,error} = await sb.auth.mfa.listFactors();
+      if(cancelled) return;
+      const factor = (data?.totp||[]).find(f=>f.status==="verified");
+      if(error || !factor){ setErr("No verified authenticator found on this account — sign out and back in, or contact an admin."); setLoading(false); return; }
+      setFactorId(factor.id);
+      setLoading(false);
+    })();
+    return ()=>{cancelled=true;};
+  },[]);
+
+  const verify = async () => {
+    if(!code.trim()){ setErr("Enter the 6-digit code from your authenticator app."); return; }
+    setBusy(true); setErr("");
+    const {data:challenge,error:challengeErr} = await sb.auth.mfa.challenge({factorId});
+    if(challengeErr){ setBusy(false); setErr(challengeErr.message||"Could not verify that code."); return; }
+    const {error:verifyErr} = await sb.auth.mfa.verify({factorId, challengeId:challenge.id, code:code.trim()});
+    setBusy(false);
+    if(verifyErr){ setErr("That code didn't match — try again."); setCode(""); return; }
+    onDone();
+  };
+
+  return (
+    <div style={AUTH_SCREEN_WRAP}>
+      <div style={AUTH_CARD}>
+        <div style={AUTH_TITLE}>PostTrack</div>
+        <div style={AUTH_SUB}>Enter the 6-digit code from your authenticator app</div>
+        {loading ? (
+          <div style={{color:"#9ca3af",fontSize:16,padding:"20px 0"}}>Checking your account…</div>
+        ) : (
+          <>
+            <input value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))}
+              onKeyDown={e=>{if(e.key==="Enter") verify();}} autoFocus disabled={!factorId}
+              placeholder="123456" style={{...AUTH_INPUT, textAlign:"center", fontSize:24, letterSpacing:"0.3em"}}/>
+            {err && <div style={{color:"#ef4444",fontSize:14,marginBottom:12,marginTop:-6}}>{err}</div>}
+            <button onClick={verify} disabled={busy||!factorId} style={AUTH_BUTTON(busy)}>{busy?"Verifying…":"Verify"}</button>
+          </>
+        )}
+        <div style={{textAlign:"center",marginTop:16}}>
+          <button onClick={()=>sb.auth.signOut()} style={AUTH_LINK}>Sign out</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function App() {
   // Real per-person auth via Supabase, replacing the old shared-password gate.
   // authChecked stays false only for the brief moment while we ask Supabase
@@ -27423,6 +27637,31 @@ function App() {
     });
     return ()=>sub?.subscription?.unsubscribe();
   },[]);
+  // Two-factor auth is mandatory for every account. Once `authed` flips true
+  // we still don't know whether this session has cleared MFA — a fresh
+  // sign-in only reaches aal1 (password) until the TOTP code is verified,
+  // and an account with no enrolled factor yet needs to enroll one before
+  // it can reach aal2 at all. mfaChecked stays false only for the brief
+  // lookup, same pattern as authChecked above, so neither state flashes the
+  // real app before we know which screen (if any) actually belongs there.
+  const [mfaChecked,setMfaChecked]=useState(false);
+  const [mfaStatus,setMfaStatus]=useState(null); // "needs-enroll" | "needs-challenge" | "ok"
+  const checkMfaStatus = useCallback(async () => {
+    if(!sb) { setMfaStatus("ok"); setMfaChecked(true); return; }
+    const {data:aal} = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    if(aal?.nextLevel==="aal2" && aal?.currentLevel!==aal?.nextLevel) {
+      setMfaStatus("needs-challenge");
+    } else {
+      const {data:factors} = await sb.auth.mfa.listFactors();
+      const hasVerified = (factors?.totp||[]).some(f=>f.status==="verified");
+      setMfaStatus(hasVerified ? "ok" : "needs-enroll");
+    }
+    setMfaChecked(true);
+  },[]);
+  useEffect(()=>{
+    if(!authed){ setMfaChecked(false); setMfaStatus(null); return; }
+    checkMfaStatus();
+  },[authed, checkMfaStatus]);
   const [projects,setProjects]=useState(SEED_PROJECTS);
   const [studioBookings,setStudioBookings]=useState([]);
   const [mediaCards, setMediaCards] = useState(MEDIA_CARDS_SEED);
@@ -28480,6 +28719,9 @@ function App() {
   if(!authChecked) return null;
   if(passwordRecovery) return React.createElement(SetNewPasswordScreen,{onDone:()=>setPasswordRecovery(false)});
   if(!authed) return React.createElement(SupabaseAuthGate,null);
+  if(!mfaChecked) return null;
+  if(mfaStatus==="needs-enroll") return React.createElement(MfaEnrollScreen,{onDone:checkMfaStatus});
+  if(mfaStatus==="needs-challenge") return React.createElement(MfaChallengeScreen,{onDone:checkMfaStatus});
 
   return (
     <>
