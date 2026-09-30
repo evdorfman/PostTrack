@@ -4361,6 +4361,22 @@ const SpeakersPicker = ({value=[], onChange, talentRoster=[]}) => {
 };
 
 // ─── Deliverable Detail Panel (inline expand/collapse, no modal) ───────────────
+// Labeled field wrapper for DeliverableDetailModal's grid layout — a
+// top-level component (not defined inside DeliverableDetailModal) so its
+// identity stays stable across re-renders. Defining it inline there used to
+// give React a brand-new component function on every keystroke in any field
+// it wrapped (Video Length, File Path, Keywords, Notes, …), which made it
+// unmount+remount the input underneath (killing focus) after just one
+// character — the same "only one key at a time" bug fixed earlier in the
+// Ingest tab, here in the Deliverables modal instead. It closes over nothing
+// from its old parent scope, so lifting it out needed no prop-threading.
+const DelField = ({label,children,span}) => (
+  <div style={{gridColumn:span?"1/-1":"auto"}}>
+    <div style={{fontSize:13,fontWeight:800,color: "#8e97a6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:5}}>{label}</div>
+    {children}
+  </div>
+);
+
 const DeliverableDetailModal = React.memo(({del,projectId,team,allProjects,onUpdateDel,onDeleteDel,onClose,project,locked=false,onUpdateProject,talentRoster=[],reviewerNames=[],addReviewerName}) => {
   const teamNames=team.map(m=>m.name);
   const upd=(f,v)=>{ if(locked) return; onUpdateDel(projectId,del.id,f,v); };
@@ -4379,12 +4395,8 @@ const DeliverableDetailModal = React.memo(({del,projectId,team,allProjects,onUpd
   const effectiveWS = del.workstream || project?.workstream || "";
   const effectiveProducerId = del.producerId || project?.assignees?.["Producer"]?.[0] || null;
 
-  const F = ({label,children,span}) => (
-    <div style={{gridColumn:span?"1/-1":"auto"}}>
-      <div style={{fontSize:13,fontWeight:800,color: "#8e97a6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:5}}>{label}</div>
-      {children}
-    </div>
-  );
+  const F = DelField;
+
 
   return (
     <div style={{background:"#0d1117",borderRadius:"0 0 12px 12px",overflow:"hidden"}}>
