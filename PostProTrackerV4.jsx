@@ -1580,7 +1580,11 @@ const Chip = ({label,color,xs,style:s={}}) => (
   <span style={{background:color+"18",color,border:`1px solid ${color}40`,borderRadius:4,padding:xs?"1px 6px":"2px 9px",fontSize:xs?11:13,fontWeight:700,letterSpacing:"0.05em",whiteSpace:"nowrap",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",...s}}>{label}</span>
 );
 
-const Dl = ({date,inline}) => {
+const Dl = ({date,inline,deliveredAt}) => {
+  if(deliveredAt){
+    const dd=new Date(deliveredAt+"T00:00");
+    return <span style={{color:"#10b981",fontSize:14,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.06em"}}>{`DELIVERED ${dd.toLocaleDateString("en-US",{month:"short",day:"numeric"})}`}</span>;
+  }
   if(!date) return null;
   const d=daysLeft(date);
   const c=d<0?"#ef4444":d<=3?"#ef4444":d<=7?"#f59e0b":"#4b5563";
@@ -5564,7 +5568,7 @@ const IngestFullFields = ({ig, update, editableLocation=true, showCallSheet=fals
                 {activeR&&!changes&&<Chip label={activeR.label} color={RCOLOR[activeR.status]} xs/>}
                 {changes&&<Chip label="↩ Changes" color="#ef4444" xs/>}
                 <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW} small/>
-                <Dl date={d.deadline}/>
+                <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>
                 <span style={{fontSize:14,color:exp?"#6366f1":"#8e97a6"}}>{exp?"▲":"›"}</span>
               </div>
               {/* Ingest-specific extras — not part of the standard deliverable row */}
@@ -7228,7 +7232,7 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                             <div key={i} title={`${r.label}: ${r.status}`} style={{width:20,height:20,borderRadius:"50%",background:RCOLOR[r.status]+"30",border:`2px solid ${RCOLOR[r.status]}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:RCOLOR[r.status]}}>{i+1}</div>
                           ))}
                         </div>
-                        <Dl date={d.deadline}/>
+                        <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>
                         <span style={{fontSize:17,color: "#8e97a6"}}>›</span>
                       </div>
                     );
@@ -11201,7 +11205,7 @@ const KanbanStatus = ({projects,team,onUpdateDel}) => {
                     </select>
                     <div style={{display:"flex",gap:3,alignItems:"center"}}>
                       {d.aspectRatio&&<Chip label={d.aspectRatio} color="#374151" xs/>}
-                      <Dl date={d.deadline}/>
+                      <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>
                     </div>
                   </div>
                   {changes&&<div style={{fontSize:13,color:"#ef4444",fontWeight:700,marginTop:4}}>↩ Changes Requested</div>}
@@ -11273,7 +11277,7 @@ const KanbanEditorCol = ({ed, dels, editors, onUpdateDel}) => {
                         </select>
                         <div style={{display:"flex",gap:3,alignItems:"center"}}>
                           <Chip label={d.status} color={c} xs/>
-                          <Dl date={d.deadline}/>
+                          <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>
                         </div>
                       </div>
                       {ch&&<div style={{fontSize:13,color:"#ef4444",marginTop:3,fontWeight:700}}>↩ Changes</div>}
@@ -11892,7 +11896,7 @@ const TeamMemberCard = ({m, projects, onOpenProject, nudges=[]}) => {
                         <div style={{fontSize:13,color: "#9ca3af"}}>{d.projectName}</div>
                       </div>
                       <Chip label={d.status} color={stColor} xs/>
-                      <Dl date={d.deadline}/>
+                      <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>
                     </div>
                   );
                 })}
@@ -12115,9 +12119,9 @@ const DeliverableRow = ({
           <div onClick={e=>e.stopPropagation()} style={{display:"flex",alignItems:"center",gap:5}}>
             <input type="date" value={d.deadline||""} onChange={e=>onUpdateDel(projectId,d.id,"deadline",e.target.value)}
               style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:5,color:d.deadline?"#e2e8f0":"#4b5563",padding:"2px 5px",fontSize:12,outline:"none",cursor:"pointer",colorScheme:"dark",fontFamily:"inherit"}}/>
-            {d.deadline&&<Dl date={d.deadline}/>}
+            {d.deadline&&<Dl date={d.deadline} deliveredAt={d.deliveredAt}/>}
           </div>
-        ) : <Dl date={d.deadline}/>}
+        ) : <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>}
         {editable&&onDeleteDel&&(
           <div onClick={e=>e.stopPropagation()}>
             {confirmDelete
@@ -12180,7 +12184,7 @@ const DelInfoPopup = ({del, team, onClose}) => {
           {del.captionsNeeded&&<Chip label="Captions" color="#a855f7"/>}
           {del.containsAI&&<Chip label="AI" color="#f59e0b"/>}
           {allAppr&&<Chip label="✓ All Approved" color="#10b981"/>}
-          <Dl date={del.deadline}/>
+          <Dl date={del.deadline} deliveredAt={del.deliveredAt}/>
         </div>
         <h2 style={{fontSize:25,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:3}}>{del.title}</h2>
         <div style={{fontSize:16,color: "#9ca3af",marginBottom:14}}>{del.projectName} · Due {fmtDT(del.deadline)}</div>
@@ -12381,7 +12385,7 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
                         <Chip label="Required" color="#f97316" xs/>
                         {changes&&<Chip label="↩ Changes" color="#ef4444" xs/>}
                         <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW} small/>
-                        <Dl date={d.deadline}/>
+                        <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>
                       </div>
                     );
                   })}
@@ -27195,8 +27199,9 @@ const MobileDeliverables = ({project, onUpdateDel}) => {
         const due=d.deadline?new Date(d.deadline+"T00:00"):null;
         if(due) due.setHours(0,0,0,0);
         const diff=due?Math.ceil((due-today)/86400000):null;
-        const dlLabel=!due?null:diff<0?`${Math.abs(diff)}d overdue`:diff===0?"Due today":diff===1?"Due tomorrow":`Due ${due.toLocaleDateString("en-US",{month:"short",day:"numeric"})}`;
-        const dlColor=!due?"#838ba0":diff<0?"#ef4444":diff<=2?"#f59e0b":diff<=7?"#3b82f6":"#838ba0";
+        const dlLabel=d.deliveredAt?`Delivered ${new Date(d.deliveredAt+"T00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})}`
+          :!due?null:diff<0?`${Math.abs(diff)}d overdue`:diff===0?"Due today":diff===1?"Due tomorrow":`Due ${due.toLocaleDateString("en-US",{month:"short",day:"numeric"})}`;
+        const dlColor=d.deliveredAt?"#10b981":!due?"#838ba0":diff<0?"#ef4444":diff<=2?"#f59e0b":diff<=7?"#3b82f6":"#838ba0";
         return (
           <div key={d.id} style={{background:"#111827",border:"1px solid #1f2937",borderLeft:`3px solid ${ws.color}`,borderRadius:10,padding:"12px 14px",display:"flex",flexDirection:"column",gap:8}}>
             <div style={{fontSize:17,fontWeight:700,color:"#e2e8f0",lineHeight:1.2}}>{d.title}</div>
@@ -28852,14 +28857,21 @@ function App() {
   const updateDel=useCallback((projectId,delId,field,value)=>{
     const prevProj = projectsRef.current.find(p=>p.id===projectId);
     const prevDel = prevProj?.deliverables.find(d=>d.id===delId);
-    setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:p.deliverables.map(d=>d.id!==delId?d:{...d,[field]:value})}));
+    // Stamp/clear the delivered date whenever status flips in or out of "Delivered",
+    // so the UI can show "Delivered <date>" instead of a stale overdue countdown.
+    const applyFieldUpdate = d => {
+      const updated = {...d,[field]:value};
+      if(field==="status") updated.deliveredAt = value==="Delivered" ? (d.deliveredAt||new Date().toISOString().slice(0,10)) : null;
+      return updated;
+    };
+    setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:p.deliverables.map(d=>d.id!==delId?d:applyFieldUpdate(d))}));
     // Seed project override
     if(SEED_PROJECTS.some(p=>p.id===projectId)){
       setSeedOverrides(prev=>{
         const existing=prev[projectId]||{};
         const seedProj=SEED_PROJECTS.find(p=>p.id===projectId);
         const baseDels=existing.deliverables||seedProj?.deliverables||[];
-        return {...prev,[projectId]:{...existing,deliverables:baseDels.map(d=>d.id!==delId?d:{...d,[field]:value})}};
+        return {...prev,[projectId]:{...existing,deliverables:baseDels.map(d=>d.id!==delId?d:applyFieldUpdate(d))}};
       });
     }
     const label = prevDel?.title || "Deliverable";
