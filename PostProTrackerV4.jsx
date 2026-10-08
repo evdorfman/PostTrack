@@ -9720,14 +9720,14 @@ const PipelineView = ({projects, team, onOpenProject, onUpdateProject}) => {
 
                   {/* # + remove */}
                   <TD style={{textAlign:"center",padding:"6px 8px"}}>
-                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
                       <span style={{color:"#374151",fontSize:13,fontWeight:700}}>{i+1}</span>
                       <button onClick={()=>onUpdateProject(p.id,"inPipeline",false)}
                         title="Remove from Pipeline"
-                        style={{background:"none",border:"none",color:"#374151",cursor:"pointer",fontSize:14,padding:"0",lineHeight:1}}
-                        onMouseEnter={e=>{e.currentTarget.style.color="#ef4444";}}
-                        onMouseLeave={e=>{e.currentTarget.style.color="#374151";}}>
-                        ×
+                        style={{background:"#ef444415",border:"1px solid #ef444440",borderRadius:6,color:"#ef4444",padding:"4px 10px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",whiteSpace:"nowrap"}}
+                        onMouseEnter={e=>{e.currentTarget.style.background="#ef444425";}}
+                        onMouseLeave={e=>{e.currentTarget.style.background="#ef444415";}}>
+                        − Pipeline
                       </button>
                     </div>
                   </TD>
