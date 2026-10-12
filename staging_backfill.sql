@@ -79,9 +79,9 @@ select
   coalesce(r.elem->'reviewers', '[]'::jsonb),
   r.elem->>'status',
   r.elem->>'notes'
-from projects p,
-     jsonb_array_elements(p.deliverables) as d(elem),
-     jsonb_array_elements(coalesce(d.elem->'rounds', '[]'::jsonb)) as r(elem)
+from projects p
+cross join lateral jsonb_array_elements(p.deliverables) as d(elem)
+cross join lateral jsonb_array_elements(coalesce(d.elem->'rounds', '[]'::jsonb)) as r(elem)
 join deliverables dl
   on dl.project_id = p.id and dl.legacy_id = (d.elem->>'id')::bigint;
 
