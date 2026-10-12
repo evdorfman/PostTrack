@@ -15186,6 +15186,142 @@ const bookingToRow = b => {
   };
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Normalized-schema data layer (deliverables/review_rounds/productions as
+// their own Supabase tables — see staging_schema.sql) — NOT YET WIRED IN.
+// Nothing below calls or is called by the live app; projects.deliverables/
+// projects.productions (the nested-JSON columns) stay the only thing any
+// component reads until a deliberate cutover step swaps the data-loading
+// effect and updateDel/addDel/deleteDel/etc. over to these. Until then this
+// is dead code that happens to live in the same file so it ships, builds,
+// and gets code-reviewed alongside everything else — see
+// assembleNormalizedProjectData's doc comment for why the shape it produces
+// has to match today's nested shape exactly.
+//
+// `_rowId` on a deliverable/production object is its real Supabase primary
+// key (always a uuid) — the *ToRow functions use it to know whether to
+// insert or update. `id` stays the legacy numeric id for anything migrated
+// by the backfill script, so every existing bit of UI that keys off
+// `del.id`/`production.id` keeps working unchanged; a deliverable created
+// after cutover has no legacy id, so `id` falls back to the row's own uuid.
+
+const rowToDeliverable = row => ({
+  id: row.legacy_id ?? row.id,
+  _rowId: row.id,
+  projectId: row.project_id,
+  title: row.title, status: row.status, deadline: row.deadline, deliveredAt: row.delivered_at,
+  editorId: row.editor_id, animatorId: row.animator_id, producerId: row.producer_id,
+  deliverableType: row.deliverable_type, aspectRatio: row.aspect_ratio, quality: row.quality,
+  frameLink: row.frame_link, framePW: row.frame_pw, frameInternalUrl: row.frame_internal_url,
+  videoLength: row.video_length, filePath: row.file_path,
+  distPlatforms: row.dist_platforms||[], useCaseLimitations: row.use_case_limitations||[], approvedUses: row.approved_uses||[],
+  speakers: row.speakers||[], keywords: row.keywords||[], notes: row.notes||"",
+  totalRevisions: row.total_revisions||0, estimatedHoursOverride: row.estimated_hours_override,
+  containsAI: row.contains_ai||false, aiTools: row.ai_tools||[], greenscreen: row.greenscreen||false,
+  captionsNeeded: row.captions_needed||false, srtDelivered: row.srt_delivered||false, srtFrameUrl: row.srt_frame_url,
+  watermark: row.watermark||false, bxtvLink: row.bxtv_link||null,
+  rounds: [], // populated by assembleNormalizedProjectData, never by this mapper alone
+});
+
+const deliverableToRow = (d, projectId) => ({
+  ...(d._rowId ? {id: d._rowId} : {}),
+  legacy_id: typeof d.id === "number" ? d.id : null,
+  project_id: projectId,
+  title: d.title||null, status: d.status||null, deadline: d.deadline||null, delivered_at: d.deliveredAt||null,
+  editor_id: d.editorId||null, animator_id: d.animatorId||null, producer_id: d.producerId||null,
+  deliverable_type: d.deliverableType||null, aspect_ratio: d.aspectRatio||null, quality: d.quality||null,
+  frame_link: d.frameLink||null, frame_pw: d.framePW||null, frame_internal_url: d.frameInternalUrl||null,
+  video_length: d.videoLength||null, file_path: d.filePath||null,
+  dist_platforms: d.distPlatforms||[], use_case_limitations: d.useCaseLimitations||[], approved_uses: d.approvedUses||[],
+  speakers: d.speakers||[], keywords: d.keywords||[], notes: d.notes||null,
+  total_revisions: d.totalRevisions||0, estimated_hours_override: d.estimatedHoursOverride ?? null,
+  contains_ai: !!d.containsAI, ai_tools: d.aiTools||[], greenscreen: !!d.greenscreen,
+  captions_needed: !!d.captionsNeeded, srt_delivered: !!d.srtDelivered, srt_frame_url: d.srtFrameUrl||null,
+  watermark: !!d.watermark, bxtv_link: d.bxtvLink||null,
+});
+
+const isUuid = v => typeof v === "string" && v.includes("-");
+
+const rowToReviewRound = row => ({
+  id: row.id,
+  deliverableRowId: row.deliverable_id,
+  label: row.label, deadline: row.deadline, reviewers: row.reviewers||[], status: row.status, notes: row.notes||"",
+  workReviewSessionId: row.work_review_session_id,
+});
+
+const reviewRoundToRow = (r, deliverableRowId) => ({
+  ...(isUuid(r.id) ? {id: r.id} : {}),
+  deliverable_id: deliverableRowId,
+  label: r.label||null, deadline: r.deadline||null, reviewers: r.reviewers||[], status: r.status||null, notes: r.notes||null,
+  work_review_session_id: isUuid(r.workReviewSessionId) ? r.workReviewSessionId : null,
+});
+
+const rowToProduction = row => ({
+  id: row.legacy_id ?? row.id,
+  _rowId: row.id,
+  projectId: row.project_id,
+  title: row.title, location: row.location, startTime: row.start_time, endTime: row.end_time, booked: row.booked||false,
+  setupTypeId: row.setup_type_id,
+  schedule: row.schedule||[], crewInternal: row.crew_internal||[], crewExternal: row.crew_external||[],
+  equipmentIds: row.equipment_ids||[], externalGear: row.external_gear||[], mediaCardIds: row.media_card_ids||[],
+  scriptFile: row.script_file||null, additionalDetails: row.additional_details||"",
+  ingest: row.ingest||{},
+});
+
+const productionToRow = (p, projectId) => ({
+  ...(p._rowId ? {id: p._rowId} : {}),
+  legacy_id: typeof p.id === "number" ? p.id : null,
+  project_id: projectId,
+  title: p.title||null, location: p.location||null, start_time: p.startTime||null, end_time: p.endTime||null, booked: !!p.booked,
+  setup_type_id: p.setupTypeId||null,
+  schedule: p.schedule||[], crew_internal: p.crewInternal||[], crew_external: p.crewExternal||[],
+  equipment_ids: p.equipmentIds||[], external_gear: p.externalGear||[], media_card_ids: p.mediaCardIds||[],
+  script_file: p.scriptFile||null, additional_details: p.additionalDetails||null,
+  ingest: p.ingest||{},
+});
+
+// Reassembles flat rows (as loaded from the three normalized tables) back
+// into the exact nested shape every existing component already reads off
+// `project.deliverables` / `project.productions` today. This is the one
+// function the cutover step actually points the data-loading effect at —
+// everything downstream of it (every screen in this file) needs zero
+// changes, because what comes out the other end is shaped identically to
+// what projectToRow/rowToProject already produce; see staging_backfill.sql's
+// verification query for the ground truth this was checked against.
+const assembleNormalizedProjectData = (deliverableRows, roundRows, productionRows) => {
+  const roundsByDeliverable = {};
+  roundRows.forEach(rr => {
+    (roundsByDeliverable[rr.deliverable_id] ||= []).push(rowToReviewRound(rr));
+  });
+  const deliverablesByProject = {};
+  deliverableRows.forEach(dr => {
+    const d = rowToDeliverable(dr);
+    d.rounds = roundsByDeliverable[dr.id] || [];
+    (deliverablesByProject[dr.project_id] ||= []).push(d);
+  });
+  const productionsByProject = {};
+  productionRows.forEach(pr => {
+    (productionsByProject[pr.project_id] ||= []).push(rowToProduction(pr));
+  });
+  return { deliverablesByProject, productionsByProject };
+};
+
+// Thin per-row writers mirroring addDel/updateDel/deleteDel's call shape
+// (App.js functions of the same un-suffixed names), so swapping the
+// cutover's call sites is a rename, not a rewrite. Untested against a live
+// Supabase instance as of writing — see the "go ahead" conversation this
+// landed in for why (no DB access from the build sandbox); exercise these
+// against staging before pointing anything real at them.
+const addDeliverableRow        = (sbClient, projectId, deliverable) => sbClient.from("deliverables").insert(deliverableToRow(deliverable, projectId)).select().single();
+const updateDeliverableRow     = (sbClient, rowId, patch)           => sbClient.from("deliverables").update(patch).eq("id", rowId);
+const deleteDeliverableRow     = (sbClient, rowId)                  => sbClient.from("deliverables").delete().eq("id", rowId);
+const addReviewRoundRow        = (sbClient, deliverableRowId, round)=> sbClient.from("review_rounds").insert(reviewRoundToRow(round, deliverableRowId)).select().single();
+const updateReviewRoundRow     = (sbClient, rowId, patch)           => sbClient.from("review_rounds").update(patch).eq("id", rowId);
+const deleteReviewRoundRow     = (sbClient, rowId)                  => sbClient.from("review_rounds").delete().eq("id", rowId);
+const addProductionRow         = (sbClient, projectId, production)  => sbClient.from("productions").insert(productionToRow(production, projectId)).select().single();
+const updateProductionRow      = (sbClient, rowId, patch)           => sbClient.from("productions").update(patch).eq("id", rowId);
+const deleteProductionRow      = (sbClient, rowId)                  => sbClient.from("productions").delete().eq("id", rowId);
+
 const INTAKE_STATUSES = ["New","In Review","Assigned","Archived"];
 const INTAKE_STATUS_COLOR = {"New":"#6366f1","In Review":"#f59e0b","Assigned":"#10b981","Archived":"#6b7280"};
 
