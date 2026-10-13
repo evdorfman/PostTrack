@@ -9967,6 +9967,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
   var sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
   window.sb = sb;
   var SHADOW_WRITE_DELIVERABLES = true;
+  var SHADOW_WRITE_PRODUCTIONS = false;
   var rowToTeamMember = (row) => ({
     id: row.id,
     name: row.name,
@@ -10154,12 +10155,35 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     notes: r.notes || null,
     work_review_session_id: isUuid(r.workReviewSessionId) ? r.workReviewSessionId : null
   });
+  var productionToRow = (p, projectId) => ({
+    ...p._rowId ? { id: p._rowId } : {},
+    legacy_id: typeof p.id === "number" ? p.id : null,
+    project_id: projectId,
+    title: p.title || null,
+    location: p.location || null,
+    start_time: p.startTime || null,
+    end_time: p.endTime || null,
+    booked: !!p.booked,
+    setup_type_id: p.setupTypeId || null,
+    schedule: p.schedule || [],
+    crew_internal: p.crewInternal || [],
+    crew_external: p.crewExternal || [],
+    equipment_ids: p.equipmentIds || [],
+    external_gear: p.externalGear || [],
+    media_card_ids: p.mediaCardIds || [],
+    script_file: p.scriptFile || null,
+    additional_details: p.additionalDetails || null,
+    ingest: p.ingest || {}
+  });
   var addDeliverableRow = (sbClient, projectId, deliverable) => sbClient.from("deliverables").insert(deliverableToRow(deliverable, projectId)).select().single();
   var updateDeliverableRow = (sbClient, rowId, patch) => sbClient.from("deliverables").update(patch).eq("id", rowId);
   var deleteDeliverableRow = (sbClient, rowId) => sbClient.from("deliverables").delete().eq("id", rowId);
   var addReviewRoundRow = (sbClient, deliverableRowId, round) => sbClient.from("review_rounds").insert(reviewRoundToRow(round, deliverableRowId)).select().single();
   var updateReviewRoundRow = (sbClient, rowId, patch) => sbClient.from("review_rounds").update(patch).eq("id", rowId);
   var deleteReviewRoundRow = (sbClient, rowId) => sbClient.from("review_rounds").delete().eq("id", rowId);
+  var addProductionRow = (sbClient, projectId, production) => sbClient.from("productions").insert(productionToRow(production, projectId)).select().single();
+  var updateProductionRow = (sbClient, rowId, patch) => sbClient.from("productions").update(patch).eq("id", rowId);
+  var deleteProductionRow = (sbClient, rowId) => sbClient.from("productions").delete().eq("id", rowId);
   var computeRoundDiff = (oldRounds, newRounds) => {
     const oldById = new Map(oldRounds.map((r) => [String(r.id), r]));
     const newIds = new Set(newRounds.map((r) => String(r.id)));
@@ -10189,6 +10213,39 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     results.forEach(({ error }) => {
       if (error) console.warn("[shadow write] round diff op failed:", error);
     });
+  });
+  var computeProductionDiff = (oldProds, newProds) => {
+    const oldById = new Map(oldProds.map((p) => [String(p.id), p]));
+    const newIds = new Set(newProds.map((p) => String(p.id)));
+    const toDelete = oldProds.filter((p) => !newIds.has(String(p.id)) && p._rowId);
+    const toInsert = [], toUpdate = [];
+    newProds.forEach((p) => {
+      const existing = oldById.get(String(p.id));
+      if (!existing?._rowId) {
+        if (!p._rowId) toInsert.push(p);
+        return;
+      }
+      const patchRow = productionToRow(p, null);
+      delete patchRow.id;
+      delete patchRow.legacy_id;
+      delete patchRow.project_id;
+      const beforeRow = productionToRow(existing, null);
+      delete beforeRow.id;
+      delete beforeRow.legacy_id;
+      delete beforeRow.project_id;
+      if (JSON.stringify(patchRow) !== JSON.stringify(beforeRow)) toUpdate.push({ rowId: existing._rowId, patch: patchRow, legacyId: p.id });
+    });
+    return { toInsert, toUpdate, toDelete };
+  };
+  var writeProductionDiff = (sbClient, projectId, diff) => Promise.all([
+    ...diff.toInsert.map((p) => addProductionRow(sbClient, projectId, p).then(({ data, error }) => ({ kind: "insert", legacyId: p.id, data, error }))),
+    ...diff.toUpdate.map(({ rowId, patch, legacyId }) => updateProductionRow(sbClient, rowId, patch).then(({ error }) => ({ kind: "update", legacyId, error }))),
+    ...diff.toDelete.map((p) => deleteProductionRow(sbClient, p._rowId).then(({ error }) => ({ kind: "delete", legacyId: p.id, error })))
+  ]).then((results) => {
+    results.forEach(({ error }) => {
+      if (error) console.warn("[shadow write] production diff op failed:", error);
+    });
+    return results.filter((r) => r.kind === "insert" && !r.error && r.data).map((r) => ({ legacyId: r.legacyId, rowId: r.data.id }));
   });
   var INTAKE_STATUSES = ["New", "In Review", "Assigned", "Archived"];
   var INTAKE_STATUS_COLOR = { "New": "#6366f1", "In Review": "#f59e0b", "Assigned": "#10b981", "Archived": "#6b7280" };
@@ -19913,6 +19970,19 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       });
     }, [authed, projectsLoaded]);
     (0, import_react.useEffect)(() => {
+      if (!authed || !sb || !SHADOW_WRITE_PRODUCTIONS || !projectsLoaded) return;
+      sb.from("productions").select("id, legacy_id").then(({ data, error }) => {
+        if (error || !data) return;
+        const rowIdByLegacyId = {};
+        data.forEach((r) => {
+          if (r.legacy_id != null) rowIdByLegacyId[r.legacy_id] = r.id;
+        });
+        setProjects((prev) => prev.map((p) => ({ ...p, productions: (p.productions || []).map(
+          (pr) => pr._rowId || !rowIdByLegacyId[pr.id] ? pr : { ...pr, _rowId: rowIdByLegacyId[pr.id] }
+        ) })));
+      });
+    }, [authed, projectsLoaded]);
+    (0, import_react.useEffect)(() => {
       if (!authed || !sb) return;
       const mergeUpsert = (setter, mapRow) => (payload) => {
         const incoming = mapRow(payload.new);
@@ -20334,6 +20404,15 @@ Never delete without explicit confirmation. Be conversational and use studio ter
             logActivity({ entityType: "production", entityLabel: pp.title || pp.type || "Production", projectId, action: "deleted" });
           }
         });
+        if (SHADOW_WRITE_PRODUCTIONS && sb) {
+          writeProductionDiff(sb, projectId, computeProductionDiff(prevProds, newProds)).then((insertedTags) => {
+            if (!insertedTags.length) return;
+            setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, productions: p.productions.map((pr) => {
+              const tag = insertedTags.find((t) => t.legacyId === pr.id);
+              return tag ? { ...pr, _rowId: tag.rowId } : pr;
+            }) }));
+          }).catch((e) => console.warn("[shadow write] production diff failed:", e));
+        }
       } else if (field === "ingestDates") {
         const prevIngests = prevProj?.ingestDates || [];
         (value || []).filter((ig) => !prevIngests.some((pi) => pi.id === ig.id)).forEach(() => {
