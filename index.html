@@ -9968,6 +9968,9 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
   window.sb = sb;
   var SHADOW_WRITE_DELIVERABLES = true;
   var SHADOW_WRITE_PRODUCTIONS = true;
+  var SHADOW_WRITE_SETUP_TYPES = false;
+  var SHADOW_WRITE_PRODUCTION_PRESETS = false;
+  var SHADOW_WRITE_CUSTOM_TASKS = false;
   var rowToTeamMember = (row) => ({
     id: row.id,
     name: row.name,
@@ -10192,6 +10195,41 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     additional_details: p.additionalDetails || null,
     ingest: p.ingest || {}
   });
+  var parseLegacyId = (v) => v != null && /^-?\d+$/.test(v) ? Number(v) : v;
+  var setupTypeToRow = (t) => ({
+    ...t._rowId ? { id: t._rowId } : {},
+    legacy_id: t.id != null ? String(t.id) : null,
+    name: t.name || null,
+    description: t.description || null,
+    floorplan_photo_key: t.floorplanPhotoKey || null,
+    ref_photo_keys: t.refPhotoKeys || [],
+    equipment_ids: t.equipmentIds || [],
+    external_gear: t.externalGear || [],
+    media_card_ids: t.mediaCardIds || [],
+    furniture_ids: t.furnitureIds || [],
+    prop_ids: t.propIds || [],
+    recording_specs: t.recordingSpecs || {},
+    screen_content: t.screenContent || {},
+    notes: t.notes || null,
+    roles: t.roles || []
+  });
+  var productionPresetToRow = (p) => ({
+    ...p._rowId ? { id: p._rowId } : {},
+    legacy_id: p.id != null ? String(p.id) : null,
+    name: p.name || null,
+    type: p.type || null,
+    sections: p.sections || {}
+  });
+  var customTaskToRow = (t) => ({
+    ...t._rowId ? { id: t._rowId } : {},
+    legacy_id: t.id != null ? Number(t.id) : null,
+    project_id: t.projectId || null,
+    title: t.title || null,
+    due_date: t.dueDate || null,
+    reminders: t.reminders || [],
+    notes: t.notes || null,
+    done: !!t.done
+  });
   var addDeliverableRow = (sbClient, projectId, deliverable) => sbClient.from("deliverables").insert(deliverableToRow(deliverable, projectId)).select().single();
   var updateDeliverableRow = (sbClient, rowId, patch) => sbClient.from("deliverables").update(patch).eq("id", rowId);
   var deleteDeliverableRow = (sbClient, rowId) => sbClient.from("deliverables").delete().eq("id", rowId);
@@ -10264,6 +10302,47 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
   ]).then((results) => {
     results.forEach(({ error }) => {
       if (error) console.warn("[shadow write] production diff op failed:", error);
+    });
+    return results.filter((r) => r.kind === "insert" && !r.error && r.data).map((r) => ({ legacyId: r.legacyId, rowId: r.data.id }));
+  });
+  var addSetupTypeRow = (sbClient, setupType) => sbClient.from("setup_types").insert(setupTypeToRow(setupType)).select().single();
+  var updateSetupTypeRow = (sbClient, rowId, patch) => sbClient.from("setup_types").update(patch).eq("id", rowId);
+  var deleteSetupTypeRow = (sbClient, rowId) => sbClient.from("setup_types").delete().eq("id", rowId);
+  var addCustomTaskRow = (sbClient, task) => sbClient.from("custom_tasks").insert(customTaskToRow(task)).select().single();
+  var updateCustomTaskRow = (sbClient, rowId, patch) => sbClient.from("custom_tasks").update(patch).eq("id", rowId);
+  var deleteCustomTaskRow = (sbClient, rowId) => sbClient.from("custom_tasks").delete().eq("id", rowId);
+  var addProductionPresetRow = (sbClient, preset) => sbClient.from("production_presets").insert(productionPresetToRow(preset)).select().single();
+  var updateProductionPresetRow = (sbClient, rowId, patch) => sbClient.from("production_presets").update(patch).eq("id", rowId);
+  var deleteProductionPresetRow = (sbClient, rowId) => sbClient.from("production_presets").delete().eq("id", rowId);
+  var computePresetDiff = (oldPresets, newPresets) => {
+    const oldById = new Map(oldPresets.map((p) => [String(p.id), p]));
+    const newIds = new Set(newPresets.map((p) => String(p.id)));
+    const toDelete = oldPresets.filter((p) => !newIds.has(String(p.id)) && p._rowId);
+    const toInsert = [], toUpdate = [];
+    newPresets.forEach((p) => {
+      const existing = oldById.get(String(p.id));
+      if (!existing) {
+        if (!p._rowId) toInsert.push(p);
+        return;
+      }
+      if (!existing._rowId) return;
+      const patchRow = productionPresetToRow(p);
+      delete patchRow.id;
+      delete patchRow.legacy_id;
+      const beforeRow = productionPresetToRow(existing);
+      delete beforeRow.id;
+      delete beforeRow.legacy_id;
+      if (JSON.stringify(patchRow) !== JSON.stringify(beforeRow)) toUpdate.push({ rowId: existing._rowId, patch: patchRow, legacyId: p.id });
+    });
+    return { toInsert, toUpdate, toDelete };
+  };
+  var writePresetDiff = (sbClient, diff) => Promise.all([
+    ...diff.toInsert.map((p) => addProductionPresetRow(sbClient, p).then(({ data, error }) => ({ kind: "insert", legacyId: p.id, data, error }))),
+    ...diff.toUpdate.map(({ rowId, patch, legacyId }) => updateProductionPresetRow(sbClient, rowId, patch).then(({ error }) => ({ kind: "update", legacyId, error }))),
+    ...diff.toDelete.map((p) => deleteProductionPresetRow(sbClient, p._rowId).then(({ error }) => ({ kind: "delete", legacyId: p.id, error })))
+  ]).then((results) => {
+    results.forEach(({ error }) => {
+      if (error) console.warn("[shadow write] preset diff op failed:", error);
     });
     return results.filter((r) => r.kind === "insert" && !r.error && r.data).map((r) => ({ legacyId: r.legacyId, rowId: r.data.id }));
   });
@@ -19613,6 +19692,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [studioSpaces, setStudioSpaces] = (0, import_react.useState)(ALL_STUDIO_LOCATIONS);
     const [studioSpaceMeta, setStudioSpaceMeta] = (0, import_react.useState)({ ...LOCATION_META });
     const [setupTypes, setSetupTypes] = (0, import_react.useState)(DEFAULT_SETUP_TYPES);
+    const [setupTypesLoaded, setSetupTypesLoaded] = (0, import_react.useState)(false);
     const [talentRoster, setTalentRoster] = (0, import_react.useState)(DEFAULT_TALENT_ROSTER);
     const [workstations, setWorkstations] = (0, import_react.useState)(() => [
       "EDIT001_BORIS",
@@ -19744,6 +19824,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       });
     };
     const [customTasks, setCustomTasks] = (0, import_react.useState)([]);
+    const [customTasksLoaded, setCustomTasksLoaded] = (0, import_react.useState)(false);
     const saveCustomTasks = (t) => {
       setCustomTasks(t);
       window.storage?.set(CUSTOM_TASKS_STORAGE_KEY, JSON.stringify(t)).catch(() => {
@@ -19752,9 +19833,36 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const addCustomTask = (task) => {
       saveCustomTasks([...customTasks, task]);
       logActivity({ entityType: "task", entityLabel: task.title || "Task", projectId: task.projectId || null, action: "created" });
+      if (SHADOW_WRITE_CUSTOM_TASKS && sb) {
+        addCustomTaskRow(sb, task).then(({ data, error }) => {
+          if (error) {
+            console.warn("[shadow write] addCustomTask failed:", error);
+            return;
+          }
+          if (!data) return;
+          setCustomTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, _rowId: data.id } : t));
+        }).catch((e) => console.warn("[shadow write] addCustomTask failed:", e));
+      }
     };
-    const updateCustomTask = (task) => saveCustomTasks(customTasks.map((t) => t.id === task.id ? task : t));
-    const deleteCustomTask = (taskId) => saveCustomTasks(customTasks.filter((t) => t.id !== taskId));
+    const updateCustomTask = (task) => {
+      const prev = customTasks.find((t) => t.id === task.id);
+      saveCustomTasks(customTasks.map((t) => t.id === task.id ? task : t));
+      if (SHADOW_WRITE_CUSTOM_TASKS && sb && prev?._rowId) {
+        const { id: _id, legacy_id: _legacyId, project_id: _projectId, ...patch } = customTaskToRow(task);
+        updateCustomTaskRow(sb, prev._rowId, patch).then(({ error }) => {
+          if (error) console.warn("[shadow write] updateCustomTask failed:", error);
+        }).catch((e) => console.warn("[shadow write] updateCustomTask failed:", e));
+      }
+    };
+    const deleteCustomTask = (taskId) => {
+      const prev = customTasks.find((t) => t.id === taskId);
+      saveCustomTasks(customTasks.filter((t) => t.id !== taskId));
+      if (SHADOW_WRITE_CUSTOM_TASKS && sb && prev?._rowId) {
+        deleteCustomTaskRow(sb, prev._rowId).then(({ error }) => {
+          if (error) console.warn("[shadow write] deleteCustomTask failed:", error);
+        }).catch((e) => console.warn("[shadow write] deleteCustomTask failed:", e));
+      }
+    };
     const [unavailability, setUnavailability] = (0, import_react.useState)([]);
     const saveUnavailability = (u) => {
       setUnavailability(u);
@@ -19798,9 +19906,38 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       window.storage?.set(SETUP_TYPES_STORAGE_KEY, JSON.stringify(st), true).catch(() => {
       });
     };
-    const addSetupType = (tpl) => saveSetupTypes([...setupTypes, tpl]);
-    const updateSetupType = (tpl) => saveSetupTypes(setupTypes.map((t) => t.id === tpl.id ? tpl : t));
-    const deleteSetupType = (id) => saveSetupTypes(setupTypes.filter((t) => t.id !== id));
+    const addSetupType = (tpl) => {
+      saveSetupTypes([...setupTypes, tpl]);
+      if (SHADOW_WRITE_SETUP_TYPES && sb) {
+        addSetupTypeRow(sb, tpl).then(({ data, error }) => {
+          if (error) {
+            console.warn("[shadow write] addSetupType failed:", error);
+            return;
+          }
+          if (!data) return;
+          setSetupTypes((prev) => prev.map((t) => t.id === tpl.id ? { ...t, _rowId: data.id } : t));
+        }).catch((e) => console.warn("[shadow write] addSetupType failed:", e));
+      }
+    };
+    const updateSetupType = (tpl) => {
+      const prev = setupTypes.find((t) => t.id === tpl.id);
+      saveSetupTypes(setupTypes.map((t) => t.id === tpl.id ? tpl : t));
+      if (SHADOW_WRITE_SETUP_TYPES && sb && prev?._rowId) {
+        const { id: _id, legacy_id: _legacyId, ...patch } = setupTypeToRow(tpl);
+        updateSetupTypeRow(sb, prev._rowId, patch).then(({ error }) => {
+          if (error) console.warn("[shadow write] updateSetupType failed:", error);
+        }).catch((e) => console.warn("[shadow write] updateSetupType failed:", e));
+      }
+    };
+    const deleteSetupType = (id) => {
+      const prev = setupTypes.find((t) => t.id === id);
+      saveSetupTypes(setupTypes.filter((t) => t.id !== id));
+      if (SHADOW_WRITE_SETUP_TYPES && sb && prev?._rowId) {
+        deleteSetupTypeRow(sb, prev._rowId).then(({ error }) => {
+          if (error) console.warn("[shadow write] deleteSetupType failed:", error);
+        }).catch((e) => console.warn("[shadow write] deleteSetupType failed:", e));
+      }
+    };
     const saveTalentRoster = (tr) => {
       setTalentRoster(tr);
       window.storage?.set(TALENT_STORAGE_KEY, JSON.stringify(tr), true).catch(() => {
@@ -19877,6 +20014,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           if (ct?.value) setCustomTasks(JSON.parse(ct.value));
         } catch (e) {
         }
+        setSetupTypesLoaded(true);
+        setCustomTasksLoaded(true);
         safeGet(UNAVAILABILITY_STORAGE_KEY).then((uv) => {
           try {
             if (uv?.value) setUnavailability(JSON.parse(uv.value));
@@ -19890,7 +20029,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           } catch (e) {
           }
         }).catch(() => {
-        });
+        }).finally(() => setProductionPresetsLoaded(true));
         safeGet(VENDOR_STORAGE_KEY).then((vc) => {
           try {
             if (vc?.value) {
@@ -20002,6 +20141,32 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         ) })));
       });
     }, [authed, projectsLoaded]);
+    (0, import_react.useEffect)(() => {
+      if (!authed || !sb || !SHADOW_WRITE_SETUP_TYPES || !setupTypesLoaded) return;
+      sb.from("setup_types").select("id, legacy_id").then(({ data, error }) => {
+        if (error || !data) return;
+        const rowIdByLegacyId = {};
+        data.forEach((r) => {
+          if (r.legacy_id != null) rowIdByLegacyId[parseLegacyId(r.legacy_id)] = r.id;
+        });
+        setSetupTypes((prev) => prev.map(
+          (t) => rowIdByLegacyId[t.id] && rowIdByLegacyId[t.id] !== t._rowId ? { ...t, _rowId: rowIdByLegacyId[t.id] } : t
+        ));
+      });
+    }, [authed, setupTypesLoaded]);
+    (0, import_react.useEffect)(() => {
+      if (!authed || !sb || !SHADOW_WRITE_CUSTOM_TASKS || !customTasksLoaded) return;
+      sb.from("custom_tasks").select("id, legacy_id").then(({ data, error }) => {
+        if (error || !data) return;
+        const rowIdByLegacyId = {};
+        data.forEach((r) => {
+          if (r.legacy_id != null) rowIdByLegacyId[String(r.legacy_id)] = r.id;
+        });
+        setCustomTasks((prev) => prev.map(
+          (t) => rowIdByLegacyId[t.id] && rowIdByLegacyId[t.id] !== t._rowId ? { ...t, _rowId: rowIdByLegacyId[t.id] } : t
+        ));
+      });
+    }, [authed, customTasksLoaded]);
     (0, import_react.useEffect)(() => {
       if (!authed || !sb) return;
       const mergeUpsert = (setter, mapRow) => (payload) => {
@@ -20125,11 +20290,39 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       sb.from("studio_bookings").upsert(studioBookings.map(bookingToRow)).then(({ error }) => reportSbError("Studio booking", error));
     }, [studioBookings]);
     const [appPresets, setAppPresets] = (0, import_react.useState)([BEC_EVENT_PRESET]);
+    const [productionPresetsLoaded, setProductionPresetsLoaded] = (0, import_react.useState)(false);
+    const appPresetsRef = (0, import_react.useRef)(appPresets);
+    (0, import_react.useEffect)(() => {
+      appPresetsRef.current = appPresets;
+    }, [appPresets]);
     const saveAppPresets = (0, import_react.useCallback)((ps) => {
+      const prevPresets = appPresetsRef.current;
       setAppPresets(ps);
       window.storage?.set(PRESET_STORAGE_KEY, JSON.stringify(ps)).catch(() => {
       });
+      if (SHADOW_WRITE_PRODUCTION_PRESETS && sb) {
+        writePresetDiff(sb, computePresetDiff(prevPresets, ps)).then((inserted) => {
+          if (!inserted.length) return;
+          setAppPresets((prev) => prev.map((p) => {
+            const match = inserted.find((i) => String(i.legacyId) === String(p.id));
+            return match ? { ...p, _rowId: match.rowId } : p;
+          }));
+        }).catch((e) => console.warn("[shadow write] preset diff failed:", e));
+      }
     }, []);
+    (0, import_react.useEffect)(() => {
+      if (!authed || !sb || !SHADOW_WRITE_PRODUCTION_PRESETS || !productionPresetsLoaded) return;
+      sb.from("production_presets").select("id, legacy_id").then(({ data, error }) => {
+        if (error || !data) return;
+        const rowIdByLegacyId = {};
+        data.forEach((r) => {
+          if (r.legacy_id != null) rowIdByLegacyId[parseLegacyId(r.legacy_id)] = r.id;
+        });
+        setAppPresets((prev) => prev.map(
+          (p) => rowIdByLegacyId[p.id] && rowIdByLegacyId[p.id] !== p._rowId ? { ...p, _rowId: rowIdByLegacyId[p.id] } : p
+        ));
+      });
+    }, [authed, productionPresetsLoaded]);
     const DEFAULT_VENDORS = ["AbelCine", "Crews Control"];
     const VENDOR_STORAGE_KEY = "vendor-companies-v1";
     const [vendorCompanies, setVendorCompanies] = (0, import_react.useState)(DEFAULT_VENDORS);

@@ -15134,6 +15134,16 @@ const SHADOW_WRITE_DELIVERABLES = true;
 // were — a real edit, checked directly in the database.
 const SHADOW_WRITE_PRODUCTIONS = true;
 
+// Same idea, for the three app_kv-backed collections that got their own
+// normalized tables + backfill (setup_types, production_presets,
+// custom_tasks — see production_patch_006/007 and the updated backfill
+// scripts). Each gets its own flag, same reasoning as
+// SHADOW_WRITE_PRODUCTIONS: independent rollback if one turns out to have
+// a bug the others don't.
+const SHADOW_WRITE_SETUP_TYPES = false;
+const SHADOW_WRITE_PRODUCTION_PRESETS = false;
+const SHADOW_WRITE_CUSTOM_TASKS = false;
+
 const rowToTeamMember = row => ({
   id: row.id, name: row.name, roles: row.roles||[], employeeType: row.employee_type,
   available: row.available, email: row.email||"", phone: row.phone||"", department: row.department,
@@ -15337,6 +15347,67 @@ const productionToRow = (p, projectId) => ({
   ingest: p.ingest||{},
 });
 
+// setup_types and production_presets ship hardcoded defaults with
+// non-numeric string ids (DEFAULT_SETUP_TYPES' "setup-001" etc.,
+// BEC_EVENT_PRESET's "preset-ny-bec-event1") right alongside uid()-generated
+// numeric ones, which is why legacy_id is `text` on both tables (see
+// production_patch_007). This converts a numeric-looking legacy_id string
+// back into a real number, matching what a user-created item's plain uid()
+// `id` looks like locally — a string id like "setup-001" passes through
+// unchanged.
+const parseLegacyId = v => v!=null && /^-?\d+$/.test(v) ? Number(v) : v;
+
+const rowToSetupType = row => ({
+  id: parseLegacyId(row.legacy_id) ?? row.id,
+  _rowId: row.id,
+  name: row.name, description: row.description||"",
+  floorplanPhotoKey: row.floorplan_photo_key||null, refPhotoKeys: row.ref_photo_keys||[],
+  equipmentIds: row.equipment_ids||[], externalGear: row.external_gear||[],
+  mediaCardIds: row.media_card_ids||[], furnitureIds: row.furniture_ids||[], propIds: row.prop_ids||[],
+  recordingSpecs: row.recording_specs||{}, screenContent: row.screen_content||{}, notes: row.notes||"",
+  roles: row.roles||[],
+});
+const setupTypeToRow = t => ({
+  ...(t._rowId ? {id: t._rowId} : {}),
+  legacy_id: t.id!=null ? String(t.id) : null,
+  name: t.name||null, description: t.description||null,
+  floorplan_photo_key: t.floorplanPhotoKey||null, ref_photo_keys: t.refPhotoKeys||[],
+  equipment_ids: t.equipmentIds||[], external_gear: t.externalGear||[],
+  media_card_ids: t.mediaCardIds||[], furniture_ids: t.furnitureIds||[], prop_ids: t.propIds||[],
+  recording_specs: t.recordingSpecs||{}, screen_content: t.screenContent||{}, notes: t.notes||null,
+  roles: t.roles||[],
+});
+
+const rowToProductionPreset = row => ({
+  id: parseLegacyId(row.legacy_id) ?? row.id,
+  _rowId: row.id,
+  name: row.name, type: row.type, createdAt: row.created_at, sections: row.sections||{},
+});
+const productionPresetToRow = p => ({
+  ...(p._rowId ? {id: p._rowId} : {}),
+  legacy_id: p.id!=null ? String(p.id) : null,
+  name: p.name||null, type: p.type||null, sections: p.sections||{},
+});
+
+// custom_tasks' legacy_id stayed bigint (ids are always String(Date.now())
+// locally, always numeric) — unlike the two above, no parseLegacyId needed,
+// just a round-trip back to the string shape the app has always used for a
+// task's id.
+const rowToCustomTask = row => ({
+  id: row.legacy_id!=null ? String(row.legacy_id) : row.id,
+  _rowId: row.id,
+  projectId: row.project_id,
+  title: row.title, dueDate: row.due_date, reminders: row.reminders||[],
+  notes: row.notes||"", done: row.done||false, createdAt: row.created_at,
+});
+const customTaskToRow = t => ({
+  ...(t._rowId ? {id: t._rowId} : {}),
+  legacy_id: t.id!=null ? Number(t.id) : null,
+  project_id: t.projectId||null,
+  title: t.title||null, due_date: t.dueDate||null, reminders: t.reminders||[],
+  notes: t.notes||null, done: !!t.done,
+});
+
 // Reassembles flat rows (as loaded from the three normalized tables) back
 // into the exact nested shape every existing component already reads off
 // `project.deliverables` / `project.productions` today. This is the one
@@ -15478,6 +15549,53 @@ const writeProductionDiff = (sbClient, projectId, diff) => Promise.all([
   ...diff.toDelete.map(p=>deleteProductionRow(sbClient, p._rowId).then(({error})=>({kind:"delete", legacyId:p.id, error}))),
 ]).then(results=>{
   results.forEach(({error})=>{ if(error) console.warn("[shadow write] production diff op failed:", error); });
+  return results.filter(r=>r.kind==="insert" && !r.error && r.data).map(r=>({legacyId:r.legacyId, rowId:r.data.id}));
+});
+
+// Thin per-row writers for the three app_kv-backed collections, same shape
+// as the deliverables/productions ones above.
+const addSetupTypeRow    = (sbClient, setupType)   => sbClient.from("setup_types").insert(setupTypeToRow(setupType)).select().single();
+const updateSetupTypeRow = (sbClient, rowId, patch)=> sbClient.from("setup_types").update(patch).eq("id", rowId);
+const deleteSetupTypeRow = (sbClient, rowId)       => sbClient.from("setup_types").delete().eq("id", rowId);
+const addCustomTaskRow    = (sbClient, task)        => sbClient.from("custom_tasks").insert(customTaskToRow(task)).select().single();
+const updateCustomTaskRow = (sbClient, rowId, patch)=> sbClient.from("custom_tasks").update(patch).eq("id", rowId);
+const deleteCustomTaskRow = (sbClient, rowId)       => sbClient.from("custom_tasks").delete().eq("id", rowId);
+const addProductionPresetRow    = (sbClient, preset)   => sbClient.from("production_presets").insert(productionPresetToRow(preset)).select().single();
+const updateProductionPresetRow = (sbClient, rowId, patch) => sbClient.from("production_presets").update(patch).eq("id", rowId);
+const deleteProductionPresetRow = (sbClient, rowId)    => sbClient.from("production_presets").delete().eq("id", rowId);
+
+// Production presets have the same coarse-write shape productions/rounds do:
+// saveAppPresets always hands over the whole replacement array (there's no
+// per-item add/update/delete call site the way setup types and custom tasks
+// have), so this is the same diff-then-write pattern as
+// computeProductionDiff/writeProductionDiff.
+const computePresetDiff = (oldPresets, newPresets) => {
+  const oldById = new Map(oldPresets.map(p=>[String(p.id), p]));
+  const newIds = new Set(newPresets.map(p=>String(p.id)));
+  const toDelete = oldPresets.filter(p=>!newIds.has(String(p.id)) && p._rowId);
+  const toInsert = [], toUpdate = [];
+  newPresets.forEach(p=>{
+    const existing = oldById.get(String(p.id));
+    if(!existing){
+      if(!p._rowId) toInsert.push(p);
+      return;
+    }
+    if(!existing._rowId) return; // not tagged yet — nothing to shadow-write against
+    const patchRow = productionPresetToRow(p);
+    delete patchRow.id; delete patchRow.legacy_id;
+    const beforeRow = productionPresetToRow(existing);
+    delete beforeRow.id; delete beforeRow.legacy_id;
+    if(JSON.stringify(patchRow)!==JSON.stringify(beforeRow)) toUpdate.push({rowId:existing._rowId, patch:patchRow, legacyId:p.id});
+  });
+  return {toInsert, toUpdate, toDelete};
+};
+
+const writePresetDiff = (sbClient, diff) => Promise.all([
+  ...diff.toInsert.map(p=>addProductionPresetRow(sbClient, p).then(({data,error})=>({kind:"insert", legacyId:p.id, data, error}))),
+  ...diff.toUpdate.map(({rowId,patch,legacyId})=>updateProductionPresetRow(sbClient, rowId, patch).then(({error})=>({kind:"update", legacyId, error}))),
+  ...diff.toDelete.map(p=>deleteProductionPresetRow(sbClient, p._rowId).then(({error})=>({kind:"delete", legacyId:p.id, error}))),
+]).then(results=>{
+  results.forEach(({error})=>{ if(error) console.warn("[shadow write] preset diff op failed:", error); });
   return results.filter(r=>r.kind==="insert" && !r.error && r.data).map(r=>({legacyId:r.legacyId, rowId:r.data.id}));
 });
 
@@ -28570,6 +28688,11 @@ function App() {
   const [studioSpaces,   setStudioSpaces]   = useState(ALL_STUDIO_LOCATIONS);
   const [studioSpaceMeta,setStudioSpaceMeta]= useState({...LOCATION_META});
   const [setupTypes,     setSetupTypes]     = useState(DEFAULT_SETUP_TYPES);
+  // Mirrors teamRosterLoaded/projectsLoaded — guards the setup_types id-
+  // mapping bootstrap effect below so it can't race the window.storage load
+  // in the mount effect (same race SHADOW_WRITE_DELIVERABLES's bootstrap
+  // effect guards against with projectsLoaded).
+  const [setupTypesLoaded, setSetupTypesLoaded] = useState(false);
   const [talentRoster,   setTalentRoster]   = useState(DEFAULT_TALENT_ROSTER);
   const [workstations,   setWorkstations]   = useState(()=>[
     "EDIT001_BORIS","EDIT002_NATASHA","EDIT003_DUDLEY","EDIT004_SHERMAN","EDIT005_PEABODY",
@@ -28676,13 +28799,39 @@ function App() {
   const [screenContentOptions, setScreenContentOptions] = useState(DEFAULT_SCREEN_CONTENT_OPTIONS);
   const saveScreenContentOptions = s => { setScreenContentOptions(s); window.storage?.set(SCREEN_CONTENT_STORAGE_KEY, JSON.stringify(s)).catch(()=>{}); };
   const [customTasks, setCustomTasks] = useState([]);
+  const [customTasksLoaded, setCustomTasksLoaded] = useState(false);
   const saveCustomTasks = t => { setCustomTasks(t); window.storage?.set(CUSTOM_TASKS_STORAGE_KEY, JSON.stringify(t)).catch(()=>{}); };
   const addCustomTask    = task   => {
     saveCustomTasks([...customTasks, task]);
     logActivity({entityType:"task", entityLabel:task.title||"Task", projectId:task.projectId||null, action:"created"});
+    // Shadow write — see SHADOW_WRITE_CUSTOM_TASKS's comment near the other flags.
+    if(SHADOW_WRITE_CUSTOM_TASKS && sb){
+      addCustomTaskRow(sb, task).then(({data,error})=>{
+        if(error){ console.warn("[shadow write] addCustomTask failed:", error); return; }
+        if(!data) return;
+        setCustomTasks(prev=>prev.map(t=>t.id===task.id?{...t,_rowId:data.id}:t));
+      }).catch(e=>console.warn("[shadow write] addCustomTask failed:", e));
+    }
   };
-  const updateCustomTask = task   => saveCustomTasks(customTasks.map(t=>t.id===task.id?task:t));
-  const deleteCustomTask = taskId => saveCustomTasks(customTasks.filter(t=>t.id!==taskId));
+  const updateCustomTask = task   => {
+    const prev = customTasks.find(t=>t.id===task.id);
+    saveCustomTasks(customTasks.map(t=>t.id===task.id?task:t));
+    if(SHADOW_WRITE_CUSTOM_TASKS && sb && prev?._rowId){
+      const {id:_id, legacy_id:_legacyId, project_id:_projectId, ...patch} = customTaskToRow(task);
+      updateCustomTaskRow(sb, prev._rowId, patch)
+        .then(({error})=>{ if(error) console.warn("[shadow write] updateCustomTask failed:", error); })
+        .catch(e=>console.warn("[shadow write] updateCustomTask failed:", e));
+    }
+  };
+  const deleteCustomTask = taskId => {
+    const prev = customTasks.find(t=>t.id===taskId);
+    saveCustomTasks(customTasks.filter(t=>t.id!==taskId));
+    if(SHADOW_WRITE_CUSTOM_TASKS && sb && prev?._rowId){
+      deleteCustomTaskRow(sb, prev._rowId)
+        .then(({error})=>{ if(error) console.warn("[shadow write] deleteCustomTask failed:", error); })
+        .catch(e=>console.warn("[shadow write] deleteCustomTask failed:", e));
+    }
+  };
   const [unavailability, setUnavailability] = useState([]);
   const saveUnavailability = u => { setUnavailability(u); window.storage?.set(UNAVAILABILITY_STORAGE_KEY, JSON.stringify(u)).catch(()=>{}); };
   const addUnavailability    = entry => saveUnavailability([...unavailability, entry]);
@@ -28719,9 +28868,38 @@ function App() {
   // Setup Types are a shared, studio-wide library — explicitly marked shared so the
   // whole team sees the same templates (unlike the personal-by-default lists above).
   const saveSetupTypes = st => { setSetupTypes(st); window.storage?.set(SETUP_TYPES_STORAGE_KEY, JSON.stringify(st), true).catch(()=>{}); };
-  const addSetupType    = tpl => saveSetupTypes([...setupTypes, tpl]);
-  const updateSetupType = tpl => saveSetupTypes(setupTypes.map(t=>t.id===tpl.id?tpl:t));
-  const deleteSetupType = id  => saveSetupTypes(setupTypes.filter(t=>t.id!==id));
+  const addSetupType    = tpl => {
+    saveSetupTypes([...setupTypes, tpl]);
+    // Shadow write — see SHADOW_WRITE_SETUP_TYPES's comment near the other
+    // flags. Tags the local object with its new row's real uuid once the
+    // insert resolves, same as addDel does for deliverables.
+    if(SHADOW_WRITE_SETUP_TYPES && sb){
+      addSetupTypeRow(sb, tpl).then(({data,error})=>{
+        if(error){ console.warn("[shadow write] addSetupType failed:", error); return; }
+        if(!data) return;
+        setSetupTypes(prev=>prev.map(t=>t.id===tpl.id?{...t,_rowId:data.id}:t));
+      }).catch(e=>console.warn("[shadow write] addSetupType failed:", e));
+    }
+  };
+  const updateSetupType = tpl => {
+    const prev = setupTypes.find(t=>t.id===tpl.id);
+    saveSetupTypes(setupTypes.map(t=>t.id===tpl.id?tpl:t));
+    if(SHADOW_WRITE_SETUP_TYPES && sb && prev?._rowId){
+      const {id:_id, legacy_id:_legacyId, ...patch} = setupTypeToRow(tpl);
+      updateSetupTypeRow(sb, prev._rowId, patch)
+        .then(({error})=>{ if(error) console.warn("[shadow write] updateSetupType failed:", error); })
+        .catch(e=>console.warn("[shadow write] updateSetupType failed:", e));
+    }
+  };
+  const deleteSetupType = id  => {
+    const prev = setupTypes.find(t=>t.id===id);
+    saveSetupTypes(setupTypes.filter(t=>t.id!==id));
+    if(SHADOW_WRITE_SETUP_TYPES && sb && prev?._rowId){
+      deleteSetupTypeRow(sb, prev._rowId)
+        .then(({error})=>{ if(error) console.warn("[shadow write] deleteSetupType failed:", error); })
+        .catch(e=>console.warn("[shadow write] deleteSetupType failed:", e));
+    }
+  };
   // Talent roster — shared so the whole team sees the same roster and booking history.
   const saveTalentRoster = tr => { setTalentRoster(tr); window.storage?.set(TALENT_STORAGE_KEY, JSON.stringify(tr), true).catch(()=>{}); };
 
@@ -28787,10 +28965,12 @@ function App() {
       try { if(prps?.value) setPropsList(JSON.parse(prps.value)); } catch(e){}
       try { if(sc?.value) setScreenContentOptions(JSON.parse(sc.value)); } catch(e){}
       try { if(ct?.value) setCustomTasks(JSON.parse(ct.value)); } catch(e){}
+      setSetupTypesLoaded(true);
+      setCustomTasksLoaded(true);
       // Load unavailability separately (added after the main Promise.all)
       safeGet(UNAVAILABILITY_STORAGE_KEY).then(uv=>{ try{if(uv?.value)setUnavailability(JSON.parse(uv.value));}catch(e){} }).catch(()=>{});
       // Load production presets
-      safeGet(PRESET_STORAGE_KEY).then(ps=>{ try{if(ps?.value)setAppPresets(JSON.parse(ps.value));}catch(e){} }).catch(()=>{});
+      safeGet(PRESET_STORAGE_KEY).then(ps=>{ try{if(ps?.value)setAppPresets(JSON.parse(ps.value));}catch(e){} }).catch(()=>{}).finally(()=>setProductionPresetsLoaded(true));
       safeGet(VENDOR_STORAGE_KEY).then(vc=>{ try{if(vc?.value){ const list=JSON.parse(vc.value); if(Array.isArray(list)&&list.length>0) setVendorCompanies(list); }}catch(e){} }).catch(()=>{});
       safeGet(REVIEWER_NAMES_STORAGE_KEY).then(rn=>{ try{if(rn?.value){ const list=JSON.parse(rn.value); if(Array.isArray(list)) setReviewerNames(list); }}catch(e){} }).catch(()=>{});
       safeGet(WORK_REVIEW_SESSIONS_STORAGE_KEY).then(wr=>{ try{if(wr?.value){ const list=JSON.parse(wr.value); if(Array.isArray(list)) setWorkReviewSessions(list); }}catch(e){} }).catch(()=>{});
@@ -28878,6 +29058,34 @@ function App() {
       )})));
     });
   },[authed, projectsLoaded]);
+
+  // Same bootstrap, for setup_types — guarded on setupTypesLoaded (not
+  // projectsLoaded) since setupTypes comes from window.storage/app_kv on
+  // the mount effect above, not the projects fetch.
+  useEffect(()=>{
+    if(!authed || !sb || !SHADOW_WRITE_SETUP_TYPES || !setupTypesLoaded) return;
+    sb.from("setup_types").select("id, legacy_id").then(({data,error})=>{
+      if(error || !data) return;
+      const rowIdByLegacyId = {};
+      data.forEach(r=>{ if(r.legacy_id!=null) rowIdByLegacyId[parseLegacyId(r.legacy_id)]=r.id; });
+      setSetupTypes(prev=>prev.map(t=>
+        rowIdByLegacyId[t.id] && rowIdByLegacyId[t.id]!==t._rowId ? {...t, _rowId:rowIdByLegacyId[t.id]} : t
+      ));
+    });
+  },[authed, setupTypesLoaded]);
+
+  // Same bootstrap, for custom_tasks — guarded on customTasksLoaded.
+  useEffect(()=>{
+    if(!authed || !sb || !SHADOW_WRITE_CUSTOM_TASKS || !customTasksLoaded) return;
+    sb.from("custom_tasks").select("id, legacy_id").then(({data,error})=>{
+      if(error || !data) return;
+      const rowIdByLegacyId = {};
+      data.forEach(r=>{ if(r.legacy_id!=null) rowIdByLegacyId[String(r.legacy_id)]=r.id; });
+      setCustomTasks(prev=>prev.map(t=>
+        rowIdByLegacyId[t.id] && rowIdByLegacyId[t.id]!==t._rowId ? {...t, _rowId:rowIdByLegacyId[t.id]} : t
+      ));
+    });
+  },[authed, customTasksLoaded]);
 
   // Realtime: with multiple people signed in at once, another session's edit
   // used to only ever show up here after a manual reload (see the one-
@@ -29058,10 +29266,44 @@ function App() {
 
   // App-level preset state — shared between AdminView (manage) and ProductionSection (use)
   const [appPresets, setAppPresets] = useState([BEC_EVENT_PRESET]);
+  const [productionPresetsLoaded, setProductionPresetsLoaded] = useState(false);
+  // Always-fresh mirror of appPresets, same reason projectsRef exists:
+  // saveAppPresets is a useCallback([]) and needs the pre-edit array to diff
+  // against, which a frozen closure over `appPresets` couldn't give it.
+  const appPresetsRef = useRef(appPresets);
+  useEffect(()=>{ appPresetsRef.current = appPresets; },[appPresets]);
   const saveAppPresets = useCallback(ps=>{
+    const prevPresets = appPresetsRef.current;
     setAppPresets(ps);
     window.storage?.set(PRESET_STORAGE_KEY, JSON.stringify(ps)).catch(()=>{});
+    // Shadow write — see SHADOW_WRITE_PRODUCTION_PRESETS's comment near the
+    // other flags. Same diff-then-write shape as productions, since this
+    // always hands over the whole replacement array.
+    if(SHADOW_WRITE_PRODUCTION_PRESETS && sb){
+      writePresetDiff(sb, computePresetDiff(prevPresets, ps)).then(inserted=>{
+        if(!inserted.length) return;
+        setAppPresets(prev=>prev.map(p=>{
+          const match = inserted.find(i=>String(i.legacyId)===String(p.id));
+          return match ? {...p, _rowId:match.rowId} : p;
+        }));
+      }).catch(e=>console.warn("[shadow write] preset diff failed:", e));
+    }
   },[]);
+
+  // Same id-mapping bootstrap as setup_types/custom_tasks above, for
+  // production_presets — placed down here (not with the others) because
+  // appPresets/setAppPresets aren't declared until just above this point.
+  useEffect(()=>{
+    if(!authed || !sb || !SHADOW_WRITE_PRODUCTION_PRESETS || !productionPresetsLoaded) return;
+    sb.from("production_presets").select("id, legacy_id").then(({data,error})=>{
+      if(error || !data) return;
+      const rowIdByLegacyId = {};
+      data.forEach(r=>{ if(r.legacy_id!=null) rowIdByLegacyId[parseLegacyId(r.legacy_id)]=r.id; });
+      setAppPresets(prev=>prev.map(p=>
+        rowIdByLegacyId[p.id] && rowIdByLegacyId[p.id]!==p._rowId ? {...p, _rowId:rowIdByLegacyId[p.id]} : p
+      ));
+    });
+  },[authed, productionPresetsLoaded]);
 
   // Vendor/company list for external crew & rental gear — starts with defaults, grows as new ones are added
   const DEFAULT_VENDORS = ["AbelCine","Crews Control"];
