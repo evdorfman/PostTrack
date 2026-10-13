@@ -10041,6 +10041,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     bxtvRefs: row.bxtv_refs || [],
     bxtvMeta: row.bxtv_meta || null
   });
+  var stripRowId = (arr) => (arr || []).map(({ _rowId, ...rest }) => rest);
   var projectToRow = (p) => ({
     id: p.id,
     project_code: p.projectCode || null,
@@ -10054,8 +10055,8 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     brief_notes: p.briefNotes || null,
     keywords: p.keywords || [],
     assignees: p.assignees || {},
-    deliverables: p.deliverables || [],
-    productions: p.productions || [],
+    deliverables: stripRowId(p.deliverables),
+    productions: stripRowId(p.productions),
     shoots: p.shoots || [],
     notes: p.notes || [],
     ingest_dates: p.ingestDates || [],
@@ -19969,7 +19970,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           if (r.legacy_id != null) rowIdByLegacyId[r.legacy_id] = r.id;
         });
         setProjects((prev) => prev.map((p) => ({ ...p, deliverables: (p.deliverables || []).map(
-          (d) => d._rowId || !rowIdByLegacyId[d.id] ? d : { ...d, _rowId: rowIdByLegacyId[d.id] }
+          (d) => rowIdByLegacyId[d.id] && rowIdByLegacyId[d.id] !== d._rowId ? { ...d, _rowId: rowIdByLegacyId[d.id] } : d
         ) })));
       });
     }, [authed, projectsLoaded]);
@@ -19982,7 +19983,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           if (r.legacy_id != null) rowIdByLegacyId[r.legacy_id] = r.id;
         });
         setProjects((prev) => prev.map((p) => ({ ...p, productions: (p.productions || []).map(
-          (pr) => pr._rowId || !rowIdByLegacyId[pr.id] ? pr : { ...pr, _rowId: rowIdByLegacyId[pr.id] }
+          (pr) => rowIdByLegacyId[pr.id] && rowIdByLegacyId[pr.id] !== pr._rowId ? { ...pr, _rowId: rowIdByLegacyId[pr.id] } : pr
         ) })));
       });
     }, [authed, projectsLoaded]);
