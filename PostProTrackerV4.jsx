@@ -28731,7 +28731,15 @@ function App() {
   // this session started (one created mid-session already gets tagged by
   // addDel's own shadow write, above).
   useEffect(()=>{
-    if(!authed || !sb || !SHADOW_WRITE_DELIVERABLES) return;
+    // Waits on projectsLoaded, not just authed — this fetch is small
+    // (id/legacy_id only) and often resolves before the much larger
+    // projects.select("*") does; without this guard, its one-shot
+    // setProjects(prev=>...) can run against the still-empty initial
+    // `projects` array and tag nothing, with the main load's own setProjects
+    // overwriting state right after and silently losing the tagging
+    // opportunity for the rest of the session (found live: every shadow
+    // write was a no-op because every deliverable's _rowId was never set).
+    if(!authed || !sb || !SHADOW_WRITE_DELIVERABLES || !projectsLoaded) return;
     sb.from("deliverables").select("id, legacy_id").then(({data,error})=>{
       if(error || !data) return;
       const rowIdByLegacyId = {};
@@ -28740,7 +28748,7 @@ function App() {
         d._rowId || !rowIdByLegacyId[d.id] ? d : {...d, _rowId:rowIdByLegacyId[d.id]}
       )})));
     });
-  },[authed]);
+  },[authed, projectsLoaded]);
 
   // Realtime: with multiple people signed in at once, another session's edit
   // used to only ever show up here after a manual reload (see the one-

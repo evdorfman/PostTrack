@@ -19916,7 +19916,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       });
     }, [authed]);
     (0, import_react.useEffect)(() => {
-      if (!authed || !sb || !SHADOW_WRITE_DELIVERABLES) return;
+      if (!authed || !sb || !SHADOW_WRITE_DELIVERABLES || !projectsLoaded) return;
       sb.from("deliverables").select("id, legacy_id").then(({ data, error }) => {
         if (error || !data) return;
         const rowIdByLegacyId = {};
@@ -19927,7 +19927,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           (d) => d._rowId || !rowIdByLegacyId[d.id] ? d : { ...d, _rowId: rowIdByLegacyId[d.id] }
         ) })));
       });
-    }, [authed]);
+    }, [authed, projectsLoaded]);
     (0, import_react.useEffect)(() => {
       if (!authed || !sb) return;
       const mergeUpsert = (setter, mapRow) => (payload) => {
