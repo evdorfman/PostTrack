@@ -124,16 +124,33 @@ create table if not exists deliverables (
 );
 create index if not exists deliverables_project_id_idx on deliverables(project_id);
 
+-- A Work Review Session is a shared meeting (date/time/location/zoom link)
+-- that several rounds, often across different deliverables, can attach to
+-- at once. Lives app-side as one JSON blob in the generic app_kv table
+-- (key "work-review-sessions-v1"), not per-project — this table mirrors it.
+create table if not exists work_review_sessions (
+  id          uuid primary key default gen_random_uuid(),
+  legacy_id   bigint,
+  datetime    timestamptz,
+  location    text,
+  zoom_link   text,
+  reviewers   jsonb default '[]'::jsonb,
+  notes       text,
+  created_at  timestamptz default now()
+);
+create index if not exists work_review_sessions_legacy_id_idx on work_review_sessions(legacy_id);
+
 create table if not exists review_rounds (
-  id                       uuid primary key default gen_random_uuid(),
-  deliverable_id           uuid not null references deliverables(id) on delete cascade,
-  label                    text,
-  deadline                 timestamptz,
-  reviewers                jsonb default '[]'::jsonb,
-  status                   text,
-  notes                    text,
-  work_review_session_id   uuid,
-  created_at               timestamptz default now()
+  id                              uuid primary key default gen_random_uuid(),
+  deliverable_id                  uuid not null references deliverables(id) on delete cascade,
+  label                           text,
+  deadline                        timestamptz,
+  reviewers                       jsonb default '[]'::jsonb,
+  status                          text,
+  notes                           text,
+  work_review_session_id          uuid references work_review_sessions(id) on delete set null,
+  legacy_work_review_session_id   bigint,  -- bookkeeping only, for the backfill's remap pass; nothing should read this
+  created_at                      timestamptz default now()
 );
 create index if not exists review_rounds_deliverable_id_idx on review_rounds(deliverable_id);
 
@@ -222,7 +239,7 @@ begin
   for t in select unnest(array[
     'team_members','projects','studio_bookings',
     'deliverables','review_rounds','productions',
-    'custom_tasks','activity_log','setup_types','production_presets'
+    'custom_tasks','activity_log','setup_types','production_presets','work_review_sessions'
   ])
   loop
     execute format('alter table %I enable row level security;', t);
