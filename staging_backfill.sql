@@ -148,7 +148,7 @@ insert into setup_types (
   prop_ids, recording_specs, screen_content, notes
 )
 select
-  (s.elem->>'id')::bigint,
+  s.elem->>'id',
   s.elem->>'name',
   s.elem->>'description',
   coalesce(s.elem->'roles', '[]'::jsonb),
@@ -167,7 +167,7 @@ where kv.key = 'posttrack-setup-types-v1';
 
 insert into production_presets (legacy_id, name, type, sections)
 select
-  (s.elem->>'id')::bigint,
+  s.elem->>'id',
   s.elem->>'name',
   s.elem->>'type',
   coalesce(s.elem->'sections', '{}'::jsonb)
