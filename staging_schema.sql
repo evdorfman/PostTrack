@@ -88,9 +88,9 @@ create table if not exists deliverables (
   status                    text,
   deadline                  date,
   delivered_at              date,
-  editor_id                 bigint references team_members(id),
-  animator_id               bigint references team_members(id),
-  producer_id               bigint references team_members(id),
+  editor_id                 bigint,  -- intentionally no FK: real data has stale ids for removed team members, same as the app tolerates today
+  animator_id               bigint,
+  producer_id               bigint,
   deliverable_type          text,
   aspect_ratio              text,
   quality                   text,
@@ -179,7 +179,7 @@ create table if not exists activity_log (
   entity_label  text,
   action        text,
   detail        text,
-  actor_id      bigint references team_members(id),
+  actor_id      bigint,
   created_at    timestamptz default now()
 );
 create index if not exists activity_log_project_id_idx on activity_log(project_id);
