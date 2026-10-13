@@ -10221,8 +10221,11 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     const toInsert = [], toUpdate = [];
     newProds.forEach((p) => {
       const existing = oldById.get(String(p.id));
-      if (!existing?._rowId) {
+      if (!existing) {
         if (!p._rowId) toInsert.push(p);
+        return;
+      }
+      if (!existing._rowId) {
         return;
       }
       const patchRow = productionToRow(p, null);

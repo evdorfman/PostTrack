@@ -15407,11 +15407,23 @@ const computeProductionDiff = (oldProds, newProds) => {
   const toInsert = [], toUpdate = [];
   newProds.forEach(p=>{
     const existing = oldById.get(String(p.id));
-    if(!existing?._rowId){
-      // Nothing known to update yet — only insert if this production itself
+    if(!existing){
+      // Genuinely new — wasn't in the old array at all. Only insert if it
       // doesn't already carry a _rowId (avoids a duplicate insert for one
-      // whose tag just hasn't round-tripped into `existing` yet).
+      // whose tag just hasn't round-tripped into local state yet).
       if(!p._rowId) toInsert.push(p);
+      return;
+    }
+    if(!existing._rowId){
+      // Existed before this edit, just not tagged with its row id yet (the
+      // bootstrap fetch hasn't resolved, or hasn't gotten to this one).
+      // Nothing to shadow-write against — skip silently, same as
+      // deliverables do when _rowId is missing, rather than treating every
+      // edit to an untagged-but-real production as a fresh insert. Getting
+      // this wrong was the actual bug behind the production-time-edit
+      // freeze: every keystroke/drag fired its own parallel insert attempt
+      // for the same already-existing production, each one's async
+      // response re-tagging local state at a different, unordered moment.
       return;
     }
     // projectId omitted here — only id/legacy_id/project_id get stripped
