@@ -15123,6 +15123,17 @@ window.sb = sb;
 // "shadow writes" design conversation this landed in.
 const SHADOW_WRITE_DELIVERABLES = true;
 
+// Same idea, for productions — off for now. Deliberately kept as its own
+// flag rather than folded into SHADOW_WRITE_DELIVERABLES, so either can be
+// turned on/off independently (e.g. if something's wrong with productions
+// specifically, it can be rolled back without losing deliverables' already-
+// proven-working shadow writes, and vice versa). Follow the same staged
+// process before flipping this on: schema + backfill run for real
+// (production_schema_new_tables.sql already covers the productions table;
+// no separate script needed), then prove it live the same way deliverables
+// were — a real edit, checked directly in the database.
+const SHADOW_WRITE_PRODUCTIONS = false;
+
 const rowToTeamMember = row => ({
   id: row.id, name: row.name, roles: row.roles||[], employeeType: row.employee_type,
   available: row.available, email: row.email||"", phone: row.phone||"", department: row.department,
@@ -15380,6 +15391,52 @@ const writeRoundDiff = (sbClient, deliverableRowId, diff) => Promise.all([
   ...diff.toDelete.map(r=>deleteReviewRoundRow(sbClient, r.id)),
 ]).then(results=>{
   results.forEach(({error})=>{ if(error) console.warn("[shadow write] round diff op failed:", error); });
+});
+
+// Productions have the exact same coarse-write problem review rounds did:
+// every edit anywhere on a shoot (status, crew, setups, schedule, ingest —
+// everything) arrives as one onUpdateProject(id,"productions",wholeArray)
+// call, not a per-field update. Same diff-then-write shape as rounds, just
+// keyed by _rowId (a production's real uuid row, tagged by the bootstrap
+// effect below) instead of a parent id, since productions aren't nested
+// inside anything else the way rounds are nested inside a deliverable.
+const computeProductionDiff = (oldProds, newProds) => {
+  const oldById = new Map(oldProds.map(p=>[String(p.id), p]));
+  const newIds = new Set(newProds.map(p=>String(p.id)));
+  const toDelete = oldProds.filter(p=>!newIds.has(String(p.id)) && p._rowId);
+  const toInsert = [], toUpdate = [];
+  newProds.forEach(p=>{
+    const existing = oldById.get(String(p.id));
+    if(!existing?._rowId){
+      // Nothing known to update yet — only insert if this production itself
+      // doesn't already carry a _rowId (avoids a duplicate insert for one
+      // whose tag just hasn't round-tripped into `existing` yet).
+      if(!p._rowId) toInsert.push(p);
+      return;
+    }
+    // projectId omitted here — only id/legacy_id/project_id get stripped
+    // from both sides for comparison anyway, so it's never actually used.
+    const patchRow = productionToRow(p, null);
+    delete patchRow.id; delete patchRow.legacy_id; delete patchRow.project_id;
+    const beforeRow = productionToRow(existing, null);
+    delete beforeRow.id; delete beforeRow.legacy_id; delete beforeRow.project_id;
+    if(JSON.stringify(patchRow)!==JSON.stringify(beforeRow)) toUpdate.push({rowId:existing._rowId, patch:patchRow, legacyId:p.id});
+  });
+  return {toInsert, toUpdate, toDelete};
+};
+
+// Unlike writeRoundDiff, this reports its insert results back to the caller
+// (as {legacyId, rowId}) so a brand-new production can be tagged with its
+// real _rowId locally right away — there's no separate "addProduction"
+// shadow-write call site the way addDel covers deliverables, since
+// productions only ever arrive through this one diffed whole-array path.
+const writeProductionDiff = (sbClient, projectId, diff) => Promise.all([
+  ...diff.toInsert.map(p=>addProductionRow(sbClient, projectId, p).then(({data,error})=>({kind:"insert", legacyId:p.id, data, error}))),
+  ...diff.toUpdate.map(({rowId,patch,legacyId})=>updateProductionRow(sbClient, rowId, patch).then(({error})=>({kind:"update", legacyId, error}))),
+  ...diff.toDelete.map(p=>deleteProductionRow(sbClient, p._rowId).then(({error})=>({kind:"delete", legacyId:p.id, error}))),
+]).then(results=>{
+  results.forEach(({error})=>{ if(error) console.warn("[shadow write] production diff op failed:", error); });
+  return results.filter(r=>r.kind==="insert" && !r.error && r.data).map(r=>({legacyId:r.legacyId, rowId:r.data.id}));
 });
 
 const INTAKE_STATUSES = ["New","In Review","Assigned","Archived"];
@@ -28753,6 +28810,20 @@ function App() {
     });
   },[authed, projectsLoaded]);
 
+  // Same bootstrap, for productions — see the comment above for why
+  // projectsLoaded (not just authed) is the guard.
+  useEffect(()=>{
+    if(!authed || !sb || !SHADOW_WRITE_PRODUCTIONS || !projectsLoaded) return;
+    sb.from("productions").select("id, legacy_id").then(({data,error})=>{
+      if(error || !data) return;
+      const rowIdByLegacyId = {};
+      data.forEach(r=>{ if(r.legacy_id!=null) rowIdByLegacyId[r.legacy_id]=r.id; });
+      setProjects(prev=>prev.map(p=>({...p, productions:(p.productions||[]).map(pr=>
+        pr._rowId || !rowIdByLegacyId[pr.id] ? pr : {...pr, _rowId:rowIdByLegacyId[pr.id]}
+      )})));
+    });
+  },[authed, projectsLoaded]);
+
   // Realtime: with multiple people signed in at once, another session's edit
   // used to only ever show up here after a manual reload (see the one-
   // directional note on the projects auto-save effect below). Mirrors every
@@ -29278,6 +29349,18 @@ function App() {
           logActivity({entityType:"production", entityLabel:pp.title||pp.type||"Production", projectId, action:"deleted"});
         }
       });
+      // Shadow write — see SHADOW_WRITE_PRODUCTIONS's comment. Reuses the
+      // same prevProds/newProds already computed above for activity
+      // logging, rather than diffing twice.
+      if(SHADOW_WRITE_PRODUCTIONS && sb){
+        writeProductionDiff(sb, projectId, computeProductionDiff(prevProds, newProds)).then(insertedTags=>{
+          if(!insertedTags.length) return;
+          setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,productions:p.productions.map(pr=>{
+            const tag = insertedTags.find(t=>t.legacyId===pr.id);
+            return tag ? {...pr, _rowId:tag.rowId} : pr;
+          })}));
+        }).catch(e=>console.warn("[shadow write] production diff failed:", e));
+      }
     } else if(field==="ingestDates"){
       const prevIngests = prevProj?.ingestDates || [];
       (value||[]).filter(ig=>!prevIngests.some(pi=>pi.id===ig.id)).forEach(()=>{
