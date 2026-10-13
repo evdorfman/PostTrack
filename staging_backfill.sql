@@ -26,6 +26,7 @@ truncate table review_rounds, deliverables, productions cascade;
 insert into deliverables (
   legacy_id, project_id, title, status, deadline, delivered_at,
   editor_id, animator_id, producer_id, deliverable_type, aspect_ratio, quality,
+  workstream, business_unit,
   frame_link, frame_pw, frame_internal_url, video_length, file_path,
   dist_platforms, use_case_limitations, approved_uses, speakers, keywords, notes,
   total_revisions, estimated_hours_override,
@@ -45,6 +46,8 @@ select
   d.elem->>'deliverableType',
   d.elem->>'aspectRatio',
   d.elem->>'quality',
+  d.elem->>'workstream',
+  d.elem->>'businessUnit',
   d.elem->>'frameLink',
   d.elem->>'framePW',
   d.elem->>'frameInternalUrl',
