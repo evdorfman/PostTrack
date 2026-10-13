@@ -1,24 +1,17 @@
 -- PostTrack PRODUCTION backfill
--- Run this in the live project's SQL Editor AFTER production_schema_new_tables.sql.
+-- Run this in the live project's SQL Editor AFTER production_schema_new_tables.sql
+-- and production_patch_005_work_review_sessions.sql (if not already run).
 -- Reads the nested JSON on projects.deliverables / projects.productions
--- (today's live format) and populates the new normalized tables
--- (deliverables, review_rounds, productions) from it.
+-- (today's live format), plus the Work Review Sessions blob in app_kv, and
+-- populates the new normalized tables (deliverables, review_rounds,
+-- productions, work_review_sessions) from it.
 --
--- Non-destructive: only ever reads from `projects`, never writes to it. The
--- JSON columns stay exactly as they are — nothing here can lose data, only
--- need a redo. Safe to re-run: it truncates its own target tables first, so
--- running it twice in a row just re-migrates from the same source rather
--- than duplicating rows.
+-- Non-destructive: only ever reads from `projects`/`app_kv`, never writes to
+-- either. Nothing here can lose data, only need a redo. Safe to re-run: it
+-- truncates its own target tables first, so running it twice in a row just
+-- re-migrates from the same source rather than duplicating rows.
 --
--- Known limitations, scoped out deliberately rather than by oversight:
---  - A review round's `workReviewSessionId` (the id that groups several
---    rounds, often across deliverables, into one shared review session —
---    see the Project Schedule work) is NOT carried over; every migrated
---    round's `work_review_session_id` comes in null. The grouping
---    information isn't lost (the original JSON is untouched), just not yet
---    translated — a legacy_id-style remapping pass can add it later if the
---    normalized tables need to represent it. Worth knowing before relying
---    on "work review session" grouping from the new tables specifically.
+-- Known limitation, scoped out deliberately rather than by oversight:
 --  - Production-nested deliverables, if any exist in real data, are out of
 --    scope here for the same reason the app's own edit path never reaches
 --    them today — see the "production-nested deliverables" note in the
@@ -26,7 +19,7 @@
 
 begin;
 
-truncate table review_rounds, deliverables, productions cascade;
+truncate table review_rounds, deliverables, productions, work_review_sessions cascade;
 
 insert into deliverables (
   legacy_id, project_id, title, status, deadline, delivered_at,
@@ -76,14 +69,18 @@ select
   d.elem->'bxtvLink'
 from projects p, jsonb_array_elements(p.deliverables) as d(elem);
 
-insert into review_rounds (deliverable_id, label, deadline, reviewers, status, notes)
+-- legacy_work_review_session_id captured here is bookkeeping only — the
+-- remap pass below translates it into the real work_review_session_id and
+-- nothing else should ever read the legacy column.
+insert into review_rounds (deliverable_id, label, deadline, reviewers, status, notes, legacy_work_review_session_id)
 select
   dl.id,
   r.elem->>'label',
   nullif(r.elem->>'deadline','')::timestamptz,
   coalesce(r.elem->'reviewers', '[]'::jsonb),
   r.elem->>'status',
-  r.elem->>'notes'
+  r.elem->>'notes',
+  nullif(r.elem->>'workReviewSessionId','')::bigint
 from projects p
 cross join lateral jsonb_array_elements(p.deliverables) as d(elem)
 cross join lateral jsonb_array_elements(coalesce(d.elem->'rounds', '[]'::jsonb)) as r(elem)
@@ -115,6 +112,30 @@ select
   coalesce(d.elem->'ingest', '{}'::jsonb)
 from projects p, jsonb_array_elements(p.productions) as d(elem);
 
+-- Work Review Sessions: one JSON array in app_kv (key "work-review-sessions-v1"),
+-- not per-project. A project with no Work Review usage, or before that key
+-- has ever been written, means this simply inserts zero rows — not an error.
+insert into work_review_sessions (legacy_id, datetime, location, zoom_link, reviewers, notes)
+select
+  (s.elem->>'id')::bigint,
+  nullif(s.elem->>'datetime','')::timestamptz,
+  s.elem->>'location',
+  s.elem->>'zoomLink',
+  coalesce(s.elem->'reviewers', '[]'::jsonb),
+  s.elem->>'notes'
+from app_kv kv, jsonb_array_elements(kv.value::jsonb) as s(elem)
+where kv.key = 'work-review-sessions-v1';
+
+-- Remap pass: now that work_review_sessions has real rows, translate each
+-- round's legacy_work_review_session_id into the matching session's real
+-- uuid. A round with no session, or one whose session somehow isn't in the
+-- app_kv blob, simply keeps work_review_session_id null — same as before.
+update review_rounds rr
+set work_review_session_id = wrs.id
+from work_review_sessions wrs
+where rr.legacy_work_review_session_id is not null
+  and rr.legacy_work_review_session_id = wrs.legacy_id;
+
 commit;
 
 -- ───────────────────────── Verification ────────────────────────────────
@@ -127,7 +148,11 @@ select 'deliverables' as table_name, count(*) from deliverables
 union all
 select 'review_rounds', count(*) from review_rounds
 union all
-select 'productions', count(*) from productions;
+select 'productions', count(*) from productions
+union all
+select 'work_review_sessions', count(*) from work_review_sessions
+union all
+select 'review_rounds with a session', count(*) from review_rounds where work_review_session_id is not null;
 
 select p.name as project, count(d.id) as deliverable_count,
        count(d.id) filter (where d.status='Delivered') as delivered_count

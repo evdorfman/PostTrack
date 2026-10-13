@@ -15302,7 +15302,15 @@ const reviewRoundToRow = (r, deliverableRowId) => ({
   ...(isUuid(r.id) ? {id: r.id} : {}),
   deliverable_id: deliverableRowId,
   label: r.label||null, deadline: r.deadline||null, reviewers: r.reviewers||[], status: r.status||null, notes: r.notes||null,
-  work_review_session_id: isUuid(r.workReviewSessionId) ? r.workReviewSessionId : null,
+  // Omitted entirely (not set to null) when the local round's
+  // workReviewSessionId isn't a real uuid — which is every round today,
+  // since reads still come from the legacy JSON where this is always a
+  // client-generated numeric id. An UPDATE only touches fields present in
+  // the request body, so omitting it leaves whatever's already correctly
+  // backfilled in the new table alone; sending null here would silently
+  // wipe out that grouping the moment any OTHER field on the same round
+  // gets edited, since this function always builds the full row either way.
+  ...(isUuid(r.workReviewSessionId) ? {work_review_session_id: r.workReviewSessionId} : {}),
 });
 
 const rowToProduction = row => ({

@@ -1,23 +1,21 @@
 -- PostTrack staging backfill
 -- Run this in the staging project's SQL Editor AFTER staging_schema.sql and
 -- staging_seed.sql. Reads the nested JSON on projects.deliverables /
--- projects.productions (today's production format) and populates the new
--- normalized tables (deliverables, review_rounds, productions) from it.
+-- projects.productions (today's production format), plus the Work Review
+-- Sessions blob in app_kv, and populates the new normalized tables
+-- (deliverables, review_rounds, productions, work_review_sessions) from it.
 --
 -- Safe to re-run: it truncates its own target tables first, so running it
--- twice in a row just re-migrates from the same source JSON rather than
--- duplicating rows. It never touches the `projects` table itself.
+-- twice in a row just re-migrates from the same source rather than
+-- duplicating rows. It never touches `projects`/`app_kv` themselves.
 --
--- Known limitation, not handled here: a review round's `workReviewSessionId`
--- in the legacy JSON is a client-generated id, not a real UUID, so it can't
--- be cast directly into the new `work_review_session_id uuid` column. None
--- of the seed data exercises this, so it's safe for this test — but before
--- running this against real production data, that'll need its own mapping
--- step (same pattern as `legacy_id`) rather than a direct cast.
+-- The seed data doesn't exercise Work Review Session grouping, so
+-- work_review_sessions will come back empty here — that's expected, not a
+-- bug; see production_backfill.sql for where this actually populates.
 
 begin;
 
-truncate table review_rounds, deliverables, productions cascade;
+truncate table review_rounds, deliverables, productions, work_review_sessions cascade;
 
 -- Deliverables (top-level array on each project; production-nested
 -- deliverables, if any exist in real data, are intentionally out of scope —
@@ -74,14 +72,18 @@ from projects p, jsonb_array_elements(p.deliverables) as d(elem);
 -- Review rounds (nested inside each deliverable's own JSON) — second pass,
 -- joined back to the deliverables rows we just inserted via legacy_id so
 -- each round gets the deliverable's real new UUID as its foreign key.
-insert into review_rounds (deliverable_id, label, deadline, reviewers, status, notes)
+-- legacy_work_review_session_id captured here is bookkeeping only — the
+-- remap pass below (after work_review_sessions is populated) translates it
+-- into the real work_review_session_id.
+insert into review_rounds (deliverable_id, label, deadline, reviewers, status, notes, legacy_work_review_session_id)
 select
   dl.id,
   r.elem->>'label',
   nullif(r.elem->>'deadline','')::timestamptz,
   coalesce(r.elem->'reviewers', '[]'::jsonb),
   r.elem->>'status',
-  r.elem->>'notes'
+  r.elem->>'notes',
+  nullif(r.elem->>'workReviewSessionId','')::bigint
 from projects p
 cross join lateral jsonb_array_elements(p.deliverables) as d(elem)
 cross join lateral jsonb_array_elements(coalesce(d.elem->'rounds', '[]'::jsonb)) as r(elem)
@@ -114,17 +116,40 @@ select
   coalesce(d.elem->'ingest', '{}'::jsonb)
 from projects p, jsonb_array_elements(p.productions) as d(elem);
 
+-- Work Review Sessions: one JSON array in app_kv (key "work-review-sessions-v1"),
+-- not per-project. Expected to insert zero rows against the seed data/a
+-- fresh staging project that's never had that key written.
+insert into work_review_sessions (legacy_id, datetime, location, zoom_link, reviewers, notes)
+select
+  (s.elem->>'id')::bigint,
+  nullif(s.elem->>'datetime','')::timestamptz,
+  s.elem->>'location',
+  s.elem->>'zoomLink',
+  coalesce(s.elem->'reviewers', '[]'::jsonb),
+  s.elem->>'notes'
+from app_kv kv, jsonb_array_elements(kv.value::jsonb) as s(elem)
+where kv.key = 'work-review-sessions-v1';
+
+update review_rounds rr
+set work_review_session_id = wrs.id
+from work_review_sessions wrs
+where rr.legacy_work_review_session_id is not null
+  and rr.legacy_work_review_session_id = wrs.legacy_id;
+
 commit;
 
 -- ───────────────────────── Verification ────────────────────────────────
 -- Run these (or just look at the output above) and send me what you see —
--- expected, from the seed data: 4 deliverables, 3 review rounds, 1 production.
+-- expected, from the seed data: 4 deliverables, 3 review rounds, 1 production,
+-- 0 work_review_sessions (seed data doesn't exercise this).
 
 select 'deliverables' as table_name, count(*) from deliverables
 union all
 select 'review_rounds', count(*) from review_rounds
 union all
-select 'productions', count(*) from productions;
+select 'productions', count(*) from productions
+union all
+select 'work_review_sessions', count(*) from work_review_sessions;
 
 select p.name as project, d.title as deliverable, d.status, d.deadline, d.delivered_at,
        (select count(*) from review_rounds r where r.deliverable_id = d.id) as round_count
