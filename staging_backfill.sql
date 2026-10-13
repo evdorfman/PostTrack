@@ -15,7 +15,8 @@
 
 begin;
 
-truncate table review_rounds, deliverables, productions, work_review_sessions cascade;
+truncate table review_rounds, deliverables, productions, work_review_sessions,
+  setup_types, production_presets, custom_tasks cascade;
 
 -- Deliverables (top-level array on each project; production-nested
 -- deliverables, if any exist in real data, are intentionally out of scope —
@@ -136,6 +137,55 @@ from work_review_sessions wrs
 where rr.legacy_work_review_session_id is not null
   and rr.legacy_work_review_session_id = wrs.legacy_id;
 
+-- Setup Types, Production Presets, Custom Tasks: like Work Review Sessions,
+-- each lives as one JSON array in app_kv rather than nested on a project.
+-- Expected to insert zero rows against the seed data/a fresh staging
+-- project that's never had these keys written — that's expected, not a bug.
+
+insert into setup_types (
+  legacy_id, name, description, roles, equipment_ids, external_gear,
+  floorplan_photo_key, ref_photo_keys, media_card_ids, furniture_ids,
+  prop_ids, recording_specs, screen_content, notes
+)
+select
+  (s.elem->>'id')::bigint,
+  s.elem->>'name',
+  s.elem->>'description',
+  coalesce(s.elem->'roles', '[]'::jsonb),
+  coalesce(s.elem->'equipmentIds', '[]'::jsonb),
+  coalesce(s.elem->'externalGear', '[]'::jsonb),
+  s.elem->>'floorplanPhotoKey',
+  coalesce(s.elem->'refPhotoKeys', '[]'::jsonb),
+  coalesce(s.elem->'mediaCardIds', '[]'::jsonb),
+  coalesce(s.elem->'furnitureIds', '[]'::jsonb),
+  coalesce(s.elem->'propIds', '[]'::jsonb),
+  coalesce(s.elem->'recordingSpecs', '{}'::jsonb),
+  coalesce(s.elem->'screenContent', '{}'::jsonb),
+  s.elem->>'notes'
+from app_kv kv, jsonb_array_elements(kv.value::jsonb) as s(elem)
+where kv.key = 'posttrack-setup-types-v1';
+
+insert into production_presets (legacy_id, name, type, sections)
+select
+  (s.elem->>'id')::bigint,
+  s.elem->>'name',
+  s.elem->>'type',
+  coalesce(s.elem->'sections', '{}'::jsonb)
+from app_kv kv, jsonb_array_elements(kv.value::jsonb) as s(elem)
+where kv.key = 'posttrack-production-presets-v1';
+
+insert into custom_tasks (legacy_id, project_id, title, due_date, reminders, notes, done)
+select
+  (s.elem->>'id')::bigint,
+  nullif(s.elem->>'projectId','')::bigint,
+  s.elem->>'title',
+  nullif(s.elem->>'dueDate','')::date,
+  coalesce(s.elem->'reminders', '[]'::jsonb),
+  s.elem->>'notes',
+  coalesce((s.elem->>'done')::boolean, false)
+from app_kv kv, jsonb_array_elements(kv.value::jsonb) as s(elem)
+where kv.key = 'posttrack-custom-tasks';
+
 commit;
 
 -- ───────────────────────── Verification ────────────────────────────────
@@ -149,7 +199,13 @@ select 'review_rounds', count(*) from review_rounds
 union all
 select 'productions', count(*) from productions
 union all
-select 'work_review_sessions', count(*) from work_review_sessions;
+select 'work_review_sessions', count(*) from work_review_sessions
+union all
+select 'setup_types', count(*) from setup_types
+union all
+select 'production_presets', count(*) from production_presets
+union all
+select 'custom_tasks', count(*) from custom_tasks;
 
 select p.name as project, d.title as deliverable, d.status, d.deadline, d.delivered_at,
        (select count(*) from review_rounds r where r.deliverable_id = d.id) as round_count
