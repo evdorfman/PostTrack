@@ -1580,7 +1580,11 @@ const Chip = ({label,color,xs,style:s={}}) => (
   <span style={{background:color+"18",color,border:`1px solid ${color}40`,borderRadius:4,padding:xs?"1px 6px":"2px 9px",fontSize:xs?11:13,fontWeight:700,letterSpacing:"0.05em",whiteSpace:"nowrap",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",...s}}>{label}</span>
 );
 
-const Dl = ({date,inline}) => {
+const Dl = ({date,inline,deliveredAt}) => {
+  if(deliveredAt){
+    const dd=new Date(deliveredAt+"T00:00");
+    return <span style={{color:"#10b981",fontSize:14,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.06em"}}>{`DELIVERED ${dd.toLocaleDateString("en-US",{month:"short",day:"numeric"})}`}</span>;
+  }
   if(!date) return null;
   const d=daysLeft(date);
   const c=d<0?"#ef4444":d<=3?"#ef4444":d<=7?"#f59e0b":"#4b5563";
@@ -4361,6 +4365,22 @@ const SpeakersPicker = ({value=[], onChange, talentRoster=[]}) => {
 };
 
 // ─── Deliverable Detail Panel (inline expand/collapse, no modal) ───────────────
+// Labeled field wrapper for DeliverableDetailModal's grid layout — a
+// top-level component (not defined inside DeliverableDetailModal) so its
+// identity stays stable across re-renders. Defining it inline there used to
+// give React a brand-new component function on every keystroke in any field
+// it wrapped (Video Length, File Path, Keywords, Notes, …), which made it
+// unmount+remount the input underneath (killing focus) after just one
+// character — the same "only one key at a time" bug fixed earlier in the
+// Ingest tab, here in the Deliverables modal instead. It closes over nothing
+// from its old parent scope, so lifting it out needed no prop-threading.
+const DelField = ({label,children,span}) => (
+  <div style={{gridColumn:span?"1/-1":"auto"}}>
+    <div style={{fontSize:13,fontWeight:800,color: "#8e97a6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:5}}>{label}</div>
+    {children}
+  </div>
+);
+
 const DeliverableDetailModal = React.memo(({del,projectId,team,allProjects,onUpdateDel,onDeleteDel,onClose,project,locked=false,onUpdateProject,talentRoster=[],reviewerNames=[],addReviewerName}) => {
   const teamNames=team.map(m=>m.name);
   const upd=(f,v)=>{ if(locked) return; onUpdateDel(projectId,del.id,f,v); };
@@ -4379,12 +4399,8 @@ const DeliverableDetailModal = React.memo(({del,projectId,team,allProjects,onUpd
   const effectiveWS = del.workstream || project?.workstream || "";
   const effectiveProducerId = del.producerId || project?.assignees?.["Producer"]?.[0] || null;
 
-  const F = ({label,children,span}) => (
-    <div style={{gridColumn:span?"1/-1":"auto"}}>
-      <div style={{fontSize:13,fontWeight:800,color: "#8e97a6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:5}}>{label}</div>
-      {children}
-    </div>
-  );
+  const F = DelField;
+
 
   return (
     <div style={{background:"#0d1117",borderRadius:"0 0 12px 12px",overflow:"hidden"}}>
@@ -5552,7 +5568,7 @@ const IngestFullFields = ({ig, update, editableLocation=true, showCallSheet=fals
                 {activeR&&!changes&&<Chip label={activeR.label} color={RCOLOR[activeR.status]} xs/>}
                 {changes&&<Chip label="↩ Changes" color="#ef4444" xs/>}
                 <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW} small/>
-                <Dl date={d.deadline}/>
+                <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>
                 <span style={{fontSize:14,color:exp?"#6366f1":"#8e97a6"}}>{exp?"▲":"›"}</span>
               </div>
               {/* Ingest-specific extras — not part of the standard deliverable row */}
@@ -7216,7 +7232,7 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                             <div key={i} title={`${r.label}: ${r.status}`} style={{width:20,height:20,borderRadius:"50%",background:RCOLOR[r.status]+"30",border:`2px solid ${RCOLOR[r.status]}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:RCOLOR[r.status]}}>{i+1}</div>
                           ))}
                         </div>
-                        <Dl date={d.deadline}/>
+                        <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>
                         <span style={{fontSize:17,color: "#8e97a6"}}>›</span>
                       </div>
                     );
@@ -9708,14 +9724,14 @@ const PipelineView = ({projects, team, onOpenProject, onUpdateProject}) => {
 
                   {/* # + remove */}
                   <TD style={{textAlign:"center",padding:"6px 8px"}}>
-                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
                       <span style={{color:"#374151",fontSize:13,fontWeight:700}}>{i+1}</span>
                       <button onClick={()=>onUpdateProject(p.id,"inPipeline",false)}
                         title="Remove from Pipeline"
-                        style={{background:"none",border:"none",color:"#374151",cursor:"pointer",fontSize:14,padding:"0",lineHeight:1}}
-                        onMouseEnter={e=>{e.currentTarget.style.color="#ef4444";}}
-                        onMouseLeave={e=>{e.currentTarget.style.color="#374151";}}>
-                        ×
+                        style={{background:"#ef444415",border:"1px solid #ef444440",borderRadius:6,color:"#ef4444",padding:"4px 10px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",whiteSpace:"nowrap"}}
+                        onMouseEnter={e=>{e.currentTarget.style.background="#ef444425";}}
+                        onMouseLeave={e=>{e.currentTarget.style.background="#ef444415";}}>
+                        − Pipeline
                       </button>
                     </div>
                   </TD>
@@ -11189,7 +11205,7 @@ const KanbanStatus = ({projects,team,onUpdateDel}) => {
                     </select>
                     <div style={{display:"flex",gap:3,alignItems:"center"}}>
                       {d.aspectRatio&&<Chip label={d.aspectRatio} color="#374151" xs/>}
-                      <Dl date={d.deadline}/>
+                      <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>
                     </div>
                   </div>
                   {changes&&<div style={{fontSize:13,color:"#ef4444",fontWeight:700,marginTop:4}}>↩ Changes Requested</div>}
@@ -11261,7 +11277,7 @@ const KanbanEditorCol = ({ed, dels, editors, onUpdateDel}) => {
                         </select>
                         <div style={{display:"flex",gap:3,alignItems:"center"}}>
                           <Chip label={d.status} color={c} xs/>
-                          <Dl date={d.deadline}/>
+                          <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>
                         </div>
                       </div>
                       {ch&&<div style={{fontSize:13,color:"#ef4444",marginTop:3,fontWeight:700}}>↩ Changes</div>}
@@ -11880,7 +11896,7 @@ const TeamMemberCard = ({m, projects, onOpenProject, nudges=[]}) => {
                         <div style={{fontSize:13,color: "#9ca3af"}}>{d.projectName}</div>
                       </div>
                       <Chip label={d.status} color={stColor} xs/>
-                      <Dl date={d.deadline}/>
+                      <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>
                     </div>
                   );
                 })}
@@ -12103,9 +12119,9 @@ const DeliverableRow = ({
           <div onClick={e=>e.stopPropagation()} style={{display:"flex",alignItems:"center",gap:5}}>
             <input type="date" value={d.deadline||""} onChange={e=>onUpdateDel(projectId,d.id,"deadline",e.target.value)}
               style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:5,color:d.deadline?"#e2e8f0":"#4b5563",padding:"2px 5px",fontSize:12,outline:"none",cursor:"pointer",colorScheme:"dark",fontFamily:"inherit"}}/>
-            {d.deadline&&<Dl date={d.deadline}/>}
+            {d.deadline&&<Dl date={d.deadline} deliveredAt={d.deliveredAt}/>}
           </div>
-        ) : <Dl date={d.deadline}/>}
+        ) : <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>}
         {editable&&onDeleteDel&&(
           <div onClick={e=>e.stopPropagation()}>
             {confirmDelete
@@ -12168,7 +12184,7 @@ const DelInfoPopup = ({del, team, onClose}) => {
           {del.captionsNeeded&&<Chip label="Captions" color="#a855f7"/>}
           {del.containsAI&&<Chip label="AI" color="#f59e0b"/>}
           {allAppr&&<Chip label="✓ All Approved" color="#10b981"/>}
-          <Dl date={del.deadline}/>
+          <Dl date={del.deadline} deliveredAt={del.deliveredAt}/>
         </div>
         <h2 style={{fontSize:25,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:3}}>{del.title}</h2>
         <div style={{fontSize:16,color: "#9ca3af",marginBottom:14}}>{del.projectName} · Due {fmtDT(del.deadline)}</div>
@@ -12369,7 +12385,7 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
                         <Chip label="Required" color="#f97316" xs/>
                         {changes&&<Chip label="↩ Changes" color="#ef4444" xs/>}
                         <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW} small/>
-                        <Dl date={d.deadline}/>
+                        <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>
                       </div>
                     );
                   })}
@@ -15093,6 +15109,17 @@ const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE
 // Supabase's app_kv table instead of localStorage-only.
 window.sb = sb;
 
+// Off by default and meant to stay off until the deliverables/review_rounds
+// tables exist for real (staging_schema.sql + staging_backfill.sql, or
+// their production equivalents once that's deliberately run). When true,
+// every deliverable write ALSO goes to the new normalized tables, in
+// addition to — not instead of — the existing projects.deliverables JSON
+// column. Reads are untouched either way: the UI keeps showing whatever the
+// JSON column says, so a bug in the shadow-write path can't surface to a
+// user, only to whoever's comparing the two tables for parity. See the
+// "shadow writes" design conversation this landed in.
+const SHADOW_WRITE_DELIVERABLES = true;
+
 const rowToTeamMember = row => ({
   id: row.id, name: row.name, roles: row.roles||[], employeeType: row.employee_type,
   available: row.available, email: row.email||"", phone: row.phone||"", department: row.department,
@@ -15169,6 +15196,188 @@ const bookingToRow = b => {
     crew_internal: b.crewInternal||[], crew_external: b.crewExternal||[], extra,
   };
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Normalized-schema data layer (deliverables/review_rounds/productions as
+// their own Supabase tables — see staging_schema.sql) — NOT YET WIRED IN.
+// Nothing below calls or is called by the live app; projects.deliverables/
+// projects.productions (the nested-JSON columns) stay the only thing any
+// component reads until a deliberate cutover step swaps the data-loading
+// effect and updateDel/addDel/deleteDel/etc. over to these. Until then this
+// is dead code that happens to live in the same file so it ships, builds,
+// and gets code-reviewed alongside everything else — see
+// assembleNormalizedProjectData's doc comment for why the shape it produces
+// has to match today's nested shape exactly.
+//
+// `_rowId` on a deliverable/production object is its real Supabase primary
+// key (always a uuid) — the *ToRow functions use it to know whether to
+// insert or update. `id` stays the legacy numeric id for anything migrated
+// by the backfill script, so every existing bit of UI that keys off
+// `del.id`/`production.id` keeps working unchanged; a deliverable created
+// after cutover has no legacy id, so `id` falls back to the row's own uuid.
+
+const rowToDeliverable = row => ({
+  id: row.legacy_id ?? row.id,
+  _rowId: row.id,
+  projectId: row.project_id,
+  title: row.title, status: row.status, deadline: row.deadline, deliveredAt: row.delivered_at,
+  editorId: row.editor_id, animatorId: row.animator_id, producerId: row.producer_id,
+  deliverableType: row.deliverable_type, aspectRatio: row.aspect_ratio, quality: row.quality,
+  workstream: row.workstream, businessUnit: row.business_unit,
+  frameLink: row.frame_link, framePW: row.frame_pw, frameInternalUrl: row.frame_internal_url,
+  videoLength: row.video_length, filePath: row.file_path,
+  distPlatforms: row.dist_platforms||[], useCaseLimitations: row.use_case_limitations||[], approvedUses: row.approved_uses||[],
+  speakers: row.speakers||[], keywords: row.keywords||[], notes: row.notes||"",
+  totalRevisions: row.total_revisions||0, estimatedHoursOverride: row.estimated_hours_override,
+  containsAI: row.contains_ai||false, aiTools: row.ai_tools||[], greenscreen: row.greenscreen||false,
+  captionsNeeded: row.captions_needed||false, srtDelivered: row.srt_delivered||false, srtFrameUrl: row.srt_frame_url,
+  watermark: row.watermark||false, bxtvLink: row.bxtv_link||null,
+  rounds: [], // populated by assembleNormalizedProjectData, never by this mapper alone
+});
+
+const deliverableToRow = (d, projectId) => ({
+  ...(d._rowId ? {id: d._rowId} : {}),
+  legacy_id: typeof d.id === "number" ? d.id : null,
+  project_id: projectId,
+  title: d.title||null, status: d.status||null, deadline: d.deadline||null, delivered_at: d.deliveredAt||null,
+  editor_id: d.editorId||null, animator_id: d.animatorId||null, producer_id: d.producerId||null,
+  deliverable_type: d.deliverableType||null, aspect_ratio: d.aspectRatio||null, quality: d.quality||null,
+  workstream: d.workstream||null, business_unit: d.businessUnit||null,
+  frame_link: d.frameLink||null, frame_pw: d.framePW||null, frame_internal_url: d.frameInternalUrl||null,
+  video_length: d.videoLength||null, file_path: d.filePath||null,
+  dist_platforms: d.distPlatforms||[], use_case_limitations: d.useCaseLimitations||[], approved_uses: d.approvedUses||[],
+  speakers: d.speakers||[], keywords: d.keywords||[], notes: d.notes||null,
+  total_revisions: d.totalRevisions||0, estimated_hours_override: d.estimatedHoursOverride ?? null,
+  contains_ai: !!d.containsAI, ai_tools: d.aiTools||[], greenscreen: !!d.greenscreen,
+  captions_needed: !!d.captionsNeeded, srt_delivered: !!d.srtDelivered, srt_frame_url: d.srtFrameUrl||null,
+  watermark: !!d.watermark, bxtv_link: d.bxtvLink||null,
+});
+
+const isUuid = v => typeof v === "string" && v.includes("-");
+
+const rowToReviewRound = row => ({
+  id: row.id,
+  deliverableRowId: row.deliverable_id,
+  label: row.label, deadline: row.deadline, reviewers: row.reviewers||[], status: row.status, notes: row.notes||"",
+  workReviewSessionId: row.work_review_session_id,
+});
+
+const reviewRoundToRow = (r, deliverableRowId) => ({
+  ...(isUuid(r.id) ? {id: r.id} : {}),
+  deliverable_id: deliverableRowId,
+  label: r.label||null, deadline: r.deadline||null, reviewers: r.reviewers||[], status: r.status||null, notes: r.notes||null,
+  work_review_session_id: isUuid(r.workReviewSessionId) ? r.workReviewSessionId : null,
+});
+
+const rowToProduction = row => ({
+  id: row.legacy_id ?? row.id,
+  _rowId: row.id,
+  projectId: row.project_id,
+  title: row.title, location: row.location, startTime: row.start_time, endTime: row.end_time, booked: row.booked||false,
+  setupTypeId: row.setup_type_id,
+  schedule: row.schedule||[], crewInternal: row.crew_internal||[], crewExternal: row.crew_external||[],
+  equipmentIds: row.equipment_ids||[], externalGear: row.external_gear||[], mediaCardIds: row.media_card_ids||[],
+  scriptFile: row.script_file||null, additionalDetails: row.additional_details||"",
+  ingest: row.ingest||{},
+});
+
+const productionToRow = (p, projectId) => ({
+  ...(p._rowId ? {id: p._rowId} : {}),
+  legacy_id: typeof p.id === "number" ? p.id : null,
+  project_id: projectId,
+  title: p.title||null, location: p.location||null, start_time: p.startTime||null, end_time: p.endTime||null, booked: !!p.booked,
+  setup_type_id: p.setupTypeId||null,
+  schedule: p.schedule||[], crew_internal: p.crewInternal||[], crew_external: p.crewExternal||[],
+  equipment_ids: p.equipmentIds||[], external_gear: p.externalGear||[], media_card_ids: p.mediaCardIds||[],
+  script_file: p.scriptFile||null, additional_details: p.additionalDetails||null,
+  ingest: p.ingest||{},
+});
+
+// Reassembles flat rows (as loaded from the three normalized tables) back
+// into the exact nested shape every existing component already reads off
+// `project.deliverables` / `project.productions` today. This is the one
+// function the cutover step actually points the data-loading effect at —
+// everything downstream of it (every screen in this file) needs zero
+// changes, because what comes out the other end is shaped identically to
+// what projectToRow/rowToProject already produce; see staging_backfill.sql's
+// verification query for the ground truth this was checked against.
+const assembleNormalizedProjectData = (deliverableRows, roundRows, productionRows) => {
+  const roundsByDeliverable = {};
+  roundRows.forEach(rr => {
+    (roundsByDeliverable[rr.deliverable_id] ||= []).push(rowToReviewRound(rr));
+  });
+  const deliverablesByProject = {};
+  deliverableRows.forEach(dr => {
+    const d = rowToDeliverable(dr);
+    d.rounds = roundsByDeliverable[dr.id] || [];
+    (deliverablesByProject[dr.project_id] ||= []).push(d);
+  });
+  const productionsByProject = {};
+  productionRows.forEach(pr => {
+    (productionsByProject[pr.project_id] ||= []).push(rowToProduction(pr));
+  });
+  return { deliverablesByProject, productionsByProject };
+};
+
+// Thin per-row writers mirroring addDel/updateDel/deleteDel's call shape
+// (App.js functions of the same un-suffixed names), so swapping the
+// cutover's call sites is a rename, not a rewrite. Untested against a live
+// Supabase instance as of writing — see the "go ahead" conversation this
+// landed in for why (no DB access from the build sandbox); exercise these
+// against staging before pointing anything real at them.
+const addDeliverableRow        = (sbClient, projectId, deliverable) => sbClient.from("deliverables").insert(deliverableToRow(deliverable, projectId)).select().single();
+const updateDeliverableRow     = (sbClient, rowId, patch)           => sbClient.from("deliverables").update(patch).eq("id", rowId);
+const deleteDeliverableRow     = (sbClient, rowId)                  => sbClient.from("deliverables").delete().eq("id", rowId);
+const addReviewRoundRow        = (sbClient, deliverableRowId, round)=> sbClient.from("review_rounds").insert(reviewRoundToRow(round, deliverableRowId)).select().single();
+const updateReviewRoundRow     = (sbClient, rowId, patch)           => sbClient.from("review_rounds").update(patch).eq("id", rowId);
+const deleteReviewRoundRow     = (sbClient, rowId)                  => sbClient.from("review_rounds").delete().eq("id", rowId);
+const addProductionRow         = (sbClient, projectId, production)  => sbClient.from("productions").insert(productionToRow(production, projectId)).select().single();
+const updateProductionRow      = (sbClient, rowId, patch)           => sbClient.from("productions").update(patch).eq("id", rowId);
+const deleteProductionRow      = (sbClient, rowId)                  => sbClient.from("productions").delete().eq("id", rowId);
+
+// Review rounds aren't edited one at a time — the UI always hands updateDel
+// a whole replacement array (upd("rounds", newArray), same coarse pattern
+// productions use). computeRoundDiff is the pure half of turning that into
+// granular writes: given the round array a deliverable had before and the
+// one it has now, decide what to insert/update/delete. A round whose `id`
+// isn't a real row uuid yet (a plain number from the client's uid()
+// counter, or anything not already in `oldRounds`) is new; anything from
+// `oldRounds` missing from `newRounds` was removed; everything else that
+// actually changed gets a patch. Kept separate from the sb calls below so
+// the decision logic is testable without a database.
+const computeRoundDiff = (oldRounds, newRounds) => {
+  const oldById = new Map(oldRounds.map(r=>[String(r.id), r]));
+  const newIds = new Set(newRounds.map(r=>String(r.id)));
+  const toDelete = oldRounds.filter(r=>!newIds.has(String(r.id)));
+  const toInsert = [], toUpdate = [];
+  newRounds.forEach(r=>{
+    const existing = isUuid(r.id) ? oldById.get(String(r.id)) : null;
+    if(!existing){ toInsert.push(r); return; }
+    const patchRow = reviewRoundToRow(r, existing.deliverableRowId);
+    delete patchRow.id; delete patchRow.deliverable_id;
+    const beforeRow = reviewRoundToRow(existing, existing.deliverableRowId);
+    delete beforeRow.id; delete beforeRow.deliverable_id;
+    if(JSON.stringify(patchRow)!==JSON.stringify(beforeRow)) toUpdate.push({rowId:existing.id, patch:patchRow});
+  });
+  return {toInsert, toUpdate, toDelete};
+};
+
+// Executes a computeRoundDiff result against Supabase. Best-effort: this is
+// a shadow write (see the "shadow writes" conversation this landed in) —
+// reads still come from the legacy projects.deliverables JSON column, so a
+// failure here never surfaces to the user, only to whoever's watching for
+// parity between the old and new tables during the shadow-write period.
+// supabase-js resolves {data,error} rather than rejecting on a query-level
+// error (a bad constraint, an RLS denial, …) — only a network failure
+// actually rejects — so each op's result is checked individually rather
+// than trusting Promise.all to catch a failure on its own.
+const writeRoundDiff = (sbClient, deliverableRowId, diff) => Promise.all([
+  ...diff.toInsert.map(r=>addReviewRoundRow(sbClient, deliverableRowId, r)),
+  ...diff.toUpdate.map(({rowId,patch})=>updateReviewRoundRow(sbClient, rowId, patch)),
+  ...diff.toDelete.map(r=>deleteReviewRoundRow(sbClient, r.id)),
+]).then(results=>{
+  results.forEach(({error})=>{ if(error) console.warn("[shadow write] round diff op failed:", error); });
+});
 
 const INTAKE_STATUSES = ["New","In Review","Assigned","Archived"];
 const INTAKE_STATUS_COLOR = {"New":"#6366f1","In Review":"#f59e0b","Assigned":"#10b981","Archived":"#6b7280"};
@@ -27183,8 +27392,9 @@ const MobileDeliverables = ({project, onUpdateDel}) => {
         const due=d.deadline?new Date(d.deadline+"T00:00"):null;
         if(due) due.setHours(0,0,0,0);
         const diff=due?Math.ceil((due-today)/86400000):null;
-        const dlLabel=!due?null:diff<0?`${Math.abs(diff)}d overdue`:diff===0?"Due today":diff===1?"Due tomorrow":`Due ${due.toLocaleDateString("en-US",{month:"short",day:"numeric"})}`;
-        const dlColor=!due?"#838ba0":diff<0?"#ef4444":diff<=2?"#f59e0b":diff<=7?"#3b82f6":"#838ba0";
+        const dlLabel=d.deliveredAt?`Delivered ${new Date(d.deliveredAt+"T00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})}`
+          :!due?null:diff<0?`${Math.abs(diff)}d overdue`:diff===0?"Due today":diff===1?"Due tomorrow":`Due ${due.toLocaleDateString("en-US",{month:"short",day:"numeric"})}`;
+        const dlColor=d.deliveredAt?"#10b981":!due?"#838ba0":diff<0?"#ef4444":diff<=2?"#f59e0b":diff<=7?"#3b82f6":"#838ba0";
         return (
           <div key={d.id} style={{background:"#111827",border:"1px solid #1f2937",borderLeft:`3px solid ${ws.color}`,borderRadius:10,padding:"12px 14px",display:"flex",flexDirection:"column",gap:8}}>
             <div style={{fontSize:17,fontWeight:700,color:"#e2e8f0",lineHeight:1.2}}>{d.title}</div>
@@ -28512,6 +28722,26 @@ function App() {
     });
   },[authed]);
 
+  // Shadow-write id-mapping bootstrap — NOT a read cutover (see
+  // SHADOW_WRITE_DELIVERABLES's comment: reads still come entirely from
+  // projects.deliverables above). This only fetches the (id, legacy_id) pair
+  // off every row already in the new `deliverables` table and tags each
+  // matching local deliverable with `_rowId`, so updateDel/deleteDel have
+  // something to shadow-write against for a deliverable that existed before
+  // this session started (one created mid-session already gets tagged by
+  // addDel's own shadow write, above).
+  useEffect(()=>{
+    if(!authed || !sb || !SHADOW_WRITE_DELIVERABLES) return;
+    sb.from("deliverables").select("id, legacy_id").then(({data,error})=>{
+      if(error || !data) return;
+      const rowIdByLegacyId = {};
+      data.forEach(r=>{ if(r.legacy_id!=null) rowIdByLegacyId[r.legacy_id]=r.id; });
+      setProjects(prev=>prev.map(p=>({...p, deliverables:(p.deliverables||[]).map(d=>
+        d._rowId || !rowIdByLegacyId[d.id] ? d : {...d, _rowId:rowIdByLegacyId[d.id]}
+      )})));
+    });
+  },[authed]);
+
   // Realtime: with multiple people signed in at once, another session's edit
   // used to only ever show up here after a manual reload (see the one-
   // directional note on the projects auto-save effect below). Mirrors every
@@ -28840,14 +29070,38 @@ function App() {
   const updateDel=useCallback((projectId,delId,field,value)=>{
     const prevProj = projectsRef.current.find(p=>p.id===projectId);
     const prevDel = prevProj?.deliverables.find(d=>d.id===delId);
-    setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:p.deliverables.map(d=>d.id!==delId?d:{...d,[field]:value})}));
+    // Stamp/clear the delivered date whenever status flips in or out of "Delivered",
+    // so the UI can show "Delivered <date>" instead of a stale overdue countdown.
+    const applyFieldUpdate = d => {
+      const updated = {...d,[field]:value};
+      if(field==="status") updated.deliveredAt = value==="Delivered" ? (d.deliveredAt||new Date().toISOString().slice(0,10)) : null;
+      return updated;
+    };
+    setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:p.deliverables.map(d=>d.id!==delId?d:applyFieldUpdate(d))}));
+    // Shadow write — see SHADOW_WRITE_DELIVERABLES's comment. Fires only once
+    // this deliverable is known to have a row in the new `deliverables` table
+    // (prevDel._rowId, set by the id-mapping bootstrap effect or by a prior
+    // addDel's own shadow write in this same session); silently does nothing
+    // otherwise, same as if the flag were off.
+    if(SHADOW_WRITE_DELIVERABLES && sb && prevDel?._rowId){
+      if(field==="rounds"){
+        writeRoundDiff(sb, prevDel._rowId, computeRoundDiff(prevDel.rounds||[], value||[]))
+          .catch(e=>console.warn("[shadow write] round diff failed:", e));
+      } else {
+        const fullRow = deliverableToRow(applyFieldUpdate(prevDel), projectId);
+        const {id:_id, legacy_id:_legacyId, project_id:_projectId, ...patch} = fullRow;
+        updateDeliverableRow(sb, prevDel._rowId, patch)
+          .then(({error})=>{ if(error) console.warn("[shadow write] updateDel failed:", error); })
+          .catch(e=>console.warn("[shadow write] updateDel failed:", e));
+      }
+    }
     // Seed project override
     if(SEED_PROJECTS.some(p=>p.id===projectId)){
       setSeedOverrides(prev=>{
         const existing=prev[projectId]||{};
         const seedProj=SEED_PROJECTS.find(p=>p.id===projectId);
         const baseDels=existing.deliverables||seedProj?.deliverables||[];
-        return {...prev,[projectId]:{...existing,deliverables:baseDels.map(d=>d.id!==delId?d:{...d,[field]:value})}};
+        return {...prev,[projectId]:{...existing,deliverables:baseDels.map(d=>d.id!==delId?d:applyFieldUpdate(d))}};
       });
     }
     const label = prevDel?.title || "Deliverable";
@@ -28885,6 +29139,17 @@ function App() {
 
   const addDel=useCallback((projectId,newDel)=>{
     setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:[...p.deliverables,newDel]}));
+    // Shadow write — tags the local object with its new row's real uuid once
+    // the insert resolves, so a later updateDel/deleteDel on this same
+    // deliverable (even later in this same session, before any reload) has
+    // a _rowId to target without waiting on the id-mapping bootstrap effect.
+    if(SHADOW_WRITE_DELIVERABLES && sb){
+      addDeliverableRow(sb, projectId, newDel).then(({data,error})=>{
+        if(error){ console.warn("[shadow write] addDel failed:", error); return; }
+        if(!data) return;
+        setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:p.deliverables.map(d=>d.id===newDel.id?{...d,_rowId:data.id}:d)}));
+      }).catch(e=>console.warn("[shadow write] addDel failed:", e));
+    }
     if(SEED_PROJECTS.some(p=>p.id===projectId)){
       setSeedOverrides(prev=>{
         const existing=prev[projectId]||{};
@@ -28901,6 +29166,12 @@ function App() {
     const proj = projectsRef.current.find(p=>p.id===projectId);
     const del = proj?.deliverables.find(d=>d.id===delId);
     setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:p.deliverables.filter(d=>d.id!==delId)}));
+    // Shadow write.
+    if(SHADOW_WRITE_DELIVERABLES && sb && del?._rowId){
+      deleteDeliverableRow(sb, del._rowId)
+        .then(({error})=>{ if(error) console.warn("[shadow write] deleteDel failed:", error); })
+        .catch(e=>console.warn("[shadow write] deleteDel failed:", e));
+    }
     if(SEED_PROJECTS.some(p=>p.id===projectId)){
       setSeedOverrides(prev=>{
         const existing=prev[projectId]||{};
