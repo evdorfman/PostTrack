@@ -117,6 +117,7 @@ create index if not exists productions_project_id_idx on productions(project_id)
 
 create table if not exists custom_tasks (
   id          uuid primary key default gen_random_uuid(),
+  legacy_id   bigint,
   project_id  bigint references projects(id) on delete cascade,
   title       text,
   due_date    date,
@@ -147,14 +148,21 @@ create table if not exists setup_types (
   description          text,
   roles                jsonb default '[]'::jsonb,
   equipment_ids        jsonb default '[]'::jsonb,
+  external_gear        jsonb default '[]'::jsonb,
   floorplan_photo_key  text,
   ref_photo_keys       jsonb default '[]'::jsonb,
+  media_card_ids       jsonb default '[]'::jsonb,
+  furniture_ids        jsonb default '[]'::jsonb,
+  prop_ids             jsonb default '[]'::jsonb,
+  recording_specs      jsonb default '{}'::jsonb,
+  screen_content       jsonb default '{}'::jsonb,
+  notes                text,
   created_at           timestamptz default now()
 );
 
 create table if not exists production_presets (
   id          uuid primary key default gen_random_uuid(),
-  legacy_id   text,
+  legacy_id   bigint,
   name        text,
   type        text,
   sections    jsonb default '{}'::jsonb,
