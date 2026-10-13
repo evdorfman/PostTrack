@@ -15177,11 +15177,26 @@ const rowToProject = row => ({
   // actually been saved.
   bxtvRefs: row.bxtv_refs||[], bxtvMeta: row.bxtv_meta||null,
 });
+// _rowId is purely local bookkeeping for the shadow-write pass (which row
+// in the new normalized table a deliverable/production corresponds to) —
+// it must never reach the legacy JSON column. This save path does a raw
+// pass-through of the whole object otherwise, so without stripping it
+// here, a tagged _rowId gets permanently baked into projects.deliverables/
+// projects.productions the moment this effect next fires, and every
+// "fresh" load reads that same stale value right back out — surviving
+// even a full tab close/reopen, since nothing about loading is actually
+// fresh when the staleness lives inside the data itself. Found live: a
+// production's shadow write kept silently targeting a row id that no
+// longer existed (from before a backfill re-run), no matter how many
+// times the tab was reloaded, because the stale id had already been
+// saved into its own JSON.
+const stripRowId = arr => (arr||[]).map(({_rowId, ...rest}) => rest);
+
 const projectToRow = p => ({
   id: p.id, project_code: p.projectCode||null, name: p.name, requester: p.requester||null,
   year: p.year||null, status: p.status, workstream: p.workstream||null, business_unit: p.businessUnit||null,
   deadline: p.deadline||null, brief_notes: p.briefNotes||null, keywords: p.keywords||[],
-  assignees: p.assignees||{}, deliverables: p.deliverables||[], productions: p.productions||[],
+  assignees: p.assignees||{}, deliverables: stripRowId(p.deliverables), productions: stripRowId(p.productions),
   shoots: p.shoots||[], notes: p.notes||[], ingest_dates: p.ingestDates||[],
   closed_at: p.closedAt||null,
   bxtv_refs: p.bxtvRefs||[], bxtv_meta: p.bxtvMeta||null,
@@ -28802,6 +28817,18 @@ function App() {
   // something to shadow-write against for a deliverable that existed before
   // this session started (one created mid-session already gets tagged by
   // addDel's own shadow write, above).
+  //
+  // Always overwrites _rowId (never "skip if already tagged") — a stale one
+  // can exist going into this even on a brand-new load: projectToRow now
+  // strips _rowId before saving (so it can't leak into the JSON going
+  // forward), but that fix alone can't clean up a value that was already
+  // saved into projects.deliverables/productions before it existed. Found
+  // live: a production's shadow write kept silently targeting a deleted
+  // row (from before a backfill re-run) no matter how many times the tab
+  // was closed and reopened, because the stale _rowId had been persisted
+  // into the project's own JSON and every "fresh" load read it right back
+  // out. Re-deriving it from the database on every load, unconditionally,
+  // is what actually makes a reload trustworthy again.
   useEffect(()=>{
     // Waits on projectsLoaded, not just authed — this fetch is small
     // (id/legacy_id only) and often resolves before the much larger
@@ -28817,13 +28844,14 @@ function App() {
       const rowIdByLegacyId = {};
       data.forEach(r=>{ if(r.legacy_id!=null) rowIdByLegacyId[r.legacy_id]=r.id; });
       setProjects(prev=>prev.map(p=>({...p, deliverables:(p.deliverables||[]).map(d=>
-        d._rowId || !rowIdByLegacyId[d.id] ? d : {...d, _rowId:rowIdByLegacyId[d.id]}
+        rowIdByLegacyId[d.id] && rowIdByLegacyId[d.id]!==d._rowId ? {...d, _rowId:rowIdByLegacyId[d.id]} : d
       )})));
     });
   },[authed, projectsLoaded]);
 
   // Same bootstrap, for productions — see the comment above for why
-  // projectsLoaded (not just authed) is the guard.
+  // projectsLoaded (not just authed) is the guard, and why this always
+  // overwrites _rowId rather than skipping an already-tagged one.
   useEffect(()=>{
     if(!authed || !sb || !SHADOW_WRITE_PRODUCTIONS || !projectsLoaded) return;
     sb.from("productions").select("id, legacy_id").then(({data,error})=>{
@@ -28831,7 +28859,7 @@ function App() {
       const rowIdByLegacyId = {};
       data.forEach(r=>{ if(r.legacy_id!=null) rowIdByLegacyId[r.legacy_id]=r.id; });
       setProjects(prev=>prev.map(p=>({...p, productions:(p.productions||[]).map(pr=>
-        pr._rowId || !rowIdByLegacyId[pr.id] ? pr : {...pr, _rowId:rowIdByLegacyId[pr.id]}
+        rowIdByLegacyId[pr.id] && rowIdByLegacyId[pr.id]!==pr._rowId ? {...pr, _rowId:rowIdByLegacyId[pr.id]} : pr
       )})));
     });
   },[authed, projectsLoaded]);
