@@ -91,7 +91,7 @@ join deliverables dl
   on dl.project_id = p.id and dl.legacy_id = (d.elem->>'id')::bigint;
 
 insert into productions (
-  legacy_id, project_id, title, location, start_time, end_time, booked,
+  legacy_id, project_id, title, type, location, start_time, end_time, booked,
   schedule, crew_internal, crew_external, equipment_ids, external_gear,
   media_card_ids, script_file, additional_details, ingest
 )
@@ -99,6 +99,7 @@ select
   (d.elem->>'id')::bigint,
   p.id,
   d.elem->>'title',
+  d.elem->>'type',
   d.elem->>'location',
   nullif(d.elem->>'startTime','')::timestamptz,
   nullif(d.elem->>'endTime','')::timestamptz,
