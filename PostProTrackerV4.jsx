@@ -15140,9 +15140,9 @@ const SHADOW_WRITE_PRODUCTIONS = true;
 // scripts). Each gets its own flag, same reasoning as
 // SHADOW_WRITE_PRODUCTIONS: independent rollback if one turns out to have
 // a bug the others don't.
-const SHADOW_WRITE_SETUP_TYPES = false;
-const SHADOW_WRITE_PRODUCTION_PRESETS = false;
-const SHADOW_WRITE_CUSTOM_TASKS = false;
+const SHADOW_WRITE_SETUP_TYPES = true;
+const SHADOW_WRITE_PRODUCTION_PRESETS = true;
+const SHADOW_WRITE_CUSTOM_TASKS = true;
 
 const rowToTeamMember = row => ({
   id: row.id, name: row.name, roles: row.roles||[], employeeType: row.employee_type,

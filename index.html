@@ -9968,9 +9968,9 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
   window.sb = sb;
   var SHADOW_WRITE_DELIVERABLES = true;
   var SHADOW_WRITE_PRODUCTIONS = true;
-  var SHADOW_WRITE_SETUP_TYPES = false;
-  var SHADOW_WRITE_PRODUCTION_PRESETS = false;
-  var SHADOW_WRITE_CUSTOM_TASKS = false;
+  var SHADOW_WRITE_SETUP_TYPES = true;
+  var SHADOW_WRITE_PRODUCTION_PRESETS = true;
+  var SHADOW_WRITE_CUSTOM_TASKS = true;
   var rowToTeamMember = (row) => ({
     id: row.id,
     name: row.name,
