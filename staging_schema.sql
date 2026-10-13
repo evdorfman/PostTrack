@@ -141,6 +141,7 @@ create table if not exists productions (
   legacy_id            bigint,
   project_id           bigint not null references projects(id) on delete cascade,
   title                text,
+  type                 text,  -- e.g. "Content Shoot", "Live Broadcast" — drives color coding and the shoot-type logic; also what the UI falls back to as a display name ("<type> <position>") when a production has no custom title
   location             text,
   start_time           timestamptz,
   end_time             timestamptz,

@@ -10160,6 +10160,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     legacy_id: typeof p.id === "number" ? p.id : null,
     project_id: projectId,
     title: p.title || null,
+    type: p.type || null,
     location: p.location || null,
     start_time: p.startTime || null,
     end_time: p.endTime || null,
