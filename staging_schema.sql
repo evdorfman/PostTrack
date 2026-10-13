@@ -94,6 +94,8 @@ create table if not exists deliverables (
   deliverable_type          text,
   aspect_ratio              text,
   quality                   text,
+  workstream                text,  -- per-deliverable override of the project's own workstream
+  business_unit             text,  -- per-deliverable override of the project's own business unit
   frame_link                text,
   frame_pw                  text,
   frame_internal_url        text,

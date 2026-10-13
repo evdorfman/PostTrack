@@ -15109,6 +15109,17 @@ const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE
 // Supabase's app_kv table instead of localStorage-only.
 window.sb = sb;
 
+// Off by default and meant to stay off until the deliverables/review_rounds
+// tables exist for real (staging_schema.sql + staging_backfill.sql, or
+// their production equivalents once that's deliberately run). When true,
+// every deliverable write ALSO goes to the new normalized tables, in
+// addition to — not instead of — the existing projects.deliverables JSON
+// column. Reads are untouched either way: the UI keeps showing whatever the
+// JSON column says, so a bug in the shadow-write path can't surface to a
+// user, only to whoever's comparing the two tables for parity. See the
+// "shadow writes" design conversation this landed in.
+const SHADOW_WRITE_DELIVERABLES = false;
+
 const rowToTeamMember = row => ({
   id: row.id, name: row.name, roles: row.roles||[], employeeType: row.employee_type,
   available: row.available, email: row.email||"", phone: row.phone||"", department: row.department,
@@ -15212,6 +15223,7 @@ const rowToDeliverable = row => ({
   title: row.title, status: row.status, deadline: row.deadline, deliveredAt: row.delivered_at,
   editorId: row.editor_id, animatorId: row.animator_id, producerId: row.producer_id,
   deliverableType: row.deliverable_type, aspectRatio: row.aspect_ratio, quality: row.quality,
+  workstream: row.workstream, businessUnit: row.business_unit,
   frameLink: row.frame_link, framePW: row.frame_pw, frameInternalUrl: row.frame_internal_url,
   videoLength: row.video_length, filePath: row.file_path,
   distPlatforms: row.dist_platforms||[], useCaseLimitations: row.use_case_limitations||[], approvedUses: row.approved_uses||[],
@@ -15230,6 +15242,7 @@ const deliverableToRow = (d, projectId) => ({
   title: d.title||null, status: d.status||null, deadline: d.deadline||null, delivered_at: d.deliveredAt||null,
   editor_id: d.editorId||null, animator_id: d.animatorId||null, producer_id: d.producerId||null,
   deliverable_type: d.deliverableType||null, aspect_ratio: d.aspectRatio||null, quality: d.quality||null,
+  workstream: d.workstream||null, business_unit: d.businessUnit||null,
   frame_link: d.frameLink||null, frame_pw: d.framePW||null, frame_internal_url: d.frameInternalUrl||null,
   video_length: d.videoLength||null, file_path: d.filePath||null,
   dist_platforms: d.distPlatforms||[], use_case_limitations: d.useCaseLimitations||[], approved_uses: d.approvedUses||[],
@@ -15321,6 +15334,44 @@ const deleteReviewRoundRow     = (sbClient, rowId)                  => sbClient.
 const addProductionRow         = (sbClient, projectId, production)  => sbClient.from("productions").insert(productionToRow(production, projectId)).select().single();
 const updateProductionRow      = (sbClient, rowId, patch)           => sbClient.from("productions").update(patch).eq("id", rowId);
 const deleteProductionRow      = (sbClient, rowId)                  => sbClient.from("productions").delete().eq("id", rowId);
+
+// Review rounds aren't edited one at a time — the UI always hands updateDel
+// a whole replacement array (upd("rounds", newArray), same coarse pattern
+// productions use). computeRoundDiff is the pure half of turning that into
+// granular writes: given the round array a deliverable had before and the
+// one it has now, decide what to insert/update/delete. A round whose `id`
+// isn't a real row uuid yet (a plain number from the client's uid()
+// counter, or anything not already in `oldRounds`) is new; anything from
+// `oldRounds` missing from `newRounds` was removed; everything else that
+// actually changed gets a patch. Kept separate from the sb calls below so
+// the decision logic is testable without a database.
+const computeRoundDiff = (oldRounds, newRounds) => {
+  const oldById = new Map(oldRounds.map(r=>[String(r.id), r]));
+  const newIds = new Set(newRounds.map(r=>String(r.id)));
+  const toDelete = oldRounds.filter(r=>!newIds.has(String(r.id)));
+  const toInsert = [], toUpdate = [];
+  newRounds.forEach(r=>{
+    const existing = isUuid(r.id) ? oldById.get(String(r.id)) : null;
+    if(!existing){ toInsert.push(r); return; }
+    const patchRow = reviewRoundToRow(r, existing.deliverableRowId);
+    delete patchRow.id; delete patchRow.deliverable_id;
+    const beforeRow = reviewRoundToRow(existing, existing.deliverableRowId);
+    delete beforeRow.id; delete beforeRow.deliverable_id;
+    if(JSON.stringify(patchRow)!==JSON.stringify(beforeRow)) toUpdate.push({rowId:existing.id, patch:patchRow});
+  });
+  return {toInsert, toUpdate, toDelete};
+};
+
+// Executes a computeRoundDiff result against Supabase. Best-effort: this is
+// a shadow write (see the "shadow writes" conversation this landed in) —
+// reads still come from the legacy projects.deliverables JSON column, so a
+// failure here never surfaces to the user, only to whoever's watching for
+// parity between the old and new tables during the shadow-write period.
+const writeRoundDiff = (sbClient, deliverableRowId, diff) => Promise.all([
+  ...diff.toInsert.map(r=>addReviewRoundRow(sbClient, deliverableRowId, r)),
+  ...diff.toUpdate.map(({rowId,patch})=>updateReviewRoundRow(sbClient, rowId, patch)),
+  ...diff.toDelete.map(r=>deleteReviewRoundRow(sbClient, r.id)),
+]);
 
 const INTAKE_STATUSES = ["New","In Review","Assigned","Archived"];
 const INTAKE_STATUS_COLOR = {"New":"#6366f1","In Review":"#f59e0b","Assigned":"#10b981","Archived":"#6b7280"};
@@ -28665,6 +28716,26 @@ function App() {
     });
   },[authed]);
 
+  // Shadow-write id-mapping bootstrap — NOT a read cutover (see
+  // SHADOW_WRITE_DELIVERABLES's comment: reads still come entirely from
+  // projects.deliverables above). This only fetches the (id, legacy_id) pair
+  // off every row already in the new `deliverables` table and tags each
+  // matching local deliverable with `_rowId`, so updateDel/deleteDel have
+  // something to shadow-write against for a deliverable that existed before
+  // this session started (one created mid-session already gets tagged by
+  // addDel's own shadow write, above).
+  useEffect(()=>{
+    if(!authed || !sb || !SHADOW_WRITE_DELIVERABLES) return;
+    sb.from("deliverables").select("id, legacy_id").then(({data,error})=>{
+      if(error || !data) return;
+      const rowIdByLegacyId = {};
+      data.forEach(r=>{ if(r.legacy_id!=null) rowIdByLegacyId[r.legacy_id]=r.id; });
+      setProjects(prev=>prev.map(p=>({...p, deliverables:(p.deliverables||[]).map(d=>
+        d._rowId || !rowIdByLegacyId[d.id] ? d : {...d, _rowId:rowIdByLegacyId[d.id]}
+      )})));
+    });
+  },[authed]);
+
   // Realtime: with multiple people signed in at once, another session's edit
   // used to only ever show up here after a manual reload (see the one-
   // directional note on the projects auto-save effect below). Mirrors every
@@ -29001,6 +29072,20 @@ function App() {
       return updated;
     };
     setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:p.deliverables.map(d=>d.id!==delId?d:applyFieldUpdate(d))}));
+    // Shadow write — see SHADOW_WRITE_DELIVERABLES's comment. Fires only once
+    // this deliverable is known to have a row in the new `deliverables` table
+    // (prevDel._rowId, set by the id-mapping bootstrap effect or by a prior
+    // addDel's own shadow write in this same session); silently does nothing
+    // otherwise, same as if the flag were off.
+    if(SHADOW_WRITE_DELIVERABLES && sb && prevDel?._rowId){
+      if(field==="rounds"){
+        writeRoundDiff(sb, prevDel._rowId, computeRoundDiff(prevDel.rounds||[], value||[])).catch(()=>{});
+      } else {
+        const fullRow = deliverableToRow(applyFieldUpdate(prevDel), projectId);
+        const {id:_id, legacy_id:_legacyId, project_id:_projectId, ...patch} = fullRow;
+        updateDeliverableRow(sb, prevDel._rowId, patch).catch(()=>{});
+      }
+    }
     // Seed project override
     if(SEED_PROJECTS.some(p=>p.id===projectId)){
       setSeedOverrides(prev=>{
@@ -29045,6 +29130,16 @@ function App() {
 
   const addDel=useCallback((projectId,newDel)=>{
     setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:[...p.deliverables,newDel]}));
+    // Shadow write — tags the local object with its new row's real uuid once
+    // the insert resolves, so a later updateDel/deleteDel on this same
+    // deliverable (even later in this same session, before any reload) has
+    // a _rowId to target without waiting on the id-mapping bootstrap effect.
+    if(SHADOW_WRITE_DELIVERABLES && sb){
+      addDeliverableRow(sb, projectId, newDel).then(({data,error})=>{
+        if(error || !data) return;
+        setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:p.deliverables.map(d=>d.id===newDel.id?{...d,_rowId:data.id}:d)}));
+      }).catch(()=>{});
+    }
     if(SEED_PROJECTS.some(p=>p.id===projectId)){
       setSeedOverrides(prev=>{
         const existing=prev[projectId]||{};
@@ -29061,6 +29156,10 @@ function App() {
     const proj = projectsRef.current.find(p=>p.id===projectId);
     const del = proj?.deliverables.find(d=>d.id===delId);
     setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:p.deliverables.filter(d=>d.id!==delId)}));
+    // Shadow write.
+    if(SHADOW_WRITE_DELIVERABLES && sb && del?._rowId){
+      deleteDeliverableRow(sb, del._rowId).catch(()=>{});
+    }
     if(SEED_PROJECTS.some(p=>p.id===projectId)){
       setSeedOverrides(prev=>{
         const existing=prev[projectId]||{};

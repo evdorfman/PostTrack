@@ -9982,6 +9982,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
   var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dWdvcGdtdXdrdnh2aWluaHRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMzkwODIsImV4cCI6MjEwMTYxNTA4Mn0.rp2jYMBjIcWRQKlBUtaUq396kJfPz4ZgPM6QIPpNhKM";
   var sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
   window.sb = sb;
+  var SHADOW_WRITE_DELIVERABLES = false;
   var rowToTeamMember = (row) => ({
     id: row.id,
     name: row.name,
@@ -10120,6 +10121,87 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
       extra
     };
   };
+  var deliverableToRow = (d, projectId) => ({
+    ...d._rowId ? { id: d._rowId } : {},
+    legacy_id: typeof d.id === "number" ? d.id : null,
+    project_id: projectId,
+    title: d.title || null,
+    status: d.status || null,
+    deadline: d.deadline || null,
+    delivered_at: d.deliveredAt || null,
+    editor_id: d.editorId || null,
+    animator_id: d.animatorId || null,
+    producer_id: d.producerId || null,
+    deliverable_type: d.deliverableType || null,
+    aspect_ratio: d.aspectRatio || null,
+    quality: d.quality || null,
+    workstream: d.workstream || null,
+    business_unit: d.businessUnit || null,
+    frame_link: d.frameLink || null,
+    frame_pw: d.framePW || null,
+    frame_internal_url: d.frameInternalUrl || null,
+    video_length: d.videoLength || null,
+    file_path: d.filePath || null,
+    dist_platforms: d.distPlatforms || [],
+    use_case_limitations: d.useCaseLimitations || [],
+    approved_uses: d.approvedUses || [],
+    speakers: d.speakers || [],
+    keywords: d.keywords || [],
+    notes: d.notes || null,
+    total_revisions: d.totalRevisions || 0,
+    estimated_hours_override: d.estimatedHoursOverride ?? null,
+    contains_ai: !!d.containsAI,
+    ai_tools: d.aiTools || [],
+    greenscreen: !!d.greenscreen,
+    captions_needed: !!d.captionsNeeded,
+    srt_delivered: !!d.srtDelivered,
+    srt_frame_url: d.srtFrameUrl || null,
+    watermark: !!d.watermark,
+    bxtv_link: d.bxtvLink || null
+  });
+  var isUuid = (v) => typeof v === "string" && v.includes("-");
+  var reviewRoundToRow = (r, deliverableRowId) => ({
+    ...isUuid(r.id) ? { id: r.id } : {},
+    deliverable_id: deliverableRowId,
+    label: r.label || null,
+    deadline: r.deadline || null,
+    reviewers: r.reviewers || [],
+    status: r.status || null,
+    notes: r.notes || null,
+    work_review_session_id: isUuid(r.workReviewSessionId) ? r.workReviewSessionId : null
+  });
+  var addDeliverableRow = (sbClient, projectId, deliverable) => sbClient.from("deliverables").insert(deliverableToRow(deliverable, projectId)).select().single();
+  var updateDeliverableRow = (sbClient, rowId, patch) => sbClient.from("deliverables").update(patch).eq("id", rowId);
+  var deleteDeliverableRow = (sbClient, rowId) => sbClient.from("deliverables").delete().eq("id", rowId);
+  var addReviewRoundRow = (sbClient, deliverableRowId, round) => sbClient.from("review_rounds").insert(reviewRoundToRow(round, deliverableRowId)).select().single();
+  var updateReviewRoundRow = (sbClient, rowId, patch) => sbClient.from("review_rounds").update(patch).eq("id", rowId);
+  var deleteReviewRoundRow = (sbClient, rowId) => sbClient.from("review_rounds").delete().eq("id", rowId);
+  var computeRoundDiff = (oldRounds, newRounds) => {
+    const oldById = new Map(oldRounds.map((r) => [String(r.id), r]));
+    const newIds = new Set(newRounds.map((r) => String(r.id)));
+    const toDelete = oldRounds.filter((r) => !newIds.has(String(r.id)));
+    const toInsert = [], toUpdate = [];
+    newRounds.forEach((r) => {
+      const existing = isUuid(r.id) ? oldById.get(String(r.id)) : null;
+      if (!existing) {
+        toInsert.push(r);
+        return;
+      }
+      const patchRow = reviewRoundToRow(r, existing.deliverableRowId);
+      delete patchRow.id;
+      delete patchRow.deliverable_id;
+      const beforeRow = reviewRoundToRow(existing, existing.deliverableRowId);
+      delete beforeRow.id;
+      delete beforeRow.deliverable_id;
+      if (JSON.stringify(patchRow) !== JSON.stringify(beforeRow)) toUpdate.push({ rowId: existing.id, patch: patchRow });
+    });
+    return { toInsert, toUpdate, toDelete };
+  };
+  var writeRoundDiff = (sbClient, deliverableRowId, diff) => Promise.all([
+    ...diff.toInsert.map((r) => addReviewRoundRow(sbClient, deliverableRowId, r)),
+    ...diff.toUpdate.map(({ rowId, patch }) => updateReviewRoundRow(sbClient, rowId, patch)),
+    ...diff.toDelete.map((r) => deleteReviewRoundRow(sbClient, r.id))
+  ]);
   var INTAKE_STATUSES = ["New", "In Review", "Assigned", "Archived"];
   var INTAKE_STATUS_COLOR = { "New": "#6366f1", "In Review": "#f59e0b", "Assigned": "#10b981", "Archived": "#6b7280" };
   var INTAKE_FIELD_DEFS = [
@@ -19830,6 +19912,19 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       });
     }, [authed]);
     (0, import_react.useEffect)(() => {
+      if (!authed || !sb || !SHADOW_WRITE_DELIVERABLES) return;
+      sb.from("deliverables").select("id, legacy_id").then(({ data, error }) => {
+        if (error || !data) return;
+        const rowIdByLegacyId = {};
+        data.forEach((r) => {
+          if (r.legacy_id != null) rowIdByLegacyId[r.legacy_id] = r.id;
+        });
+        setProjects((prev) => prev.map((p) => ({ ...p, deliverables: (p.deliverables || []).map(
+          (d) => d._rowId || !rowIdByLegacyId[d.id] ? d : { ...d, _rowId: rowIdByLegacyId[d.id] }
+        ) })));
+      });
+    }, [authed]);
+    (0, import_react.useEffect)(() => {
       if (!authed || !sb) return;
       const mergeUpsert = (setter, mapRow) => (payload) => {
         const incoming = mapRow(payload.new);
@@ -20086,6 +20181,17 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         return updated;
       };
       setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, deliverables: p.deliverables.map((d) => d.id !== delId ? d : applyFieldUpdate(d)) }));
+      if (SHADOW_WRITE_DELIVERABLES && sb && prevDel?._rowId) {
+        if (field === "rounds") {
+          writeRoundDiff(sb, prevDel._rowId, computeRoundDiff(prevDel.rounds || [], value || [])).catch(() => {
+          });
+        } else {
+          const fullRow = deliverableToRow(applyFieldUpdate(prevDel), projectId);
+          const { id: _id, legacy_id: _legacyId, project_id: _projectId, ...patch } = fullRow;
+          updateDeliverableRow(sb, prevDel._rowId, patch).catch(() => {
+          });
+        }
+      }
       if (SEED_PROJECTS.some((p) => p.id === projectId)) {
         setSeedOverrides((prev) => {
           const existing = prev[projectId] || {};
@@ -20127,6 +20233,13 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     }, []);
     const addDel = (0, import_react.useCallback)((projectId, newDel) => {
       setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, deliverables: [...p.deliverables, newDel] }));
+      if (SHADOW_WRITE_DELIVERABLES && sb) {
+        addDeliverableRow(sb, projectId, newDel).then(({ data, error }) => {
+          if (error || !data) return;
+          setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, deliverables: p.deliverables.map((d) => d.id === newDel.id ? { ...d, _rowId: data.id } : d) }));
+        }).catch(() => {
+        });
+      }
       if (SEED_PROJECTS.some((p) => p.id === projectId)) {
         setSeedOverrides((prev) => {
           const existing = prev[projectId] || {};
@@ -20141,6 +20254,10 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       const proj = projectsRef.current.find((p) => p.id === projectId);
       const del = proj?.deliverables.find((d) => d.id === delId);
       setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, deliverables: p.deliverables.filter((d) => d.id !== delId) }));
+      if (SHADOW_WRITE_DELIVERABLES && sb && del?._rowId) {
+        deleteDeliverableRow(sb, del._rowId).catch(() => {
+        });
+      }
       if (SEED_PROJECTS.some((p) => p.id === projectId)) {
         setSeedOverrides((prev) => {
           const existing = prev[projectId] || {};
