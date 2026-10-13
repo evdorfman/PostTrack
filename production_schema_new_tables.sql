@@ -170,3 +170,22 @@ begin
     end if;
   end loop;
 end $$;
+
+-- ───────────────────────── updated_at trigger ──────────────────────────────
+-- The column default only covers INSERT; without this, updated_at would
+-- stay frozen at its backfill time no matter how many times a row changes.
+
+create or replace function set_updated_at() returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists set_updated_at on deliverables;
+create trigger set_updated_at before update on deliverables
+  for each row execute function set_updated_at();
+
+drop trigger if exists set_updated_at on productions;
+create trigger set_updated_at before update on productions
+  for each row execute function set_updated_at();

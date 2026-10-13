@@ -12332,11 +12332,14 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
   // Same collapsed-row look as Project Overview's own Deliverables tab (see
   // DeliverableRow) — with the editor slot swapped for the quick-reassign
   // dropdown this tab specifically needed (task: quick editor reassign).
-  const DelRow = ({d, showProject=true}) => (
-    <DeliverableRow d={d} projectId={d.projectId} projectName={d.projectName} showProject={showProject}
-      team={team} allProjects={projects} editors={editors} onUpdateDel={onUpdateDel} onDeleteDel={onDeleteDel}
-      onClick={e=>openDel(d,e)} editorEditable readOnly={!!d._fromProduction}/>
-  );
+  // Previously a DelRow wrapper defined inline right here, recreated every
+  // render — DeliverableRow (and its title <input>) unmounted/remounted on
+  // every keystroke as a result, same bug class as IngestCard/DelField
+  // earlier this session. DeliverableRow is already a top-level component,
+  // so each .map() below now calls it directly instead of through a
+  // per-render wrapper — no new component needed, just removing the
+  // indirection that kept recreating one.
+  const delRowProps = {team, allProjects:projects, editors, onUpdateDel, onDeleteDel, editorEditable:true};
 
   return (
     <>
@@ -12423,7 +12426,7 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
                       <div key={proj} style={{marginLeft:42,marginBottom:8}}>
                         <div style={{fontSize:13,color: "#8e97a6",fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>{proj}</div>
                         <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                          {dels.map(d=><DelRow key={d.id} d={d} showProject={false}/>)}
+                          {dels.map(d=><DeliverableRow key={d.id} d={d} projectId={d.projectId} projectName={d.projectName} showProject={false} {...delRowProps} onClick={e=>openDel(d,e)} readOnly={!!d._fromProduction}/>)}
                         </div>
                       </div>
                     ))}
@@ -12434,7 +12437,7 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
                 <div>
                   <div style={{fontWeight:800,fontSize:19,color:"#ef4444",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:10}}>⚠ Unassigned</div>
                   <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                    {active.filter(d=>!d.editorId&&!d.animatorId).map(d=><DelRow key={d.id} d={d}/>)}
+                    {active.filter(d=>!d.editorId&&!d.animatorId).map(d=><DeliverableRow key={d.id} d={d} projectId={d.projectId} projectName={d.projectName} showProject {...delRowProps} onClick={e=>openDel(d,e)} readOnly={!!d._fromProduction}/>)}
                   </div>
                 </div>
               )}
@@ -12461,7 +12464,7 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
                       <div key={proj} style={{marginLeft:42,marginBottom:8}}>
                         <div style={{fontSize:13,color: "#8e97a6",fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>{proj}</div>
                         <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                          {dels.map(d=><DelRow key={d.id} d={d} showProject={false}/>)}
+                          {dels.map(d=><DeliverableRow key={d.id} d={d} projectId={d.projectId} projectName={d.projectName} showProject={false} {...delRowProps} onClick={e=>openDel(d,e)} readOnly={!!d._fromProduction}/>)}
                         </div>
                       </div>
                     ))}
@@ -12472,7 +12475,7 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
                 <div>
                   <div style={{fontWeight:800,fontSize:19,color:"#f59e0b",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:10}}>No Producer Assigned</div>
                   <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                    {active.filter(d=>!d.producerId).map(d=><DelRow key={d.id} d={d}/>)}
+                    {active.filter(d=>!d.producerId).map(d=><DeliverableRow key={d.id} d={d} projectId={d.projectId} projectName={d.projectName} showProject {...delRowProps} onClick={e=>openDel(d,e)} readOnly={!!d._fromProduction}/>)}
                   </div>
                 </div>
               )}
