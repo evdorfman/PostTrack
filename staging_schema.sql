@@ -51,7 +51,8 @@ create table if not exists projects (
   ingest_dates    jsonb default '[]'::jsonb,
   closed_at       timestamptz,
   bxtv_refs       jsonb default '[]'::jsonb,
-  bxtv_meta       jsonb
+  bxtv_meta       jsonb,
+  in_pipeline     boolean default false
 );
 
 create table if not exists studio_bookings (

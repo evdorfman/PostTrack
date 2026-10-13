@@ -15176,6 +15176,12 @@ const rowToProject = row => ({
   // session, then silently reverted on the next reload since nothing had
   // actually been saved.
   bxtvRefs: row.bxtv_refs||[], bxtvMeta: row.bxtv_meta||null,
+  // Same bug as bxtvRefs/bxtvMeta above, found later: inPipeline is used
+  // throughout the Pipeline page's UI but was missing from both this and
+  // projectToRow below, so toggling a project's pipeline status looked
+  // like it worked for the rest of that session, then silently reverted
+  // on the next reload.
+  inPipeline: row.in_pipeline||false,
 });
 // _rowId is purely local bookkeeping for the shadow-write pass (which row
 // in the new normalized table a deliverable/production corresponds to) —
@@ -15200,6 +15206,7 @@ const projectToRow = p => ({
   shoots: p.shoots||[], notes: p.notes||[], ingest_dates: p.ingestDates||[],
   closed_at: p.closedAt||null,
   bxtv_refs: p.bxtvRefs||[], bxtv_meta: p.bxtvMeta||null,
+  in_pipeline: !!p.inPipeline,
 });
 
 // Explicit fields get their own columns; anything else on a booking object
