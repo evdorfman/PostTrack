@@ -207,7 +207,7 @@ create index if not exists activity_log_created_at_idx on activity_log(created_a
 
 create table if not exists setup_types (
   id                   uuid primary key default gen_random_uuid(),
-  legacy_id            bigint,
+  legacy_id            text,  -- not bigint: the shipped defaults use string ids like "setup-001"
   name                 text,
   description          text,
   roles                jsonb default '[]'::jsonb,
@@ -226,7 +226,7 @@ create table if not exists setup_types (
 
 create table if not exists production_presets (
   id          uuid primary key default gen_random_uuid(),
-  legacy_id   bigint,
+  legacy_id   text,  -- not bigint: the shipped BEC_EVENT_PRESET default uses a string id ("preset-ny-bec-event1")
   name        text,
   type        text,
   sections    jsonb default '{}'::jsonb,
