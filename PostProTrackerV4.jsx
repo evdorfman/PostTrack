@@ -15132,7 +15132,7 @@ const SHADOW_WRITE_DELIVERABLES = true;
 // (production_schema_new_tables.sql already covers the productions table;
 // no separate script needed), then prove it live the same way deliverables
 // were — a real edit, checked directly in the database.
-const SHADOW_WRITE_PRODUCTIONS = false;
+const SHADOW_WRITE_PRODUCTIONS = true;
 
 const rowToTeamMember = row => ({
   id: row.id, name: row.name, roles: row.roles||[], employeeType: row.employee_type,
