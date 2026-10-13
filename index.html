@@ -9967,7 +9967,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
   var sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
   window.sb = sb;
   var SHADOW_WRITE_DELIVERABLES = true;
-  var SHADOW_WRITE_PRODUCTIONS = true;
+  var SHADOW_WRITE_PRODUCTIONS = false;
   var rowToTeamMember = (row) => ({
     id: row.id,
     name: row.name,
