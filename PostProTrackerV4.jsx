@@ -15118,7 +15118,7 @@ window.sb = sb;
 // JSON column says, so a bug in the shadow-write path can't surface to a
 // user, only to whoever's comparing the two tables for parity. See the
 // "shadow writes" design conversation this landed in.
-const SHADOW_WRITE_DELIVERABLES = false;
+const SHADOW_WRITE_DELIVERABLES = true;
 
 const rowToTeamMember = row => ({
   id: row.id, name: row.name, roles: row.roles||[], employeeType: row.employee_type,
@@ -15367,11 +15367,17 @@ const computeRoundDiff = (oldRounds, newRounds) => {
 // reads still come from the legacy projects.deliverables JSON column, so a
 // failure here never surfaces to the user, only to whoever's watching for
 // parity between the old and new tables during the shadow-write period.
+// supabase-js resolves {data,error} rather than rejecting on a query-level
+// error (a bad constraint, an RLS denial, …) — only a network failure
+// actually rejects — so each op's result is checked individually rather
+// than trusting Promise.all to catch a failure on its own.
 const writeRoundDiff = (sbClient, deliverableRowId, diff) => Promise.all([
   ...diff.toInsert.map(r=>addReviewRoundRow(sbClient, deliverableRowId, r)),
   ...diff.toUpdate.map(({rowId,patch})=>updateReviewRoundRow(sbClient, rowId, patch)),
   ...diff.toDelete.map(r=>deleteReviewRoundRow(sbClient, r.id)),
-]);
+]).then(results=>{
+  results.forEach(({error})=>{ if(error) console.warn("[shadow write] round diff op failed:", error); });
+});
 
 const INTAKE_STATUSES = ["New","In Review","Assigned","Archived"];
 const INTAKE_STATUS_COLOR = {"New":"#6366f1","In Review":"#f59e0b","Assigned":"#10b981","Archived":"#6b7280"};
@@ -29079,11 +29085,14 @@ function App() {
     // otherwise, same as if the flag were off.
     if(SHADOW_WRITE_DELIVERABLES && sb && prevDel?._rowId){
       if(field==="rounds"){
-        writeRoundDiff(sb, prevDel._rowId, computeRoundDiff(prevDel.rounds||[], value||[])).catch(()=>{});
+        writeRoundDiff(sb, prevDel._rowId, computeRoundDiff(prevDel.rounds||[], value||[]))
+          .catch(e=>console.warn("[shadow write] round diff failed:", e));
       } else {
         const fullRow = deliverableToRow(applyFieldUpdate(prevDel), projectId);
         const {id:_id, legacy_id:_legacyId, project_id:_projectId, ...patch} = fullRow;
-        updateDeliverableRow(sb, prevDel._rowId, patch).catch(()=>{});
+        updateDeliverableRow(sb, prevDel._rowId, patch)
+          .then(({error})=>{ if(error) console.warn("[shadow write] updateDel failed:", error); })
+          .catch(e=>console.warn("[shadow write] updateDel failed:", e));
       }
     }
     // Seed project override
@@ -29136,9 +29145,10 @@ function App() {
     // a _rowId to target without waiting on the id-mapping bootstrap effect.
     if(SHADOW_WRITE_DELIVERABLES && sb){
       addDeliverableRow(sb, projectId, newDel).then(({data,error})=>{
-        if(error || !data) return;
+        if(error){ console.warn("[shadow write] addDel failed:", error); return; }
+        if(!data) return;
         setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:p.deliverables.map(d=>d.id===newDel.id?{...d,_rowId:data.id}:d)}));
-      }).catch(()=>{});
+      }).catch(e=>console.warn("[shadow write] addDel failed:", e));
     }
     if(SEED_PROJECTS.some(p=>p.id===projectId)){
       setSeedOverrides(prev=>{
@@ -29158,7 +29168,9 @@ function App() {
     setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:p.deliverables.filter(d=>d.id!==delId)}));
     // Shadow write.
     if(SHADOW_WRITE_DELIVERABLES && sb && del?._rowId){
-      deleteDeliverableRow(sb, del._rowId).catch(()=>{});
+      deleteDeliverableRow(sb, del._rowId)
+        .then(({error})=>{ if(error) console.warn("[shadow write] deleteDel failed:", error); })
+        .catch(e=>console.warn("[shadow write] deleteDel failed:", e));
     }
     if(SEED_PROJECTS.some(p=>p.id===projectId)){
       setSeedOverrides(prev=>{

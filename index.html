@@ -9982,7 +9982,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
   var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dWdvcGdtdXdrdnh2aWluaHRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMzkwODIsImV4cCI6MjEwMTYxNTA4Mn0.rp2jYMBjIcWRQKlBUtaUq396kJfPz4ZgPM6QIPpNhKM";
   var sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
   window.sb = sb;
-  var SHADOW_WRITE_DELIVERABLES = false;
+  var SHADOW_WRITE_DELIVERABLES = true;
   var rowToTeamMember = (row) => ({
     id: row.id,
     name: row.name,
@@ -10201,7 +10201,11 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     ...diff.toInsert.map((r) => addReviewRoundRow(sbClient, deliverableRowId, r)),
     ...diff.toUpdate.map(({ rowId, patch }) => updateReviewRoundRow(sbClient, rowId, patch)),
     ...diff.toDelete.map((r) => deleteReviewRoundRow(sbClient, r.id))
-  ]);
+  ]).then((results) => {
+    results.forEach(({ error }) => {
+      if (error) console.warn("[shadow write] round diff op failed:", error);
+    });
+  });
   var INTAKE_STATUSES = ["New", "In Review", "Assigned", "Archived"];
   var INTAKE_STATUS_COLOR = { "New": "#6366f1", "In Review": "#f59e0b", "Assigned": "#10b981", "Archived": "#6b7280" };
   var INTAKE_FIELD_DEFS = [
@@ -20183,13 +20187,13 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, deliverables: p.deliverables.map((d) => d.id !== delId ? d : applyFieldUpdate(d)) }));
       if (SHADOW_WRITE_DELIVERABLES && sb && prevDel?._rowId) {
         if (field === "rounds") {
-          writeRoundDiff(sb, prevDel._rowId, computeRoundDiff(prevDel.rounds || [], value || [])).catch(() => {
-          });
+          writeRoundDiff(sb, prevDel._rowId, computeRoundDiff(prevDel.rounds || [], value || [])).catch((e) => console.warn("[shadow write] round diff failed:", e));
         } else {
           const fullRow = deliverableToRow(applyFieldUpdate(prevDel), projectId);
           const { id: _id, legacy_id: _legacyId, project_id: _projectId, ...patch } = fullRow;
-          updateDeliverableRow(sb, prevDel._rowId, patch).catch(() => {
-          });
+          updateDeliverableRow(sb, prevDel._rowId, patch).then(({ error }) => {
+            if (error) console.warn("[shadow write] updateDel failed:", error);
+          }).catch((e) => console.warn("[shadow write] updateDel failed:", e));
         }
       }
       if (SEED_PROJECTS.some((p) => p.id === projectId)) {
@@ -20235,10 +20239,13 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, deliverables: [...p.deliverables, newDel] }));
       if (SHADOW_WRITE_DELIVERABLES && sb) {
         addDeliverableRow(sb, projectId, newDel).then(({ data, error }) => {
-          if (error || !data) return;
+          if (error) {
+            console.warn("[shadow write] addDel failed:", error);
+            return;
+          }
+          if (!data) return;
           setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, deliverables: p.deliverables.map((d) => d.id === newDel.id ? { ...d, _rowId: data.id } : d) }));
-        }).catch(() => {
-        });
+        }).catch((e) => console.warn("[shadow write] addDel failed:", e));
       }
       if (SEED_PROJECTS.some((p) => p.id === projectId)) {
         setSeedOverrides((prev) => {
@@ -20255,8 +20262,9 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       const del = proj?.deliverables.find((d) => d.id === delId);
       setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, deliverables: p.deliverables.filter((d) => d.id !== delId) }));
       if (SHADOW_WRITE_DELIVERABLES && sb && del?._rowId) {
-        deleteDeliverableRow(sb, del._rowId).catch(() => {
-        });
+        deleteDeliverableRow(sb, del._rowId).then(({ error }) => {
+          if (error) console.warn("[shadow write] deleteDel failed:", error);
+        }).catch((e) => console.warn("[shadow write] deleteDel failed:", e));
       }
       if (SEED_PROJECTS.some((p) => p.id === projectId)) {
         setSeedOverrides((prev) => {
