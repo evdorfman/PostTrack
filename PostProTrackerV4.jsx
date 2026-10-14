@@ -15144,6 +15144,29 @@ const SHADOW_WRITE_SETUP_TYPES = true;
 const SHADOW_WRITE_PRODUCTION_PRESETS = true;
 const SHADOW_WRITE_CUSTOM_TASKS = true;
 
+// Phase 3 — the remaining app_kv-backed collections (see production_schema_new_tables.sql's
+// Phase 3 section and the "what else should be its own table" conversation).
+// Same independent-rollback reasoning as every flag above: each collection
+// gets its own flag so a bug in one doesn't force rolling back the rest.
+// All ship off until schema + backfill have actually been run for real.
+const SHADOW_WRITE_GEAR = false;
+const SHADOW_WRITE_FURNITURE = false;
+const SHADOW_WRITE_PROPS = false;
+const SHADOW_WRITE_SCREEN_CONTENT = false;
+const SHADOW_WRITE_UNAVAILABILITY = false;
+const SHADOW_WRITE_TALENT_ROSTER = false;
+const SHADOW_WRITE_NUDGES = false;
+const SHADOW_WRITE_INTAKES = false;
+const SHADOW_WRITE_BEC_REQUESTS = false;
+const SHADOW_WRITE_MEDIA_CARDS = false;
+const SHADOW_WRITE_WORKSTATIONS = false;
+const SHADOW_WRITE_VENDOR_COMPANIES = false;
+const SHADOW_WRITE_REVIEWER_NAMES = false;
+const SHADOW_WRITE_STUDIO_SPACES = false;  // covers both studio_spaces and studio_space_meta together
+const SHADOW_WRITE_APP_LISTS = false;
+const SHADOW_WRITE_RESOURCE_CONFIG = false;
+const SHADOW_WRITE_TAB_LOCKS = false;
+
 const rowToTeamMember = row => ({
   id: row.id, name: row.name, roles: row.roles||[], employeeType: row.employee_type,
   available: row.available, email: row.email||"", phone: row.phone||"", department: row.department,
@@ -15407,6 +15430,228 @@ const customTaskToRow = t => ({
   title: t.title||null, due_date: t.dueDate||null, reminders: t.reminders||[],
   notes: t.notes||null, done: !!t.done,
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 3 data layer — the 18 remaining app_kv-backed collections (see
+// production_schema_new_tables.sql's Phase 3 section for the id-type
+// reasoning behind each legacy_id column). Same NOT-YET-WIRED-IN status as
+// everything above until each collection's own SHADOW_WRITE_* flag flips on.
+
+const rowToGear = row => ({
+  id: row.legacy_id ?? row.id, _rowId: row.id,
+  name: row.name, category: row.category, quantity: row.quantity||1, notes: row.notes||"",
+});
+const gearToRow = g => ({
+  ...(g._rowId ? {id: g._rowId} : {}),
+  legacy_id: typeof g.id==="number" ? g.id : null,
+  name: g.name||null, category: g.category||null, quantity: g.quantity||1, notes: g.notes||null,
+});
+
+const rowToFurniture = row => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category||"Furniture" });
+const furnitureToRow = f => ({
+  ...(f._rowId ? {id: f._rowId} : {}),
+  legacy_id: f.id!=null ? String(f.id) : null,
+  name: f.name||null, category: f.category||"Furniture",
+});
+
+const rowToProp = row => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category||"Prop" });
+const propToRow = p => ({
+  ...(p._rowId ? {id: p._rowId} : {}),
+  legacy_id: p.id!=null ? String(p.id) : null,
+  name: p.name||null, category: p.category||"Prop",
+});
+
+// category isn't a local field (it's implicit from which of the 3 arrays an
+// item lives in) — screenContentOptionToRow takes it as a second argument
+// from whichever category array is being diffed, same approach
+// assembleNormalizedProjectData's siblings use for their own parent-scoped fields.
+const rowToScreenContentOption = row => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name });
+const screenContentOptionToRow = (item, category) => ({
+  ...(item._rowId ? {id: item._rowId} : {}),
+  legacy_id: item.id!=null ? String(item.id) : null,
+  category, name: item.name||null,
+});
+
+const rowToUnavailability = row => ({
+  id: row.legacy_id ?? row.id, _rowId: row.id,
+  memberId: row.member_id, type: row.type, label: row.label,
+  startDate: row.start_date, endDate: row.end_date, allDay: row.all_day,
+  startTime: row.start_time, endTime: row.end_time, notes: row.notes||"", createdAt: row.created_at,
+});
+const unavailabilityToRow = u => ({
+  ...(u._rowId ? {id: u._rowId} : {}),
+  legacy_id: u.id!=null ? String(u.id) : null,
+  member_id: u.memberId||null, type: u.type||null, label: u.label||null,
+  start_date: u.startDate||null, end_date: u.endDate||null, all_day: u.allDay!==false,
+  start_time: u.startTime||null, end_time: u.endTime||null, notes: u.notes||null,
+});
+
+const rowToTalent = row => ({
+  id: row.legacy_id ?? row.id, _rowId: row.id,
+  name: row.name, category: row.category, bio: row.bio||"", photoKey: row.photo_key, lastBookedAt: row.last_booked_at,
+});
+const talentToRow = t => ({
+  ...(t._rowId ? {id: t._rowId} : {}),
+  legacy_id: t.id!=null ? String(t.id) : null,
+  name: t.name||null, category: t.category||null, bio: t.bio||null,
+  photo_key: t.photoKey||null, last_booked_at: t.lastBookedAt||null,
+});
+
+// Nudges and BEC requests are append-only (no edit/delete path exists in the
+// app today — see the research this landed in), so they only need a row
+// builder for INSERT, not a full round-trip pair.
+const nudgeToRow = n => ({
+  legacy_id: typeof n.id==="number" ? n.id : null,
+  task_key: n.taskKey||null, project_id: n.projectId||null, task_id: n.taskId||null,
+  task_label: n.taskLabel||null, tab: n.tab||null, to_member_id: n.toMemberId||null,
+});
+const becRequestToRow = b => ({
+  legacy_id: typeof b.id==="number" ? b.id : null,
+  reservation_id: b.reservationId||null, project_id: b.projectId||null, action: b.action||null,
+  received_at: b.receivedAt||null, parsed: b.parsed||{},
+});
+
+// intakes' ~48 free-text fields round-trip through the jsonb `fields` column
+// as a single blob rather than 48 mapped columns (see the schema's own
+// reasoning) — rowToIntake spreads them back onto the object so nothing
+// downstream needs to know they're stored any differently than the other 4.
+const rowToIntake = row => ({
+  id: row.legacy_id ?? row.id, _rowId: row.id,
+  dateReceived: row.date_received, status: row.status, assignedProjectId: row.assigned_project_id,
+  ...(row.fields||{}),
+});
+const intakeToRow = i => {
+  const {id, _rowId, dateReceived, status, assignedProjectId, ...fields} = i;
+  return {
+    ...(i._rowId ? {id: i._rowId} : {}),
+    legacy_id: typeof i.id==="number" ? i.id : null,
+    date_received: i.dateReceived||null, status: i.status||null, assigned_project_id: i.assignedProjectId||null,
+    fields,
+  };
+};
+
+const rowToMediaCard = row => ({
+  id: row.legacy_id ?? row.id, _rowId: row.id,
+  label: row.label, category: row.category, type: row.type, format: row.format,
+  capacityGB: row.capacity_gb, manufacturer: row.manufacturer, model: row.model, folderName: row.folder_name,
+  status: row.status, assignedTo: row.assigned_to, projectRef: row.project_ref, homeLocation: row.home_location, notes: row.notes,
+});
+const mediaCardToRow = m => ({
+  ...(m._rowId ? {id: m._rowId} : {}),
+  legacy_id: m.id!=null ? String(m.id) : null,
+  label: m.label||null, category: m.category||null, type: m.type||null, format: m.format||null,
+  capacity_gb: m.capacityGB||null, manufacturer: m.manufacturer||null, model: m.model||null, folder_name: m.folderName||null,
+  status: m.status||null, assigned_to: m.assignedTo||null, project_ref: m.projectRef||null, home_location: m.homeLocation||null, notes: m.notes||null,
+});
+
+const rowToWorkstation = row => ({
+  id: row.legacy_id ?? row.id, _rowId: row.id,
+  name: row.name, location: row.location, machineType: row.machine_type,
+  serialNumber: row.serial_number, assignedTo: row.assigned_to, available: row.available,
+});
+const workstationToRow = w => ({
+  ...(w._rowId ? {id: w._rowId} : {}),
+  legacy_id: typeof w.id==="number" ? w.id : null,
+  name: w.name||null, location: w.location||null, machine_type: w.machineType||null,
+  serial_number: w.serialNumber||null, assigned_to: w.assignedTo||null, available: w.available!==false,
+});
+
+// Generic whole-array-replace diff/write pair — the same compare-by-id
+// shape as computeProductionDiff/writeProductionDiff above, written once
+// and reused for every Phase 3 collection whose admin UI only ever hands
+// the App level a full replacement array (gear, furniture, props,
+// talent_roster, media_cards, workstations, intakes) rather than calling
+// a per-item add/update/delete prop.
+const computeListDiff = (oldList, newList, toRow) => {
+  const oldById = new Map(oldList.map(x=>[String(x.id), x]));
+  const newIds = new Set(newList.map(x=>String(x.id)));
+  const toDelete = oldList.filter(x=>!newIds.has(String(x.id)) && x._rowId);
+  const toInsert = [], toUpdate = [];
+  newList.forEach(x=>{
+    const existing = oldById.get(String(x.id));
+    if(!existing){ if(!x._rowId) toInsert.push(x); return; }
+    if(!existing._rowId) return;  // not tagged yet — nothing to shadow-write against
+    const patchRow = toRow(x);
+    delete patchRow.id; delete patchRow.legacy_id;
+    const beforeRow = toRow(existing);
+    delete beforeRow.id; delete beforeRow.legacy_id;
+    if(JSON.stringify(patchRow)!==JSON.stringify(beforeRow)) toUpdate.push({rowId:existing._rowId, patch:patchRow, legacyId:x.id});
+  });
+  return {toInsert, toUpdate, toDelete};
+};
+const writeListDiff = (sbClient, table, diff, toRow) => Promise.all([
+  ...diff.toInsert.map(x=>sbClient.from(table).insert(toRow(x)).select().single().then(({data,error})=>({kind:"insert", legacyId:x.id, data, error}))),
+  ...diff.toUpdate.map(({rowId,patch,legacyId})=>sbClient.from(table).update(patch).eq("id", rowId).then(({error})=>({kind:"update", legacyId, error}))),
+  ...diff.toDelete.map(x=>sbClient.from(table).delete().eq("id", x._rowId).then(({error})=>({kind:"delete", legacyId:x.id, error}))),
+]).then(results=>{
+  results.forEach(({error})=>{ if(error) console.warn(`[shadow write] ${table} diff op failed:`, error); });
+  return results.filter(r=>r.kind==="insert" && !r.error && r.data).map(r=>({legacyId:r.legacyId, rowId:r.data.id}));
+});
+
+// Plain string lists (vendor_companies, reviewer_names, studio_spaces) have
+// no id concept at all — the string IS the row, so this diffs by value
+// instead of by id, and writes are keyed by the string itself rather than a
+// _rowId. A rename (studio_spaces) necessarily shows up here as one delete
+// + one insert, matching the same destructive-rename behavior the app
+// already has today (see production_schema_new_tables.sql's note on this).
+const computeStringListDiff = (oldList, newList) => {
+  const oldSet = new Set(oldList), newSet = new Set(newList);
+  return {
+    toInsert: newList.filter(s=>!oldSet.has(s)),
+    toDelete: oldList.filter(s=>!newSet.has(s)),
+  };
+};
+const writeStringListDiff = (sbClient, table, diff) => Promise.all([
+  ...diff.toInsert.map(name=>sbClient.from(table).insert({name}).then(({error})=>({error}))),
+  ...diff.toDelete.map(name=>sbClient.from(table).delete().eq("name", name).then(({error})=>({error}))),
+]).then(results=>{
+  results.forEach(({error})=>{ if(error) console.warn(`[shadow write] ${table} diff op failed:`, error); });
+});
+
+// studio_space_meta is an object keyed by space name rather than an array —
+// diffs by key instead of by id/value. Every key present in newMeta gets
+// upserted (covers both "new space" and "edited meta" in one case, since
+// there's no cheap way to tell them apart from the object shape alone and
+// upsert handles both correctly); every key that disappeared gets deleted.
+const spaceMetaToRow = (spaceName, m) => ({
+  space_name: spaceName,
+  is_hmu: !!m.isHMU, is_green_room: !!m.isGreenRoom, is_pcr: !!m.isPCR, suggest_hmu: !!m.suggestHMU,
+  linked_green_room: m.linkedGreenRoom||null, crew_call_offset_ms: m.crewCallOffsetMs||0,
+});
+const computeSpaceMetaDiff = (oldMeta, newMeta) => {
+  const toUpsert = Object.keys(newMeta).map(k=>spaceMetaToRow(k, newMeta[k]));
+  const toDelete = Object.keys(oldMeta).filter(k=>!(k in newMeta));
+  return {toUpsert, toDelete};
+};
+const writeSpaceMetaDiff = (sbClient, diff) => Promise.all([
+  ...(diff.toUpsert.length ? [sbClient.from("studio_space_meta").upsert(diff.toUpsert).then(({error})=>({error}))] : []),
+  ...diff.toDelete.map(name=>sbClient.from("studio_space_meta").delete().eq("space_name", name).then(({error})=>({error}))),
+]).then(results=>{
+  results.forEach(({error})=>{ if(error) console.warn("[shadow write] studio_space_meta diff op failed:", error); });
+});
+
+// The three singleton config rows (id always 1) just get overwritten in
+// full on every save — no diffing needed, since there's exactly one row
+// and the whole object is always known at save time anyway.
+const writeAppListsRow = (sbClient, lists) => sbClient.from("app_lists").upsert({
+  id: 1,
+  workstreams: lists.workstreams||[], business_units: lists.businessUnits||[], production_types: lists.productionTypes||[],
+  deliverable_statuses: lists.deliverableStatuses||[], anim_batch_statuses: lists.animBatchStatuses||[],
+  admin_roles: lists.adminRoles||[], design_roles: lists.designRoles||[],
+  production_roles: lists.productionRoles||[], post_production_roles: lists.postProductionRoles||[],
+}).then(({error})=>{ if(error) console.warn("[shadow write] app_lists failed:", error); });
+
+const writeResourceConfigRow = (sbClient, rc) => sbClient.from("resource_config").upsert({
+  id: 1,
+  deliverable_type_hours: rc.deliverableTypeHours||{}, status_remaining_pct: rc.statusRemainingPct||{},
+  media_task_hours: rc.mediaTaskHours||{}, ingest_remaining_pct: rc.ingestRemainingPct||{},
+  assignable_percent: rc.assignablePercent ?? null,
+  default_hours_per_animation: rc.defaultHoursPerAnimation ?? null,
+  hours_per_shoot: rc.hoursPerShoot ?? null, hours_per_deliverable: rc.hoursPerDeliverable ?? null,
+}).then(({error})=>{ if(error) console.warn("[shadow write] resource_config failed:", error); });
+
+const writeTabLocksRow = (sbClient, locks) => sbClient.from("tab_locks").upsert({id: 1, locks: locks||{}})
+  .then(({error})=>{ if(error) console.warn("[shadow write] tab_locks failed:", error); });
 
 // Reassembles flat rows (as loaded from the three normalized tables) back
 // into the exact nested shape every existing component already reads off
@@ -28645,7 +28890,19 @@ function App() {
   const [studioBookings,setStudioBookings]=useState([]);
   const [mediaCards, setMediaCards] = useState(MEDIA_CARDS_SEED);
   const saveMediaCards = useCallback(list=>{
-    setMediaCards(list);
+    // Diffs against the functional updater's `prev` rather than closing over
+    // `mediaCards` directly — this is a useCallback([]) so a plain closure
+    // would be frozen stale at mount, same trap appPresetsRef works around
+    // for saveAppPresets above.
+    setMediaCards(prev=>{
+      if(SHADOW_WRITE_MEDIA_CARDS && sb){
+        writeListDiff(sb, "media_cards", computeListDiff(prev, list, mediaCardToRow), mediaCardToRow).then(inserted=>{
+          if(!inserted.length) return;
+          setMediaCards(p2=>p2.map(x=>{ const m=inserted.find(i=>String(i.legacyId)===String(x.id)); return m?{...x,_rowId:m.rowId}:x; }));
+        });
+      }
+      return list;
+    });
     window.storage?.set(MEDIA_CARDS_STORAGE_KEY, JSON.stringify(list)).catch(()=>{});
   },[]);
   const [view,setView]=useState(()=>{
@@ -28668,6 +28925,21 @@ function App() {
   // "new user" form for people who are already linked, before their
   // membership row has actually come back from Supabase.
   const [teamRosterLoaded, setTeamRosterLoaded] = useState(false);
+  // Same race-prevention pattern as setupTypesLoaded/customTasksLoaded above
+  // for the rest of the Phase 3 collections' bootstrap id-mapping effects.
+  // adminDataLoaded covers everything resolved inside the main mount-effect
+  // Promise.all (gear, furniture, props, screenContentOptions, talentRoster,
+  // nudges, resourceConfig, lists, studioSpaces, studioSpaceMeta); the
+  // others below resolve on their own separate .then() after that batch, so
+  // each needs its own flag.
+  const [adminDataLoaded, setAdminDataLoaded] = useState(false);
+  const [unavailabilityLoaded, setUnavailabilityLoaded] = useState(false);
+  const [vendorCompaniesLoaded, setVendorCompaniesLoaded] = useState(false);
+  const [reviewerNamesLoaded, setReviewerNamesLoaded] = useState(false);
+  const [intakesLoaded, setIntakesLoaded] = useState(false);
+  const [becRequestsLoaded, setBecRequestsLoaded] = useState(false);
+  const [mediaCardsLoaded, setMediaCardsLoaded] = useState(false);
+  const [tabLocksLoaded, setTabLocksLoaded] = useState(false);
   const [gearList,   setGearList]   = useState([
     // Seed a basic gear inventory
     {id:uid(),name:"Sony FX9",           category:"Camera",  quantity:2, notes:""},
@@ -28786,18 +29058,76 @@ function App() {
     removed.forEach(m=>logActivity({entityType:"team_member", entityLabel:m.name, action:"deleted"}));
     edited.forEach(m=>logActivity({entityType:"team_member", entityLabel:m.name, action:"updated"}));
   };
-  const saveGear   = g => { setGearList(g);      window.storage?.set("posttrack-admin-gear",   JSON.stringify(g)).catch(()=>{}); };
-  const saveSpaces = s => { setStudioSpaces(s);  window.storage?.set("posttrack-admin-spaces", JSON.stringify(s)).catch(()=>{}); };
-  const saveMeta   = m => { setStudioSpaceMeta(m);window.storage?.set("posttrack-admin-meta",  JSON.stringify(m)).catch(()=>{}); };
-  const saveWorkstations = w => { setWorkstations(w); window.storage?.set("posttrack-admin-workstations", JSON.stringify(w)).catch(()=>{}); };
+  const saveGear   = g => {
+    setGearList(g);
+    window.storage?.set("posttrack-admin-gear",   JSON.stringify(g)).catch(()=>{});
+    if(SHADOW_WRITE_GEAR && sb){
+      writeListDiff(sb, "gear", computeListDiff(gearList, g, gearToRow), gearToRow).then(inserted=>{
+        if(!inserted.length) return;
+        setGearList(prev=>prev.map(x=>{ const m=inserted.find(i=>String(i.legacyId)===String(x.id)); return m?{...x,_rowId:m.rowId}:x; }));
+      });
+    }
+  };
+  const saveSpaces = s => {
+    setStudioSpaces(s);
+    window.storage?.set("posttrack-admin-spaces", JSON.stringify(s)).catch(()=>{});
+    if(SHADOW_WRITE_STUDIO_SPACES && sb) writeStringListDiff(sb, "studio_spaces", computeStringListDiff(studioSpaces, s));
+  };
+  const saveMeta   = m => {
+    setStudioSpaceMeta(m);
+    window.storage?.set("posttrack-admin-meta",  JSON.stringify(m)).catch(()=>{});
+    if(SHADOW_WRITE_STUDIO_SPACES && sb) writeSpaceMetaDiff(sb, computeSpaceMetaDiff(studioSpaceMeta, m));
+  };
+  const saveWorkstations = w => {
+    setWorkstations(w);
+    window.storage?.set("posttrack-admin-workstations", JSON.stringify(w)).catch(()=>{});
+    if(SHADOW_WRITE_WORKSTATIONS && sb){
+      writeListDiff(sb, "workstations", computeListDiff(workstations, w, workstationToRow), workstationToRow).then(inserted=>{
+        if(!inserted.length) return;
+        setWorkstations(prev=>prev.map(x=>{ const m=inserted.find(i=>String(i.legacyId)===String(x.id)); return m?{...x,_rowId:m.rowId}:x; }));
+      });
+    }
+  };
   const saveNudges = n => { setNudges(n); window.storage?.set(NUDGES_STORAGE_KEY, JSON.stringify(n), true).catch(()=>{}); };
   // Props & Furniture lists
   const [furnitureList, setFurnitureList] = useState(DEFAULT_FURNITURE_LIST);
   const [propsList,     setPropsList]     = useState(DEFAULT_PROPS_LIST);
-  const saveFurniture = f => { setFurnitureList(f); window.storage?.set(FURNITURE_STORAGE_KEY, JSON.stringify(f)).catch(()=>{}); };
-  const saveProps_    = p => { setPropsList(p);     window.storage?.set(PROPS_STORAGE_KEY,     JSON.stringify(p)).catch(()=>{}); };
+  const saveFurniture = f => {
+    setFurnitureList(f);
+    window.storage?.set(FURNITURE_STORAGE_KEY, JSON.stringify(f)).catch(()=>{});
+    if(SHADOW_WRITE_FURNITURE && sb){
+      writeListDiff(sb, "furniture", computeListDiff(furnitureList, f, furnitureToRow), furnitureToRow).then(inserted=>{
+        if(!inserted.length) return;
+        setFurnitureList(prev=>prev.map(x=>{ const m=inserted.find(i=>String(i.legacyId)===String(x.id)); return m?{...x,_rowId:m.rowId}:x; }));
+      });
+    }
+  };
+  const saveProps_    = p => {
+    setPropsList(p);
+    window.storage?.set(PROPS_STORAGE_KEY,     JSON.stringify(p)).catch(()=>{});
+    if(SHADOW_WRITE_PROPS && sb){
+      writeListDiff(sb, "props", computeListDiff(propsList, p, propToRow), propToRow).then(inserted=>{
+        if(!inserted.length) return;
+        setPropsList(prev=>prev.map(x=>{ const m=inserted.find(i=>String(i.legacyId)===String(x.id)); return m?{...x,_rowId:m.rowId}:x; }));
+      });
+    }
+  };
   const [screenContentOptions, setScreenContentOptions] = useState(DEFAULT_SCREEN_CONTENT_OPTIONS);
-  const saveScreenContentOptions = s => { setScreenContentOptions(s); window.storage?.set(SCREEN_CONTENT_STORAGE_KEY, JSON.stringify(s)).catch(()=>{}); };
+  const saveScreenContentOptions = s => {
+    setScreenContentOptions(s);
+    window.storage?.set(SCREEN_CONTENT_STORAGE_KEY, JSON.stringify(s)).catch(()=>{});
+    if(SHADOW_WRITE_SCREEN_CONTENT && sb){
+      ["windowWall","vpWall","frameTv"].forEach(cat=>{
+        const toRow = item => screenContentOptionToRow(item, cat);
+        writeListDiff(sb, "screen_content_options", computeListDiff(screenContentOptions[cat]||[], s[cat]||[], toRow), toRow).then(inserted=>{
+          if(!inserted.length) return;
+          setScreenContentOptions(prev=>({...prev, [cat]: (prev[cat]||[]).map(x=>{
+            const m=inserted.find(i=>String(i.legacyId)===String(x.id)); return m?{...x,_rowId:m.rowId}:x;
+          })}));
+        });
+      });
+    }
+  };
   const [customTasks, setCustomTasks] = useState([]);
   const [customTasksLoaded, setCustomTasksLoaded] = useState(false);
   const saveCustomTasks = t => { setCustomTasks(t); window.storage?.set(CUSTOM_TASKS_STORAGE_KEY, JSON.stringify(t)).catch(()=>{}); };
@@ -28834,10 +29164,31 @@ function App() {
   };
   const [unavailability, setUnavailability] = useState([]);
   const saveUnavailability = u => { setUnavailability(u); window.storage?.set(UNAVAILABILITY_STORAGE_KEY, JSON.stringify(u)).catch(()=>{}); };
-  const addUnavailability    = entry => saveUnavailability([...unavailability, entry]);
-  const deleteUnavailability = id    => saveUnavailability(unavailability.filter(u=>u.id!==id));
+  const addUnavailability    = entry => {
+    saveUnavailability([...unavailability, entry]);
+    if(SHADOW_WRITE_UNAVAILABILITY && sb){
+      sb.from("unavailability").insert(unavailabilityToRow(entry)).select().single().then(({data,error})=>{
+        if(error){ console.warn("[shadow write] addUnavailability failed:", error); return; }
+        if(!data) return;
+        setUnavailability(prev=>prev.map(u=>u.id===entry.id?{...u,_rowId:data.id}:u));
+      }).catch(e=>console.warn("[shadow write] addUnavailability failed:", e));
+    }
+  };
+  const deleteUnavailability = id    => {
+    const prev = unavailability.find(u=>u.id===id);
+    saveUnavailability(unavailability.filter(u=>u.id!==id));
+    if(SHADOW_WRITE_UNAVAILABILITY && sb && prev?._rowId){
+      sb.from("unavailability").delete().eq("id", prev._rowId)
+        .then(({error})=>{ if(error) console.warn("[shadow write] deleteUnavailability failed:", error); })
+        .catch(e=>console.warn("[shadow write] deleteUnavailability failed:", e));
+    }
+  };
   const RESOURCE_CONFIG_STORAGE_KEY = "posttrack-resource-config";
-  const saveResourceConfig = c => { setResourceConfig(c); window.storage?.set(RESOURCE_CONFIG_STORAGE_KEY, JSON.stringify(c), true).catch(()=>{}); };
+  const saveResourceConfig = c => {
+    setResourceConfig(c);
+    window.storage?.set(RESOURCE_CONFIG_STORAGE_KEY, JSON.stringify(c), true).catch(()=>{});
+    if(SHADOW_WRITE_RESOURCE_CONFIG && sb) writeResourceConfigRow(sb, c);
+  };
   // Admin-editable dropdown lists (Workstream, Business Unit, Production Type)
   const [lists, setLists] = useState({
     workstreams:    WORKSTREAMS,
@@ -28847,6 +29198,7 @@ function App() {
   const saveLists = l => {
     setLists(l);
     window.storage?.set(LISTS_STORAGE_KEY, JSON.stringify(l)).catch(()=>{});
+    if(SHADOW_WRITE_APP_LISTS && sb) writeAppListsRow(sb, l);
   };
   // Which job roles can see the Resourcing nav tab / a project's Budget tab.
   // {resourcing:[...roles], budget:[...roles]} — an empty/missing list for a
@@ -28854,7 +29206,11 @@ function App() {
   // regardless (see canAccessTab below), same as they bypass everything else.
   const TAB_LOCKS_STORAGE_KEY = "posttrack-tab-locks";
   const [tabLocks, setTabLocks] = useState({});
-  const saveTabLocks = t => { setTabLocks(t); window.storage?.set(TAB_LOCKS_STORAGE_KEY, JSON.stringify(t), true).catch(()=>{}); };
+  const saveTabLocks = t => {
+    setTabLocks(t);
+    window.storage?.set(TAB_LOCKS_STORAGE_KEY, JSON.stringify(t), true).catch(()=>{});
+    if(SHADOW_WRITE_TAB_LOCKS && sb) writeTabLocksRow(sb, t);
+  };
   // Sends (or re-sends) a nudge for one task to one or more recipients. Any
   // prior nudge for this exact task+recipient is replaced rather than stacked,
   // so re-nudging just refreshes the timestamp instead of piling up duplicates.
@@ -28864,6 +29220,10 @@ function App() {
     const fresh = toMemberIds.map(toMemberId=>({id:uid(), taskKey:key, projectId, taskId, taskLabel, tab, toMemberId, createdAt:now}));
     saveNudges([...nudges.filter(n=>!(n.taskKey===key && toMemberIds.includes(n.toMemberId))), ...fresh]);
     showToast({msg:`Nudge sent for "${taskLabel}"`, color:"#f59e0b"});
+    // Shadow write — insert-only, no delete/update path exists for nudges today.
+    if(SHADOW_WRITE_NUDGES && sb){
+      sb.from("nudges").insert(fresh.map(nudgeToRow)).then(({error})=>{ if(error) console.warn("[shadow write] addNudge failed:", error); });
+    }
   };
   // Setup Types are a shared, studio-wide library — explicitly marked shared so the
   // whole team sees the same templates (unlike the personal-by-default lists above).
@@ -28901,7 +29261,16 @@ function App() {
     }
   };
   // Talent roster — shared so the whole team sees the same roster and booking history.
-  const saveTalentRoster = tr => { setTalentRoster(tr); window.storage?.set(TALENT_STORAGE_KEY, JSON.stringify(tr), true).catch(()=>{}); };
+  const saveTalentRoster = tr => {
+    setTalentRoster(tr);
+    window.storage?.set(TALENT_STORAGE_KEY, JSON.stringify(tr), true).catch(()=>{});
+    if(SHADOW_WRITE_TALENT_ROSTER && sb){
+      writeListDiff(sb, "talent_roster", computeListDiff(talentRoster, tr, talentToRow), talentToRow).then(inserted=>{
+        if(!inserted.length) return;
+        setTalentRoster(prev=>prev.map(x=>{ const m=inserted.find(i=>String(i.legacyId)===String(x.id)); return m?{...x,_rowId:m.rowId}:x; }));
+      });
+    }
+  };
 
   // Guards the projects auto-save effect (declared further below) so it can't
   // fire with the initial SEED_PROJECTS default and clobber real saved data
@@ -28967,17 +29336,18 @@ function App() {
       try { if(ct?.value) setCustomTasks(JSON.parse(ct.value)); } catch(e){}
       setSetupTypesLoaded(true);
       setCustomTasksLoaded(true);
+      setAdminDataLoaded(true);
       // Load unavailability separately (added after the main Promise.all)
-      safeGet(UNAVAILABILITY_STORAGE_KEY).then(uv=>{ try{if(uv?.value)setUnavailability(JSON.parse(uv.value));}catch(e){} }).catch(()=>{});
+      safeGet(UNAVAILABILITY_STORAGE_KEY).then(uv=>{ try{if(uv?.value)setUnavailability(JSON.parse(uv.value));}catch(e){} }).catch(()=>{}).finally(()=>setUnavailabilityLoaded(true));
       // Load production presets
       safeGet(PRESET_STORAGE_KEY).then(ps=>{ try{if(ps?.value)setAppPresets(JSON.parse(ps.value));}catch(e){} }).catch(()=>{}).finally(()=>setProductionPresetsLoaded(true));
-      safeGet(VENDOR_STORAGE_KEY).then(vc=>{ try{if(vc?.value){ const list=JSON.parse(vc.value); if(Array.isArray(list)&&list.length>0) setVendorCompanies(list); }}catch(e){} }).catch(()=>{});
-      safeGet(REVIEWER_NAMES_STORAGE_KEY).then(rn=>{ try{if(rn?.value){ const list=JSON.parse(rn.value); if(Array.isArray(list)) setReviewerNames(list); }}catch(e){} }).catch(()=>{});
+      safeGet(VENDOR_STORAGE_KEY).then(vc=>{ try{if(vc?.value){ const list=JSON.parse(vc.value); if(Array.isArray(list)&&list.length>0) setVendorCompanies(list); }}catch(e){} }).catch(()=>{}).finally(()=>setVendorCompaniesLoaded(true));
+      safeGet(REVIEWER_NAMES_STORAGE_KEY).then(rn=>{ try{if(rn?.value){ const list=JSON.parse(rn.value); if(Array.isArray(list)) setReviewerNames(list); }}catch(e){} }).catch(()=>{}).finally(()=>setReviewerNamesLoaded(true));
       safeGet(WORK_REVIEW_SESSIONS_STORAGE_KEY).then(wr=>{ try{if(wr?.value){ const list=JSON.parse(wr.value); if(Array.isArray(list)) setWorkReviewSessions(list); }}catch(e){} }).catch(()=>{});
-      safeGet(INTAKE_STORAGE_KEY).then(iv=>{ try{if(iv?.value){ const list=JSON.parse(iv.value); if(Array.isArray(list)) setIntakes(list); }}catch(e){} }).catch(()=>{});
-      safeGet(BEC_REQUEST_STORAGE_KEY).then(bv=>{ try{if(bv?.value){ const list=JSON.parse(bv.value); if(Array.isArray(list)) setBecRequests(list); }}catch(e){} }).catch(()=>{});
-      safeGet(MEDIA_CARDS_STORAGE_KEY).then(mv=>{ try{if(mv?.value){ const list=JSON.parse(mv.value); if(Array.isArray(list)) setMediaCards(list); }}catch(e){} }).catch(()=>{});
-      safeGet(TAB_LOCKS_STORAGE_KEY, true).then(tl=>{ try{if(tl?.value) setTabLocks(JSON.parse(tl.value)); }catch(e){} }).catch(()=>{});
+      safeGet(INTAKE_STORAGE_KEY).then(iv=>{ try{if(iv?.value){ const list=JSON.parse(iv.value); if(Array.isArray(list)) setIntakes(list); }}catch(e){} }).catch(()=>{}).finally(()=>setIntakesLoaded(true));
+      safeGet(BEC_REQUEST_STORAGE_KEY).then(bv=>{ try{if(bv?.value){ const list=JSON.parse(bv.value); if(Array.isArray(list)) setBecRequests(list); }}catch(e){} }).catch(()=>{}).finally(()=>setBecRequestsLoaded(true));
+      safeGet(MEDIA_CARDS_STORAGE_KEY).then(mv=>{ try{if(mv?.value){ const list=JSON.parse(mv.value); if(Array.isArray(list)) setMediaCards(list); }}catch(e){} }).catch(()=>{}).finally(()=>setMediaCardsLoaded(true));
+      safeGet(TAB_LOCKS_STORAGE_KEY, true).then(tl=>{ try{if(tl?.value) setTabLocks(JSON.parse(tl.value)); }catch(e){} }).catch(()=>{}).finally(()=>setTabLocksLoaded(true));
     });
   },[]);
 
@@ -29086,6 +29456,57 @@ function App() {
       ));
     });
   },[authed, customTasksLoaded]);
+
+  // Phase 3 bootstrap id-mapping effects — same pattern as every one above:
+  // re-derive _rowId from the database on every load (never "skip if
+  // already tagged") so updates/deletes on an item that existed before this
+  // session started have something to shadow-write against.
+  const genericBootstrap = (table, setter, flag, loadedFlag, idKey="id") => {
+    if(!authed || !sb || !flag || !loadedFlag) return;
+    sb.from(table).select("id, legacy_id").then(({data,error})=>{
+      if(error || !data) return;
+      const rowIdByLegacyId = {};
+      data.forEach(r=>{ if(r.legacy_id!=null) rowIdByLegacyId[String(r.legacy_id)]=r.id; });
+      setter(prev=>prev.map(x=>
+        rowIdByLegacyId[x[idKey]] && rowIdByLegacyId[x[idKey]]!==x._rowId ? {...x, _rowId:rowIdByLegacyId[x[idKey]]} : x
+      ));
+    });
+  };
+  useEffect(()=>{ genericBootstrap("gear", setGearList, SHADOW_WRITE_GEAR, adminDataLoaded); },[authed, adminDataLoaded]);
+  useEffect(()=>{ genericBootstrap("furniture", setFurnitureList, SHADOW_WRITE_FURNITURE, adminDataLoaded); },[authed, adminDataLoaded]);
+  useEffect(()=>{ genericBootstrap("props", setPropsList, SHADOW_WRITE_PROPS, adminDataLoaded); },[authed, adminDataLoaded]);
+  useEffect(()=>{ genericBootstrap("talent_roster", setTalentRoster, SHADOW_WRITE_TALENT_ROSTER, adminDataLoaded); },[authed, adminDataLoaded]);
+  useEffect(()=>{ genericBootstrap("unavailability", setUnavailability, SHADOW_WRITE_UNAVAILABILITY, unavailabilityLoaded); },[authed, unavailabilityLoaded]);
+  useEffect(()=>{ genericBootstrap("media_cards", setMediaCards, SHADOW_WRITE_MEDIA_CARDS, mediaCardsLoaded); },[authed, mediaCardsLoaded]);
+  useEffect(()=>{ genericBootstrap("intakes", setIntakes, SHADOW_WRITE_INTAKES, intakesLoaded); },[authed, intakesLoaded]);
+  // workstations is never loaded from window.storage on mount (always starts
+  // from its hardcoded seed array — a pre-existing gap, not something this
+  // pass introduces), so there's no load race to guard against here.
+  useEffect(()=>{ genericBootstrap("workstations", setWorkstations, SHADOW_WRITE_WORKSTATIONS, true); },[authed]);
+
+  // screen_content_options splits into 3 local sub-arrays (windowWall/vpWall/
+  // frameTv) but is one flat table — tags each sub-array from the same
+  // fetch, matched by category + legacy_id together (not legacy_id alone,
+  // since the same numeric id could in principle appear in more than one
+  // category — each category's ids come from an independent uid() stream).
+  useEffect(()=>{
+    if(!authed || !sb || !SHADOW_WRITE_SCREEN_CONTENT || !adminDataLoaded) return;
+    sb.from("screen_content_options").select("id, legacy_id, category").then(({data,error})=>{
+      if(error || !data) return;
+      const rowIdByKey = {};
+      data.forEach(r=>{ if(r.legacy_id!=null) rowIdByKey[`${r.category}:${r.legacy_id}`]=r.id; });
+      setScreenContentOptions(prev=>{
+        const next = {...prev};
+        ["windowWall","vpWall","frameTv"].forEach(cat=>{
+          next[cat] = (prev[cat]||[]).map(x=>{
+            const rowId = rowIdByKey[`${cat}:${x.id}`];
+            return rowId && rowId!==x._rowId ? {...x, _rowId:rowId} : x;
+          });
+        });
+        return next;
+      });
+    });
+  },[authed, adminDataLoaded]);
 
   // Realtime: with multiple people signed in at once, another session's edit
   // used to only ever show up here after a manual reload (see the one-
@@ -29321,6 +29742,9 @@ function App() {
       if(prev.some(c=>c.toLowerCase()===trimmed.toLowerCase())) return prev;
       const next = [...prev, trimmed];
       window.storage?.set(VENDOR_STORAGE_KEY, JSON.stringify(next)).catch(()=>{});
+      if(SHADOW_WRITE_VENDOR_COMPANIES && sb){
+        sb.from("vendor_companies").insert({name:trimmed}).then(({error})=>{ if(error) console.warn("[shadow write] addVendorCompany failed:", error); });
+      }
       return next;
     });
   },[]);
@@ -29337,6 +29761,9 @@ function App() {
       if(prev.some(c=>c.toLowerCase()===trimmed.toLowerCase())) return prev;
       const next = [...prev, trimmed];
       window.storage?.set(REVIEWER_NAMES_STORAGE_KEY, JSON.stringify(next)).catch(()=>{});
+      if(SHADOW_WRITE_REVIEWER_NAMES && sb){
+        sb.from("reviewer_names").insert({name:trimmed}).then(({error})=>{ if(error) console.warn("[shadow write] addReviewerName failed:", error); });
+      }
       return next;
     });
   },[]);
@@ -29372,7 +29799,15 @@ function App() {
   // Intake list — persisted to storage
   const [intakes, setIntakes] = useState([]);
   const saveIntakes = useCallback(list=>{
-    setIntakes(list);
+    setIntakes(prev=>{
+      if(SHADOW_WRITE_INTAKES && sb){
+        writeListDiff(sb, "intakes", computeListDiff(prev, list, intakeToRow), intakeToRow).then(inserted=>{
+          if(!inserted.length) return;
+          setIntakes(p2=>p2.map(x=>{ const m=inserted.find(i=>String(i.legacyId)===String(x.id)); return m?{...x,_rowId:m.rowId}:x; }));
+        });
+      }
+      return list;
+    });
     window.storage?.set(INTAKE_STORAGE_KEY, JSON.stringify(list)).catch(()=>{});
   },[]);
   // GCS/BEC booking request history — one entry per paste (create or update),
@@ -29807,7 +30242,12 @@ function App() {
     // Recorded regardless of create/update, so every past request stays browsable
     // from the GCS Intakes tab and from the linked project — see becRequests.
     const logRequest = (projectId, action) => {
-      saveBecRequests([{id:uid(), reservationId:resId, projectId, action, receivedAt:now, parsed}, ...becRequests]);
+      const entry = {id:uid(), reservationId:resId, projectId, action, receivedAt:now, parsed};
+      saveBecRequests([entry, ...becRequests]);
+      // Shadow write — insert-only, bec_requests is a pure append-only log (no edit/delete path).
+      if(SHADOW_WRITE_BEC_REQUESTS && sb){
+        sb.from("bec_requests").insert(becRequestToRow(entry)).then(({error})=>{ if(error) console.warn("[shadow write] bec_requests insert failed:", error); });
+      }
     };
 
     if(matchProject){
