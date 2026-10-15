@@ -15172,6 +15172,13 @@ const READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS = true;
 // skipped (not raced against) whenever this is true.
 const READ_FROM_NORMALIZED_PHASE3 = false;
 
+// work_review_sessions got its schema + a one-time backfill during the
+// "Let's address work review" work, but never actually got wired for live
+// shadow-write — addWorkReviewSession/updateWorkReviewSession only ever
+// touched window.storage. Found while scoping the Phase 3 read cutover.
+// Off until verified live the same way as everything else.
+const SHADOW_WRITE_WORK_REVIEW_SESSIONS = false;
+
 // Phase 3 — the remaining app_kv-backed collections (see production_schema_new_tables.sql's
 // Phase 3 section and the "what else should be its own table" conversation).
 // Same independent-rollback reasoning as every flag above: each collection
@@ -15351,6 +15358,20 @@ const deliverableToRow = (d, projectId) => ({
 });
 
 const isUuid = v => typeof v === "string" && v.includes("-");
+
+const rowToWorkReviewSession = row => ({
+  id: row.legacy_id ?? row.id, _rowId: row.id,
+  datetime: row.datetime, location: row.location, zoomLink: row.zoom_link,
+  reviewers: row.reviewers||[], notes: row.notes||"",
+});
+const workReviewSessionToRow = s => ({
+  ...(s._rowId ? {id: s._rowId} : {}),
+  legacy_id: typeof s.id==="number" ? s.id : null,
+  datetime: s.datetime||null, location: s.location||null, zoom_link: s.zoomLink||null,
+  reviewers: s.reviewers||[], notes: s.notes||null,
+});
+const addWorkReviewSessionRow    = (sbClient, session)     => sbClient.from("work_review_sessions").insert(workReviewSessionToRow(session)).select().single();
+const updateWorkReviewSessionRow = (sbClient, rowId, patch) => sbClient.from("work_review_sessions").update(patch).eq("id", rowId);
 
 const rowToReviewRound = row => ({
   id: row.id,
@@ -29397,7 +29418,7 @@ function App() {
       safeGet(PRESET_STORAGE_KEY).then(ps=>{ try{if(ps?.value && !READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS)setAppPresets(JSON.parse(ps.value));}catch(e){} }).catch(()=>{}).finally(()=>setProductionPresetsLoaded(true));
       safeGet(VENDOR_STORAGE_KEY).then(vc=>{ try{if(vc?.value && !READ_FROM_NORMALIZED_PHASE3){ const list=JSON.parse(vc.value); if(Array.isArray(list)&&list.length>0) setVendorCompanies(list); }}catch(e){} }).catch(()=>{}).finally(()=>setVendorCompaniesLoaded(true));
       safeGet(REVIEWER_NAMES_STORAGE_KEY).then(rn=>{ try{if(rn?.value && !READ_FROM_NORMALIZED_PHASE3){ const list=JSON.parse(rn.value); if(Array.isArray(list)) setReviewerNames(list); }}catch(e){} }).catch(()=>{}).finally(()=>setReviewerNamesLoaded(true));
-      safeGet(WORK_REVIEW_SESSIONS_STORAGE_KEY).then(wr=>{ try{if(wr?.value){ const list=JSON.parse(wr.value); if(Array.isArray(list)) setWorkReviewSessions(list); }}catch(e){} }).catch(()=>{});
+      safeGet(WORK_REVIEW_SESSIONS_STORAGE_KEY).then(wr=>{ try{if(wr?.value){ const list=JSON.parse(wr.value); if(Array.isArray(list)) setWorkReviewSessions(list); }}catch(e){} }).catch(()=>{}).finally(()=>setWorkReviewSessionsLoaded(true));
       safeGet(INTAKE_STORAGE_KEY).then(iv=>{ try{if(iv?.value && !READ_FROM_NORMALIZED_PHASE3){ const list=JSON.parse(iv.value); if(Array.isArray(list)) setIntakes(list); }}catch(e){} }).catch(()=>{}).finally(()=>setIntakesLoaded(true));
       safeGet(BEC_REQUEST_STORAGE_KEY).then(bv=>{ try{if(bv?.value && !READ_FROM_NORMALIZED_PHASE3){ const list=JSON.parse(bv.value); if(Array.isArray(list)) setBecRequests(list); }}catch(e){} }).catch(()=>{}).finally(()=>setBecRequestsLoaded(true));
       safeGet(MEDIA_CARDS_STORAGE_KEY).then(mv=>{ try{if(mv?.value && !READ_FROM_NORMALIZED_PHASE3){ const list=JSON.parse(mv.value); if(Array.isArray(list)) setMediaCards(list); }}catch(e){} }).catch(()=>{}).finally(()=>setMediaCardsLoaded(true));
@@ -29950,6 +29971,7 @@ function App() {
   // per-deliverable status tracking still works independently afterward.
   const WORK_REVIEW_SESSIONS_STORAGE_KEY = "work-review-sessions-v1";
   const [workReviewSessions, setWorkReviewSessions] = useState([]);
+  const [workReviewSessionsLoaded, setWorkReviewSessionsLoaded] = useState(false);
   const saveWorkReviewSessions = useCallback(list=>{
     setWorkReviewSessions(list);
     window.storage?.set(WORK_REVIEW_SESSIONS_STORAGE_KEY, JSON.stringify(list)).catch(()=>{});
@@ -29961,15 +29983,38 @@ function App() {
       window.storage?.set(WORK_REVIEW_SESSIONS_STORAGE_KEY, JSON.stringify(next)).catch(()=>{});
       return next;
     });
+    if(SHADOW_WRITE_WORK_REVIEW_SESSIONS && sb){
+      addWorkReviewSessionRow(sb, withId).then(({data,error})=>{
+        if(error){ console.warn("[shadow write] addWorkReviewSession failed:", error); return; }
+        if(!data) return;
+        setWorkReviewSessions(prev=>prev.map(s=>s.id===withId.id?{...s,_rowId:data.id}:s));
+      }).catch(e=>console.warn("[shadow write] addWorkReviewSession failed:", e));
+    }
     return withId;
   },[]);
   const updateWorkReviewSession = useCallback((id,patch)=>{
     setWorkReviewSessions(prev=>{
       const next = prev.map(s=>s.id===id?{...s,...patch}:s);
       window.storage?.set(WORK_REVIEW_SESSIONS_STORAGE_KEY, JSON.stringify(next)).catch(()=>{});
+      if(SHADOW_WRITE_WORK_REVIEW_SESSIONS && sb){
+        const existing = prev.find(s=>s.id===id);
+        if(existing?._rowId){
+          const {id:_id, legacy_id:_legacyId, ...rowPatch} = workReviewSessionToRow({...existing, ...patch});
+          updateWorkReviewSessionRow(sb, existing._rowId, rowPatch)
+            .then(({error})=>{ if(error) console.warn("[shadow write] updateWorkReviewSession failed:", error); })
+            .catch(e=>console.warn("[shadow write] updateWorkReviewSession failed:", e));
+        }
+      }
       return next;
     });
   },[]);
+
+  // Bootstrap id-mapping effect for work_review_sessions — placed here (not
+  // with the other genericBootstrap calls above) because
+  // workReviewSessionsLoaded isn't declared until just above this point,
+  // and this effect's dependency array is evaluated synchronously at
+  // render time, unlike a deferred .then() callback.
+  useEffect(()=>{ genericBootstrap("work_review_sessions", setWorkReviewSessions, SHADOW_WRITE_WORK_REVIEW_SESSIONS, workReviewSessionsLoaded); },[authed, workReviewSessionsLoaded]);
 
   // Intake list — persisted to storage
   const [intakes, setIntakes] = useState([]);
