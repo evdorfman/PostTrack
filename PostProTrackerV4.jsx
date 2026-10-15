@@ -15623,12 +15623,27 @@ const computeSpaceMetaDiff = (oldMeta, newMeta) => {
   const toDelete = Object.keys(oldMeta).filter(k=>!(k in newMeta));
   return {toUpsert, toDelete};
 };
-const writeSpaceMetaDiff = (sbClient, diff) => Promise.all([
-  ...(diff.toUpsert.length ? [sbClient.from("studio_space_meta").upsert(diff.toUpsert).then(({error})=>({error}))] : []),
-  ...diff.toDelete.map(name=>sbClient.from("studio_space_meta").delete().eq("space_name", name).then(({error})=>({error}))),
-]).then(results=>{
-  results.forEach(({error})=>{ if(error) console.warn("[shadow write] studio_space_meta diff op failed:", error); });
-});
+// studio_space_meta.space_name has a foreign key to studio_spaces.name, but
+// AdminSpacesTab's add() fires onUpdateSpaces and onUpdateSpaceMeta back to
+// back in the same tick — both async, no ordering guarantee between them.
+// Rather than depend on saveSpaces having already landed (it sometimes
+// hasn't, by the time this runs, which fails the FK check and silently
+// drops the meta write), this ensures every referenced space row exists
+// first, unconditionally, before touching studio_space_meta at all. Also
+// covers toggling meta on an older space that predates this normalization
+// pass and was never individually synced to studio_spaces on its own.
+const writeSpaceMetaDiff = (sbClient, diff) => {
+  const spaceNames = [...new Set([...diff.toUpsert.map(r=>r.space_name), ...diff.toDelete])];
+  const ensureSpaces = spaceNames.length
+    ? sbClient.from("studio_spaces").upsert(spaceNames.map(name=>({name})), {onConflict:"name", ignoreDuplicates:true}).then(({error})=>{ if(error) console.warn("[shadow write] studio_spaces ensure-exists failed:", error); })
+    : Promise.resolve();
+  return ensureSpaces.then(()=>Promise.all([
+    ...(diff.toUpsert.length ? [sbClient.from("studio_space_meta").upsert(diff.toUpsert).then(({error})=>({error}))] : []),
+    ...diff.toDelete.map(name=>sbClient.from("studio_space_meta").delete().eq("space_name", name).then(({error})=>({error}))),
+  ])).then(results=>{
+    results.forEach(({error})=>{ if(error) console.warn("[shadow write] studio_space_meta diff op failed:", error); });
+  });
+};
 
 // The three singleton config rows (id always 1) just get overwritten in
 // full on every save — no diffing needed, since there's exactly one row

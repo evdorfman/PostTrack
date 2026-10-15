@@ -10411,14 +10411,20 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     const toDelete = Object.keys(oldMeta).filter((k) => !(k in newMeta));
     return { toUpsert, toDelete };
   };
-  var writeSpaceMetaDiff = (sbClient, diff) => Promise.all([
-    ...diff.toUpsert.length ? [sbClient.from("studio_space_meta").upsert(diff.toUpsert).then(({ error }) => ({ error }))] : [],
-    ...diff.toDelete.map((name) => sbClient.from("studio_space_meta").delete().eq("space_name", name).then(({ error }) => ({ error })))
-  ]).then((results) => {
-    results.forEach(({ error }) => {
-      if (error) console.warn("[shadow write] studio_space_meta diff op failed:", error);
+  var writeSpaceMetaDiff = (sbClient, diff) => {
+    const spaceNames = [.../* @__PURE__ */ new Set([...diff.toUpsert.map((r) => r.space_name), ...diff.toDelete])];
+    const ensureSpaces = spaceNames.length ? sbClient.from("studio_spaces").upsert(spaceNames.map((name) => ({ name })), { onConflict: "name", ignoreDuplicates: true }).then(({ error }) => {
+      if (error) console.warn("[shadow write] studio_spaces ensure-exists failed:", error);
+    }) : Promise.resolve();
+    return ensureSpaces.then(() => Promise.all([
+      ...diff.toUpsert.length ? [sbClient.from("studio_space_meta").upsert(diff.toUpsert).then(({ error }) => ({ error }))] : [],
+      ...diff.toDelete.map((name) => sbClient.from("studio_space_meta").delete().eq("space_name", name).then(({ error }) => ({ error })))
+    ])).then((results) => {
+      results.forEach(({ error }) => {
+        if (error) console.warn("[shadow write] studio_space_meta diff op failed:", error);
+      });
     });
-  });
+  };
   var writeAppListsRow = (sbClient, lists) => sbClient.from("app_lists").upsert({
     id: 1,
     workstreams: lists.workstreams || [],
