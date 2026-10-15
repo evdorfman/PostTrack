@@ -378,7 +378,7 @@ var supabase=(function(e){function t(e,t){var n={};for(var r in e)Object.prototy
 `))throw Error(`@supabase/auth-js: Invalid SIWE message field "statement". Statement must not include '\\n'. Provided value: ${e.statement}`);let f=gi(e.address),p=`${l?`${l}://${n}`:n} wants you to sign in with your Ethereum account:\n${f}\n\n${e.statement?`${e.statement}\n`:``}`,m=`URI: ${u}\nVersion: ${d}\nChain ID: ${t}${a?`\nNonce: ${a}`:``}\nIssued At: ${i.toISOString()}`;if(r&&(m+=`\nExpiration Time: ${r.toISOString()}`),o&&(m+=`\nNot Before: ${o.toISOString()}`),s&&(m+=`\nRequest ID: ${s}`),c){let e=`
 Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/auth-js: Invalid SIWE message field "resources". Every resource must be a valid string. Provided value: ${t}`);e+=`\n- ${t}`}m+=e}return`${p}\n${m}`}var $=class extends Error{constructor({message:e,code:t,cause:n,name:r}){super(e,{cause:n}),this.__isWebAuthnError=!0,this.name=r??(n instanceof Error?n.name:void 0)??`Unknown Error`,this.code=t}toJSON(){return{name:this.name,message:this.message,code:this.code}}},bi=class extends ${constructor(e,t){super({code:`ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY`,cause:t,message:e}),this.name=`WebAuthnUnknownError`,this.originalError=t}};function xi({error:e,options:t}){let{publicKey:n}=t;if(!n)throw Error(`options was missing required publicKey property`);if(e.name===`AbortError`){if(t.signal instanceof AbortSignal)return new $({message:`Registration ceremony was sent an abort signal`,code:`ERROR_CEREMONY_ABORTED`,cause:e})}else if(e.name===`ConstraintError`){if(n.authenticatorSelection?.requireResidentKey===!0)return new $({message:`Discoverable credentials were required but no available authenticator supported it`,code:`ERROR_AUTHENTICATOR_MISSING_DISCOVERABLE_CREDENTIAL_SUPPORT`,cause:e});if(t.mediation===`conditional`&&n.authenticatorSelection?.userVerification===`required`)return new $({message:`User verification was required during automatic registration but it could not be performed`,code:`ERROR_AUTO_REGISTER_USER_VERIFICATION_FAILURE`,cause:e});if(n.authenticatorSelection?.userVerification===`required`)return new $({message:`User verification was required but no available authenticator supported it`,code:`ERROR_AUTHENTICATOR_MISSING_USER_VERIFICATION_SUPPORT`,cause:e})}else if(e.name===`InvalidStateError`)return new $({message:`The authenticator was previously registered`,code:`ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED`,cause:e});else if(e.name===`NotAllowedError`)return new $({message:e.message,code:`ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY`,cause:e});else if(e.name===`NotSupportedError`)return n.pubKeyCredParams.filter(e=>e.type===`public-key`).length===0?new $({message:`No entry in pubKeyCredParams was of type "public-key"`,code:`ERROR_MALFORMED_PUBKEYCREDPARAMS`,cause:e}):new $({message:`No available authenticator supported any of the specified pubKeyCredParams algorithms`,code:`ERROR_AUTHENTICATOR_NO_SUPPORTED_PUBKEYCREDPARAMS_ALG`,cause:e});else if(e.name===`SecurityError`){let t=window.location.hostname;if(Oi(t)){if(n.rp.id!==t)return new $({message:`The RP ID "${n.rp.id}" is invalid for this domain`,code:`ERROR_INVALID_RP_ID`,cause:e})}else return new $({message:`${window.location.hostname} is an invalid domain`,code:`ERROR_INVALID_DOMAIN`,cause:e})}else if(e.name===`TypeError`){if(n.user.id.byteLength<1||n.user.id.byteLength>64)return new $({message:`User ID was not between 1 and 64 characters`,code:`ERROR_INVALID_USER_ID_LENGTH`,cause:e})}else if(e.name===`UnknownError`)return new $({message:`The authenticator was unable to process the specified options, or could not create a new credential`,code:`ERROR_AUTHENTICATOR_GENERAL_ERROR`,cause:e});return new $({message:`a Non-Webauthn related error has occurred`,code:`ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY`,cause:e})}function Si({error:e,options:t}){let{publicKey:n}=t;if(!n)throw Error(`options was missing required publicKey property`);if(e.name===`AbortError`){if(t.signal instanceof AbortSignal)return new $({message:`Authentication ceremony was sent an abort signal`,code:`ERROR_CEREMONY_ABORTED`,cause:e})}else if(e.name===`NotAllowedError`)return new $({message:e.message,code:`ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY`,cause:e});else if(e.name===`SecurityError`){let t=window.location.hostname;if(Oi(t)){if(n.rpId!==t)return new $({message:`The RP ID "${n.rpId}" is invalid for this domain`,code:`ERROR_INVALID_RP_ID`,cause:e})}else return new $({message:`${window.location.hostname} is an invalid domain`,code:`ERROR_INVALID_DOMAIN`,cause:e})}else if(e.name===`UnknownError`)return new $({message:`The authenticator was unable to process the specified options, or could not create a new assertion signature`,code:`ERROR_AUTHENTICATOR_GENERAL_ERROR`,cause:e});return new $({message:`a Non-Webauthn related error has occurred`,code:`ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY`,cause:e})}let Ci=new class{createNewAbortSignal(){if(this.controller){let e=Error(`Cancelling existing WebAuthn API call for new one`);e.name=`AbortError`,this.controller.abort(e)}let e=new AbortController;return this.controller=e,e.signal}cancelCeremony(){if(this.controller){let e=Error(`Manually cancelling existing WebAuthn API call`);e.name=`AbortError`,this.controller.abort(e),this.controller=void 0}}};function wi(e){if(!e)throw Error(`Credential creation options are required`);if(typeof PublicKeyCredential<`u`&&`parseCreationOptionsFromJSON`in PublicKeyCredential&&typeof PublicKeyCredential.parseCreationOptionsFromJSON==`function`)return PublicKeyCredential.parseCreationOptionsFromJSON(e);let{challenge:n,user:r,excludeCredentials:i}=e,a=t(e,[`challenge`,`user`,`excludeCredentials`]),o=R(n).buffer,s=Object.assign(Object.assign({},r),{id:R(r.id).buffer}),c=Object.assign(Object.assign({},a),{challenge:o,user:s});if(i&&i.length>0){c.excludeCredentials=Array(i.length);for(let e=0;e<i.length;e++){let t=i[e];c.excludeCredentials[e]=Object.assign(Object.assign({},t),{id:R(t.id).buffer,type:t.type||`public-key`,transports:t.transports})}}return c}function Ti(e){if(!e)throw Error(`Credential request options are required`);if(typeof PublicKeyCredential<`u`&&`parseRequestOptionsFromJSON`in PublicKeyCredential&&typeof PublicKeyCredential.parseRequestOptionsFromJSON==`function`)return PublicKeyCredential.parseRequestOptionsFromJSON(e);let{challenge:n,allowCredentials:r}=e,i=t(e,[`challenge`,`allowCredentials`]),a=R(n).buffer,o=Object.assign(Object.assign({},i),{challenge:a});if(r&&r.length>0){o.allowCredentials=Array(r.length);for(let e=0;e<r.length;e++){let t=r[e];o.allowCredentials[e]=Object.assign(Object.assign({},t),{id:R(t.id).buffer,type:t.type||`public-key`,transports:t.transports})}}return o}function Ei(e){if(`toJSON`in e&&typeof e.toJSON==`function`)return e.toJSON();let t=e;return{id:e.id,rawId:e.id,response:{attestationObject:z(new Uint8Array(e.response.attestationObject)),clientDataJSON:z(new Uint8Array(e.response.clientDataJSON))},type:`public-key`,clientExtensionResults:e.getClientExtensionResults(),authenticatorAttachment:t.authenticatorAttachment??void 0}}function Di(e){if(`toJSON`in e&&typeof e.toJSON==`function`)return e.toJSON();let t=e,n=e.getClientExtensionResults(),r=e.response;return{id:e.id,rawId:e.id,response:{authenticatorData:z(new Uint8Array(r.authenticatorData)),clientDataJSON:z(new Uint8Array(r.clientDataJSON)),signature:z(new Uint8Array(r.signature)),userHandle:r.userHandle?z(new Uint8Array(r.userHandle)):void 0},type:`public-key`,clientExtensionResults:n,authenticatorAttachment:t.authenticatorAttachment??void 0}}function Oi(e){return e===`localhost`||/^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$/i.test(e)}function ki(){return!!(B()&&`PublicKeyCredential`in window&&window.PublicKeyCredential&&`credentials`in navigator&&typeof(navigator==null?void 0:navigator.credentials)?.create==`function`&&typeof(navigator==null?void 0:navigator.credentials)?.get==`function`)}async function Ai(e){try{let t=await navigator.credentials.create(e);return t?t instanceof PublicKeyCredential?{data:t,error:null}:{data:null,error:new bi(`Browser returned unexpected credential type`,t)}:{data:null,error:new bi(`Empty credential response`,t)}}catch(t){return{data:null,error:xi({error:t,options:e})}}}async function ji(e){try{let t=await navigator.credentials.get(e);return t?t instanceof PublicKeyCredential?{data:t,error:null}:{data:null,error:new bi(`Browser returned unexpected credential type`,t)}:{data:null,error:new bi(`Empty credential response`,t)}}catch(t){return{data:null,error:Si({error:t,options:e})}}}let Mi={hints:[`security-key`],authenticatorSelection:{authenticatorAttachment:`cross-platform`,requireResidentKey:!1,userVerification:`preferred`,residentKey:`discouraged`},attestation:`direct`},Ni={userVerification:`preferred`,hints:[`security-key`],attestation:`direct`};function Pi(...e){let t=e=>typeof e==`object`&&!!e&&!Array.isArray(e),n=e=>e instanceof ArrayBuffer||ArrayBuffer.isView(e),r={};for(let i of e)if(i)for(let e in i){let a=i[e];if(a!==void 0)if(Array.isArray(a))r[e]=a;else if(n(a))r[e]=a;else if(t(a)){let n=r[e];t(n)?r[e]=Pi(n,a):r[e]=Pi(a)}else r[e]=a}return r}function Fi(e,t){return Pi(Mi,e,t||{})}function Ii(e,t){return Pi(Ni,e,t||{})}var Li=class{constructor(e){this.client=e,this.enroll=this._enroll.bind(this),this.challenge=this._challenge.bind(this),this.verify=this._verify.bind(this),this.authenticate=this._authenticate.bind(this),this.register=this._register.bind(this)}async _enroll(e){return this.client.mfa.enroll(Object.assign(Object.assign({},e),{factorType:`webauthn`}))}async _challenge({factorId:e,webauthn:t,friendlyName:n,signal:r},i){try{let{data:a,error:o}=await this.client.mfa.challenge({factorId:e,webauthn:t});if(!a)return{data:null,error:o};let s=r??Ci.createNewAbortSignal();if(a.webauthn.type===`create`){let{user:e}=a.webauthn.credential_options.publicKey;if(!e.name){let t=n;if(t)e.name=`${e.id}:${t}`;else{let t=(await this.client.getUser()).data.user,n=t?.user_metadata?.name||t?.email||t?.id||`User`;e.name=`${e.id}:${n}`}}e.displayName||=e.name}switch(a.webauthn.type){case`create`:{let{data:t,error:n}=await Ai({publicKey:Fi(a.webauthn.credential_options.publicKey,i?.create),signal:s});return t?{data:{factorId:e,challengeId:a.id,webauthn:{type:a.webauthn.type,credential_response:t}},error:null}:{data:null,error:n}}case`request`:{let t=Ii(a.webauthn.credential_options.publicKey,i?.request),{data:n,error:r}=await ji(Object.assign(Object.assign({},a.webauthn.credential_options),{publicKey:t,signal:s}));return n?{data:{factorId:e,challengeId:a.id,webauthn:{type:a.webauthn.type,credential_response:n}},error:null}:{data:null,error:r}}}}catch(e){return N(e)?{data:null,error:e}:{data:null,error:new P(`Unexpected error in challenge`,e)}}}async _verify({challengeId:e,factorId:t,webauthn:n}){return this.client.mfa.verify({factorId:t,challengeId:e,webauthn:n})}async _authenticate({factorId:e,webauthn:{rpId:t=typeof window<`u`?window.location.hostname:void 0,rpOrigins:n=typeof window<`u`?[window.location.origin]:void 0,signal:r}={}},i){if(!t)return{data:null,error:new Gn(`rpId is required for WebAuthn authentication`)};try{if(!ki())return{data:null,error:new P(`Browser does not support WebAuthn`,null)};let{data:a,error:o}=await this.challenge({factorId:e,webauthn:{rpId:t,rpOrigins:n},signal:r},{request:i});if(!a)return{data:null,error:o};let{webauthn:s}=a;return this._verify({factorId:e,challengeId:a.challengeId,webauthn:{type:s.type,rpId:t,rpOrigins:n,credential_response:s.credential_response}})}catch(e){return N(e)?{data:null,error:e}:{data:null,error:new P(`Unexpected error in authenticate`,e)}}}async _register({friendlyName:e,webauthn:{rpId:t=typeof window<`u`?window.location.hostname:void 0,rpOrigins:n=typeof window<`u`?[window.location.origin]:void 0,signal:r}={}},i){if(!t)return{data:null,error:new Gn(`rpId is required for WebAuthn registration`)};try{if(!ki())return{data:null,error:new P(`Browser does not support WebAuthn`,null)};let{data:a,error:o}=await this._enroll({friendlyName:e});if(!a)return await this.client.mfa.listFactors().then(t=>t.data?.all.find(t=>t.factor_type===`webauthn`&&t.friendly_name===e&&t.status!==`unverified`)).then(e=>e?this.client.mfa.unenroll({factorId:e?.id}):void 0),{data:null,error:o};let{data:s,error:c}=await this._challenge({factorId:a.id,friendlyName:a.friendly_name,webauthn:{rpId:t,rpOrigins:n},signal:r},{create:i});return s?this._verify({factorId:a.id,challengeId:s.challengeId,webauthn:{rpId:t,rpOrigins:n,type:s.webauthn.type,credential_response:s.webauthn.credential_response}}):{data:null,error:c}}catch(e){return N(e)?{data:null,error:e}:{data:null,error:new P(`Unexpected error in register`,e)}}}};hi();let Ri={url:`http://localhost:9999`,storageKey:`supabase.auth.token`,autoRefreshToken:!0,persistSession:!0,detectSessionInUrl:!0,headers:Vn,flowType:`implicit`,debug:!1,hasCustomAuthorizationHeader:!1,throwOnError:!1,lockAcquireTimeout:5e3,skipAutoInitialize:!1,experimental:{}},zi={};var Bi=class e{get jwks(){return zi[this.storageKey]?.jwks??{keys:[]}}set jwks(e){zi[this.storageKey]=Object.assign(Object.assign({},zi[this.storageKey]),{jwks:e})}get jwks_cached_at(){return zi[this.storageKey]?.cachedAt??-(2**53-1)}set jwks_cached_at(e){zi[this.storageKey]=Object.assign(Object.assign({},zi[this.storageKey]),{cachedAt:e})}constructor(t){var n;this.userStorage=null,this.memoryStorage=null,this.stateChangeEmitters=new Map,this.autoRefreshTicker=null,this.autoRefreshTickTimeout=null,this.visibilityChangedCallback=null,this.refreshingDeferred=null,this.lastRefreshFailure=null,this._sessionRemovalEpoch=0,this.initializePromise=null,this._pendingInitNotifications=null,this.detectSessionInUrl=!0,this.hasCustomAuthorizationHeader=!1,this.suppressGetSessionWarning=!1,this.lock=null,this.lockAcquired=!1,this.pendingInLock=[],this.broadcastChannel=null,this.logger=console.log;let r=Object.assign(Object.assign({},Ri),t);if(this.storageKey=r.storageKey,this.instanceID=e.nextInstanceID[this.storageKey]??0,e.nextInstanceID[this.storageKey]=this.instanceID+1,this.logDebugMessages=!!r.debug,typeof r.debug==`function`&&(this.logger=r.debug),this.instanceID>0&&B()){let e=`${this._logPrefix()} Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.`;console.warn(e),this.logDebugMessages&&console.trace(e)}if(this.persistSession=r.persistSession,this.autoRefreshToken=r.autoRefreshToken,this.experimental=r.experimental??{},this.admin=new si({url:r.url,headers:r.headers,fetch:r.fetch,experimental:this.experimental}),this.url=r.url,this.headers=r.headers,this.fetch=Sr(r.fetch),this.detectSessionInUrl=r.detectSessionInUrl,this.flowType=r.flowType,this.hasCustomAuthorizationHeader=r.hasCustomAuthorizationHeader,this.throwOnError=r.throwOnError,this.lockAcquireTimeout=r.lockAcquireTimeout,r.lock!=null&&(this.lock=r.lock),this.jwks||(this.jwks={keys:[]},this.jwks_cached_at=-(2**53-1)),this.mfa={verify:this._verify.bind(this),enroll:this._enroll.bind(this),unenroll:this._unenroll.bind(this),challenge:this._challenge.bind(this),listFactors:this._listFactors.bind(this),challengeAndVerify:this._challengeAndVerify.bind(this),getAuthenticatorAssuranceLevel:this._getAuthenticatorAssuranceLevel.bind(this),webauthn:new Li(this)},this.oauth={getAuthorizationDetails:this._getAuthorizationDetails.bind(this),approveAuthorization:this._approveAuthorization.bind(this),denyAuthorization:this._denyAuthorization.bind(this),listGrants:this._listOAuthGrants.bind(this),revokeGrant:this._revokeOAuthGrant.bind(this)},this.passkey={startRegistration:this._startPasskeyRegistration.bind(this),verifyRegistration:this._verifyPasskeyRegistration.bind(this),startAuthentication:this._startPasskeyAuthentication.bind(this),verifyAuthentication:this._verifyPasskeyAuthentication.bind(this),list:this._listPasskeys.bind(this),update:this._updatePasskey.bind(this),delete:this._deletePasskey.bind(this)},this.persistSession?(r.storage?this.storage=r.storage:br()?this.storage=globalThis.localStorage:(this.memoryStorage={},this.storage=ci(this.memoryStorage)),r.userStorage&&(this.userStorage=r.userStorage)):(this.memoryStorage={},this.storage=ci(this.memoryStorage)),B()&&globalThis.BroadcastChannel&&this.persistSession&&this.storageKey){try{this.broadcastChannel=new globalThis.BroadcastChannel(this.storageKey)}catch(e){console.error(`Failed to create a new BroadcastChannel, multi-tab state changes will not be available`,e)}(n=this.broadcastChannel)==null||n.addEventListener(`message`,async e=>{this._debug(`received broadcast notification from other tab or client`,e),(e.data.event===`TOKEN_REFRESHED`||e.data.event===`SIGNED_IN`)&&(this.lastRefreshFailure=null);try{await this._notifyAllSubscribers(e.data.event,e.data.session,!1)}catch(e){this._debug(`#broadcastChannel`,`error`,e)}})}r.skipAutoInitialize||this.initialize().catch(e=>{this._debug(`#initialize()`,`error`,e)})}isThrowOnErrorEnabled(){return this.throwOnError}_returnResult(e){if(this.throwOnError&&e&&e.error)throw e.error;return e}_logPrefix(){return`GoTrueClient@${this.storageKey}:${this.instanceID} (${zn}) ${new Date().toISOString()}`}_debug(...e){return this.logDebugMessages&&this.logger(this._logPrefix(),...e),this}async initialize(){if(this.initializePromise)return await this.initializePromise;this._pendingInitNotifications=[],this.initializePromise=(async()=>this.lock==null?await this._initialize():await this._acquireLock(this.lockAcquireTimeout,async()=>await this._initialize()))();let e=await this.initializePromise,t=this._pendingInitNotifications??[];this._pendingInitNotifications=null;for(let e of t)await this._notifyAllSubscribers(e.event,e.session,e.broadcast);return e}async _initialize(){try{let e={},t=`none`;if(B()&&(e=xr(window.location.href),this._isImplicitGrantCallback(e)?t=`implicit`:await this._isPKCECallback(e)&&(t=`pkce`)),B()&&this.detectSessionInUrl&&t!==`none`){let{data:n,error:r}=await this._getSessionFromURL(e,t);if(r){if(this._debug(`#_initialize()`,`error detecting session from URL`,r),Zn(r)){let e=r.details?.code;if(e===`identity_already_exists`||e===`identity_not_found`||e===`single_identity_not_deletable`)return{error:r}}return{error:r}}let{session:i,redirectType:a}=n;return this._debug(`#_initialize()`,`detected session in URL`,i,`redirect type`,a),await this._saveSession(i),setTimeout(async()=>{a===`recovery`?await this._notifyAllSubscribers(`PASSWORD_RECOVERY`,i):await this._notifyAllSubscribers(`SIGNED_IN`,i)},0),{error:null}}return await this._recoverAndRefresh(),{error:null}}catch(e){return N(e)?this._returnResult({error:e}):this._returnResult({error:new P(`Unexpected error during initialization`,e)})}finally{await this._handleVisibilityChange(),this._debug(`#_initialize()`,`end`)}}async signInAnonymously(e){try{let{data:t,error:n}=await Y(this.fetch,`POST`,`${this.url}/signup`,{headers:this.headers,body:{data:e?.options?.data??{},gotrue_meta_security:{captcha_token:e?.options?.captchaToken}},xform:X});if(n||!t)return this._returnResult({data:{user:null,session:null},error:n});let r=t.session,i=t.user;return t.session&&(await this._saveSession(t.session),await this._notifyAllSubscribers(`SIGNED_IN`,r)),this._returnResult({data:{user:i,session:r},error:null})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async signUp(e){let t=null;try{let n;if(`email`in e){let{email:r,password:i,options:a}=e,o=null,s=null;this.flowType===`pkce`&&([o,s,t]=await this._getCodeChallengeAndMethod()),n=await Y(this.fetch,`POST`,`${this.url}/signup`,{headers:this.headers,redirectTo:this._maybeAppendFlowIdToRedirect(a?.emailRedirectTo,t),body:{email:r,password:i,data:a?.data??{},gotrue_meta_security:{captcha_token:a?.captchaToken},code_challenge:o,code_challenge_method:s},xform:X})}else if(`phone`in e){let{phone:t,password:r,options:i}=e;n=await Y(this.fetch,`POST`,`${this.url}/signup`,{headers:this.headers,body:{phone:t,password:r,data:i?.data??{},channel:i?.channel??`sms`,gotrue_meta_security:{captcha_token:i?.captchaToken}},xform:X})}else throw new Yn(`You must provide either an email or phone number and a password`);let{data:r,error:i}=n;if(i||!r)return await G(this.storage,this.storageKey,t),this._returnResult({data:{user:null,session:null},error:i});let a=r.session,o=r.user;return r.session&&(await this._saveSession(r.session),await this._notifyAllSubscribers(`SIGNED_IN`,a)),this._returnResult({data:{user:o,session:a},error:null})}catch(e){if(await G(this.storage,this.storageKey,t),N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async signInWithPassword(e){try{let t;if(`email`in e){let{email:n,password:r,options:i}=e;t=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=password`,{headers:this.headers,body:{email:n,password:r,gotrue_meta_security:{captcha_token:i?.captchaToken}},xform:ti})}else if(`phone`in e){let{phone:n,password:r,options:i}=e;t=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=password`,{headers:this.headers,body:{phone:n,password:r,gotrue_meta_security:{captcha_token:i?.captchaToken}},xform:ti})}else throw new Yn(`You must provide either an email or phone number and a password`);let{data:n,error:r}=t;if(r)return this._returnResult({data:{user:null,session:null},error:r});if(!n||!n.session||!n.user){let e=new L;return this._returnResult({data:{user:null,session:null},error:e})}return n.session&&(await this._saveSession(n.session),await this._notifyAllSubscribers(`SIGNED_IN`,n.session)),this._returnResult({data:Object.assign({user:n.user,session:n.session},n.weak_password?{weakPassword:n.weak_password}:null),error:r})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async signInWithOAuth(e){return await this._handleProviderSignIn(e.provider,{redirectTo:e.options?.redirectTo,scopes:e.options?.scopes,queryParams:e.options?.queryParams,skipBrowserRedirect:e.options?.skipBrowserRedirect})}async exchangeCodeForSession(e,t){return await this.initializePromise,this.lock==null?this._exchangeCodeForSession(e,t):this._acquireLock(this.lockAcquireTimeout,async()=>this._exchangeCodeForSession(e,t))}async signInWithWeb3(e){let{chain:t}=e;switch(t){case`ethereum`:return await this.signInWithEthereum(e);case`solana`:return await this.signInWithSolana(e);default:throw Error(`@supabase/auth-js: Unsupported chain "${t}"`)}}async signInWithEthereum(e){let t,n;if(`message`in e)t=e.message,n=e.signature;else{let{chain:r,wallet:i,statement:a,options:o}=e,s;if(B())if(typeof i==`object`)s=i;else{let e=window;if(`ethereum`in e&&typeof e.ethereum==`object`&&`request`in e.ethereum&&typeof e.ethereum.request==`function`)s=e.ethereum;else throw Error(`@supabase/auth-js: No compatible Ethereum wallet interface on the window object (window.ethereum) detected. Make sure the user already has a wallet installed and connected for this app. Prefer passing the wallet interface object directly to signInWithWeb3({ chain: 'ethereum', wallet: resolvedUserWallet }) instead.`)}else{if(typeof i!=`object`||!o?.url)throw Error(`@supabase/auth-js: Both wallet and url must be specified in non-browser environments.`);s=i}let c=new URL(o?.url??window.location.href),l=await s.request({method:`eth_requestAccounts`}).then(e=>e).catch(()=>{throw Error(`@supabase/auth-js: Wallet method eth_requestAccounts is missing or invalid`)});if(!l||l.length===0)throw Error(`@supabase/auth-js: No accounts available. Please ensure the wallet is connected.`);let u=gi(l[0]),d=o?.signInWithEthereum?.chainId;d||=_i(await s.request({method:`eth_chainId`})),t=yi({domain:c.host,address:u,statement:a,uri:c.href,version:`1`,chainId:d,nonce:o?.signInWithEthereum?.nonce,issuedAt:o?.signInWithEthereum?.issuedAt??new Date,expirationTime:o?.signInWithEthereum?.expirationTime,notBefore:o?.signInWithEthereum?.notBefore,requestId:o?.signInWithEthereum?.requestId,resources:o?.signInWithEthereum?.resources}),n=await s.request({method:`personal_sign`,params:[vi(t),u]})}try{let{data:r,error:i}=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=web3`,{headers:this.headers,body:Object.assign({chain:`ethereum`,message:t,signature:n},e.options?.captchaToken?{gotrue_meta_security:{captcha_token:e.options?.captchaToken}}:null),xform:X});if(i)throw i;if(!r||!r.session||!r.user){let e=new L;return this._returnResult({data:{user:null,session:null},error:e})}return r.session&&(await this._saveSession(r.session),await this._notifyAllSubscribers(`SIGNED_IN`,r.session)),this._returnResult({data:Object.assign({},r),error:i})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async signInWithSolana(e){let t,n;if(`message`in e)t=e.message,n=e.signature;else{let{chain:r,wallet:i,statement:a,options:o}=e,s;if(B())if(typeof i==`object`)s=i;else{let e=window;if(`solana`in e&&typeof e.solana==`object`&&(`signIn`in e.solana&&typeof e.solana.signIn==`function`||`signMessage`in e.solana&&typeof e.solana.signMessage==`function`))s=e.solana;else throw Error(`@supabase/auth-js: No compatible Solana wallet interface on the window object (window.solana) detected. Make sure the user already has a wallet installed and connected for this app. Prefer passing the wallet interface object directly to signInWithWeb3({ chain: 'solana', wallet: resolvedUserWallet }) instead.`)}else{if(typeof i!=`object`||!o?.url)throw Error(`@supabase/auth-js: Both wallet and url must be specified in non-browser environments.`);s=i}let c=new URL(o?.url??window.location.href);if(`signIn`in s&&s.signIn){let e=await s.signIn(Object.assign(Object.assign(Object.assign({issuedAt:new Date().toISOString()},o?.signInWithSolana),{version:`1`,domain:c.host,uri:c.href}),a?{statement:a}:null)),r;if(Array.isArray(e)&&e[0]&&typeof e[0]==`object`)r=e[0];else if(e&&typeof e==`object`&&`signedMessage`in e&&`signature`in e)r=e;else throw Error(`@supabase/auth-js: Wallet method signIn() returned unrecognized value`);if(`signedMessage`in r&&`signature`in r&&(typeof r.signedMessage==`string`||r.signedMessage instanceof Uint8Array)&&r.signature instanceof Uint8Array)t=typeof r.signedMessage==`string`?r.signedMessage:new TextDecoder().decode(r.signedMessage),n=r.signature;else throw Error(`@supabase/auth-js: Wallet method signIn() API returned object without signedMessage and signature fields`)}else{if(!(`signMessage`in s)||typeof s.signMessage!=`function`||!(`publicKey`in s)||typeof s!=`object`||!s.publicKey||!(`toBase58`in s.publicKey)||typeof s.publicKey.toBase58!=`function`)throw Error(`@supabase/auth-js: Wallet does not have a compatible signMessage() and publicKey.toBase58() API`);t=[`${c.host} wants you to sign in with your Solana account:`,s.publicKey.toBase58(),...a?[``,a,``]:[``],`Version: 1`,`URI: ${c.href}`,`Issued At: ${o?.signInWithSolana?.issuedAt??new Date().toISOString()}`,...o?.signInWithSolana?.notBefore?[`Not Before: ${o.signInWithSolana.notBefore}`]:[],...o?.signInWithSolana?.expirationTime?[`Expiration Time: ${o.signInWithSolana.expirationTime}`]:[],...o?.signInWithSolana?.chainId?[`Chain ID: ${o.signInWithSolana.chainId}`]:[],...o?.signInWithSolana?.nonce?[`Nonce: ${o.signInWithSolana.nonce}`]:[],...o?.signInWithSolana?.requestId?[`Request ID: ${o.signInWithSolana.requestId}`]:[],...o?.signInWithSolana?.resources?.length?[`Resources`,...o.signInWithSolana.resources.map(e=>`- ${e}`)]:[]].join(`
 `);let e=await s.signMessage(new TextEncoder().encode(t),`utf8`);if(!e||!(e instanceof Uint8Array))throw Error(`@supabase/auth-js: Wallet signMessage() API returned an recognized value`);n=e}}try{let{data:r,error:i}=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=web3`,{headers:this.headers,body:Object.assign({chain:`solana`,message:t,signature:z(n)},e.options?.captchaToken?{gotrue_meta_security:{captcha_token:e.options?.captchaToken}}:null),xform:X});if(i)throw i;if(!r||!r.session||!r.user){let e=new L;return this._returnResult({data:{user:null,session:null},error:e})}return r.session&&(await this._saveSession(r.session),await this._notifyAllSubscribers(`SIGNED_IN`,r.session)),this._returnResult({data:Object.assign({},r),error:i})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async _exchangeCodeForSession(e,t){let n=t?.flowId!=null,r=n?Nr(t?.flowId):B()?Nr(xr(window.location.href)[M]):null;n&&!r&&this._debug(`#_exchangeCodeForSession()`,`provided flowId is not a valid flow id`,t?.flowId);let{verifier:i,flowId:a}=n&&!r?{verifier:null,flowId:null}:await zr(this.storage,this.storageKey,r),[o,s]=(i??``).split(`/`);try{if(!o&&this.flowType===`pkce`)throw new $n;let{data:t,error:n}=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=pkce`,{headers:this.headers,body:{auth_code:e,code_verifier:o},xform:X});if(await G(this.storage,this.storageKey,a),n)throw n;if(!t||!t.session||!t.user){let e=new L;return this._returnResult({data:{user:null,session:null,redirectType:null},error:e})}return t.session&&(await this._saveSession(t.session),await this._notifyAllSubscribers(s===`recovery`?`PASSWORD_RECOVERY`:`SIGNED_IN`,t.session)),this._returnResult({data:Object.assign(Object.assign({},t),{redirectType:s??null}),error:n})}catch(e){if(await G(this.storage,this.storageKey,a),N(e))return this._returnResult({data:{user:null,session:null,redirectType:null},error:e});throw e}}async signInWithIdToken(e){try{let{options:t,provider:n,token:r,access_token:i,nonce:a}=e,{data:o,error:s}=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=id_token`,{headers:this.headers,body:{provider:n,id_token:r,access_token:i,nonce:a,gotrue_meta_security:{captcha_token:t?.captchaToken}},xform:X});if(s)return this._returnResult({data:{user:null,session:null},error:s});if(!o||!o.session||!o.user){let e=new L;return this._returnResult({data:{user:null,session:null},error:e})}return o.session&&(await this._saveSession(o.session),await this._notifyAllSubscribers(`SIGNED_IN`,o.session)),this._returnResult({data:o,error:s})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async signInWithOtp(e){let t=null;try{if(`email`in e){let{email:n,options:r}=e,i=null,a=null;this.flowType===`pkce`&&([i,a,t]=await this._getCodeChallengeAndMethod());let{error:o}=await Y(this.fetch,`POST`,`${this.url}/otp`,{headers:this.headers,body:{email:n,data:r?.data??{},create_user:r?.shouldCreateUser??!0,gotrue_meta_security:{captcha_token:r?.captchaToken},code_challenge:i,code_challenge_method:a},redirectTo:this._maybeAppendFlowIdToRedirect(r?.emailRedirectTo,t)});return this._returnResult({data:{user:null,session:null},error:o})}if(`phone`in e){let{phone:t,options:n}=e,{data:r,error:i}=await Y(this.fetch,`POST`,`${this.url}/otp`,{headers:this.headers,body:{phone:t,data:n?.data??{},create_user:n?.shouldCreateUser??!0,gotrue_meta_security:{captcha_token:n?.captchaToken},channel:n?.channel??`sms`}});return this._returnResult({data:{user:null,session:null,messageId:r?.message_id},error:i})}throw new Yn(`You must provide either an email or phone number.`)}catch(e){if(await G(this.storage,this.storageKey,t),N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async verifyOtp(e){try{let t,n;`options`in e&&(t=e.options?.redirectTo,n=e.options?.captchaToken);let{data:r,error:i}=await Y(this.fetch,`POST`,`${this.url}/verify`,{headers:this.headers,body:Object.assign(Object.assign({},e),{gotrue_meta_security:{captcha_token:n}}),redirectTo:t,xform:X});if(i)throw i;if(!r)throw Error(`An error occurred on token verification.`);let a=r.session,o=r.user;return a?.access_token&&(await this._saveSession(a),await this._notifyAllSubscribers(e.type==`recovery`?`PASSWORD_RECOVERY`:`SIGNED_IN`,a)),this._returnResult({data:{user:o,session:a},error:null})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async signInWithSSO(e){let t=null;try{let n=null,r=null;this.flowType===`pkce`&&([n,r,t]=await this._getCodeChallengeAndMethod());let i=await Y(this.fetch,`POST`,`${this.url}/sso`,{body:Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({},`providerId`in e?{provider_id:e.providerId}:null),`domain`in e?{domain:e.domain}:null),{redirect_to:this._maybeAppendFlowIdToRedirect(e.options?.redirectTo,t)}),e?.options?.captchaToken?{gotrue_meta_security:{captcha_token:e.options.captchaToken}}:null),{skip_http_redirect:!0,code_challenge:n,code_challenge_method:r}),headers:this.headers,xform:ni});return i.data?.url&&B()&&!e.options?.skipBrowserRedirect&&window.location.assign(i.data.url),this._returnResult(i)}catch(e){if(await G(this.storage,this.storageKey,t),N(e))return this._returnResult({data:null,error:e});throw e}}async reauthenticate(){return await this.initializePromise,this.lock==null?await this._reauthenticate():await this._acquireLock(this.lockAcquireTimeout,async()=>await this._reauthenticate())}async _reauthenticate(){try{return await this._useSession(async e=>{let{data:{session:t},error:n}=e;if(n)throw n;if(!t)throw new I;let{error:r}=await Y(this.fetch,`GET`,`${this.url}/reauthenticate`,{headers:this.headers,jwt:t.access_token});return this._returnResult({data:{user:null,session:null},error:r})})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async resend(e){let t=null;try{let n=`${this.url}/resend`;if(`email`in e){let{email:r,type:i,options:a}=e,o=null,s=null;this.flowType===`pkce`&&([o,s,t]=await this._getCodeChallengeAndMethod());let{error:c}=await Y(this.fetch,`POST`,n,{headers:this.headers,body:{email:r,type:i,gotrue_meta_security:{captcha_token:a?.captchaToken},code_challenge:o,code_challenge_method:s},redirectTo:this._maybeAppendFlowIdToRedirect(a?.emailRedirectTo,t)});return c&&await G(this.storage,this.storageKey,t),this._returnResult({data:{user:null,session:null},error:c})}else if(`phone`in e){let{phone:t,type:r,options:i}=e,{data:a,error:o}=await Y(this.fetch,`POST`,n,{headers:this.headers,body:{phone:t,type:r,gotrue_meta_security:{captcha_token:i?.captchaToken}}});return this._returnResult({data:{user:null,session:null,messageId:a?.message_id},error:o})}throw new Yn(`You must provide either an email or phone number and a type`)}catch(e){if(await G(this.storage,this.storageKey,t),N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async getSession(){return await this.initializePromise,this.lock==null?await this._useSession(async e=>e):await this._acquireLock(this.lockAcquireTimeout,async()=>this._useSession(async e=>e))}async _acquireLock(e,t){this._debug(`#_acquireLock`,`begin`,e);try{if(this.lockAcquired){let e=this.pendingInLock.length?this.pendingInLock[this.pendingInLock.length-1]:Promise.resolve(),n=(async()=>(await e,await t()))();return this.pendingInLock.push((async()=>{try{await n}catch{}})()),n}return await this.lock(`lock:${this.storageKey}`,e,async()=>{this._debug(`#_acquireLock`,`lock acquired for storage key`,this.storageKey);try{this.lockAcquired=!0;let e=t();for(this.pendingInLock.push((async()=>{try{await e}catch{}})()),await e;this.pendingInLock.length;){let e=[...this.pendingInLock];await Promise.all(e),this.pendingInLock.splice(0,e.length)}return await e}finally{this._debug(`#_acquireLock`,`lock released for storage key`,this.storageKey),this.lockAcquired=!1}})}finally{this._debug(`#_acquireLock`,`end`)}}async _useSession(e){this._debug(`#_useSession`,`begin`);try{return await e(await this.__loadSession())}finally{this._debug(`#_useSession`,`end`)}}async __loadSession(){this._debug(`#__loadSession()`,`begin`),this.lock!=null&&!this.lockAcquired&&this._debug(`#__loadSession()`,`used outside of an acquired lock!`,Error().stack);try{let e=null,t=await U(this.storage,this.storageKey);if(this._debug(`#getSession()`,`session from storage`,t),t!==null&&(this._isValidSession(t)?e=t:(this._debug(`#getSession()`,`session from storage is not valid`),await this._removeSession())),!e)return{data:{session:null},error:null};let n=e.expires_at?e.expires_at*1e3-Date.now()<Bn:!1;if(this._debug(`#__loadSession()`,`session has${n?``:` not`} expired`,`expires_at`,e.expires_at),!n){if(this.userStorage){let t=await U(this.userStorage,this.storageKey+`-user`);t?.user?e.user=t.user:e.user=Jr()}if(this.storage.isServer&&e.user&&!e.user.__isUserNotAvailableProxy){let t={value:this.suppressGetSessionWarning};e.user=Yr(e.user,t),t.value&&(this.suppressGetSessionWarning=!0)}return{data:{session:e},error:null}}let{data:r,error:i}=await this._callRefreshToken(e.refresh_token);if(i){if(e.expires_at&&e.expires_at*1e3>Date.now()){let t=await U(this.storage,this.storageKey);if(t&&t.refresh_token===e.refresh_token)return this._returnResult({data:{session:e},error:null})}return this._returnResult({data:{session:null},error:i})}return this._returnResult({data:{session:r},error:null})}finally{this._debug(`#__loadSession()`,`end`)}}async getUser(e){if(e)return await this._getUser(e);await this.initializePromise;let t;return t=this.lock==null?await this._getUser():await this._acquireLock(this.lockAcquireTimeout,async()=>await this._getUser()),t.data.user&&(this.suppressGetSessionWarning=!0),t}async _getUser(e){try{return e?await Y(this.fetch,`GET`,`${this.url}/user`,{headers:this.headers,jwt:e,xform:Z}):await this._useSession(async e=>{let{data:t,error:n}=e;if(n)throw n;return!t.session?.access_token&&!this.hasCustomAuthorizationHeader?{data:{user:null},error:new I}:await Y(this.fetch,`GET`,`${this.url}/user`,{headers:this.headers,jwt:t.session?.access_token??void 0,xform:Z})})}catch(e){if(N(e))return Jn(e)&&await this._removeSession(),this._returnResult({data:{user:null},error:e});throw e}}async updateUser(e,t={}){return await this.initializePromise,this.lock==null?await this._updateUser(e,t):await this._acquireLock(this.lockAcquireTimeout,async()=>await this._updateUser(e,t))}async _updateUser(e,t={}){let n=null;try{return await this._useSession(async r=>{let{data:i,error:a}=r;if(a)throw a;if(!i.session)throw new I;let o=i.session,s=null,c=null;this.flowType===`pkce`&&e.email!=null&&([s,c,n]=await this._getCodeChallengeAndMethod());let{data:l,error:u}=await Y(this.fetch,`PUT`,`${this.url}/user`,{headers:this.headers,redirectTo:this._maybeAppendFlowIdToRedirect(t?.emailRedirectTo,n),body:Object.assign(Object.assign({},e),{code_challenge:s,code_challenge_method:c}),jwt:o.access_token,xform:Z});if(u)throw u;return o.user=l.user,await this._saveSession(o),await this._notifyAllSubscribers(`USER_UPDATED`,o),this._returnResult({data:{user:o.user},error:null})})}catch(e){if(await G(this.storage,this.storageKey,n),N(e))return this._returnResult({data:{user:null},error:e});throw e}}async setSession(e){return await this.initializePromise,this.lock==null?await this._setSession(e):await this._acquireLock(this.lockAcquireTimeout,async()=>await this._setSession(e))}async _setSession(e){try{if(!e.access_token||!e.refresh_token)throw new I;let t=Date.now()/1e3,n=t,r=!0,i=null,{payload:a}=Tr(e.access_token);if(a.exp&&(n=a.exp,r=n<=t),r){let{data:t,error:n}=await this._callRefreshToken(e.refresh_token);if(n)return this._returnResult({data:{user:null,session:null},error:n});if(!t)return{data:{user:null,session:null},error:null};i=t}else{let{data:r,error:a}=await this._getUser(e.access_token);if(a)return this._returnResult({data:{user:null,session:null},error:a});i={access_token:e.access_token,refresh_token:e.refresh_token,user:r.user,token_type:`bearer`,expires_in:n-t,expires_at:n},await this._saveSession(i),await this._notifyAllSubscribers(`SIGNED_IN`,i)}return this._returnResult({data:{user:i.user,session:i},error:null})}catch(e){if(N(e))return this._returnResult({data:{session:null,user:null},error:e});throw e}}async refreshSession(e){return await this.initializePromise,this.lock==null?await this._refreshSession(e):await this._acquireLock(this.lockAcquireTimeout,async()=>await this._refreshSession(e))}async _refreshSession(e){try{return await this._useSession(async t=>{if(!e){let{data:n,error:r}=t;if(r)throw r;e=n.session??void 0}if(!e?.refresh_token)throw new I;let{data:n,error:r}=await this._callRefreshToken(e.refresh_token);return r?this._returnResult({data:{user:null,session:null},error:r}):n?this._returnResult({data:{user:n.user,session:n},error:null}):this._returnResult({data:{user:null,session:null},error:null})})}catch(e){if(N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async _getSessionFromURL(e,t){try{if(!B())throw new Xn(`No browser detected.`);if(e.error||e.error_description||e.error_code)throw new Xn(e.error_description||`Error in URL with unspecified error_description`,{error:e.error||`unspecified_error`,code:e.error_code||`unspecified_code`});switch(t){case`implicit`:if(this.flowType===`pkce`)throw new Qn(`Not a valid PKCE flow url.`);break;case`pkce`:if(this.flowType===`implicit`)throw new Xn(`Not a valid implicit grant flow url.`);break;default:}if(t===`pkce`){if(this._debug(`#_initialize()`,`begin`,`is PKCE flow`,!0),!e.code)throw new Qn(`No code detected.`);let{data:t,error:n}=await this._exchangeCodeForSession(e.code,{flowId:e[M]});if(n)throw n;let r=new URL(window.location.href);return r.searchParams.delete(`code`),r.searchParams.delete(M),window.history.replaceState(window.history.state,``,r.toString()),{data:{session:t.session,redirectType:t.redirectType??null},error:null}}let{provider_token:n,provider_refresh_token:r,access_token:i,refresh_token:a,expires_in:o,expires_at:s,token_type:c}=e;if(!i||!o||!a||!c)throw new Xn(`No session defined in URL`);let l=Math.round(Date.now()/1e3),u=parseInt(o),d=l+u;s&&(d=parseInt(s));let f=d-l;f*1e3<=j&&console.warn(`@supabase/gotrue-js: Session as retrieved from URL expires in ${f}s, should have been closer to ${u}s`);let p=d-u;l-p>=120?console.warn(`@supabase/gotrue-js: Session as retrieved from URL was issued over 120s ago, URL could be stale`,p,d,l):l-p<0&&console.warn(`@supabase/gotrue-js: Session as retrieved from URL was issued in the future? Check the device clock for skew`,p,d,l);let{data:m,error:h}=await this._getUser(i);if(h)throw h;let g={provider_token:n,provider_refresh_token:r,access_token:i,expires_in:u,expires_at:d,refresh_token:a,token_type:c,user:m.user};return window.location.hash=``,this._debug(`#_getSessionFromURL()`,`clearing window.location.hash`),this._returnResult({data:{session:g,redirectType:e.type},error:null})}catch(e){if(N(e))return this._returnResult({data:{session:null,redirectType:null},error:e});throw e}}_isImplicitGrantCallback(e){return typeof this.detectSessionInUrl==`function`?this.detectSessionInUrl(new URL(window.location.href),e):!!(e.access_token||e.error||e.error_description||e.error_code)}async _isPKCECallback(e){if(!e.code)return!1;let t=Nr(e[M]);return t&&await U(this.storage,Fr(this.storageKey,t))?!0:!!await U(this.storage,`${this.storageKey}-code-verifier`)}async signOut(e={scope:`global`}){return await this.initializePromise,this.lock==null?await this._signOut(e):await this._acquireLock(this.lockAcquireTimeout,async()=>await this._signOut(e))}async _signOut({scope:e}={scope:`global`}){return await this._useSession(async t=>{let n=async()=>{await this._removeSession()},{data:r,error:i}=t;if(i&&!Jn(i))return this._returnResult({error:i});let a=r.session?.access_token;if(a){let{error:t}=await this.admin.signOut(a,e);if(t&&!(qn(t)&&(t.status===404||t.status===401||t.status===403)||Jn(t)))return e!==`others`&&await n(),this._returnResult({error:t})}return e!==`others`&&await n(),this._returnResult({error:null})})}onAuthStateChange(e){let t=yr(),n={id:t,callback:e,unsubscribe:()=>{this._debug(`#unsubscribe()`,`state change callback with id removed`,t),this.stateChangeEmitters.delete(t)}};return this._debug(`#onAuthStateChange()`,`registered callback with id`,t),this.stateChangeEmitters.set(t,n),(async()=>{await this.initializePromise,this.lock==null?await this._emitInitialSession(t):await this._acquireLock(this.lockAcquireTimeout,async()=>{this._emitInitialSession(t)})})(),{data:{subscription:n}}}async _emitInitialSession(e){return await this._useSession(async t=>{try{let{data:{session:n},error:r}=t;if(r)throw r;await this.stateChangeEmitters.get(e)?.callback(`INITIAL_SESSION`,n),this._debug(`INITIAL_SESSION`,`callback id`,e,`session`,n)}catch(t){await this.stateChangeEmitters.get(e)?.callback(`INITIAL_SESSION`,null),this._debug(`INITIAL_SESSION`,`callback id`,e,`error`,t),Jn(t)||nr(t)||qn(t)&&(t.code===`refresh_token_not_found`||t.code===`refresh_token_already_used`||t.code===`session_expired`)?console.warn(t):console.error(t)}})}async resetPasswordForEmail(e,t={}){let n=null,r=null,i=null;this.flowType===`pkce`&&([n,r,i]=await this._getCodeChallengeAndMethod(!0));try{return await Y(this.fetch,`POST`,`${this.url}/recover`,{body:{email:e,code_challenge:n,code_challenge_method:r,gotrue_meta_security:{captcha_token:t.captchaToken}},headers:this.headers,redirectTo:this._maybeAppendFlowIdToRedirect(t.redirectTo,i)})}catch(e){if(await G(this.storage,this.storageKey,i),N(e))return this._returnResult({data:null,error:e});throw e}}async getUserIdentities(){try{let{data:e,error:t}=await this.getUser();if(t)throw t;return this._returnResult({data:{identities:e.user.identities??[]},error:null})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async linkIdentity(e){return`token`in e?this.linkIdentityIdToken(e):this.linkIdentityOAuth(e)}async linkIdentityOAuth(e){let t=null;try{let{data:n,error:r}=await this._useSession(async n=>{let{data:r,error:i}=n;if(i)throw i;let{url:a,flowId:o}=await this._getUrlForProvider(`${this.url}/user/identities/authorize`,e.provider,{redirectTo:e.options?.redirectTo,scopes:e.options?.scopes,queryParams:e.options?.queryParams,skipBrowserRedirect:!0});return t=o,await Y(this.fetch,`GET`,a,{headers:this.headers,jwt:r.session?.access_token??void 0})});if(r)throw r;return B()&&!e.options?.skipBrowserRedirect&&window.location.assign(n?.url),this._returnResult({data:{provider:e.provider,url:n?.url,flowId:t},error:null})}catch(n){if(N(n))return this._returnResult({data:{provider:e.provider,url:null,flowId:t},error:n});throw n}}async linkIdentityIdToken(e){return await this._useSession(async t=>{try{let{error:n,data:{session:r}}=t;if(n)throw n;let{options:i,provider:a,token:o,access_token:s,nonce:c}=e,{data:l,error:u}=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=id_token`,{headers:this.headers,jwt:r?.access_token??void 0,body:{provider:a,id_token:o,access_token:s,nonce:c,link_identity:!0,gotrue_meta_security:{captcha_token:i?.captchaToken}},xform:X});return u?this._returnResult({data:{user:null,session:null},error:u}):!l||!l.session||!l.user?this._returnResult({data:{user:null,session:null},error:new L}):(l.session&&(await this._saveSession(l.session),await this._notifyAllSubscribers(`USER_UPDATED`,l.session)),this._returnResult({data:l,error:u}))}catch(e){if(await G(this.storage,this.storageKey,null),N(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}})}async unlinkIdentity(e){try{return await this._useSession(async t=>{let{data:n,error:r}=t;if(r)throw r;return await Y(this.fetch,`DELETE`,`${this.url}/user/identities/${e.identity_id}`,{headers:this.headers,jwt:n.session?.access_token??void 0})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _refreshAccessToken(e){let t=`#_refreshAccessToken()`;this._debug(t,`begin`);try{let n=Date.now();return await Dr(async n=>(n>0&&await Er(200*2**(n-1)),this._debug(t,`refreshing attempt`,n),await Y(this.fetch,`POST`,`${this.url}/token?grant_type=refresh_token`,{body:{refresh_token:e},headers:this.headers,xform:X})),(e,t)=>{let r=200*2**e;return t&&nr(t)&&Date.now()+r-n<j})}catch(e){if(this._debug(t,`error`,e),N(e))return this._returnResult({data:{session:null,user:null},error:e});throw e}finally{this._debug(t,`end`)}}_isValidSession(e){return typeof e==`object`&&!!e&&`access_token`in e&&`refresh_token`in e&&`expires_at`in e}async _handleProviderSignIn(e,t){let{url:n,flowId:r}=await this._getUrlForProvider(`${this.url}/authorize`,e,{redirectTo:t.redirectTo,scopes:t.scopes,queryParams:t.queryParams});return this._debug(`#_handleProviderSignIn()`,`provider`,e,`options`,t,`url`,n),B()&&!t.skipBrowserRedirect&&window.location.assign(n),{data:{provider:e,url:n,flowId:r},error:null}}async _recoverAndRefresh(){let e=`#_recoverAndRefresh()`;this._debug(e,`begin`);try{let t=await U(this.storage,this.storageKey);if(t&&this.userStorage){let e=await U(this.userStorage,this.storageKey+`-user`);!this.storage.isServer&&Object.is(this.storage,this.userStorage)&&!e&&(e={user:t.user},await H(this.userStorage,this.storageKey+`-user`,e)),t.user=e?.user??Jr()}else if(t&&!t.user&&!t.user){let e=await U(this.storage,this.storageKey+`-user`);e&&e?.user?(t.user=e.user,await W(this.storage,this.storageKey+`-user`),await H(this.storage,this.storageKey,t)):t.user=Jr()}if(this._debug(e,`session from storage`,t),!this._isValidSession(t)){this._debug(e,`session is not valid`),t!==null&&await this._removeSession();return}let n=(t.expires_at??1/0)*1e3-Date.now()<Bn;if(this._debug(e,`session has${n?``:` not`} expired with margin of ${Bn}s`),n){if(this.autoRefreshToken&&t.refresh_token){let{error:n}=await this._callRefreshToken(t.refresh_token);n&&(ir(n)?this._debug(e,`refresh discarded by commit guard`,n):this._debug(e,`refresh failed`,n))}}else if(t.user&&t.user.__isUserNotAvailableProxy===!0)try{let{data:n,error:r}=await this._getUser(t.access_token);!r&&n?.user?(t.user=n.user,await this._saveSession(t),await this._notifyAllSubscribers(`SIGNED_IN`,t)):this._debug(e,`could not get user data, skipping SIGNED_IN notification`)}catch(t){console.error(`Error getting user data:`,t),this._debug(e,`error getting user data, skipping SIGNED_IN notification`,t)}else await this._notifyAllSubscribers(`SIGNED_IN`,t)}catch(t){this._debug(e,`error`,t),nr(t)?console.warn(t):console.error(t);return}finally{this._debug(e,`end`)}}async _callRefreshToken(e){var t,n;if(!e)throw new I;if(this.refreshingDeferred)return this.refreshingDeferred.promise;if(this.lastRefreshFailure&&this.lastRefreshFailure.refreshToken===e&&Date.now()<this.lastRefreshFailure.expiresAt)return this._debug(`#_callRefreshToken()`,`returning cached failure (cooldown active)`),this.lastRefreshFailure.result;let r=`#_callRefreshToken()`;this._debug(r,`begin`);try{this.refreshingDeferred=new wr;let t=await U(this.storage,this.storageKey),{data:n,error:i}=await this._refreshAccessToken(e);if(i)throw i;if(!n.session)throw new I;let a=await U(this.storage,this.storageKey);if(t!==null&&(a===null||a.refresh_token!==t.refresh_token)){this._debug(r,`commit guard: storage changed since refresh started, discarding rotated tokens`,{startedWith:`present`,nowHolds:a?`replaced`:`cleared`});let e={data:null,error:new rr};return this.refreshingDeferred.resolve(e),e}let o=this._sessionRemovalEpoch;if(await this._saveSession(n.session),this._sessionRemovalEpoch!==o){this._debug(r,`commit guard (post-save): _removeSession ran during _saveSession, undoing write`),await W(this.storage,this.storageKey),this.userStorage&&await W(this.userStorage,this.storageKey+`-user`);let e={data:null,error:new rr};return this.refreshingDeferred.resolve(e),e}await this._notifyAllSubscribers(`TOKEN_REFRESHED`,n.session);let s={data:n.session,error:null};return this.lastRefreshFailure=null,this.refreshingDeferred.resolve(s),s}catch(i){if(this._debug(r,`error`,i),N(i)){let n={data:null,error:i};if(!nr(i)){let e=await U(this.storage,this.storageKey);e?.expires_at&&e.expires_at*1e3>Date.now()?this._debug(r,`proactive refresh failed, access token still valid — preserving session`):await this._removeSession()}return this.lastRefreshFailure={refreshToken:e,result:n,expiresAt:Date.now()+6e4},(t=this.refreshingDeferred)==null||t.resolve(n),n}throw(n=this.refreshingDeferred)==null||n.reject(i),i}finally{this.refreshingDeferred=null,this._debug(r,`end`)}}async _notifyAllSubscribers(e,t,n=!0){if(this._pendingInitNotifications!==null&&n){this._pendingInitNotifications.push({event:e,session:t,broadcast:n});return}let r=`#_notifyAllSubscribers(${e})`;this._debug(r,`begin`,t,`broadcast = ${n}`);try{this.broadcastChannel&&n&&this.broadcastChannel.postMessage({event:e,session:t});let r=[],i=Array.from(this.stateChangeEmitters.values()).map(async n=>{try{await n.callback(e,t)}catch(e){r.push(e)}});if(await Promise.all(i),r.length>0){for(let e=0;e<r.length;e+=1)console.error(r[e]);throw r[0]}}finally{this._debug(r,`end`)}}async _saveSession(e){this._debug(`#_saveSession()`,e),this.suppressGetSessionWarning=!0;let t=Object.assign({},e),n=t.user&&t.user.__isUserNotAvailableProxy===!0;if(this.userStorage){!n&&t.user&&await H(this.userStorage,this.storageKey+`-user`,{user:t.user});let e=Object.assign({},t);delete e.user;let r=Xr(e);await H(this.storage,this.storageKey,r)}else{let e=Xr(t);await H(this.storage,this.storageKey,e)}}async _removeSession(){this._sessionRemovalEpoch+=1,this._debug(`#_removeSession()`),this.lastRefreshFailure=null,this.suppressGetSessionWarning=!1,await W(this.storage,this.storageKey),await Br(this.storage,this.storageKey),await W(this.storage,this.storageKey+`-user`),this.userStorage&&await W(this.userStorage,this.storageKey+`-user`),await this._notifyAllSubscribers(`SIGNED_OUT`,null)}_removeVisibilityChangedCallback(){this._debug(`#_removeVisibilityChangedCallback()`);let e=this.visibilityChangedCallback;this.visibilityChangedCallback=null;try{e&&B()&&window!=null&&window.removeEventListener&&window.removeEventListener(`visibilitychange`,e)}catch(e){console.error(`removing visibilitychange callback failed`,e)}}async _startAutoRefresh(){await this._stopAutoRefresh(),this._debug(`#_startAutoRefresh()`);let e=setInterval(()=>this._autoRefreshTokenTick(),j);this.autoRefreshTicker=e,e&&typeof e==`object`&&typeof e.unref==`function`?e.unref():typeof Deno<`u`&&typeof Deno.unrefTimer==`function`&&Deno.unrefTimer(e);let t=setTimeout(async()=>{await this.initializePromise,await this._autoRefreshTokenTick()},0);this.autoRefreshTickTimeout=t,t&&typeof t==`object`&&typeof t.unref==`function`?t.unref():typeof Deno<`u`&&typeof Deno.unrefTimer==`function`&&Deno.unrefTimer(t)}async _stopAutoRefresh(){this._debug(`#_stopAutoRefresh()`);let e=this.autoRefreshTicker;this.autoRefreshTicker=null,e&&clearInterval(e);let t=this.autoRefreshTickTimeout;this.autoRefreshTickTimeout=null,t&&clearTimeout(t)}async startAutoRefresh(){this._removeVisibilityChangedCallback(),await this._startAutoRefresh()}async stopAutoRefresh(){this._removeVisibilityChangedCallback(),await this._stopAutoRefresh()}async dispose(){var e;this._removeVisibilityChangedCallback(),await this._stopAutoRefresh(),(e=this.broadcastChannel)==null||e.close(),this.broadcastChannel=null,this.stateChangeEmitters.clear()}async _autoRefreshTokenTick(){if(this._debug(`#_autoRefreshTokenTick()`,`begin`),this.lock!=null){try{await this._acquireLock(0,async()=>{try{let e=Date.now();try{return await this._useSession(async t=>{let{data:{session:n}}=t;if(!n||!n.refresh_token||!n.expires_at){this._debug(`#_autoRefreshTokenTick()`,`no session`);return}let r=Math.floor((n.expires_at*1e3-e)/j);this._debug(`#_autoRefreshTokenTick()`,`access token expires in ${r} ticks, a tick lasts ${j}ms, refresh threshold is 3 ticks`),r<=3&&await this._callRefreshToken(n.refresh_token)})}catch(e){console.error(`Auto refresh tick failed with error. This is likely a transient error.`,e)}}finally{this._debug(`#_autoRefreshTokenTick()`,`end`)}})}catch(e){if(e instanceof li)this._debug(`auto refresh token tick lock not available`);else throw e}return}if(this.refreshingDeferred!==null){this._debug(`#_autoRefreshTokenTick()`,`refresh already in flight, skipping`);return}try{let e=Date.now();try{await this._useSession(async t=>{let{data:{session:n}}=t;if(!n||!n.refresh_token||!n.expires_at){this._debug(`#_autoRefreshTokenTick()`,`no session`);return}let r=Math.floor((n.expires_at*1e3-e)/j);this._debug(`#_autoRefreshTokenTick()`,`access token expires in ${r} ticks, a tick lasts ${j}ms, refresh threshold is 3 ticks`),r<=3&&await this._callRefreshToken(n.refresh_token)})}catch(e){console.error(`Auto refresh tick failed with error. This is likely a transient error.`,e)}}finally{this._debug(`#_autoRefreshTokenTick()`,`end`)}}async _handleVisibilityChange(){if(this._debug(`#_handleVisibilityChange()`),!B()||!(window!=null&&window.addEventListener))return this.autoRefreshToken&&this.startAutoRefresh(),!1;try{this.visibilityChangedCallback=async()=>{try{await this._onVisibilityChanged(!1)}catch(e){this._debug(`#visibilityChangedCallback`,`error`,e)}},window==null||window.addEventListener(`visibilitychange`,this.visibilityChangedCallback),await this._onVisibilityChanged(!0)}catch(e){console.error(`_handleVisibilityChange`,e)}}async _onVisibilityChanged(e){let t=`#_onVisibilityChanged(${e})`;if(this._debug(t,`visibilityState`,document.visibilityState),document.visibilityState===`visible`){if(this.autoRefreshToken&&this._startAutoRefresh(),!e)if(await this.initializePromise,this.lock!=null)await this._acquireLock(this.lockAcquireTimeout,async()=>{if(document.visibilityState!==`visible`){this._debug(t,`acquired the lock to recover the session, but the browser visibilityState is no longer visible, aborting`);return}await this._recoverAndRefresh()});else{if(document.visibilityState!==`visible`){this._debug(t,`visibilityState is no longer visible, skipping recovery`);return}await this._recoverAndRefresh()}}else document.visibilityState===`hidden`&&this.autoRefreshToken&&this._stopAutoRefresh()}async _getUrlForProvider(e,t,n){let r=n?.redirectTo,i=null,a=null,o=null;this.flowType===`pkce`&&([i,a,o]=await this._getCodeChallengeAndMethod(),r=this._maybeAppendFlowIdToRedirect(r,o));let s=[`provider=${encodeURIComponent(t)}`];if(r&&s.push(`redirect_to=${encodeURIComponent(r)}`),n?.scopes&&s.push(`scopes=${encodeURIComponent(n.scopes)}`),i!=null&&a!=null){let e=new URLSearchParams({code_challenge:`${encodeURIComponent(i)}`,code_challenge_method:`${encodeURIComponent(a)}`});s.push(e.toString())}if(n?.queryParams){let e=new URLSearchParams(n.queryParams);s.push(e.toString())}return n?.skipBrowserRedirect&&s.push(`skip_http_redirect=${n.skipBrowserRedirect}`),{url:`${e}?${s.join(`&`)}`,flowId:o}}_maybeAppendFlowIdToRedirect(e,t){return!e||!t||!this.experimental.appendPkceFlowIdToRedirects?e??void 0:Vr(e,t)}async _getCodeChallengeAndMethod(e=!1){return Hr(this.storage,this.storageKey,e,e=>this._debug(`#_getCodeChallengeAndMethod()`,`evicted oldest pending PKCE verifier slot`,e))}async _unenroll(e){try{return await this._useSession(async t=>{let{data:n,error:r}=t;return r?this._returnResult({data:null,error:r}):await Y(this.fetch,`DELETE`,`${this.url}/factors/${e.factorId}`,{headers:this.headers,jwt:n?.session?.access_token})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _enroll(e){try{return await this._useSession(async t=>{let{data:n,error:r}=t;if(r)return this._returnResult({data:null,error:r});let i=Object.assign({friendly_name:e.friendlyName,factor_type:e.factorType},e.factorType===`phone`?{phone:e.phone}:e.factorType===`totp`?{issuer:e.issuer}:{}),{data:a,error:o}=await Y(this.fetch,`POST`,`${this.url}/factors`,{body:i,headers:this.headers,jwt:n?.session?.access_token});return o?this._returnResult({data:null,error:o}):(e.factorType===`totp`&&a.type===`totp`&&a?.totp?.qr_code&&(a.totp.qr_code=`data:image/svg+xml;utf-8,${a.totp.qr_code}`),this._returnResult({data:a,error:null}))})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _verify(e){let t=async()=>{try{return await this._useSession(async t=>{let{data:n,error:r}=t;if(r)return this._returnResult({data:null,error:r});let i=Object.assign({challenge_id:e.challengeId},`webauthn`in e?{webauthn:Object.assign(Object.assign({},e.webauthn),{credential_response:e.webauthn.type===`create`?Ei(e.webauthn.credential_response):Di(e.webauthn.credential_response)})}:{code:e.code}),{data:a,error:o}=await Y(this.fetch,`POST`,`${this.url}/factors/${e.factorId}/verify`,{body:i,headers:this.headers,jwt:n?.session?.access_token});return o?this._returnResult({data:null,error:o}):(await this._saveSession(Object.assign({expires_at:Math.round(Date.now()/1e3)+a.expires_in},a)),await this._notifyAllSubscribers(`MFA_CHALLENGE_VERIFIED`,a),this._returnResult({data:a,error:o}))})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}};return this.lock==null?t():this._acquireLock(this.lockAcquireTimeout,t)}async _challenge(e){let t=async()=>{try{return await this._useSession(async t=>{let{data:n,error:r}=t;if(r)return this._returnResult({data:null,error:r});let i=await Y(this.fetch,`POST`,`${this.url}/factors/${e.factorId}/challenge`,{body:e,headers:this.headers,jwt:n?.session?.access_token});if(i.error)return i;let{data:a}=i;if(a.type!==`webauthn`)return{data:a,error:null};switch(a.webauthn.type){case`create`:return{data:Object.assign(Object.assign({},a),{webauthn:Object.assign(Object.assign({},a.webauthn),{credential_options:Object.assign(Object.assign({},a.webauthn.credential_options),{publicKey:wi(a.webauthn.credential_options.publicKey)})})}),error:null};case`request`:return{data:Object.assign(Object.assign({},a),{webauthn:Object.assign(Object.assign({},a.webauthn),{credential_options:Object.assign(Object.assign({},a.webauthn.credential_options),{publicKey:Ti(a.webauthn.credential_options.publicKey)})})}),error:null}}})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}};return this.lock==null?t():this._acquireLock(this.lockAcquireTimeout,t)}async _challengeAndVerify(e){let{data:t,error:n}=await this._challenge({factorId:e.factorId});return n?this._returnResult({data:null,error:n}):await this._verify({factorId:e.factorId,challengeId:t.id,code:e.code})}async _listFactors(){let{data:{user:e},error:t}=await this.getUser();if(t)return{data:null,error:t};let n={all:[],phone:[],totp:[],webauthn:[]};for(let t of e?.factors??[])n.all.push(t),t.status===`verified`&&n[t.factor_type].push(t);return{data:n,error:null}}async _getAuthenticatorAssuranceLevel(e){if(e)try{let{payload:t}=Tr(e),n=null;t.aal&&(n=t.aal);let r=n,{data:{user:i},error:a}=await this.getUser(e);if(a)return this._returnResult({data:null,error:a});((i?.factors)?.filter(e=>e.status===`verified`)??[]).length>0&&(r=`aal2`);let o=t.amr||[];return{data:{currentLevel:n,nextLevel:r,currentAuthenticationMethods:o},error:null}}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}let{data:{session:t},error:n}=await this.getSession();if(n)return this._returnResult({data:null,error:n});if(!t)return{data:{currentLevel:null,nextLevel:null,currentAuthenticationMethods:[]},error:null};let{payload:r}=Tr(t.access_token),i=null;r.aal&&(i=r.aal);let a=i;(t.user.factors?.filter(e=>e.status===`verified`)??[]).length>0&&(a=`aal2`);let o=r.amr||[];return{data:{currentLevel:i,nextLevel:a,currentAuthenticationMethods:o},error:null}}async _getAuthorizationDetails(e){try{return await this._useSession(async t=>{let{data:{session:n},error:r}=t;return r?this._returnResult({data:null,error:r}):n?await Y(this.fetch,`GET`,`${this.url}/oauth/authorizations/${e}`,{headers:this.headers,jwt:n.access_token,xform:e=>({data:e,error:null})}):this._returnResult({data:null,error:new I})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _approveAuthorization(e,t){try{return await this._useSession(async n=>{let{data:{session:r},error:i}=n;if(i)return this._returnResult({data:null,error:i});if(!r)return this._returnResult({data:null,error:new I});let a=await Y(this.fetch,`POST`,`${this.url}/oauth/authorizations/${e}/consent`,{headers:this.headers,jwt:r.access_token,body:{action:`approve`},xform:e=>({data:e,error:null})});return a.data&&a.data.redirect_url&&B()&&!t?.skipBrowserRedirect&&window.location.assign(a.data.redirect_url),a})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _denyAuthorization(e,t){try{return await this._useSession(async n=>{let{data:{session:r},error:i}=n;if(i)return this._returnResult({data:null,error:i});if(!r)return this._returnResult({data:null,error:new I});let a=await Y(this.fetch,`POST`,`${this.url}/oauth/authorizations/${e}/consent`,{headers:this.headers,jwt:r.access_token,body:{action:`deny`},xform:e=>({data:e,error:null})});return a.data&&a.data.redirect_url&&B()&&!t?.skipBrowserRedirect&&window.location.assign(a.data.redirect_url),a})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _listOAuthGrants(){try{return await this._useSession(async e=>{let{data:{session:t},error:n}=e;return n?this._returnResult({data:null,error:n}):t?await Y(this.fetch,`GET`,`${this.url}/user/oauth/grants`,{headers:this.headers,jwt:t.access_token,xform:e=>({data:e,error:null})}):this._returnResult({data:null,error:new I})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _revokeOAuthGrant(e){try{return await this._useSession(async t=>{let{data:{session:n},error:r}=t;return r?this._returnResult({data:null,error:r}):n?(await Y(this.fetch,`DELETE`,`${this.url}/user/oauth/grants`,{headers:this.headers,jwt:n.access_token,query:{client_id:e.clientId},noResolveJson:!0}),{data:{},error:null}):this._returnResult({data:null,error:new I})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async fetchJwk(e,t={keys:[]}){let n=t.keys.find(t=>t.kid===e);if(n)return n;let r=Date.now();if(n=this.jwks.keys.find(t=>t.kid===e),n&&this.jwks_cached_at+6e5>r)return n;let{data:i,error:a}=await Y(this.fetch,`GET`,`${this.url}/.well-known/jwks.json`,{headers:this.headers});if(a)throw a;return!i.keys||i.keys.length===0||(this.jwks=i,this.jwks_cached_at=r,n=i.keys.find(t=>t.kid===e),!n)?null:n}async getClaims(e,t={}){try{let n=e;if(!n){let{data:e,error:t}=await this.getSession();if(t||!e.session)return this._returnResult({data:null,error:t});n=e.session.access_token}let{header:r,payload:i,signature:a,raw:{header:o,payload:s}}=Tr(n);if(!t?.allowExpired)try{Gr(i.exp)}catch(e){throw new sr(e instanceof Error?e.message:`JWT validation failed`)}let c=!r.alg||r.alg.startsWith(`HS`)||!r.kid||!(`crypto`in globalThis&&`subtle`in globalThis.crypto)?null:await this.fetchJwk(r.kid,t?.keys?{keys:t.keys}:t?.jwks);if(!c){let{error:e}=await this.getUser(n);if(e)throw e;return{data:{claims:i,header:r,signature:a},error:null}}let l=Kr(r.alg),u=await crypto.subtle.importKey(`jwk`,c,l,!0,[`verify`]);if(!await crypto.subtle.verify(l,u,a,_r(`${o}.${s}`)))throw new sr(`Invalid JWT signature`);return{data:{claims:i,header:r,signature:a},error:null}}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async signInWithPasskey(e){q(this.experimental);try{if(!ki())return this._returnResult({data:null,error:new P(`Browser does not support WebAuthn`,null)});let{data:t,error:n}=await this._startPasskeyAuthentication({options:{captchaToken:e?.options?.captchaToken}});if(n||!t)return this._returnResult({data:null,error:n});let{data:r,error:i}=await ji({publicKey:Ti(t.options),signal:e?.options?.signal??Ci.createNewAbortSignal()});if(i||!r)return this._returnResult({data:null,error:i??new P(`WebAuthn ceremony failed`,null)});let a=Di(r);return this._verifyPasskeyAuthentication({challengeId:t.challenge_id,credential:a})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async registerPasskey(e){q(this.experimental);try{if(!ki())return this._returnResult({data:null,error:new P(`Browser does not support WebAuthn`,null)});let{data:t,error:n}=await this._startPasskeyRegistration();if(n||!t)return this._returnResult({data:null,error:n});let{data:r,error:i}=await Ai({publicKey:wi(t.options),signal:e?.options?.signal??Ci.createNewAbortSignal()});if(i||!r)return this._returnResult({data:null,error:i??new P(`WebAuthn ceremony failed`,null)});let a=Ei(r);return this._verifyPasskeyRegistration({challengeId:t.challenge_id,credential:a})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _startPasskeyRegistration(){q(this.experimental);try{return await this._useSession(async e=>{let{data:{session:t},error:n}=e;if(n)return this._returnResult({data:null,error:n});if(!t)return this._returnResult({data:null,error:new I});let{data:r,error:i}=await Y(this.fetch,`POST`,`${this.url}/passkeys/registration/options`,{headers:this.headers,jwt:t.access_token,body:{}});return i?this._returnResult({data:null,error:i}):this._returnResult({data:r,error:null})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _verifyPasskeyRegistration(e){q(this.experimental);try{return await this._useSession(async t=>{let{data:{session:n},error:r}=t;if(r)return this._returnResult({data:null,error:r});if(!n)return this._returnResult({data:null,error:new I});let{data:i,error:a}=await Y(this.fetch,`POST`,`${this.url}/passkeys/registration/verify`,{headers:this.headers,jwt:n.access_token,body:{challenge_id:e.challengeId,credential:e.credential}});return a?this._returnResult({data:null,error:a}):this._returnResult({data:i,error:null})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _startPasskeyAuthentication(e){q(this.experimental);try{let{data:t,error:n}=await Y(this.fetch,`POST`,`${this.url}/passkeys/authentication/options`,{headers:this.headers,body:{gotrue_meta_security:{captcha_token:e?.options?.captchaToken}}});return n?this._returnResult({data:null,error:n}):this._returnResult({data:t,error:null})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _verifyPasskeyAuthentication(e){q(this.experimental);try{let{data:t,error:n}=await Y(this.fetch,`POST`,`${this.url}/passkeys/authentication/verify`,{headers:this.headers,body:{challenge_id:e.challengeId,credential:e.credential},xform:X});return n?this._returnResult({data:null,error:n}):(t.session&&(await this._saveSession(t.session),await this._notifyAllSubscribers(`SIGNED_IN`,t.session)),this._returnResult({data:t,error:null}))}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _listPasskeys(){q(this.experimental);try{return await this._useSession(async e=>{let{data:{session:t},error:n}=e;if(n)return this._returnResult({data:null,error:n});if(!t)return this._returnResult({data:null,error:new I});let{data:r,error:i}=await Y(this.fetch,`GET`,`${this.url}/passkeys`,{headers:this.headers,jwt:t.access_token,xform:e=>({data:e,error:null})});return i?this._returnResult({data:null,error:i}):this._returnResult({data:r,error:null})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _updatePasskey(e){q(this.experimental);try{return await this._useSession(async t=>{let{data:{session:n},error:r}=t;if(r)return this._returnResult({data:null,error:r});if(!n)return this._returnResult({data:null,error:new I});let{data:i,error:a}=await Y(this.fetch,`PATCH`,`${this.url}/passkeys/${e.passkeyId}`,{headers:this.headers,jwt:n.access_token,body:{friendly_name:e.friendlyName}});return a?this._returnResult({data:null,error:a}):this._returnResult({data:i,error:null})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}async _deletePasskey(e){q(this.experimental);try{return await this._useSession(async t=>{let{data:{session:n},error:r}=t;if(r)return this._returnResult({data:null,error:r});if(!n)return this._returnResult({data:null,error:new I});let{error:i}=await Y(this.fetch,`DELETE`,`${this.url}/passkeys/${e.passkeyId}`,{headers:this.headers,jwt:n.access_token,noResolveJson:!0});return i?this._returnResult({data:null,error:i}):this._returnResult({data:null,error:null})})}catch(e){if(N(e))return this._returnResult({data:null,error:e});throw e}}};Bi.nextInstanceID={};var Vi=Bi,Hi=si,Ui=Vi,Wi=class extends Ui{constructor(e){super(e)}},Gi=class{constructor(e,t,n){this.supabaseUrl=e,this.supabaseKey=t;let r=Rn(e);if(!t)throw Error(`supabaseKey is required.`);jn(t),this.realtimeUrl=new URL(`realtime/v1`,r),this.realtimeUrl.protocol=this.realtimeUrl.protocol.replace(`http`,`ws`),this.authUrl=new URL(`auth/v1`,r),this.storageUrl=new URL(`storage/v1`,r),this.functionsUrl=new URL(`functions/v1`,r);let i=`sb-${r.hostname.split(`.`)[0]}-auth-token`,a={db:_n,realtime:yn,auth:{...vn,storageKey:i},global:gn,tracePropagation:bn},o=Ln(n??{},a);this.settings=o,this.storageKey=o.auth.storageKey??``,this.headers=o.global.headers??{},o.accessToken?(this.accessToken=o.accessToken,this.auth=new Proxy({},{get:(e,t)=>{throw Error(`@supabase/supabase-js: Supabase Client is configured with the accessToken option, accessing supabase.auth.${String(t)} is not possible`)}})):this.auth=this._initSupabaseAuthClient(o.auth??{},this.headers,o.global.fetch),this.fetch=Mn(t,e,this._getSessionToken.bind(this),o.global.fetch,o.tracePropagation),this.functionsFetch=Mn(t,e,this._getSessionToken.bind(this),o.global.fetch,o.tracePropagation,{omitApiKeyAsBearer:!0}),this.realtime=this._initRealtimeClient({headers:this.headers,accessToken:this._getAccessToken.bind(this),fetch:this.fetch,...o.realtime}),this.accessToken&&Promise.resolve(this.accessToken()).then(e=>this.realtime.setAuth(e)).catch(e=>console.warn(`Failed to set initial Realtime auth token:`,e)),this.rest=new le(new URL(`rest/v1`,r).href,{headers:this.headers,schema:o.db.schema,fetch:this.fetch,timeout:o.db.timeout,urlLengthLimit:o.db.urlLengthLimit,retry:o.db.retry}),this.storage=new fn(this.storageUrl.href,this.headers,this.fetch,n?.storage),o.accessToken||this._listenForAuthEvents()}get functions(){return new l(this.functionsUrl.href,{headers:this.headers,customFetch:this.functionsFetch})}from(e){return this.rest.from(e)}schema(e){return this.rest.schema(e)}rpc(e,t={},n={head:!1,get:!1,count:void 0}){return this.rest.rpc(e,t,n)}channel(e,t={config:{}}){return this.realtime.channel(e,t)}getChannels(){return this.realtime.getChannels()}removeChannel(e){return this.realtime.removeChannel(e)}removeAllChannels(){return this.realtime.removeAllChannels()}async _getSessionToken(){if(this.accessToken)return await this.accessToken();let{data:e}=await this.auth.getSession();return e.session?.access_token??null}async _getAccessToken(){return await this._getSessionToken()??this.supabaseKey}_initSupabaseAuthClient({autoRefreshToken:e,persistSession:t,detectSessionInUrl:n,storage:r,userStorage:i,storageKey:a,flowType:o,lock:s,debug:c,throwOnError:l,experimental:u,lockAcquireTimeout:d,skipAutoInitialize:f},p,m){let h={Authorization:`Bearer ${this.supabaseKey}`,apikey:`${this.supabaseKey}`};return new Wi({url:this.authUrl.href,headers:{...h,...p},storageKey:a,autoRefreshToken:e,persistSession:t,detectSessionInUrl:n,storage:r,userStorage:i,flowType:o,lock:s,debug:c,throwOnError:l,experimental:u,fetch:m,lockAcquireTimeout:d,skipAutoInitialize:f,hasCustomAuthorizationHeader:Object.keys(this.headers).some(e=>e.toLowerCase()===`authorization`)})}_initRealtimeClient(e){return new ht(this.realtimeUrl.href,{...e,params:{apikey:this.supabaseKey,...e?.params}})}_listenForAuthEvents(){return this.auth.onAuthStateChange((e,t)=>{this._handleTokenChanged(e,`CLIENT`,t?.access_token)})}_handleTokenChanged(e,t,n){(e===`TOKEN_REFRESHED`||e===`SIGNED_IN`||e===`INITIAL_SESSION`)&&this.changedAccessToken!==n?(this.changedAccessToken=n,this.realtime.setAuth(n)):e===`SIGNED_OUT`&&(this.realtime.setAuth(),t==`STORAGE`&&this.auth.signOut(),this.changedAccessToken=void 0)}};let Ki=(e,t,n)=>new Gi(e,t,n);function qi(){if(typeof window<`u`||globalThis.Deno!==void 0)return!1;let e=globalThis.process;if(!e)return!1;let t=e.version;if(t==null)return!1;let n=t.match(/^v(\d+)\./);return n?parseInt(n[1],10)<=20:!1}return qi()&&console.warn(`⚠️  Node.js 20 and below are deprecated and will no longer be supported in future versions of @supabase/supabase-js. Please upgrade to Node.js 22 or later. For more information, visit: https://github.com/orgs/supabase/discussions/45715`),e.AuthAdminApi=Hi,e.AuthApiError=Kn,e.AuthClient=Ui,e.AuthError=Gn,e.AuthImplicitGrantRedirectError=Xn,e.AuthInvalidCredentialsError=Yn,e.AuthInvalidJwtError=sr,e.AuthInvalidTokenResponseError=L,e.AuthPKCECodeVerifierMissingError=$n,e.AuthPKCEGrantCodeExchangeError=Qn,e.AuthRefreshDiscardedError=rr,e.AuthRetryableFetchError=tr,e.AuthSessionMissingError=I,e.AuthUnknownError=P,e.AuthWeakPasswordError=ar,e.CustomAuthError=F,Object.defineProperty(e,`FunctionRegion`,{enumerable:!0,get:function(){return c}}),e.FunctionsError=i,e.FunctionsFetchError=a,e.FunctionsHttpError=s,e.FunctionsRelayError=o,e.GoTrueAdminApi=si,e.GoTrueClient=Vi,e.NavigatorLockAcquireTimeoutError=ui,e.PostgrestError=p,e.REALTIME_CHANNEL_STATES=ct,Object.defineProperty(e,`REALTIME_LISTEN_TYPES`,{enumerable:!0,get:function(){return w}}),Object.defineProperty(e,`REALTIME_POSTGRES_CHANGES_LISTEN_EVENT`,{enumerable:!0,get:function(){return st}}),Object.defineProperty(e,`REALTIME_PRESENCE_LISTEN_EVENTS`,{enumerable:!0,get:function(){return Je}}),Object.defineProperty(e,`REALTIME_SUBSCRIBE_STATES`,{enumerable:!0,get:function(){return T}}),e.RealtimeChannel=lt,e.RealtimeClient=ht,e.RealtimePostgresFilterBuilder=at,e.RealtimePresence=Ye,e.SIGN_OUT_SCOPES=oi,e.StorageApiError=jt,e.SupabaseClient=Gi,e.WebSocketFactory=ue,e.createClient=Ki,e.isAuthApiError=qn,e.isAuthError=N,e.isAuthImplicitGrantRedirectError=Zn,e.isAuthPKCECodeVerifierMissingError=er,e.isAuthRefreshDiscardedError=ir,e.isAuthRetryableFetchError=nr,e.isAuthSessionMissingError=Jn,e.isAuthWeakPasswordError=or,e.lockInternals=Q,e.navigatorLock=fi,e.postgresChangesFilter=ot,e.processLock=mi,e})({});</script>
-<script>window.require=function(m){if(m==="react")return window.React;if(m==="recharts")return window.Recharts;throw new Error("Unknown module: "+m);}</script>
+<script>window.require=function(m){if(m==="react")return window.React;if(m==="recharts")return window.Recharts;throw new Error("Cannot find module "+m);};</script>
 <script>
 (() => {
   var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
@@ -388,7 +388,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     throw Error('Dynamic require of "' + x + '" is not supported');
   });
 
-  // ../../home/user/production/PostProTrackerV4.jsx
+  // PostProTrackerV4.jsx
   var import_react = __require("react");
   var import_recharts = __require("recharts");
   var NAV_HEADER_HEIGHT = 53;
@@ -2443,7 +2443,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       )))
     );
   };
-  var LoadPresetModal = ({ presets, allProjects = [], onApply, onDelete, onClose }) => {
+  var LoadPresetModal = ({ presets: allPresets, allProjects = [], onApply, onDelete, onClose }) => {
+    const presets = allPresets.filter((p) => p.active !== false);
     const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const [sel, setSel] = (0, import_react.useState)(null);
     const [sections, setSections] = (0, import_react.useState)(/* @__PURE__ */ new Set(["datetime", "spaces", "talent", "setups", "crew", "schedule", "gear", "deliverables", "ingest"]));
@@ -3273,7 +3274,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   var EditorPicker = ({ value, onChange, deadline, allProjects, excludeDelId, team, style: s = {} }) => {
     const [open, setOpen] = (0, import_react.useState)(false);
     const ref = (0, import_react.useRef)();
-    const editors = team.filter((m) => m.roles.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
+    const editors = team.filter((m) => m.active !== false && m.roles.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
     const current = team.find((m) => m.id === value);
     (0, import_react.useEffect)(() => {
       if (!open) return;
@@ -3423,9 +3424,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const allApproved = del.rounds.length > 0 && del.rounds.every((r) => r.status === "Approved");
     const [secOpen, setSecOpen] = (0, import_react.useState)({ info: true, frame: true, rounds: false });
     const toggleSec = (k) => setSecOpen((s) => ({ ...s, [k]: !s[k] }));
-    const editors = team.filter((m) => m.roles.some((r) => ["Editor", "Animator"].includes(r)));
+    const editors = team.filter((m) => m.active !== false && m.roles.some((r) => ["Editor", "Animator"].includes(r)));
     const animators = team.filter((m) => m.roles.includes("Animator"));
-    const producers = team.filter((m) => m.roles.some((r) => ["Producer", "Project Manager", "Post Project Manager"].includes(r)));
+    const producers = team.filter((m) => m.active !== false && m.roles.some((r) => ["Producer", "Project Manager", "Post Project Manager"].includes(r)));
     const effectiveBU = del.businessUnit || project?.businessUnit || "";
     const effectiveWS = del.workstream || project?.workstream || "";
     const effectiveProducerId = del.producerId || project?.assignees?.["Producer"]?.[0] || null;
@@ -4800,7 +4801,7 @@ Brief content: ${content}`;
   var ProjectOverview = ({ project, team, allProjects, onClose, onUpdateDel, onAddDel, onDeleteDel, onUpdateProject, initialDelId, initialTab, initialShootId, initialItemId, studioBookings = [], mediaCards = [], setupTypes = [], onAddSetupType, talentRoster = [], onUpdateTalentRoster, nudges = [], onAddNudge, furnitureList = [], propsList = [], screenContentOptions = {}, gearList = [], customTasks = [], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, appPresets = [], onSaveAppPresets, vendorCompanies = [], addVendorCompany, intakes = [], becRequests = [], canAccessBudget = true, reviewerNames = [], addReviewerName, workReviewSessions = [], addWorkReviewSession, updateWorkReviewSession, lists = {}, onTabChange }) => {
     const [activeDelModal, setActiveDelModal] = (0, import_react.useState)(initialDelId || (initialTab === "deliverables" || initialTab === "ingest" ? initialItemId : null) || null);
     const [handoffDelId, setHandoffDelId] = (0, import_react.useState)(null);
-    const editors = team.filter((m) => m.roles?.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
+    const editors = team.filter((m) => m.active !== false && m.roles?.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
     const [showAddDel, setShowAddDel] = (0, import_react.useState)(false);
     const [showAddReviewRound, setShowAddReviewRound] = (0, import_react.useState)(false);
     const [showAddWorkReview, setShowAddWorkReview] = (0, import_react.useState)(false);
@@ -4920,7 +4921,7 @@ Brief content: ${content}`;
       const attached = (lp.intakeIds || []).map((id) => (intakes || []).find((i) => i.id === id)).filter(Boolean);
       const latestIntake = attached.sort((a, b) => new Date(b.dateReceived) - new Date(a.dateReceived))[0];
       return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(LW, { label: "Project Name", style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement(Inp, { value: lp.name || "", onChange: (e) => onUpdateProject(project.id, "name", e.target.value), placeholder: "Official project name\u2026" }), latestIntake?.requestName && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 5, display: "flex", alignItems: "center", gap: 6, background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, padding: "5px 10px" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: "#4b5563", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.07em", flexShrink: 0 } }, "Client Request Name:"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#9ca3af", fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, latestIntake.requestName), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#374151", flexShrink: 0, marginLeft: "auto", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "Reference only"))));
-    })(), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } }, /* @__PURE__ */ React.createElement(LW, { label: "Status" }, /* @__PURE__ */ React.createElement(Sel, { value: lp.status, onChange: (e) => onUpdateProject(project.id, "status", e.target.value) }, PROJECT_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s }, s)))), /* @__PURE__ */ React.createElement(LW, { label: "Project ID" }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, background: "#060d18", border: "1px solid #1f2937", borderRadius: 7, color: "#818cf8", padding: "7px 11px", fontSize: 17, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.08em" } }, lp.projectCode || "\u2014"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" } }, "Auto-assigned"))), /* @__PURE__ */ React.createElement(LW, { label: "Workstream" }, /* @__PURE__ */ React.createElement(Sel, { value: lp.workstream || "", onChange: (e) => onUpdateProject(project.id, "workstream", e.target.value) }, WORKSTREAMS.map((s) => /* @__PURE__ */ React.createElement("option", { key: s }, s)))), /* @__PURE__ */ React.createElement(LW, { label: "Business Unit" }, /* @__PURE__ */ React.createElement(Sel, { value: lp.businessUnit || "", onChange: (e) => onUpdateProject(project.id, "businessUnit", e.target.value) }, lp.businessUnit && !BUSINESS_UNITS.includes(lp.businessUnit) && /* @__PURE__ */ React.createElement("option", { value: lp.businessUnit, style: { color: "#f59e0b" } }, lp.businessUnit), BUSINESS_UNITS.map((s) => /* @__PURE__ */ React.createElement("option", { key: s }, s))), lp.businessUnit?.startsWith("Undefined") && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#f59e0b", marginTop: 3 } }, "\u26A0 BU from intake not in standard list \u2014 update if needed")), /* @__PURE__ */ React.createElement(LW, { label: "Final Deadline", style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: lp.deadline || "", onChange: (v) => onUpdateProject(project.id, "deadline", v) }))), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", fontSize: 14, color: lp.basedOnExistingMaterial ? "#10b981" : "#9ca3af", background: "#0f172a", borderRadius: 9, padding: "10px 12px", marginBottom: 14 } }, /* @__PURE__ */ React.createElement(
+    })(), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } }, /* @__PURE__ */ React.createElement(LW, { label: "Status" }, /* @__PURE__ */ React.createElement(Sel, { value: lp.status, onChange: (e) => onUpdateProject(project.id, "status", e.target.value) }, PROJECT_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s }, s)))), /* @__PURE__ */ React.createElement(LW, { label: "Project ID" }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, background: "#060d18", border: "1px solid #1f2937", borderRadius: 7, color: "#818cf8", padding: "7px 11px", fontSize: 17, fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.08em" } }, lp.projectCode || "\u2014"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" } }, "Auto-assigned"))), /* @__PURE__ */ React.createElement(LW, { label: "Workstream" }, /* @__PURE__ */ React.createElement(Sel, { value: lp.workstream || "", onChange: (e) => onUpdateProject(project.id, "workstream", e.target.value) }, lp.workstream && !WORKSTREAMS.includes(lp.workstream) && /* @__PURE__ */ React.createElement("option", { value: lp.workstream, style: { color: "#f59e0b" } }, lp.workstream), WORKSTREAMS.map((s) => /* @__PURE__ */ React.createElement("option", { key: s }, s)))), /* @__PURE__ */ React.createElement(LW, { label: "Business Unit" }, /* @__PURE__ */ React.createElement(Sel, { value: lp.businessUnit || "", onChange: (e) => onUpdateProject(project.id, "businessUnit", e.target.value) }, lp.businessUnit && !BUSINESS_UNITS.includes(lp.businessUnit) && /* @__PURE__ */ React.createElement("option", { value: lp.businessUnit, style: { color: "#f59e0b" } }, lp.businessUnit), BUSINESS_UNITS.map((s) => /* @__PURE__ */ React.createElement("option", { key: s }, s))), lp.businessUnit?.startsWith("Undefined") && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#f59e0b", marginTop: 3 } }, "\u26A0 BU from intake not in standard list \u2014 update if needed")), /* @__PURE__ */ React.createElement(LW, { label: "Final Deadline", style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: lp.deadline || "", onChange: (v) => onUpdateProject(project.id, "deadline", v) }))), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", fontSize: 14, color: lp.basedOnExistingMaterial ? "#10b981" : "#9ca3af", background: "#0f172a", borderRadius: 9, padding: "10px 12px", marginBottom: 14 } }, /* @__PURE__ */ React.createElement(
       "input",
       {
         type: "checkbox",
@@ -6842,8 +6843,8 @@ Brief content: ${content}`;
       } else setSidebarProjectId(p.id);
     };
     const sidebarProject = sidebarProjectId ? projects.find((p) => p.id === sidebarProjectId) : null;
-    const producers = team.filter((m) => m.roles.some((r) => ["Producer", "Project Manager"].includes(r)));
-    const editors = team.filter((m) => m.roles.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
+    const producers = team.filter((m) => m.active !== false && m.roles.some((r) => ["Producer", "Project Manager"].includes(r)));
+    const editors = team.filter((m) => m.active !== false && m.roles.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
     const years = [...new Set(projects.map((p) => p.year || new Date(p.deadline || Date.now()).getFullYear()))].sort((a, b) => b - a);
     const filtered = (0, import_react.useMemo)(() => projects.filter((p) => {
       const q = search.toLowerCase();
@@ -6928,7 +6929,7 @@ Brief content: ${content}`;
         return /* @__PURE__ */ React.createElement("div", { key: pm.id }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12 } }, /* @__PURE__ */ React.createElement(Av, { name: pm.name, size: 30, email: pm.email }), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 19, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, pm.name), /* @__PURE__ */ React.createElement(Chip, { label: "Project Manager", color: "#f59e0b", xs: true }), /* @__PURE__ */ React.createElement("div", { style: { background: "#f59e0b20", color: "#fbbf24", borderRadius: 99, padding: "2px 10px", fontSize: 14, fontWeight: 800 } }, pp.length)), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(285px,1fr))", gap: 12 } }, sortS(pp).map((p) => /* @__PURE__ */ React.createElement(ProjectCard, { key: p.id, project: p, team, onClick: openSidebar, onUpdateProject }))));
       }), activeFiltered.filter((p) => !(p.assignees?.["Project Manager"] || []).some((id) => pms.some((pm) => pm.id === id))).length > 0 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 900, fontSize: 18, color: "#9ca3af", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 12 } }, "No PM Assigned"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(285px,1fr))", gap: 12 } }, activeFiltered.filter((p) => !(p.assignees?.["Project Manager"] || []).some((id) => pms.some((pm) => pm.id === id))).map((p) => /* @__PURE__ */ React.createElement(ProjectCard, { key: p.id, project: p, team, onClick: openSidebar, onUpdateProject })))));
     })(), groupMode === "editor" && (() => {
-      const eds = team.filter((m) => m.roles.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
+      const eds = team.filter((m) => m.active !== false && m.roles.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
       const STAGE_ORD = ["New Request", "Ideation", "Pre-Pro", "In Production", "Post", "In Review", "On Hold"];
       const sortS = (ps) => [...ps].sort((a, b) => STAGE_ORD.indexOf(a.status) - STAGE_ORD.indexOf(b.status));
       const activeFiltered = displayFiltered.filter((p) => !p.closedAt && !["Delivered", "Canceled"].includes(p.status));
@@ -7393,7 +7394,7 @@ Brief content: ${content}`;
     }, [sidebarHandle.dragging, sidebarWidth]);
     usePushPanel(vis ? pushWidth : 0);
     const stage = project.status;
-    const editors = team.filter((m) => (m.roles || []).some((r) => /editor|animator/i.test(r)));
+    const editors = team.filter((m) => m.active !== false && (m.roles || []).some((r) => /editor|animator/i.test(r)));
     const doHandoff = (projectId, delId, mode, newEditorId, fromDate, toDate) => {
       const projEditors = [...project.assignees?.["Editor"] || [], ...project.assignees?.["Animator"] || []];
       const del = (project.deliverables || []).find((d) => d.id === delId);
@@ -7606,7 +7607,7 @@ Brief content: ${content}`;
   var KanbanStatus = ({ projects, team, onUpdateDel }) => {
     const [drag, setDrag] = (0, import_react.useState)(null);
     const [over, setOver] = (0, import_react.useState)(null);
-    const editors = team.filter((m) => m.roles.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
+    const editors = team.filter((m) => m.active !== false && m.roles.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
     const all = (0, import_react.useMemo)(() => projects.flatMap((p) => p.deliverables.map((d) => ({ ...d, projectName: p.name, projectId: p.id }))), [projects]);
     const cols = (0, import_react.useMemo)(() => {
       const m = {};
@@ -7715,7 +7716,7 @@ Brief content: ${content}`;
     }));
   };
   var KanbanEditor = ({ projects, team, onUpdateDel }) => {
-    const editors = team.filter((m) => m.roles.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
+    const editors = team.filter((m) => m.active !== false && m.roles.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
     const allEditors = [...editors, { id: "unassigned", name: "Unassigned", roles: ["\u2014"], available: false }];
     const grouped = (0, import_react.useMemo)(() => {
       const map = {};
@@ -7739,7 +7740,7 @@ Brief content: ${content}`;
     const calTypeColors = { deadline: "#ef4444", review: "#f59e0b", shoot: "#3b82f6", ingest: "#06b6d4", unavailability: "#eab308" };
     const [tooltip, setTooltip] = (0, import_react.useState)(null);
     const [selDate, setSelDate] = (0, import_react.useState)(null);
-    const editors = team.filter((m) => m.roles.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
+    const editors = team.filter((m) => m.active !== false && m.roles.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
     const allItems = (0, import_react.useMemo)(() => {
       let items = [];
       projects.forEach((p) => {
@@ -8392,8 +8393,8 @@ Brief content: ${content}`;
       const seen = new Set(projectDels.map((d) => d.id));
       return [...projectDels, ...prodDels.filter((d) => !seen.has(d.id))];
     }, [projects]);
-    const editors = team.filter((m) => m.roles.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
-    const producers = team.filter((m) => m.roles.some((r) => ["Producer", "Project Manager", "Post Project Manager"].includes(r)));
+    const editors = team.filter((m) => m.active !== false && m.roles.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
+    const producers = team.filter((m) => m.active !== false && m.roles.some((r) => ["Producer", "Project Manager", "Post Project Manager"].includes(r)));
     const active = allDels.filter((d) => !["Delivered", "On Hold"].includes(d.status));
     const countBy = (arr, key) => {
       const m = {};
@@ -10211,7 +10212,13 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     name: row.name,
     roles: row.roles || [],
     employeeType: row.employee_type,
+    // `available` is a scheduling/capacity concept (do they currently have
+    // bandwidth) — unrelated to `active`, which is "do they still work here
+    // at all". Conflating the two would mean someone on PTO looks like a
+    // former employee, so this is a genuinely separate field, defaulting to
+    // true for any row written before this column existed.
     available: row.available,
+    active: row.active !== false,
     email: row.email || "",
     phone: row.phone || "",
     department: row.department,
@@ -10229,6 +10236,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     roles: m.roles || [],
     employee_type: m.employeeType,
     available: m.available,
+    active: m.active !== false,
     email: m.email || null,
     phone: m.phone || null,
     department: m.department,
@@ -10539,7 +10547,8 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     recordingSpecs: row.recording_specs || {},
     screenContent: row.screen_content || {},
     notes: row.notes || "",
-    roles: row.roles || []
+    roles: row.roles || [],
+    active: row.active !== false
   });
   var setupTypeToRow = (t) => ({
     ...t._rowId ? { id: t._rowId } : {},
@@ -10556,7 +10565,8 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     recording_specs: t.recordingSpecs || {},
     screen_content: t.screenContent || {},
     notes: t.notes || null,
-    roles: t.roles || []
+    roles: t.roles || [],
+    active: t.active !== false
   });
   var rowToProductionPreset = (row) => ({
     id: parseLegacyId(row.legacy_id) ?? row.id,
@@ -10564,14 +10574,16 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     name: row.name,
     type: row.type,
     createdAt: row.created_at,
-    sections: row.sections || {}
+    sections: row.sections || {},
+    active: row.active !== false
   });
   var productionPresetToRow = (p) => ({
     ...p._rowId ? { id: p._rowId } : {},
     legacy_id: p.id != null ? String(p.id) : null,
     name: p.name || null,
     type: p.type || null,
-    sections: p.sections || {}
+    sections: p.sections || {},
+    active: p.active !== false
   });
   var rowToCustomTask = (row) => ({
     id: row.legacy_id != null ? String(row.legacy_id) : row.id,
@@ -10600,7 +10612,8 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     name: row.name,
     category: row.category,
     quantity: row.quantity || 1,
-    notes: row.notes || ""
+    notes: row.notes || "",
+    active: row.active !== false
   });
   var gearToRow = (g) => ({
     ...g._rowId ? { id: g._rowId } : {},
@@ -10608,28 +10621,32 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     name: g.name || null,
     category: g.category || null,
     quantity: g.quantity || 1,
-    notes: g.notes || null
+    notes: g.notes || null,
+    active: g.active !== false
   });
-  var rowToFurniture = (row) => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category || "Furniture" });
+  var rowToFurniture = (row) => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category || "Furniture", active: row.active !== false });
   var furnitureToRow = (f) => ({
     ...f._rowId ? { id: f._rowId } : {},
     legacy_id: f.id != null ? String(f.id) : null,
     name: f.name || null,
-    category: f.category || "Furniture"
+    category: f.category || "Furniture",
+    active: f.active !== false
   });
-  var rowToProp = (row) => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category || "Prop" });
+  var rowToProp = (row) => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category || "Prop", active: row.active !== false });
   var propToRow = (p) => ({
     ...p._rowId ? { id: p._rowId } : {},
     legacy_id: p.id != null ? String(p.id) : null,
     name: p.name || null,
-    category: p.category || "Prop"
+    category: p.category || "Prop",
+    active: p.active !== false
   });
-  var rowToScreenContentOption = (row) => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name });
+  var rowToScreenContentOption = (row) => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, active: row.active !== false });
   var screenContentOptionToRow = (item, category) => ({
     ...item._rowId ? { id: item._rowId } : {},
     legacy_id: item.id != null ? String(item.id) : null,
     category,
-    name: item.name || null
+    name: item.name || null,
+    active: item.active !== false
   });
   var rowToUnavailability = (row) => ({
     id: row.legacy_id ?? row.id,
@@ -10665,7 +10682,8 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     category: row.category,
     bio: row.bio || "",
     photoKey: row.photo_key,
-    lastBookedAt: row.last_booked_at
+    lastBookedAt: row.last_booked_at,
+    active: row.active !== false
   });
   var talentToRow = (t) => ({
     ...t._rowId ? { id: t._rowId } : {},
@@ -10674,7 +10692,8 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     category: t.category || null,
     bio: t.bio || null,
     photo_key: t.photoKey || null,
-    last_booked_at: t.lastBookedAt || null
+    last_booked_at: t.lastBookedAt || null,
+    active: t.active !== false
   });
   var nudgeToRow = (n) => ({
     legacy_id: typeof n.id === "number" ? n.id : null,
@@ -10772,7 +10791,8 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     machineType: row.machine_type,
     serialNumber: row.serial_number,
     assignedTo: row.assigned_to,
-    available: row.available
+    available: row.available,
+    active: row.active !== false
   });
   var workstationToRow = (w) => ({
     ...w._rowId ? { id: w._rowId } : {},
@@ -10782,7 +10802,8 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     machine_type: w.machineType || null,
     serial_number: w.serialNumber || null,
     assigned_to: w.assignedTo || null,
-    available: w.available !== false
+    available: w.available !== false,
+    active: w.active !== false
   });
   var computeListDiff = (oldList, newList, toRow) => {
     const oldById = new Map(oldList.map((x) => [String(x.id), x]));
@@ -10838,7 +10859,8 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     is_pcr: !!m.isPCR,
     suggest_hmu: !!m.suggestHMU,
     linked_green_room: m.linkedGreenRoom || null,
-    crew_call_offset_ms: m.crewCallOffsetMs || 0
+    crew_call_offset_ms: m.crewCallOffsetMs || 0,
+    active: m.active !== false
   });
   var computeSpaceMetaDiff = (oldMeta, newMeta) => {
     const toUpsert = Object.keys(newMeta).map((k) => spaceMetaToRow(k, newMeta[k]));
@@ -11831,9 +11853,10 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
       }
     ));
   };
-  var SetupPicker = ({ setupTypes, team, onAddTemplate, onAddInstance, onClose }) => {
+  var SetupPicker = ({ setupTypes: allSetupTypes, team, onAddTemplate, onAddInstance, onClose }) => {
     const [creating, setCreating] = (0, import_react.useState)(false);
     const [formKey, setFormKey] = (0, import_react.useState)(0);
+    const setupTypes = allSetupTypes.filter((t) => t.active !== false);
     if (creating) {
       return /* @__PURE__ */ React.createElement(Modal, { onClose, maxWidth: 620 }, /* @__PURE__ */ React.createElement("h3", { style: { fontSize: 22, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 14 } }, "New Setup Type"), /* @__PURE__ */ React.createElement(
         SetupTypeForm,
@@ -12160,6 +12183,8 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     const updField = (f, v) => onUpdateSetup({ ...setup, [f]: v, _isCustom: true });
     const [showAllRoles, setShowAllRoles] = (0, import_react.useState)(false);
     const roleOptions = showAllRoles && crewRoleCategories ? Object.entries(crewRoleCategories).map(([cat, roles]) => /* @__PURE__ */ React.createElement("optgroup", { key: cat, label: cat }, roles.map((r) => /* @__PURE__ */ React.createElement("option", { key: r, value: r }, r)))) : crewRoles.map((r) => /* @__PURE__ */ React.createElement("option", { key: r, value: r }, r));
+    const knownRoles = /* @__PURE__ */ new Set([...crewRoles, ...crewRoleCategories ? Object.values(crewRoleCategories).flat() : []]);
+    const staleRoleOption = (role) => role && !knownRoles.has(role) ? /* @__PURE__ */ React.createElement("option", { value: role, style: { color: "#f59e0b" } }, role, " (inactive)") : null;
     const roleListToggle = crewRoleCategories && /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -12225,6 +12250,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
           style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#e2e8f0", padding: "5px 7px", fontSize: 14, outline: "none" }
         },
         /* @__PURE__ */ React.createElement("option", { value: "" }, "Role\u2026"),
+        staleRoleOption(c.role),
         roleOptions
       ), /* @__PURE__ */ React.createElement(
         "select",
@@ -12260,7 +12286,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
       const wrapT = schedT.wrap || spaceT.wrap;
       const status = c.status || "Not Booked";
       const statusColor = EXT_CREW_STATUS_COLOR[status] || "#4b5563";
-      return /* @__PURE__ */ React.createElement("div", { key: c.id, style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 8, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "120px 1fr 1fr 70px 70px auto", gap: 5, alignItems: "center" } }, /* @__PURE__ */ React.createElement("select", { value: c.role || "", onChange: (e) => updCrewExt(c.id, "role", e.target.value), style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#e2e8f0", padding: "5px 7px", fontSize: 14, outline: "none" } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Role\u2026"), roleOptions), /* @__PURE__ */ React.createElement(Inp, { value: c.name || "", onChange: (e) => updCrewExt(c.id, "name", e.target.value), placeholder: "Name\u2026" }), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", flex: 1 } }, /* @__PURE__ */ React.createElement("datalist", { id: "vendor-companies-list" }, vendorCompanies.map((c2) => /* @__PURE__ */ React.createElement("option", { key: c2, value: c2 }))), /* @__PURE__ */ React.createElement(
+      return /* @__PURE__ */ React.createElement("div", { key: c.id, style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 8, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "120px 1fr 1fr 70px 70px auto", gap: 5, alignItems: "center" } }, /* @__PURE__ */ React.createElement("select", { value: c.role || "", onChange: (e) => updCrewExt(c.id, "role", e.target.value), style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#e2e8f0", padding: "5px 7px", fontSize: 14, outline: "none" } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Role\u2026"), staleRoleOption(c.role), roleOptions), /* @__PURE__ */ React.createElement(Inp, { value: c.name || "", onChange: (e) => updCrewExt(c.id, "name", e.target.value), placeholder: "Name\u2026" }), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", flex: 1 } }, /* @__PURE__ */ React.createElement("datalist", { id: "vendor-companies-list" }, vendorCompanies.map((c2) => /* @__PURE__ */ React.createElement("option", { key: c2, value: c2 }))), /* @__PURE__ */ React.createElement(
         Inp,
         {
           list: "vendor-companies-list",
@@ -12539,7 +12565,7 @@ Please confirm availability and booking status for each item above, and let us k
     const [search, setSearch] = (0, import_react.useState)("");
     const [sortMode, setSortMode] = (0, import_react.useState)("recent");
     const [pending, setPending] = (0, import_react.useState)(() => new Set(selectedIds));
-    const filtered = talentRoster.filter((t) => !search || t.name.toLowerCase().includes(search.toLowerCase()) || (t.bio || "").toLowerCase().includes(search.toLowerCase()) || (t.category || "").toLowerCase().includes(search.toLowerCase())).sort((a, b) => sortMode === "alpha" ? a.name.localeCompare(b.name) : new Date(b.lastBookedAt || 0) - new Date(a.lastBookedAt || 0));
+    const filtered = talentRoster.filter((t) => (t.active !== false || pending.has(t.id)) && (!search || t.name.toLowerCase().includes(search.toLowerCase()) || (t.bio || "").toLowerCase().includes(search.toLowerCase()) || (t.category || "").toLowerCase().includes(search.toLowerCase()))).sort((a, b) => sortMode === "alpha" ? a.name.localeCompare(b.name) : new Date(b.lastBookedAt || 0) - new Date(a.lastBookedAt || 0));
     const toggle = (id) => setPending((s) => {
       const n = new Set(s);
       n.has(id) ? n.delete(id) : n.add(id);
@@ -13492,7 +13518,7 @@ ${conditions}`;
     }, [_activeId]);
     const crewRoleCategories = {};
     Object.entries(CREW_ROLE_CATEGORY_LIST_KEYS).forEach(([cat, key]) => {
-      crewRoleCategories[cat] = [...lists[key] || CREW_ROLE_CATEGORIES_DEFAULT[cat]].sort((a, b) => a.localeCompare(b));
+      crewRoleCategories[cat] = [...lists[key] && lists[key].length ? lists[key] : CREW_ROLE_CATEGORIES_DEFAULT[cat]].sort((a, b) => a.localeCompare(b));
     });
     const CREW_ROLES = crewRoleCategories["Production Roles"];
     const cs = { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 9, padding: "12px 14px" };
@@ -13719,7 +13745,7 @@ ${conditions}`;
           if (v === "__blank__") addBlankSetupFull();
           else if (v === "__custom__") {
           } else applySetupPreset(v);
-        }, style: { flex: 1, minWidth: 0, background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 7, color: isCustom ? "#f59e0b" : "#e2e8f0", padding: "7px 10px", fontSize: 16, outline: "none", cursor: "pointer", colorScheme: "dark", fontWeight: isCustom ? 700 : 400 } }, /* @__PURE__ */ React.createElement("option", { value: "__blank__" }, "New Setup"), isCustom && /* @__PURE__ */ React.createElement("option", { value: "__custom__" }, "Custom"), setupTypes.length > 0 && /* @__PURE__ */ React.createElement("optgroup", { label: "\u2500\u2500\u2500 Presets \u2500\u2500\u2500" }, setupTypes.map((t) => /* @__PURE__ */ React.createElement("option", { key: t.id, value: String(t.id) }, t.name))));
+        }, style: { flex: 1, minWidth: 0, background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 7, color: isCustom ? "#f59e0b" : "#e2e8f0", padding: "7px 10px", fontSize: 16, outline: "none", cursor: "pointer", colorScheme: "dark", fontWeight: isCustom ? 700 : 400 } }, /* @__PURE__ */ React.createElement("option", { value: "__blank__" }, "New Setup"), isCustom && /* @__PURE__ */ React.createElement("option", { value: "__custom__" }, "Custom"), setupTypes.length > 0 && /* @__PURE__ */ React.createElement("optgroup", { label: "\u2500\u2500\u2500 Presets \u2500\u2500\u2500" }, setupTypes.filter((t) => t.active !== false || String(t.id) === presetId).map((t) => /* @__PURE__ */ React.createElement("option", { key: t.id, value: String(t.id) }, t.name, t.active === false ? " (inactive)" : ""))));
       })(), _activeSetup?._isCustom && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
         Inp,
         {
@@ -14016,7 +14042,7 @@ ${conditions}`;
       const preset = productionToPreset(production, name, sections);
       persistPresets([...presets, preset]);
     };
-    const deletePreset = (id) => persistPresets(presets.filter((p) => p.id !== id));
+    const deletePreset = (id) => persistPresets(presets.map((p) => p.id !== id ? p : { ...p, active: false }));
     const applyPresetTo = (preset, sections, targetId, targetDate, targetStartTime, targetLocation) => {
       const sourceProd = targetId ? productions.find((p) => p.id === targetId) : null;
       const baseProd = sourceProd || {
@@ -16545,9 +16571,10 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         setMfaResetId(null);
       }
     };
-    const filtered = team.filter(
-      (m) => !search || m.name.toLowerCase().includes(search.toLowerCase()) || m.roles.some((r) => r.toLowerCase().includes(search.toLowerCase())) || m.department?.toLowerCase().includes(search.toLowerCase())
-    );
+    const matchesSearch = (m) => !search || m.name.toLowerCase().includes(search.toLowerCase()) || m.roles.some((r) => r.toLowerCase().includes(search.toLowerCase())) || m.department?.toLowerCase().includes(search.toLowerCase());
+    const filtered = team.filter((m) => m.active !== false && matchesSearch(m));
+    const formerEmployees = team.filter((m) => m.active === false && matchesSearch(m));
+    const [showFormer, setShowFormer] = (0, import_react.useState)(false);
     const countsFor = (m) => {
       const myProjects = projects.filter((p) => Object.values(p.assignees || {}).some((ids) => (ids || []).includes(m.id)));
       const activeProjects = myProjects.filter((p) => !["Delivered", "Canceled"].includes(p.status));
@@ -16571,13 +16598,14 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       setDraft(null);
     };
     const deleteM = (id) => {
-      onUpdateTeam(team.filter((m) => m.id !== id));
+      onUpdateTeam(team.map((m) => m.id !== id ? m : { ...m, active: false }));
       if (expandedId === id) setExpandedId(null);
       if (editId === id) {
         setEditId(null);
         setDraft(null);
       }
     };
+    const reactivateM = (id) => onUpdateTeam(team.map((m) => m.id !== id ? m : { ...m, active: true }));
     const addMember = () => {
       if (!newMember.name.trim()) return;
       onUpdateTeam([...team, { ...newMember, id: Math.max(...team.map((m) => m.id)) + 1 }]);
@@ -16755,15 +16783,33 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         },
         mfaResetId === m.id ? "Resetting\u2026" : "Reset 2FA"
       ), mfaResetMsg[m.id] === "ok" && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#10b981" } }, "2FA cleared"), mfaResetMsg[m.id] && mfaResetMsg[m.id] !== "ok" && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#ef4444" } }, mfaResetMsg[m.id])))));
-    })), confirmDeleteId != null && /* @__PURE__ */ React.createElement(Modal, { onClose: () => setConfirmDeleteId(null), maxWidth: 380 }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 20, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, "Remove Team Member?"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#9ca3af", marginBottom: 20 } }, "This will permanently remove ", team.find((m) => m.id === confirmDeleteId)?.name || "this member", " from the team roster."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setConfirmDeleteId(null), style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "8px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer" } }, "Cancel"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+    })), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 24, borderTop: "1px solid #1f2937", paddingTop: 16 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setShowFormer((v) => !v),
+        style: { background: "transparent", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "7px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer" }
+      },
+      showFormer ? "\u25B2 Hide" : "\u25BC Show",
+      " Former Employees",
+      formerEmployees.length ? ` (${formerEmployees.length})` : ""
+    ), showFormer && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginTop: 12 } }, formerEmployees.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { color: "#4b5563", fontSize: 15, padding: "8px 0" } }, "No former employees."), formerEmployees.map((m) => /* @__PURE__ */ React.createElement("div", { key: m.id, style: { display: "flex", alignItems: "center", gap: 12, padding: "9px 14px", background: "#0d1117", border: "1px solid #1f2937", borderRadius: 8, opacity: 0.7 } }, /* @__PURE__ */ React.createElement(Av, { name: m.name, size: 26 }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: "#e2e8f0" } }, m.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280" } }, m.roles.join(", ") || "\u2014", m.department ? ` \xB7 ${m.department}` : "")), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => reactivateM(m.id),
+        style: { background: "#10b98118", border: "1px solid #10b98130", borderRadius: 6, color: "#10b981", padding: "4px 11px", fontSize: 13, fontWeight: 700, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }
+      },
+      "Reactivate"
+    ))))), confirmDeleteId != null && /* @__PURE__ */ React.createElement(Modal, { onClose: () => setConfirmDeleteId(null), maxWidth: 380 }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 20, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, "Mark as Former Employee?"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#9ca3af", marginBottom: 20 } }, team.find((m) => m.id === confirmDeleteId)?.name || "This member", " will stop showing up when assigning new work, but stays visible on everything they've already worked on, and can be reactivated anytime from the Former Employees section below."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setConfirmDeleteId(null), style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "8px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer" } }, "Cancel"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
       deleteM(confirmDeleteId);
       setConfirmDeleteId(null);
-    }, style: { background: "#ef4444", border: "none", borderRadius: 7, color: "#fff", padding: "8px 16px", fontSize: 14, fontWeight: 800, cursor: "pointer" } }, "Remove"))));
+    }, style: { background: "#ef4444", border: "none", borderRadius: 7, color: "#fff", padding: "8px 16px", fontSize: 14, fontWeight: 800, cursor: "pointer" } }, "Mark Former"))));
   };
-  var AdminPropsFurnitureSection = ({ title, icon, color, items, newVal, setNewVal, onAdd, onDel }) => {
+  var AdminPropsFurnitureSection = ({ title, icon, color, items, newVal, setNewVal, onAdd, onDel, onReactivate }) => {
     const row = { display: "flex", alignItems: "center", justifyContent: "space-between", background: "#111827", border: "1px solid #1f2937", borderRadius: 6, padding: "7px 11px" };
     const inp = { background: "#0a0f1a", border: "1px solid #374151", borderRadius: 6, color: "#e2e8f0", padding: "6px 10px", fontSize: 14, outline: "none", flex: 1, fontFamily: "'DM Sans',sans-serif" };
-    return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, background: "#0d1117", border: "1px solid #1f2937", borderRadius: 10, padding: "16px 18px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#838ba0", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.1em", marginBottom: 10 } }, icon, " ", title, " ", /* @__PURE__ */ React.createElement("span", { style: { color: "#1f2937", fontWeight: 400 } }, "(", items.length, ")")), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10, display: "flex", flexDirection: "column", gap: 4, minHeight: 60 } }, items.map((item) => /* @__PURE__ */ React.createElement("div", { key: item.id, style: row }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, color: "#d1d5db" } }, item.name), /* @__PURE__ */ React.createElement(
+    const active = items.filter((item) => item.active !== false);
+    const inactive = items.filter((item) => item.active === false);
+    return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, background: "#0d1117", border: "1px solid #1f2937", borderRadius: 10, padding: "16px 18px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#838ba0", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.1em", marginBottom: 10 } }, icon, " ", title, " ", /* @__PURE__ */ React.createElement("span", { style: { color: "#1f2937", fontWeight: 400 } }, "(", active.length, ")")), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10, display: "flex", flexDirection: "column", gap: 4, minHeight: 60 } }, active.map((item) => /* @__PURE__ */ React.createElement("div", { key: item.id, style: row }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, color: "#d1d5db" } }, item.name), /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => onDel(item.id),
@@ -16772,7 +16818,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         onMouseLeave: (e) => e.currentTarget.style.color = "#838ba0"
       },
       "\xD7"
-    ))), items.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#374151", fontStyle: "italic" } }, "No items yet \u2014 add one below")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(
+    ))), active.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#374151", fontStyle: "italic" } }, "No items yet \u2014 add one below")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement(
       "input",
       {
         style: inp,
@@ -16789,7 +16835,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         style: { background: "#6366f1", border: "none", borderRadius: 6, color: "#fff", padding: "6px 14px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", opacity: newVal.trim() ? 1 : 0.4 }
       },
       "+ Add"
-    )));
+    )), /* @__PURE__ */ React.createElement(InactiveItemsSection, { items: inactive, onReactivate: (item) => onReactivate(item.id), renderLabel: (item) => item.name }));
   };
   var AdminPropsFurnitureTab = ({ furniture = [], onUpdateFurniture, props_ = [], onUpdateProps }) => {
     const [newF, setNewF] = (0, import_react.useState)("");
@@ -16800,20 +16846,16 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       onUpdateFurniture([...furniture, { id: `furn-${Date.now()}`, name: n, category: "Furniture" }]);
       setNewF("");
     };
-    const delFurniture = (id) => {
-      if (window.confirm("Remove this furniture item? Productions using it will lose the reference."))
-        onUpdateFurniture(furniture.filter((f) => f.id !== id));
-    };
+    const delFurniture = (id) => onUpdateFurniture(furniture.map((f) => f.id === id ? { ...f, active: false } : f));
+    const reactivateFurniture = (id) => onUpdateFurniture(furniture.map((f) => f.id === id ? { ...f, active: true } : f));
     const addProp = () => {
       const n = newP.trim();
       if (!n) return;
       onUpdateProps([...props_, { id: `prop-${Date.now()}`, name: n, category: "Prop" }]);
       setNewP("");
     };
-    const delProp = (id) => {
-      if (window.confirm("Remove this prop? Productions using it will lose the reference."))
-        onUpdateProps(props_.filter((p) => p.id !== id));
-    };
+    const delProp = (id) => onUpdateProps(props_.map((p) => p.id === id ? { ...p, active: false } : p));
+    const reactivateProp = (id) => onUpdateProps(props_.map((p) => p.id === id ? { ...p, active: true } : p));
     return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#838ba0", marginBottom: 14, lineHeight: 1.6 } }, "Manage furniture and props available for studio productions. Items can only be assigned to one location at a time.", /* @__PURE__ */ React.createElement("span", { style: { display: "block", marginTop: 4, color: "#374151", fontSize: 14 } }, "Note: BEC has its own inventory and is managed separately.")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12 } }, /* @__PURE__ */ React.createElement(
       AdminPropsFurnitureSection,
       {
@@ -16824,7 +16866,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         newVal: newF,
         setNewVal: setNewF,
         onAdd: addFurniture,
-        onDel: delFurniture
+        onDel: delFurniture,
+        onReactivate: reactivateFurniture
       }
     ), /* @__PURE__ */ React.createElement(
       AdminPropsFurnitureSection,
@@ -16836,7 +16879,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         newVal: newP,
         setNewVal: setNewP,
         onAdd: addProp,
-        onDel: delProp
+        onDel: delProp,
+        onReactivate: reactivateProp
       }
     )));
   };
@@ -18045,7 +18089,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const bxtvEps = getBXTVProjects(allProjects);
     const currentEpId = del.bxtvLink?.episodeProjectId;
     const currentEp = currentEpId ? allProjects.find((p) => p.id === currentEpId) : null;
-    const editors = team.filter((m) => m.roles?.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
+    const editors = team.filter((m) => m.active !== false && m.roles?.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
     const isBXTV = !!currentEpId;
     const sel = { background: "#0a0f1a", border: "1px solid #374151", borderRadius: 6, color: "#e2e8f0", padding: "6px 8px", fontSize: 14, outline: "none", width: "100%", colorScheme: "dark" };
     const handlePickEpisode = (epId) => {
@@ -18092,7 +18136,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       upd({ [cat]: [...screenContent[cat] || [], { id: `sc-${Date.now()}`, name: n }] });
       setF("");
     };
-    const delItem = (cat, id) => upd({ [cat]: (screenContent[cat] || []).filter((o) => o.id !== id) });
+    const delItem = (cat, id) => upd({ [cat]: (screenContent[cat] || []).map((o) => o.id === id ? { ...o, active: false } : o) });
+    const reactivateItem = (cat, id) => upd({ [cat]: (screenContent[cat] || []).map((o) => o.id === id ? { ...o, active: true } : o) });
     const cats = [
       { key: "windowWall", icon: "\u{1FA9F}", label: "Window Wall", val: newWW, set: setNewWW },
       { key: "vpWall", icon: "\u{1F4E1}", label: "VP Wall", val: newVP, set: setNewVP },
@@ -18109,7 +18154,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         newVal: c.val,
         setNewVal: c.set,
         onAdd: () => addItem(c.key, c.val, c.set),
-        onDel: (id) => delItem(c.key, id)
+        onDel: (id) => delItem(c.key, id),
+        onReactivate: (id) => reactivateItem(c.key, id)
       }
     ))));
   };
@@ -18176,6 +18222,67 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       );
     })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16, borderTop: "1px solid #1f2937", paddingTop: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#838ba0" } }, cats.reduce((n, c) => n + (selected[c.key] || []).length, 0), " selected"), /* @__PURE__ */ React.createElement(Btn, { onClick: onClose }, "Done")));
   };
+  var findInactiveSetupRefs = (setup, { gearList = [], furnitureList = [], propsList = [], screenContentOptions = {} } = {}) => {
+    const bad = [];
+    (setup?.equipmentIds || []).forEach((id) => {
+      const g = gearList.find((x) => x.id === id);
+      if (g && g.active === false) bad.push(g.name);
+    });
+    (setup?.furnitureIds || []).forEach((id) => {
+      const f = furnitureList.find((x) => x.id === id);
+      if (f && f.active === false) bad.push(f.name);
+    });
+    (setup?.propIds || []).forEach((id) => {
+      const p = propsList.find((x) => x.id === id);
+      if (p && p.active === false) bad.push(p.name);
+    });
+    Object.entries(setup?.screenContent || {}).forEach(([cat, ids]) => {
+      (ids || []).forEach((id) => {
+        const o = (screenContentOptions[cat] || []).find((x) => x.id === id);
+        if (o && o.active === false) bad.push(o.name);
+      });
+    });
+    return bad;
+  };
+  var findInactivePresetRefs = (preset, refCtx) => {
+    const bad = new Set(findInactiveSetupRefs(preset?.sections?.gear, refCtx));
+    (preset?.sections?.setups || []).forEach((s) => findInactiveSetupRefs(s, refCtx).forEach((r) => bad.add(r)));
+    return [...bad];
+  };
+  var InactiveRefBanner = ({ refs }) => {
+    if (!refs || refs.length === 0) return null;
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        title: `References inactive: ${refs.join(", ")}`,
+        style: { display: "inline-flex", alignItems: "center", gap: 5, background: "#f59e0b15", border: "1px solid #f59e0b40", borderRadius: 5, color: "#f59e0b", padding: "3px 9px", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }
+      },
+      "\u26A0 ",
+      refs.length,
+      " inactive ref",
+      refs.length !== 1 ? "s" : ""
+    );
+  };
+  var InactiveItemsSection = ({ items, onReactivate, renderLabel }) => {
+    const [show, setShow] = (0, import_react.useState)(false);
+    return /* @__PURE__ */ React.createElement("div", { style: { marginTop: 20, borderTop: "1px solid #1f2937", paddingTop: 14 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setShow((v) => !v),
+        style: { background: "transparent", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "6px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }
+      },
+      show ? "\u25B2 Hide" : "\u25BC Show",
+      " Inactive",
+      items.length ? ` (${items.length})` : ""
+    ), show && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginTop: 10 } }, items.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { color: "#4b5563", fontSize: 14, padding: "6px 0" } }, "None."), items.map((item) => /* @__PURE__ */ React.createElement("div", { key: item._rowId || item.id, style: { display: "flex", alignItems: "center", gap: 10, padding: "7px 12px", background: "#0d1117", border: "1px solid #1f2937", borderRadius: 7, opacity: 0.7 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 14, color: "#e2e8f0", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, renderLabel(item)), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => onReactivate(item),
+        style: { background: "#10b98118", border: "1px solid #10b98130", borderRadius: 5, color: "#10b981", padding: "3px 9px", fontSize: 12, fontWeight: 700, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }
+      },
+      "Reactivate"
+    )))));
+  };
   var AdminGearTab = ({ gear, onUpdateGear }) => {
     const [editId, setEditId] = (0, import_react.useState)(null);
     const [draft, setDraft] = (0, import_react.useState)(null);
@@ -18186,16 +18293,17 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       onUpdateGear(gear.map((g) => g.id === editId ? { ...g, ...draft } : g));
       setEditId(null);
     };
-    const del = (id) => {
-      if (window.confirm("Remove this gear item?")) onUpdateGear(gear.filter((g) => g.id !== id));
-    };
+    const del = (id) => onUpdateGear(gear.map((g) => g.id === id ? { ...g, active: false } : g));
+    const reactivate = (id) => onUpdateGear(gear.map((g) => g.id === id ? { ...g, active: true } : g));
     const add = () => {
       if (!newItem.name.trim()) return;
       onUpdateGear([...gear, { ...newItem, id: uid() }]);
       setNewItem({ name: "", category: "Camera", quantity: 1, notes: "" });
       setShowAdd(false);
     };
-    const byCat = GEAR_CATS.reduce((a, c) => ({ ...a, [c]: gear.filter((g) => g.category === c) }), {});
+    const activeGear = gear.filter((g) => g.active !== false);
+    const inactiveGear = gear.filter((g) => g.active === false);
+    const byCat = GEAR_CATS.reduce((a, c) => ({ ...a, [c]: activeGear.filter((g) => g.category === c) }), {});
     return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 14 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -18288,7 +18396,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     ))) : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", cursor: "pointer" }, onClick: () => {
       setEditId(g.id);
       setDraft({ ...g });
-    } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, fontSize: 16, color: "#e2e8f0" } }, g.name), g.quantity > 1 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#9ca3af", marginLeft: 8 } }, "\xD7", g.quantity), g.notes && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#838ba0", marginLeft: 8 } }, g.notes)), /* @__PURE__ */ React.createElement("div", { style: { color: "#838ba0", fontSize: 14 } }, "\u203A"))))))), gear.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 40, color: "#838ba0", fontSize: 16 } }, "No gear items yet. Add your first piece of equipment above."));
+    } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, fontSize: 16, color: "#e2e8f0" } }, g.name), g.quantity > 1 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#9ca3af", marginLeft: 8 } }, "\xD7", g.quantity), g.notes && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#838ba0", marginLeft: 8 } }, g.notes)), /* @__PURE__ */ React.createElement("div", { style: { color: "#838ba0", fontSize: 14 } }, "\u203A"))))))), activeGear.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 40, color: "#838ba0", fontSize: 16 } }, "No gear items yet. Add your first piece of equipment above."), /* @__PURE__ */ React.createElement(InactiveItemsSection, { items: inactiveGear, onReactivate: (item) => reactivate(item.id), renderLabel: (item) => `${item.name}${item.category ? ` \xB7 ${item.category}` : ""}` }));
   };
   var MEDIA_CARD_TYPES = ["Card", "Drive", "iPhone"];
   var AdminMediaCardsTab = ({ mediaCards, onUpdateMediaCards }) => {
@@ -18356,16 +18464,17 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       onUpdateWorkstations(workstations.map((w) => w.id === editId ? { ...w, ...draft } : w));
       setEditId(null);
     };
-    const del = (id) => {
-      if (window.confirm("Remove this workstation?")) onUpdateWorkstations(workstations.filter((w) => w.id !== id));
-    };
+    const del = (id) => onUpdateWorkstations(workstations.map((w) => w.id !== id ? w : { ...w, active: false }));
+    const reactivate = (id) => onUpdateWorkstations(workstations.map((w) => w.id !== id ? w : { ...w, active: true }));
     const add = () => {
       if (!newWS.name.trim()) return;
       onUpdateWorkstations([...workstations, { ...newWS, id: uid() }]);
       setNewWS({ name: "", location: "TBD", machineType: "Mac Studio", serialNumber: "TBD", assignedTo: null, available: true });
       setShowAdd(false);
     };
-    const byType = MACHINE_TYPES.reduce((a, t) => ({ ...a, [t]: workstations.filter((w) => w.machineType === t) }), {});
+    const activeWorkstations = workstations.filter((w) => w.active !== false);
+    const inactiveWorkstations = workstations.filter((w) => w.active === false);
+    const byType = MACHINE_TYPES.reduce((a, t) => ({ ...a, [t]: activeWorkstations.filter((w) => w.machineType === t) }), {});
     const inputStyle = { width: "100%", background: "#0a0f1a", border: "1px solid #374151", borderRadius: 6, color: "#e2e8f0", padding: "6px 10px", fontSize: 14, outline: "none", fontFamily: "'DM Sans',sans-serif" };
     const labelStyle = { fontSize: 13, color: "#8e97a6", marginBottom: 3, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" };
     return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 14 } }, /* @__PURE__ */ React.createElement(
@@ -18407,12 +18516,12 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           onMouseEnter: (e) => e.currentTarget.style.color = "#ef4444",
           onMouseLeave: (e) => e.currentTarget.style.color = "#ef444470"
         },
-        "Remove"
+        "Mark Inactive"
       ))) : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, padding: "9px 14px", cursor: "pointer" }, onClick: () => {
         setEditId(w.id);
         setDraft({ ...w });
       } }, /* @__PURE__ */ React.createElement("div", { style: { width: 32, height: 32, borderRadius: 7, background: "#111827", border: "1px solid #1f2937", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 } }, "\u{1F4BB}"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7 } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, fontSize: 16, color: "#f1f5f9", fontFamily: "'DM Mono',monospace" } }, w.name), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, padding: "1px 6px", borderRadius: 3, background: w.available ? "#22c55e15" : "#374151", color: w.available ? "#22c55e" : "#4b5563", fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, w.available ? "Available" : "Unavailable")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6" } }, "\u{1F4CD} ", w.location, " \xB7 SN: ", w.serialNumber)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: assignee ? "#9ca3af" : "#374151", textAlign: "right", flexShrink: 0 } }, assignee ? assignee.name : "Unassigned"), /* @__PURE__ */ React.createElement("div", { style: { color: "#838ba0", fontSize: 17, flexShrink: 0 } }, "\u203A")));
-    })))), workstations.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 40, color: "#838ba0", fontSize: 16 } }, "No workstations yet. Add your first one above."));
+    })))), activeWorkstations.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 40, color: "#838ba0", fontSize: 16 } }, "No workstations yet. Add your first one above."), /* @__PURE__ */ React.createElement(InactiveItemsSection, { items: inactiveWorkstations, onReactivate: (item) => reactivate(item.id), renderLabel: (w) => `${w.name}${w.location ? ` \xB7 ${w.location}` : ""}` }));
   };
   var AdminTalentTab = ({ talentRoster, onUpdateTalentRoster }) => {
     const [editId, setEditId] = (0, import_react.useState)(null);
@@ -18425,19 +18534,17 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       setEditId(null);
       setDraft(null);
     };
-    const del = (id) => {
-      if (!window.confirm("Remove this person from the talent pool?")) return;
-      const t = talentRoster.find((x) => x.id === id);
-      if (t?.photoKey) deleteSetupPhoto(t.photoKey);
-      onUpdateTalentRoster(talentRoster.filter((t2) => t2.id !== id));
-    };
+    const del = (id) => onUpdateTalentRoster(talentRoster.map((t) => t.id !== id ? t : { ...t, active: false }));
+    const reactivate = (id) => onUpdateTalentRoster(talentRoster.map((t) => t.id !== id ? t : { ...t, active: true }));
     const add = () => {
       if (!newT.name.trim()) return;
       onUpdateTalentRoster([...talentRoster, { ...newT, id: `tal-${uid()}`, lastBookedAt: null }]);
       setNewT({ name: "", category: TALENT_CATEGORIES?.[0] || "Athlete", bio: "", photoKey: null });
       setShowAdd(false);
     };
-    const filtered = talentRoster.filter((t) => !search || t.name.toLowerCase().includes(search.toLowerCase()) || t.category.toLowerCase().includes(search.toLowerCase()));
+    const matchesSearch = (t) => !search || t.name.toLowerCase().includes(search.toLowerCase()) || t.category.toLowerCase().includes(search.toLowerCase());
+    const filtered = talentRoster.filter((t) => t.active !== false && matchesSearch(t));
+    const inactiveTalent = talentRoster.filter((t) => t.active === false && matchesSearch(t));
     const inputStyle = { width: "100%", background: "#0a0f1a", border: "1px solid #374151", borderRadius: 6, color: "#e2e8f0", padding: "6px 10px", fontSize: 14, outline: "none", fontFamily: "'DM Sans',sans-serif" };
     const labelStyle = { fontSize: 13, color: "#8e97a6", marginBottom: 3, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" };
     const CATS = TALENT_CATEGORIES || ["Athlete", "Executive", "Host", "Actor", "Model", "Musician", "Influencer"];
@@ -18473,11 +18580,11 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         onMouseEnter: (e) => e.currentTarget.style.color = "#ef4444",
         onMouseLeave: (e) => e.currentTarget.style.color = "#ef444470"
       },
-      "Remove"
+      "Mark Inactive"
     )))) : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, padding: "9px 14px", cursor: "pointer" }, onClick: () => {
       setEditId(t.id);
       setDraft({ ...t });
-    } }, t.photoKey ? /* @__PURE__ */ React.createElement(SetupPhotoThumb, { photoKey: t.photoKey, size: 36 }) : /* @__PURE__ */ React.createElement("div", { style: { width: 36, height: 36, borderRadius: "50%", background: "#111827", border: "1px solid #1f2937", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: "#6366f1", flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif" } }, t.name.split(" ").map((n) => n[0]).join("").slice(0, 2)), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 17, color: "#f1f5f9" } }, t.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6" } }, t.category, t.bio ? ` \xB7 ${t.bio}` : "")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", textAlign: "right", flexShrink: 0 } }, t.lastBookedAt ? `Last booked ${fmtDate(t.lastBookedAt)}` : "Never booked"), /* @__PURE__ */ React.createElement("div", { style: { color: "#838ba0", fontSize: 17, flexShrink: 0 } }, "\u203A")))), filtered.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 40, color: "#838ba0", fontSize: 16 } }, "No talent found.")));
+    } }, t.photoKey ? /* @__PURE__ */ React.createElement(SetupPhotoThumb, { photoKey: t.photoKey, size: 36 }) : /* @__PURE__ */ React.createElement("div", { style: { width: 36, height: 36, borderRadius: "50%", background: "#111827", border: "1px solid #1f2937", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: "#6366f1", flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif" } }, t.name.split(" ").map((n) => n[0]).join("").slice(0, 2)), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 17, color: "#f1f5f9" } }, t.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6" } }, t.category, t.bio ? ` \xB7 ${t.bio}` : "")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", textAlign: "right", flexShrink: 0 } }, t.lastBookedAt ? `Last booked ${fmtDate(t.lastBookedAt)}` : "Never booked"), /* @__PURE__ */ React.createElement("div", { style: { color: "#838ba0", fontSize: 17, flexShrink: 0 } }, "\u203A")))), filtered.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 40, color: "#838ba0", fontSize: 16 } }, "No talent found.")), /* @__PURE__ */ React.createElement(InactiveItemsSection, { items: inactiveTalent, onReactivate: (item) => reactivate(item.id), renderLabel: (t) => `${t.name}${t.category ? ` \xB7 ${t.category}` : ""}` }));
   };
   var AdminResourceSettingsTab = ({ resourceConfig, onUpdateResourceConfig }) => {
     const updType = (type, val) => onUpdateResourceConfig({ ...resourceConfig, deliverableTypeHours: { ...resourceConfig.deliverableTypeHours, [type]: Number(val) || 0 } });
@@ -18520,14 +18627,11 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       setEditId(null);
     };
     const del = (idx) => {
-      if (window.confirm(`Remove "${spaces[idx]}"?`)) {
-        const name = spaces[idx];
-        onUpdateSpaces(spaces.filter((_, i) => i !== idx));
-        const newMeta = { ...spaceMeta };
-        delete newMeta[name];
-        onUpdateSpaceMeta(newMeta);
-      }
+      const name = spaces[idx];
+      onUpdateSpaceMeta({ ...spaceMeta, [name]: { ...spaceMeta[name] || {}, active: false } });
+      setEditId(null);
     };
+    const reactivate = (name) => onUpdateSpaceMeta({ ...spaceMeta, [name]: { ...spaceMeta[name] || {}, active: true } });
     const add = () => {
       if (!newSpace.name.trim() || spaces.includes(newSpace.name.trim())) return;
       const name = newSpace.name.trim();
@@ -18572,7 +18676,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         style: { background: "#0a0f1a", border: "1px solid #374151", borderRadius: 6, color: "#e2e8f0", padding: "6px 8px", fontSize: 14, outline: "none" }
       },
       /* @__PURE__ */ React.createElement("option", { value: "" }, "None"),
-      spaces.filter((s) => spaceMeta[s]?.isGreenRoom).map((s) => /* @__PURE__ */ React.createElement("option", { key: s }, s))
+      spaces.filter((s) => spaceMeta[s]?.isGreenRoom && spaceMeta[s]?.active !== false).map((s) => /* @__PURE__ */ React.createElement("option", { key: s }, s))
     )), /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -18583,6 +18687,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       "Add Space"
     )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } }, spaces.map((name, idx) => {
       const meta = spaceMeta[name] || {};
+      if (meta.active === false) return null;
       const typeLabel = meta.isHMU ? "HMU Station" : meta.isGreenRoom ? "Green Room" : meta.isPCR ? "PCR" : "Shoot Space";
       const typeColor = meta.isHMU ? "#ec4899" : meta.isGreenRoom ? "#22c55e" : meta.isPCR ? "#f97316" : "#6366f1";
       return /* @__PURE__ */ React.createElement("div", { key: name, style: { background: "#0d1117", border: `1px solid ${editId === idx ? "#6366f140" : "#1f2937"}`, borderRadius: 9, overflow: "hidden" } }, editId === idx && draft ? /* @__PURE__ */ React.createElement("div", { style: { padding: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 3, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Name"), /* @__PURE__ */ React.createElement(
@@ -18600,7 +18705,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           style: { background: "#0a0f1a", border: "1px solid #374151", borderRadius: 6, color: "#e2e8f0", padding: "6px 8px", fontSize: 14, outline: "none" }
         },
         /* @__PURE__ */ React.createElement("option", { value: "" }, "None"),
-        spaces.filter((s) => spaceMeta[s]?.isGreenRoom && s !== name).map((s) => /* @__PURE__ */ React.createElement("option", { key: s }, s))
+        spaces.filter((s) => spaceMeta[s]?.isGreenRoom && spaceMeta[s]?.active !== false && s !== name).map((s) => /* @__PURE__ */ React.createElement("option", { key: s }, s))
       )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement("button", { onClick: save, style: { background: "#6366f1", border: "none", borderRadius: 7, color: "#fff", padding: "6px 16px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "Save"), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditId(null), style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "6px 14px", fontSize: 14, cursor: "pointer" } }, "Cancel"), /* @__PURE__ */ React.createElement(
         "button",
         {
@@ -18609,17 +18714,26 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           onMouseEnter: (e) => e.currentTarget.style.color = "#ef4444",
           onMouseLeave: (e) => e.currentTarget.style.color = "#ef444460"
         },
-        "Remove"
+        "Mark Inactive"
       ))) : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", cursor: "pointer" }, onClick: () => {
         setEditId(idx);
         setDraft({ name, ...meta });
       } }, /* @__PURE__ */ React.createElement("div", { style: { width: 8, height: 8, borderRadius: "50%", background: typeColor, flexShrink: 0 } }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, fontSize: 16, color: "#e2e8f0" } }, name), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: typeColor, marginLeft: 8, fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, textTransform: "uppercase" } }, typeLabel), meta.linkedGreenRoom && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#838ba0", marginLeft: 8 } }, "\u2192 ", meta.linkedGreenRoom), meta.suggestHMU && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#8b5cf6", marginLeft: 8 } }, "suggests HMU")), /* @__PURE__ */ React.createElement("div", { style: { color: "#838ba0", fontSize: 14 } }, "\u203A")));
-    })));
+    })), /* @__PURE__ */ React.createElement(
+      InactiveItemsSection,
+      {
+        items: spaces.filter((s) => spaceMeta[s]?.active === false).map((name) => ({ id: name, name })),
+        onReactivate: (item) => reactivate(item.id),
+        renderLabel: (item) => item.name
+      }
+    ));
   };
-  var AdminSetupsTab = ({ setupTypes = [], team, onAddSetupType, onUpdateSetupType, onDeleteSetupType, furnitureList = [], propsList = [], screenContentOptions = {}, mediaCards = [] }) => {
+  var AdminSetupsTab = ({ setupTypes = [], team, onAddSetupType, onUpdateSetupType, onDeleteSetupType, furnitureList = [], propsList = [], screenContentOptions = {}, mediaCards = [], gearList = [] }) => {
     const [showAdd, setShowAdd] = (0, import_react.useState)(false);
     const [editId, setEditId] = (0, import_react.useState)(null);
-    const [confirmDeleteId, setConfirmDeleteId] = (0, import_react.useState)(null);
+    const activeSetupTypes = setupTypes.filter((t) => t.active !== false);
+    const inactiveSetupTypes = setupTypes.filter((t) => t.active === false);
+    const refCtx = { gearList, furnitureList, propsList, screenContentOptions };
     return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#8e97a6", marginBottom: 14, lineHeight: 1.5 } }, "Setup Types are a shared library \u2014 anyone on the team can create or attach one to a production. Each captures a floorplan, reference photos, gear, and the crew roles it typically needs (with optional default people)."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 14 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -18644,51 +18758,36 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           setShowAdd(false);
         }
       }
-    )), setupTypes.length === 0 && !showAdd && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#838ba0", textAlign: "center", padding: "24px 0" } }, "No setup types yet."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, setupTypes.map((t) => /* @__PURE__ */ React.createElement("div", { key: t.id, style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 10, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "10px 14px" } }, t.floorplanPhotoKey ? /* @__PURE__ */ React.createElement(SetupPhotoThumb, { photoKey: t.floorplanPhotoKey, size: 40 }) : /* @__PURE__ */ React.createElement("div", { style: { width: 40, height: 40, borderRadius: 7, background: "#1f2937", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, flexShrink: 0 } }, "\u{1F3AC}"), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: "#e2e8f0" } }, t.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, t.description || `${(t.roles || []).length} roles \xB7 ${(t.equipmentIds || []).length} gear items`)), /* @__PURE__ */ React.createElement(Btn, { small: true, onClick: () => {
-      setEditId(editId === t.id ? null : t.id);
-      setShowAdd(false);
-      setConfirmDeleteId(null);
-    } }, editId === t.id ? "Close" : "Edit"), confirmDeleteId === t.id ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#f59e0b" } }, "Delete?"), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        onClick: () => {
-          onDeleteSetupType(t.id);
-          setConfirmDeleteId(null);
+    )), activeSetupTypes.length === 0 && !showAdd && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#838ba0", textAlign: "center", padding: "24px 0" } }, "No setup types yet."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, activeSetupTypes.map((t) => {
+      const inactiveRefs = findInactiveSetupRefs(t, refCtx);
+      return /* @__PURE__ */ React.createElement("div", { key: t.id, style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 10, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "10px 14px" } }, t.floorplanPhotoKey ? /* @__PURE__ */ React.createElement(SetupPhotoThumb, { photoKey: t.floorplanPhotoKey, size: 40 }) : /* @__PURE__ */ React.createElement("div", { style: { width: 40, height: 40, borderRadius: 7, background: "#1f2937", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, flexShrink: 0 } }, "\u{1F3AC}"), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: "#e2e8f0" } }, t.name), /* @__PURE__ */ React.createElement(InactiveRefBanner, { refs: inactiveRefs })), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, t.description || `${(t.roles || []).length} roles \xB7 ${(t.equipmentIds || []).length} gear items`)), /* @__PURE__ */ React.createElement(Btn, { small: true, onClick: () => {
+        setEditId(editId === t.id ? null : t.id);
+        setShowAdd(false);
+      } }, editId === t.id ? "Close" : "Edit"), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => onUpdateSetupType({ ...t, active: false }),
+          style: { background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 19, padding: "4px", lineHeight: 1 },
+          title: "Mark inactive"
         },
-        style: { background: "#ef444420", border: "1px solid #ef444450", borderRadius: 5, color: "#ef4444", padding: "3px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer" }
-      },
-      "Yes"
-    ), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        onClick: () => setConfirmDeleteId(null),
-        style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 5, color: "#9ca3af", padding: "3px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer" }
-      },
-      "No"
-    )) : /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        onClick: () => setConfirmDeleteId(t.id),
-        style: { background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 19, padding: "4px", lineHeight: 1 },
-        title: "Delete setup type"
-      },
-      "\u{1F5D1}"
-    )), editId === t.id && /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid #1f2937", padding: 16 } }, /* @__PURE__ */ React.createElement(
-      SetupTypeForm,
-      {
-        initial: t,
-        team,
-        onCancel: () => setEditId(null),
-        furnitureList,
-        propsList,
-        screenContentOptions,
-        mediaCards,
-        onSave: (tpl) => {
-          onUpdateSetupType(tpl);
-          setEditId(null);
+        "\u{1F5D1}"
+      )), editId === t.id && /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid #1f2937", padding: 16 } }, /* @__PURE__ */ React.createElement(
+        SetupTypeForm,
+        {
+          initial: t,
+          team,
+          onCancel: () => setEditId(null),
+          furnitureList,
+          propsList,
+          screenContentOptions,
+          mediaCards,
+          onSave: (tpl) => {
+            onUpdateSetupType(tpl);
+            setEditId(null);
+          }
         }
-      }
-    ))))));
+      )));
+    })), /* @__PURE__ */ React.createElement(InactiveItemsSection, { items: inactiveSetupTypes, onReactivate: (item) => onUpdateSetupType({ ...item, active: true }), renderLabel: (t) => t.name }));
   };
   var gatherIngests = (projects, team) => {
     const rows = [];
@@ -19300,7 +19399,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     },
     notes: ""
   });
-  var ProductionPresetsAdmin = ({ presets = [], onUpdatePresets, setupTypes = [], team = [], spaces = [], lists = {} }) => {
+  var ProductionPresetsAdmin = ({ presets = [], onUpdatePresets, setupTypes = [], team = [], spaces = [], lists = {}, gear = [], furniture = [], props_ = [], screenContent = {} }) => {
     const [showForm, setShowForm] = (0, import_react.useState)(false);
     const [editId, setEditId] = (0, import_react.useState)(null);
     const [draft, setDraft] = (0, import_react.useState)(null);
@@ -19328,7 +19427,11 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       onUpdatePresets(updated);
       cancel();
     };
-    const del = (id) => onUpdatePresets(presets.filter((p) => p.id !== id));
+    const del = (id) => onUpdatePresets(presets.map((p) => p.id !== id ? p : { ...p, active: false }));
+    const reactivate = (id) => onUpdatePresets(presets.map((p) => p.id !== id ? p : { ...p, active: true }));
+    const activePresets = presets.filter((p) => p.active !== false);
+    const inactivePresets = presets.filter((p) => p.active === false);
+    const presetRefCtx = { gearList: gear, furnitureList: furniture, propsList: props_, screenContentOptions: screenContent };
     const upd = (patch) => setDraft((d) => ({ ...d, ...patch }));
     const updS = (patch) => setDraft((d) => ({ ...d, sections: { ...d.sections, ...patch } }));
     const updC = (patch) => setDraft((d) => ({ ...d, sections: { ...d.sections, crew: { ...d.sections.crew, ...patch } } }));
@@ -19383,7 +19486,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     }), (!spaces || spaces.length === 0) && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#374151", fontStyle: "italic" } }, "No spaces configured \u2014 add them in the Spaces tab."))), secH("Setups", "setups", (draft.sections.setups || []).length), openSecs.setups && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("label", { style: sub }, "Add from library:"), /* @__PURE__ */ React.createElement("select", { value: "", onChange: (e) => {
       const st = setupTypes.find((x) => x.id === e.target.value);
       if (st) applySetupType(st);
-    }, style: { ...sel, width: "auto", flex: 1 } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 Select a setup type to add \u2014"), setupTypes.map((s) => /* @__PURE__ */ React.createElement("option", { key: s.id, value: s.id }, s.name))), /* @__PURE__ */ React.createElement(
+    }, style: { ...sel, width: "auto", flex: 1 } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 Select a setup type to add \u2014"), setupTypes.filter((s) => s.active !== false).map((s) => /* @__PURE__ */ React.createElement("option", { key: s.id, value: s.id }, s.name))), /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => updS({ setups: [...draft.sections.setups || [], { id: uid(), name: "Custom Setup", setupTypeId: null, crewInternal: [], crewExternal: [], equipmentIds: [], externalGear: [], mediaCardIds: [], furnitureIds: [], propIds: [], recordingSpecs: {}, screenContent: {}, notes: "" }] }),
@@ -19586,7 +19689,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         style: { background: draft.name?.trim() ? "#6366f1" : "#1f2937", border: "none", borderRadius: 7, color: draft.name?.trim() ? "#fff" : "#4b5563", padding: "8px 20px", fontSize: 14, fontWeight: 800, cursor: draft.name?.trim() ? "pointer" : "not-allowed", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" }
       },
       editId ? "Save Changes" : "Create Preset"
-    ))), presets.length === 0 && !showForm && /* @__PURE__ */ React.createElement("div", { style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 10, padding: "32px 24px", textAlign: "center", color: "#4b5563", fontSize: 16 } }, 'No presets yet. Click "+ New Preset" to build one, or save from an existing production.'), presets.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, presets.map((p) => {
+    ))), activePresets.length === 0 && !showForm && /* @__PURE__ */ React.createElement("div", { style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 10, padding: "32px 24px", textAlign: "center", color: "#4b5563", fontSize: 16 } }, 'No presets yet. Click "+ New Preset" to build one, or save from an existing production.'), activePresets.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, activePresets.map((p) => {
+      const inactiveRefs = findInactivePresetRefs(p, presetRefCtx);
       const setup = (p.sections?.setups || []).length;
       const crewInt = (p.sections?.crew?.internal || []).length;
       const crewExt = (p.sections?.crew?.external || []).length;
@@ -19602,8 +19706,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         sched > 0 && `${sched} sched. rows`,
         dels > 0 && `${dels} deliverable${dels !== 1 ? "s" : ""}`
       ].filter(Boolean);
-      return /* @__PURE__ */ React.createElement("div", { key: p.id, style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 } }, p.name), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, chips.map((c) => /* @__PURE__ */ React.createElement("span", { key: c, style: { fontSize: 12, color: "#9ca3af", background: "#1f2937", borderRadius: 4, padding: "2px 7px" } }, c))), p.notes && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#4b5563", marginTop: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.notes)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => openEdit(p), style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 6, color: "#9ca3af", padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "Edit"), /* @__PURE__ */ React.createElement("button", { onClick: () => del(p.id), style: { background: "#ef444415", border: "1px solid #ef444440", borderRadius: 6, color: "#ef4444", padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "Delete")));
-    })));
+      return /* @__PURE__ */ React.createElement("div", { key: p.id, style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: "#f1f5f9" } }, p.name), /* @__PURE__ */ React.createElement(InactiveRefBanner, { refs: inactiveRefs })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, chips.map((c) => /* @__PURE__ */ React.createElement("span", { key: c, style: { fontSize: 12, color: "#9ca3af", background: "#1f2937", borderRadius: 4, padding: "2px 7px" } }, c))), p.notes && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#4b5563", marginTop: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.notes)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => openEdit(p), style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 6, color: "#9ca3af", padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "Edit"), /* @__PURE__ */ React.createElement("button", { onClick: () => del(p.id), style: { background: "#ef444415", border: "1px solid #ef444440", borderRadius: 6, color: "#ef4444", padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "Mark Inactive")));
+    })), /* @__PURE__ */ React.createElement(InactiveItemsSection, { items: inactivePresets, onReactivate: (item) => reactivate(item.id), renderLabel: (p) => p.name }));
   };
   var AdminView = ({ team, onUpdateTeam, projects = [], nudges = [], onOpenProject, gear, onUpdateGear, mediaCards = [], onUpdateMediaCards, furniture = [], onUpdateFurniture, props_ = [], onUpdateProps, screenContent = {}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes = [], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations = [], onUpdateWorkstations, talentRoster = [], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists = {}, onUpdateLists, presets = [], onUpdatePresets, tabLocks = {}, onUpdateTabLocks, issueReports = [], onResolveIssue, onSearchResolvedIssues, initialTab, initialGearSubTab, onTabChange }) => {
     const [gearSubTab, setGearSubTab] = (0, import_react.useState)(initialGearSubTab || "equipment");
@@ -19637,7 +19741,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       },
       "\u{1F4BE} Media Cards & Drives ",
       /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#838ba0", marginLeft: 4 } }, mediaCards.length)
-    )), gearSubTab === "equipment" && /* @__PURE__ */ React.createElement(AdminGearTab, { gear, onUpdateGear }), gearSubTab === "media" && /* @__PURE__ */ React.createElement(AdminMediaCardsTab, { mediaCards, onUpdateMediaCards })), tab === "props" && /* @__PURE__ */ React.createElement(AdminPropsFurnitureTab, { furniture, onUpdateFurniture, props_, onUpdateProps }), tab === "screen" && /* @__PURE__ */ React.createElement(AdminScreenContentTab, { screenContent, onUpdate: onUpdateScreenContent }), tab === "spaces" && /* @__PURE__ */ React.createElement(AdminSpacesTab, { spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta }), tab === "setups" && /* @__PURE__ */ React.createElement(AdminSetupsTab, { setupTypes, team, onAddSetupType, onUpdateSetupType, onDeleteSetupType, furnitureList: furniture, propsList: props_, screenContentOptions: screenContent, mediaCards: [] }), tab === "workstations" && /* @__PURE__ */ React.createElement(AdminWorkstationsTab, { workstations, team, onUpdateWorkstations }), tab === "talent" && /* @__PURE__ */ React.createElement(AdminTalentTab, { talentRoster, onUpdateTalentRoster }), tab === "resources" && /* @__PURE__ */ React.createElement(AdminResourceSettingsTab, { resourceConfig, onUpdateResourceConfig }), tab === "lists" && /* @__PURE__ */ React.createElement(AdminListsTab, { lists, onUpdateLists }), tab === "crewRoles" && /* @__PURE__ */ React.createElement(AdminCrewRolesTab, { lists, onUpdateLists }), tab === "presets" && /* @__PURE__ */ React.createElement(
+    )), gearSubTab === "equipment" && /* @__PURE__ */ React.createElement(AdminGearTab, { gear, onUpdateGear }), gearSubTab === "media" && /* @__PURE__ */ React.createElement(AdminMediaCardsTab, { mediaCards, onUpdateMediaCards })), tab === "props" && /* @__PURE__ */ React.createElement(AdminPropsFurnitureTab, { furniture, onUpdateFurniture, props_, onUpdateProps }), tab === "screen" && /* @__PURE__ */ React.createElement(AdminScreenContentTab, { screenContent, onUpdate: onUpdateScreenContent }), tab === "spaces" && /* @__PURE__ */ React.createElement(AdminSpacesTab, { spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta }), tab === "setups" && /* @__PURE__ */ React.createElement(AdminSetupsTab, { setupTypes, team, onAddSetupType, onUpdateSetupType, onDeleteSetupType, furnitureList: furniture, propsList: props_, screenContentOptions: screenContent, mediaCards: [], gearList: gear }), tab === "workstations" && /* @__PURE__ */ React.createElement(AdminWorkstationsTab, { workstations, team, onUpdateWorkstations }), tab === "talent" && /* @__PURE__ */ React.createElement(AdminTalentTab, { talentRoster, onUpdateTalentRoster }), tab === "resources" && /* @__PURE__ */ React.createElement(AdminResourceSettingsTab, { resourceConfig, onUpdateResourceConfig }), tab === "lists" && /* @__PURE__ */ React.createElement(AdminListsTab, { lists, onUpdateLists }), tab === "crewRoles" && /* @__PURE__ */ React.createElement(AdminCrewRolesTab, { lists, onUpdateLists }), tab === "presets" && /* @__PURE__ */ React.createElement(
       ProductionPresetsAdmin,
       {
         presets,
@@ -19646,6 +19750,9 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         team,
         spaces: spaces || [],
         gear: gear || [],
+        furniture: furniture || [],
+        props_: props_ || [],
+        screenContent: screenContent || {},
         lists
       }
     ), tab === "access" && /* @__PURE__ */ React.createElement(AdminAccessTab, { tabLocks, onUpdateTabLocks }), tab === "issues" && /* @__PURE__ */ React.createElement(AdminIssuesTab, { issueReports, onResolve: onResolveIssue, onSearchResolved: onSearchResolvedIssues }));
@@ -21274,7 +21381,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
               isPCR: row.is_pcr,
               suggestHMU: row.suggest_hmu,
               linkedGreenRoom: row.linked_green_room || void 0,
-              crewCallOffsetMs: row.crew_call_offset_ms
+              crewCallOffsetMs: row.crew_call_offset_ms,
+              active: row.active !== false
             };
           });
           setStudioSpaceMeta(meta);
@@ -21629,7 +21737,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           isPCR: row.is_pcr,
           suggestHMU: row.suggest_hmu,
           linkedGreenRoom: row.linked_green_room || void 0,
-          crewCallOffsetMs: row.crew_call_offset_ms
+          crewCallOffsetMs: row.crew_call_offset_ms,
+          active: row.active !== false
         } }));
       };
       const mergeSpaceMetaDelete = (payload) => {
@@ -22851,6 +22960,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
   }
   window.App = App;
 })();
+
 </script>
 <script>
 try {

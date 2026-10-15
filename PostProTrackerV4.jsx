@@ -2771,7 +2771,8 @@ const SavePresetModal = ({production, onSave, onClose}) => {
 };
 
 // ── Load Preset Modal ──
-const LoadPresetModal = ({presets, allProjects=[], onApply, onDelete, onClose}) => {
+const LoadPresetModal = ({presets: allPresets, allProjects=[], onApply, onDelete, onClose}) => {
+  const presets = allPresets.filter(p=>p.active!==false);
   const todayStr = new Date().toISOString().slice(0,10);
   const [sel, setSel] = useState(null);
   const [sections, setSections] = useState(new Set(["datetime","spaces","talent","setups","crew","schedule","gear","deliverables","ingest"]));
@@ -4213,7 +4214,7 @@ const SetupPhotoUploadButton = ({label, multiple=false, onUploaded, size=64}) =>
 const EditorPicker = ({value,onChange,deadline,allProjects,excludeDelId,team,style:s={}}) => {
   const [open,setOpen]=useState(false);
   const ref=useRef();
-  const editors=team.filter(m=>m.roles.some(r=>["Editor","Animator","Designer"].includes(r)));
+  const editors=team.filter(m=>m.active!==false&&m.roles.some(r=>["Editor","Animator","Designer"].includes(r)));
   const current=team.find(m=>m.id===value);
   useEffect(()=>{
     if(!open) return;
@@ -4474,9 +4475,9 @@ const DeliverableDetailModal = React.memo(({del,projectId,team,allProjects,onUpd
 
   const [secOpen,setSecOpen]=useState({info:true,frame:true,rounds:false});
   const toggleSec=k=>setSecOpen(s=>({...s,[k]:!s[k]}));
-  const editors=team.filter(m=>m.roles.some(r=>["Editor","Animator"].includes(r)));
+  const editors=team.filter(m=>m.active!==false&&m.roles.some(r=>["Editor","Animator"].includes(r)));
   const animators=team.filter(m=>m.roles.includes("Animator"));
-  const producers=team.filter(m=>m.roles.some(r=>["Producer","Project Manager","Post Project Manager"].includes(r)));
+  const producers=team.filter(m=>m.active!==false&&m.roles.some(r=>["Producer","Project Manager","Post Project Manager"].includes(r)));
   // Auto-populate BU, workstream, and producer from project if not set on deliverable
   const effectiveBU = del.businessUnit || project?.businessUnit || "";
   const effectiveWS = del.workstream || project?.workstream || "";
@@ -6876,7 +6877,7 @@ class ProjectOverviewErrorBoundary extends React.Component {
 const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,onDeleteDel,onUpdateProject,initialDelId,initialTab,initialShootId,initialItemId,studioBookings=[],mediaCards=[],setupTypes=[],onAddSetupType,talentRoster=[],onUpdateTalentRoster,nudges=[],onAddNudge,furnitureList=[],propsList=[],screenContentOptions={},gearList=[],customTasks=[],onAddCustomTask,onUpdateCustomTask,onDeleteCustomTask,appPresets=[],onSaveAppPresets,vendorCompanies=[],addVendorCompany,intakes=[],becRequests=[],canAccessBudget=true,reviewerNames=[],addReviewerName,workReviewSessions=[],addWorkReviewSession,updateWorkReviewSession,lists={},onTabChange}) => {
   const [activeDelModal,setActiveDelModal]=useState(initialDelId||((initialTab==="deliverables"||initialTab==="ingest")?initialItemId:null)||null);
   const [handoffDelId,  setHandoffDelId]  = useState(null); // for editor assignment modal in deliverables tab
-  const editors = team.filter(m=>m.roles?.some(r=>["Editor","Animator","Designer"].includes(r)));
+  const editors = team.filter(m=>m.active!==false&&m.roles?.some(r=>["Editor","Animator","Designer"].includes(r)));
   const [showAddDel,setShowAddDel]=useState(false);
   const [showAddReviewRound,setShowAddReviewRound]=useState(false);
   const [showAddWorkReview,setShowAddWorkReview]=useState(false);
@@ -7154,6 +7155,9 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                     </LW>
                     <LW label="Workstream">
                       <Sel value={lp.workstream||""} onChange={e=>onUpdateProject(project.id,"workstream",e.target.value)}>
+                        {lp.workstream&&!WORKSTREAMS.includes(lp.workstream)&&(
+                          <option value={lp.workstream} style={{color:"#f59e0b"}}>{lp.workstream}</option>
+                        )}
                         {WORKSTREAMS.map(s=><option key={s}>{s}</option>)}
                       </Sel>
                     </LW>
@@ -10178,8 +10182,8 @@ const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateD
   };
   const sidebarProject = sidebarProjectId ? projects.find(p=>p.id===sidebarProjectId) : null;
 
-  const producers = team.filter(m=>m.roles.some(r=>["Producer","Project Manager"].includes(r)));
-  const editors   = team.filter(m=>m.roles.some(r=>["Editor","Animator","Designer"].includes(r)));
+  const producers = team.filter(m=>m.active!==false&&m.roles.some(r=>["Producer","Project Manager"].includes(r)));
+  const editors   = team.filter(m=>m.active!==false&&m.roles.some(r=>["Editor","Animator","Designer"].includes(r)));
   const years = [...new Set(projects.map(p=>p.year||new Date(p.deadline||Date.now()).getFullYear()))].sort((a,b)=>b-a);
 
   const filtered = useMemo(()=>projects.filter(p=>{
@@ -10392,7 +10396,7 @@ const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateD
 
       {/* Group by Editor */}
       {groupMode==="editor"&&(()=>{
-        const eds=team.filter(m=>m.roles.some(r=>["Editor","Animator","Designer"].includes(r)));
+        const eds=team.filter(m=>m.active!==false&&m.roles.some(r=>["Editor","Animator","Designer"].includes(r)));
         const STAGE_ORD=["New Request","Ideation","Pre-Pro","In Production","Post","In Review","On Hold"];
         const sortS=ps=>[...ps].sort((a,b)=>STAGE_ORD.indexOf(a.status)-STAGE_ORD.indexOf(b.status));
         const activeFiltered=displayFiltered.filter(p=>!p.closedAt&&!["Delivered","Canceled"].includes(p.status));
@@ -11077,7 +11081,7 @@ const ProjectSidebar = ({project, team, allProjects=[], onUpdateProject, onUpdat
   const stage = project.status;
 
   // Editors and animators on this team (for HandoffModal + SidebarDelCard)
-  const editors = team.filter(m=>(m.roles||[]).some(r=>/editor|animator/i.test(r)));
+  const editors = team.filter(m=>m.active!==false&&(m.roles||[]).some(r=>/editor|animator/i.test(r)));
 
   const doHandoff = (projectId, delId, mode, newEditorId, fromDate, toDate) => {
     const projEditors = [...(project.assignees?.["Editor"]||[]),...(project.assignees?.["Animator"]||[])];
@@ -11391,7 +11395,7 @@ const ProjectSidebar = ({project, team, allProjects=[], onUpdateProject, onUpdat
 const KanbanStatus = ({projects,team,onUpdateDel}) => {
   const [drag,setDrag]=useState(null);
   const [over,setOver]=useState(null);
-  const editors=team.filter(m=>m.roles.some(r=>["Editor","Animator","Designer"].includes(r)));
+  const editors=team.filter(m=>m.active!==false&&m.roles.some(r=>["Editor","Animator","Designer"].includes(r)));
   const all=useMemo(()=>projects.flatMap(p=>p.deliverables.map(d=>({...d,projectName:p.name,projectId:p.id}))),[projects]);
   const cols=useMemo(()=>{const m={};KANBAN_COLS.forEach(c=>{m[c]=[];});all.forEach(d=>{const c=toKanban(d.status);if(m[c])m[c].push(d);});return m;},[all]);
   const drop=col=>{if(!drag)return;const map={"Not Started":"Not Started","In Progress":"Assembly","Review":"Picture Lock","Delivered":"Delivered","On Hold":"On Hold"};onUpdateDel(drag.projectId,drag.id,"status",map[col]);setDrag(null);setOver(null);};
@@ -11512,7 +11516,7 @@ const KanbanEditorCol = ({ed, dels, editors, onUpdateDel}) => {
 };
 
 const KanbanEditor = ({projects,team,onUpdateDel}) => {
-  const editors=team.filter(m=>m.roles.some(r=>["Editor","Animator","Designer"].includes(r)));
+  const editors=team.filter(m=>m.active!==false&&m.roles.some(r=>["Editor","Animator","Designer"].includes(r)));
   const allEditors=[...editors,{id:"unassigned",name:"Unassigned",roles:["—"],available:false}];
   const grouped=useMemo(()=>{
     const map={};
@@ -11548,7 +11552,7 @@ const CalendarView = ({projects,team,onOpenProject,onUpdateProject,unavailabilit
   const [tooltip,setTooltip]=useState(null);
   const [selDate,setSelDate]=useState(null);
 
-  const editors=team.filter(m=>m.roles.some(r=>["Editor","Animator","Designer"].includes(r)));
+  const editors=team.filter(m=>m.active!==false&&m.roles.some(r=>["Editor","Animator","Designer"].includes(r)));
 
   const allItems=useMemo(()=>{
     let items=[];
@@ -12573,8 +12577,8 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
     return [...projectDels, ...prodDels.filter(d=>!seen.has(d.id))];
   },[projects]);
 
-  const editors   = team.filter(m=>m.roles.some(r=>["Editor","Animator","Designer"].includes(r)));
-  const producers = team.filter(m=>m.roles.some(r=>["Producer","Project Manager","Post Project Manager"].includes(r)));
+  const editors   = team.filter(m=>m.active!==false&&m.roles.some(r=>["Editor","Animator","Designer"].includes(r)));
+  const producers = team.filter(m=>m.active!==false&&m.roles.some(r=>["Producer","Project Manager","Post Project Manager"].includes(r)));
   const active    = allDels.filter(d=>!["Delivered","On Hold"].includes(d.status));
 
   // Bar chart helper
@@ -15435,7 +15439,12 @@ const SHADOW_WRITE_TAB_LOCKS = true;
 
 const rowToTeamMember = row => ({
   id: row.id, name: row.name, roles: row.roles||[], employeeType: row.employee_type,
-  available: row.available, email: row.email||"", phone: row.phone||"", department: row.department,
+  // `available` is a scheduling/capacity concept (do they currently have
+  // bandwidth) — unrelated to `active`, which is "do they still work here
+  // at all". Conflating the two would mean someone on PTO looks like a
+  // former employee, so this is a genuinely separate field, defaulting to
+  // true for any row written before this column existed.
+  available: row.available, active: row.active!==false, email: row.email||"", phone: row.phone||"", department: row.department,
   rate: row.rate||{type:"salary",amount:null}, skills: row.skills||[],
   workHours: row.work_hours||{days:[1,2,3,4,5],start:9,end:17,timezone:"EST"},
   assignablePercent: row.assignable_percent, authUserId: row.auth_user_id||null,
@@ -15443,7 +15452,7 @@ const rowToTeamMember = row => ({
 });
 const teamMemberToRow = m => ({
   id: m.id, name: m.name, roles: m.roles||[], employee_type: m.employeeType,
-  available: m.available, email: m.email||null, phone: m.phone||null, department: m.department,
+  available: m.available, active: m.active!==false, email: m.email||null, phone: m.phone||null, department: m.department,
   rate: m.rate||{}, skills: m.skills||[], work_hours: m.workHours||{}, assignable_percent: m.assignablePercent ?? null,
   auth_user_id: m.authUserId||null, is_admin: m.isAdmin||false, color: m.color||null,
 });
@@ -15665,7 +15674,7 @@ const rowToSetupType = row => ({
   equipmentIds: row.equipment_ids||[], externalGear: row.external_gear||[],
   mediaCardIds: row.media_card_ids||[], furnitureIds: row.furniture_ids||[], propIds: row.prop_ids||[],
   recordingSpecs: row.recording_specs||{}, screenContent: row.screen_content||{}, notes: row.notes||"",
-  roles: row.roles||[],
+  roles: row.roles||[], active: row.active!==false,
 });
 const setupTypeToRow = t => ({
   ...(t._rowId ? {id: t._rowId} : {}),
@@ -15675,18 +15684,18 @@ const setupTypeToRow = t => ({
   equipment_ids: t.equipmentIds||[], external_gear: t.externalGear||[],
   media_card_ids: t.mediaCardIds||[], furniture_ids: t.furnitureIds||[], prop_ids: t.propIds||[],
   recording_specs: t.recordingSpecs||{}, screen_content: t.screenContent||{}, notes: t.notes||null,
-  roles: t.roles||[],
+  roles: t.roles||[], active: t.active!==false,
 });
 
 const rowToProductionPreset = row => ({
   id: parseLegacyId(row.legacy_id) ?? row.id,
   _rowId: row.id,
-  name: row.name, type: row.type, createdAt: row.created_at, sections: row.sections||{},
+  name: row.name, type: row.type, createdAt: row.created_at, sections: row.sections||{}, active: row.active!==false,
 });
 const productionPresetToRow = p => ({
   ...(p._rowId ? {id: p._rowId} : {}),
   legacy_id: p.id!=null ? String(p.id) : null,
-  name: p.name||null, type: p.type||null, sections: p.sections||{},
+  name: p.name||null, type: p.type||null, sections: p.sections||{}, active: p.active!==false,
 });
 
 // custom_tasks' legacy_id stayed bigint (ids are always String(Date.now())
@@ -15716,37 +15725,37 @@ const customTaskToRow = t => ({
 
 const rowToGear = row => ({
   id: row.legacy_id ?? row.id, _rowId: row.id,
-  name: row.name, category: row.category, quantity: row.quantity||1, notes: row.notes||"",
+  name: row.name, category: row.category, quantity: row.quantity||1, notes: row.notes||"", active: row.active!==false,
 });
 const gearToRow = g => ({
   ...(g._rowId ? {id: g._rowId} : {}),
   legacy_id: typeof g.id==="number" ? g.id : null,
-  name: g.name||null, category: g.category||null, quantity: g.quantity||1, notes: g.notes||null,
+  name: g.name||null, category: g.category||null, quantity: g.quantity||1, notes: g.notes||null, active: g.active!==false,
 });
 
-const rowToFurniture = row => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category||"Furniture" });
+const rowToFurniture = row => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category||"Furniture", active: row.active!==false });
 const furnitureToRow = f => ({
   ...(f._rowId ? {id: f._rowId} : {}),
   legacy_id: f.id!=null ? String(f.id) : null,
-  name: f.name||null, category: f.category||"Furniture",
+  name: f.name||null, category: f.category||"Furniture", active: f.active!==false,
 });
 
-const rowToProp = row => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category||"Prop" });
+const rowToProp = row => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category||"Prop", active: row.active!==false });
 const propToRow = p => ({
   ...(p._rowId ? {id: p._rowId} : {}),
   legacy_id: p.id!=null ? String(p.id) : null,
-  name: p.name||null, category: p.category||"Prop",
+  name: p.name||null, category: p.category||"Prop", active: p.active!==false,
 });
 
 // category isn't a local field (it's implicit from which of the 3 arrays an
 // item lives in) — screenContentOptionToRow takes it as a second argument
 // from whichever category array is being diffed, same approach
 // assembleNormalizedProjectData's siblings use for their own parent-scoped fields.
-const rowToScreenContentOption = row => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name });
+const rowToScreenContentOption = row => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, active: row.active!==false });
 const screenContentOptionToRow = (item, category) => ({
   ...(item._rowId ? {id: item._rowId} : {}),
   legacy_id: item.id!=null ? String(item.id) : null,
-  category, name: item.name||null,
+  category, name: item.name||null, active: item.active!==false,
 });
 
 const rowToUnavailability = row => ({
@@ -15766,12 +15775,13 @@ const unavailabilityToRow = u => ({
 const rowToTalent = row => ({
   id: row.legacy_id ?? row.id, _rowId: row.id,
   name: row.name, category: row.category, bio: row.bio||"", photoKey: row.photo_key, lastBookedAt: row.last_booked_at,
+  active: row.active!==false,
 });
 const talentToRow = t => ({
   ...(t._rowId ? {id: t._rowId} : {}),
   legacy_id: t.id!=null ? String(t.id) : null,
   name: t.name||null, category: t.category||null, bio: t.bio||null,
-  photo_key: t.photoKey||null, last_booked_at: t.lastBookedAt||null,
+  photo_key: t.photoKey||null, last_booked_at: t.lastBookedAt||null, active: t.active!==false,
 });
 
 // Nudges and BEC requests are append-only (no edit/delete path exists in the
@@ -15836,12 +15846,14 @@ const rowToWorkstation = row => ({
   id: row.legacy_id ?? row.id, _rowId: row.id,
   name: row.name, location: row.location, machineType: row.machine_type,
   serialNumber: row.serial_number, assignedTo: row.assigned_to, available: row.available,
+  active: row.active!==false,
 });
 const workstationToRow = w => ({
   ...(w._rowId ? {id: w._rowId} : {}),
   legacy_id: typeof w.id==="number" ? w.id : null,
   name: w.name||null, location: w.location||null, machine_type: w.machineType||null,
   serial_number: w.serialNumber||null, assigned_to: w.assignedTo||null, available: w.available!==false,
+  active: w.active!==false,
 });
 
 // Generic whole-array-replace diff/write pair — the same compare-by-id
@@ -15905,6 +15917,7 @@ const spaceMetaToRow = (spaceName, m) => ({
   space_name: spaceName,
   is_hmu: !!m.isHMU, is_green_room: !!m.isGreenRoom, is_pcr: !!m.isPCR, suggest_hmu: !!m.suggestHMU,
   linked_green_room: m.linkedGreenRoom||null, crew_call_offset_ms: m.crewCallOffsetMs||0,
+  active: m.active!==false,
 });
 const computeSpaceMetaDiff = (oldMeta, newMeta) => {
   const toUpsert = Object.keys(newMeta).map(k=>spaceMetaToRow(k, newMeta[k]));
@@ -17311,9 +17324,10 @@ const SetupTypeForm = ({initial, team, onSave, onCancel, furnitureList=[], props
 // ─── Setup Picker — "+ Add Setup" entry point on a production ────────────────
 // Lets the user pick an existing Setup Type from the shared library, or create
 // a brand new one inline (which is saved to the library AND immediately attached).
-const SetupPicker = ({setupTypes, team, onAddTemplate, onAddInstance, onClose}) => {
+const SetupPicker = ({setupTypes: allSetupTypes, team, onAddTemplate, onAddInstance, onClose}) => {
   const [creating, setCreating] = useState(false);
   const [formKey, setFormKey] = useState(0); // increment to force fresh mount
+  const setupTypes = allSetupTypes.filter(t=>t.active!==false);
 
   if(creating){
     return (
@@ -17620,6 +17634,12 @@ const SetupInstanceCard = ({
         <optgroup key={cat} label={cat}>{roles.map(r=><option key={r} value={r}>{r}</option>)}</optgroup>
       ))
     : crewRoles.map(r=><option key={r} value={r}>{r}</option>);
+  // A role already assigned on this setup can fall out of the active list
+  // (removed via Admin → Crew Roles) — keep it selectable/visible instead of
+  // the <select> silently snapping to a different option.
+  const knownRoles = new Set([...crewRoles, ...(crewRoleCategories ? Object.values(crewRoleCategories).flat() : [])]);
+  const staleRoleOption = role => role && !knownRoles.has(role)
+    ? <option value={role} style={{color:"#f59e0b"}}>{role} (inactive)</option> : null;
   const roleListToggle = crewRoleCategories&&(
     <button onClick={()=>setShowAllRoles(s=>!s)}
       style={{background:"none",border:"none",color:"#6b7280",fontSize:12,cursor:"pointer",textDecoration:"underline",padding:0}}>
@@ -17722,7 +17742,7 @@ const SetupInstanceCard = ({
                   <div style={{display:"grid",gridTemplateColumns:"130px 1fr 100px 76px auto",gap:5,alignItems:"center"}}>
                     <select value={c.role||""} onChange={e=>updCrewInt(c.id,"role",e.target.value)}
                       style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#e2e8f0",padding:"5px 7px",fontSize:14,outline:"none"}}>
-                      <option value="">Role…</option>{roleOptions}
+                      <option value="">Role…</option>{staleRoleOption(c.role)}{roleOptions}
                     </select>
                     <select value={c.memberId||""} onChange={e=>updCrewInt(c.id,"memberId",e.target.value?Number(e.target.value):null)}
                       style={{background:"#0a0f1a",border:`1px solid ${c._autoNote?"#f59e0b50":"#1f2937"}`,borderRadius:6,color:c.memberId?"#e2e8f0":"#4b5563",padding:"5px 7px",fontSize:14,outline:"none"}}>
@@ -17772,7 +17792,7 @@ const SetupInstanceCard = ({
                 <div key={c.id} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:8,padding:"8px 10px",display:"flex",flexDirection:"column",gap:6}}>
                   <div style={{display:"grid",gridTemplateColumns:"120px 1fr 1fr 70px 70px auto",gap:5,alignItems:"center"}}>
                     <select value={c.role||""} onChange={e=>updCrewExt(c.id,"role",e.target.value)} style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#e2e8f0",padding:"5px 7px",fontSize:14,outline:"none"}}>
-                      <option value="">Role…</option>{roleOptions}
+                      <option value="">Role…</option>{staleRoleOption(c.role)}{roleOptions}
                     </select>
                     <Inp value={c.name||""} onChange={e=>updCrewExt(c.id,"name",e.target.value)} placeholder="Name…"/>
                     <div style={{position:"relative",flex:1}}>
@@ -18298,10 +18318,10 @@ const TalentPicker = ({talentRoster=[], selectedIds=[], onConfirm, onClose}) => 
   const [pending,  setPending]  = useState(()=>new Set(selectedIds));
 
   const filtered = talentRoster
-    .filter(t => !search ||
+    .filter(t => (t.active!==false || pending.has(t.id)) && (!search ||
       t.name.toLowerCase().includes(search.toLowerCase()) ||
       (t.bio||"").toLowerCase().includes(search.toLowerCase()) ||
-      (t.category||"").toLowerCase().includes(search.toLowerCase()))
+      (t.category||"").toLowerCase().includes(search.toLowerCase())))
     .sort((a,b)=> sortMode==="alpha"
       ? a.name.localeCompare(b.name)
       : new Date(b.lastBookedAt||0) - new Date(a.lastBookedAt||0));
@@ -19754,7 +19774,7 @@ const ProductionCard = ({production, idx, projectId, allProductions, allProjectD
   // "show full list" toggle reveals every category via crewRoleCategories.
   const crewRoleCategories = {};
   Object.entries(CREW_ROLE_CATEGORY_LIST_KEYS).forEach(([cat,key])=>{
-    crewRoleCategories[cat] = [...(lists[key]||CREW_ROLE_CATEGORIES_DEFAULT[cat])].sort((a,b)=>a.localeCompare(b));
+    crewRoleCategories[cat] = [...((lists[key]&&lists[key].length) ? lists[key] : CREW_ROLE_CATEGORIES_DEFAULT[cat])].sort((a,b)=>a.localeCompare(b));
   });
   const CREW_ROLES = crewRoleCategories["Production Roles"];
 
@@ -20087,8 +20107,8 @@ const ProductionCard = ({production, idx, projectId, allProductions, allProjectD
                                 {isCustom&&<option value="__custom__">Custom</option>}
                                 {setupTypes.length>0&&(
                                   <optgroup label="─── Presets ───">
-                                    {setupTypes.map(t=>(
-                                      <option key={t.id} value={String(t.id)}>{t.name}</option>
+                                    {setupTypes.filter(t=>t.active!==false||String(t.id)===presetId).map(t=>(
+                                      <option key={t.id} value={String(t.id)}>{t.name}{t.active===false?" (inactive)":""}</option>
                                     ))}
                                   </optgroup>
                                 )}
@@ -20482,7 +20502,7 @@ const ProductionSection = ({productions=[], projectDeliverables=[], onUpdate, on
     persistPresets([...presets, preset]);
   };
 
-  const deletePreset = id => persistPresets(presets.filter(p=>p.id!==id));
+  const deletePreset = id => persistPresets(presets.map(p=>p.id!==id?p:{...p,active:false}));
 
   const applyPresetTo = (preset, sections, targetId, targetDate, targetStartTime, targetLocation) => {
     const sourceProd = targetId ? productions.find(p=>p.id===targetId) : null;
@@ -24147,11 +24167,13 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
     }
   };
 
-  const filtered = team.filter(m=>
+  const matchesSearch = m =>
     !search || m.name.toLowerCase().includes(search.toLowerCase()) ||
     m.roles.some(r=>r.toLowerCase().includes(search.toLowerCase())) ||
-    m.department?.toLowerCase().includes(search.toLowerCase())
-  );
+    m.department?.toLowerCase().includes(search.toLowerCase());
+  const filtered = team.filter(m=>m.active!==false && matchesSearch(m));
+  const formerEmployees = team.filter(m=>m.active===false && matchesSearch(m));
+  const [showFormer, setShowFormer] = useState(false);
 
   // Active (non-Delivered/Canceled project, non-Delivered/On-Hold deliverable)
   // workload counts for the collapsed card.
@@ -24167,11 +24189,16 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
   const startEdit = m => { setEditId(m.id); setDraft({...m}); setExpandedId(m.id); };
   const cancelEdit = () => { setEditId(null); setDraft(null); };
   const saveEdit  = () => { onUpdateTeam(team.map(m=>m.id===editId?{...m,...draft}:m)); setEditId(null); setDraft(null); };
+  // Marks inactive rather than removing — a former employee's id stays
+  // resolvable everywhere they're still referenced (past deliverables/
+  // productions they worked on), they just stop being offered for new
+  // assignments. Reactivate below undoes it.
   const deleteM   = id => {
-    onUpdateTeam(team.filter(m=>m.id!==id));
+    onUpdateTeam(team.map(m=>m.id!==id?m:{...m,active:false}));
     if(expandedId===id) setExpandedId(null);
     if(editId===id){ setEditId(null); setDraft(null); }
   };
+  const reactivateM = id => onUpdateTeam(team.map(m=>m.id!==id?m:{...m,active:true}));
   const addMember = () => {
     if(!newMember.name.trim()) return;
     onUpdateTeam([...team, {...newMember, id:Math.max(...team.map(m=>m.id))+1}]);
@@ -24464,15 +24491,43 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
         })}
       </div>
 
+      {/* Former employees — kept forever (see deleteM's comment), just out
+          of the way by default so the active roster above isn't cluttered
+          with people who no longer work here. */}
+      <div style={{marginTop:24,borderTop:"1px solid #1f2937",paddingTop:16}}>
+        <button onClick={()=>setShowFormer(v=>!v)}
+          style={{background:"transparent",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"7px 16px",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+          {showFormer?"▲ Hide":"▼ Show"} Former Employees{formerEmployees.length?` (${formerEmployees.length})`:""}
+        </button>
+        {showFormer&&(
+          <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:12}}>
+            {formerEmployees.length===0&&<div style={{color:"#4b5563",fontSize:15,padding:"8px 0"}}>No former employees.</div>}
+            {formerEmployees.map(m=>(
+              <div key={m.id} style={{display:"flex",alignItems:"center",gap:12,padding:"9px 14px",background:"#0d1117",border:"1px solid #1f2937",borderRadius:8,opacity:0.7}}>
+                <Av name={m.name} size={26}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:700,color:"#e2e8f0"}}>{m.name}</div>
+                  <div style={{fontSize:13,color:"#6b7280"}}>{m.roles.join(", ")||"—"}{m.department?` · ${m.department}`:""}</div>
+                </div>
+                <button onClick={()=>reactivateM(m.id)}
+                  style={{background:"#10b98118",border:"1px solid #10b98130",borderRadius:6,color:"#10b981",padding:"4px 11px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
+                  Reactivate
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {confirmDeleteId!=null && (
         <Modal onClose={()=>setConfirmDeleteId(null)} maxWidth={380}>
-          <div style={{fontSize:20,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:10}}>Remove Team Member?</div>
+          <div style={{fontSize:20,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:10}}>Mark as Former Employee?</div>
           <div style={{fontSize:15,color:"#9ca3af",marginBottom:20}}>
-            This will permanently remove {team.find(m=>m.id===confirmDeleteId)?.name||"this member"} from the team roster.
+            {team.find(m=>m.id===confirmDeleteId)?.name||"This member"} will stop showing up when assigning new work, but stays visible on everything they've already worked on, and can be reactivated anytime from the Former Employees section below.
           </div>
           <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
             <button onClick={()=>setConfirmDeleteId(null)} style={{background:"#1f2937",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"8px 16px",fontSize:14,fontWeight:700,cursor:"pointer"}}>Cancel</button>
-            <button onClick={()=>{deleteM(confirmDeleteId);setConfirmDeleteId(null);}} style={{background:"#ef4444",border:"none",borderRadius:7,color:"#fff",padding:"8px 16px",fontSize:14,fontWeight:800,cursor:"pointer"}}>Remove</button>
+            <button onClick={()=>{deleteM(confirmDeleteId);setConfirmDeleteId(null);}} style={{background:"#ef4444",border:"none",borderRadius:7,color:"#fff",padding:"8px 16px",fontSize:14,fontWeight:800,cursor:"pointer"}}>Mark Former</button>
           </div>
         </Modal>
       )}
@@ -24482,16 +24537,21 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
 
 // ─── Admin: Props & Furniture ────────────────────────────────────────────────
 // Module-level to avoid remount-on-keystroke (same pattern as AdminListSection)
-const AdminPropsFurnitureSection = ({title, icon, color, items, newVal, setNewVal, onAdd, onDel}) => {
+// `items` is the full list (active + inactive) — onDel marks inactive
+// rather than removing (see InactiveItemsSection's own comment), so this
+// filters to active for the main list and surfaces the rest below.
+const AdminPropsFurnitureSection = ({title, icon, color, items, newVal, setNewVal, onAdd, onDel, onReactivate}) => {
   const row = {display:"flex",alignItems:"center",justifyContent:"space-between",background:"#111827",border:"1px solid #1f2937",borderRadius:6,padding:"7px 11px"};
   const inp = {background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 10px",fontSize:14,outline:"none",flex:1,fontFamily:"'DM Sans',sans-serif"};
+  const active = items.filter(item=>item.active!==false);
+  const inactive = items.filter(item=>item.active===false);
   return (
     <div style={{flex:1,background:"#0d1117",border:"1px solid #1f2937",borderRadius:10,padding:"16px 18px"}}>
       <div style={{fontSize:13,fontWeight:800,color:"#838ba0",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.1em",marginBottom:10}}>
-        {icon} {title} <span style={{color:"#1f2937",fontWeight:400}}>({items.length})</span>
+        {icon} {title} <span style={{color:"#1f2937",fontWeight:400}}>({active.length})</span>
       </div>
       <div style={{marginBottom:10,display:"flex",flexDirection:"column",gap:4,minHeight:60}}>
-        {items.map(item=>(
+        {active.map(item=>(
           <div key={item.id} style={row}>
             <span style={{fontSize:16,color:"#d1d5db"}}>{item.name}</span>
             <button onClick={()=>onDel(item.id)}
@@ -24500,7 +24560,7 @@ const AdminPropsFurnitureSection = ({title, icon, color, items, newVal, setNewVa
               onMouseLeave={e=>e.currentTarget.style.color="#838ba0"}>×</button>
           </div>
         ))}
-        {items.length===0&&<div style={{fontSize:14,color:"#374151",fontStyle:"italic"}}>No items yet — add one below</div>}
+        {active.length===0&&<div style={{fontSize:14,color:"#374151",fontStyle:"italic"}}>No items yet — add one below</div>}
       </div>
       <div style={{display:"flex",gap:8}}>
         <input style={inp} value={newVal} onChange={e=>setNewVal(e.target.value)}
@@ -24511,6 +24571,7 @@ const AdminPropsFurnitureSection = ({title, icon, color, items, newVal, setNewVa
           + Add
         </button>
       </div>
+      <InactiveItemsSection items={inactive} onReactivate={item=>onReactivate(item.id)} renderLabel={item=>item.name}/>
     </div>
   );
 };
@@ -24524,19 +24585,18 @@ const AdminPropsFurnitureTab = ({furniture=[], onUpdateFurniture, props_=[], onU
     onUpdateFurniture([...furniture, {id:`furn-${Date.now()}`, name:n, category:"Furniture"}]);
     setNewF("");
   };
-  const delFurniture = id => {
-    if(window.confirm("Remove this furniture item? Productions using it will lose the reference."))
-      onUpdateFurniture(furniture.filter(f=>f.id!==id));
-  };
+  // Marks inactive rather than removing — see InactiveItemsSection's own
+  // comment. Past productions that already used this item keep showing
+  // it correctly; it just stops being offered as an option for new ones.
+  const delFurniture = id => onUpdateFurniture(furniture.map(f=>f.id===id?{...f,active:false}:f));
+  const reactivateFurniture = id => onUpdateFurniture(furniture.map(f=>f.id===id?{...f,active:true}:f));
   const addProp = () => {
     const n=newP.trim(); if(!n) return;
     onUpdateProps([...props_, {id:`prop-${Date.now()}`, name:n, category:"Prop"}]);
     setNewP("");
   };
-  const delProp = id => {
-    if(window.confirm("Remove this prop? Productions using it will lose the reference."))
-      onUpdateProps(props_.filter(p=>p.id!==id));
-  };
+  const delProp = id => onUpdateProps(props_.map(p=>p.id===id?{...p,active:false}:p));
+  const reactivateProp = id => onUpdateProps(props_.map(p=>p.id===id?{...p,active:true}:p));
 
   return (
     <div>
@@ -24546,9 +24606,9 @@ const AdminPropsFurnitureTab = ({furniture=[], onUpdateFurniture, props_=[], onU
       </div>
       <div style={{display:"flex",gap:12}}>
         <AdminPropsFurnitureSection title="Furniture" icon="🪑" color="#6366f1"
-          items={furniture} newVal={newF} setNewVal={setNewF} onAdd={addFurniture} onDel={delFurniture}/>
+          items={furniture} newVal={newF} setNewVal={setNewF} onAdd={addFurniture} onDel={delFurniture} onReactivate={reactivateFurniture}/>
         <AdminPropsFurnitureSection title="Props" icon="🎭" color="#10b981"
-          items={props_} newVal={newP} setNewVal={setNewP} onAdd={addProp} onDel={delProp}/>
+          items={props_} newVal={newP} setNewVal={setNewP} onAdd={addProp} onDel={delProp} onReactivate={reactivateProp}/>
       </div>
     </div>
   );
@@ -25677,7 +25737,7 @@ const BXTVLinkSection = ({del, sourceProject, allProjects, team, onUpdateProject
   const bxtvEps  = getBXTVProjects(allProjects);
   const currentEpId = del.bxtvLink?.episodeProjectId;
   const currentEp   = currentEpId ? allProjects.find(p=>p.id===currentEpId) : null;
-  const editors  = team.filter(m=>m.roles?.some(r=>["Editor","Animator","Designer"].includes(r)));
+  const editors  = team.filter(m=>m.active!==false&&m.roles?.some(r=>["Editor","Animator","Designer"].includes(r)));
   const isBXTV   = !!currentEpId;
   const sel = {background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:14,outline:"none",width:"100%",colorScheme:"dark"};
 
@@ -25801,7 +25861,10 @@ const AdminScreenContentTab = ({screenContent={}, onUpdate}) => {
     upd({[cat]:[...(screenContent[cat]||[]),{id:`sc-${Date.now()}`,name:n}]});
     setF("");
   };
-  const delItem = (cat,id) => upd({[cat]:(screenContent[cat]||[]).filter(o=>o.id!==id)});
+  // Marks inactive rather than removing — see InactiveItemsSection's own
+  // comment.
+  const delItem = (cat,id) => upd({[cat]:(screenContent[cat]||[]).map(o=>o.id===id?{...o,active:false}:o)});
+  const reactivateItem = (cat,id) => upd({[cat]:(screenContent[cat]||[]).map(o=>o.id===id?{...o,active:true}:o)});
   const cats = [
     {key:"windowWall",icon:"🪟",label:"Window Wall",val:newWW,set:setNewWW},
     {key:"vpWall",    icon:"📡",label:"VP Wall",     val:newVP,set:setNewVP},
@@ -25818,7 +25881,7 @@ const AdminScreenContentTab = ({screenContent={}, onUpdate}) => {
             items={screenContent[c.key]||[]}
             newVal={c.val} setNewVal={c.set}
             onAdd={()=>addItem(c.key,c.val,c.set)}
-            onDel={id=>delItem(c.key,id)}/>
+            onDel={id=>delItem(c.key,id)} onReactivate={id=>reactivateItem(c.key,id)}/>
         ))}
       </div>
     </div>
@@ -25880,6 +25943,78 @@ const ScreenContentModal = ({selected={}, onUpdate, screenContentOptions={}, onC
   );
 };
 
+// Shared by every Admin reference-collection tab below (Gear, Furniture,
+// Props, Screen Content, Setups, Workstations, Talent, Production
+// Presets) — "delete" in each of these means marking inactive, never
+// actually removing the row (see the active column's own comment in
+// production_patch_012), so each tab needs a place to find and reactivate
+// whatever's been marked inactive. One generic implementation rather than
+// 8 near-identical ones.
+// A setup type (or a setup embedded in a production preset — same shape:
+// equipmentIds/furnitureIds/propIds/screenContent) can keep pointing at a
+// gear/furniture/prop/screen-content item after that item is marked
+// inactive elsewhere. Returns a list of human-readable labels for anything
+// it references that's now inactive, so callers can show a warning banner
+// instead of silently leaving a stale pick in place.
+const findInactiveSetupRefs = (setup, {gearList=[], furnitureList=[], propsList=[], screenContentOptions={}}={}) => {
+  const bad = [];
+  (setup?.equipmentIds||[]).forEach(id=>{ const g=gearList.find(x=>x.id===id); if(g&&g.active===false) bad.push(g.name); });
+  (setup?.furnitureIds||[]).forEach(id=>{ const f=furnitureList.find(x=>x.id===id); if(f&&f.active===false) bad.push(f.name); });
+  (setup?.propIds||[]).forEach(id=>{ const p=propsList.find(x=>x.id===id); if(p&&p.active===false) bad.push(p.name); });
+  Object.entries(setup?.screenContent||{}).forEach(([cat,ids])=>{
+    (ids||[]).forEach(id=>{ const o=(screenContentOptions[cat]||[]).find(x=>x.id===id); if(o&&o.active===false) bad.push(o.name); });
+  });
+  return bad;
+};
+
+// A production preset's own top-level gear section, plus every setup it
+// embeds, can each separately reference inactive items — union them all
+// into one list of labels for the preset-level banner.
+const findInactivePresetRefs = (preset, refCtx) => {
+  const bad = new Set(findInactiveSetupRefs(preset?.sections?.gear, refCtx));
+  (preset?.sections?.setups||[]).forEach(s=>findInactiveSetupRefs(s, refCtx).forEach(r=>bad.add(r)));
+  return [...bad];
+};
+
+// Shown next to a setup type / preset setup whose equipment/furniture/
+// props/screen content include something now marked inactive — so whoever's
+// reusing it knows to swap it out before relying on it.
+const InactiveRefBanner = ({refs}) => {
+  if(!refs||refs.length===0) return null;
+  return (
+    <div title={`References inactive: ${refs.join(", ")}`}
+      style={{display:"inline-flex",alignItems:"center",gap:5,background:"#f59e0b15",border:"1px solid #f59e0b40",borderRadius:5,color:"#f59e0b",padding:"3px 9px",fontSize:12,fontWeight:700,whiteSpace:"nowrap"}}>
+      ⚠ {refs.length} inactive ref{refs.length!==1?"s":""}
+    </div>
+  );
+};
+
+const InactiveItemsSection = ({items, onReactivate, renderLabel}) => {
+  const [show, setShow] = useState(false);
+  return (
+    <div style={{marginTop:20,borderTop:"1px solid #1f2937",paddingTop:14}}>
+      <button onClick={()=>setShow(v=>!v)}
+        style={{background:"transparent",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"6px 14px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+        {show?"▲ Hide":"▼ Show"} Inactive{items.length?` (${items.length})`:""}
+      </button>
+      {show&&(
+        <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:10}}>
+          {items.length===0&&<div style={{color:"#4b5563",fontSize:14,padding:"6px 0"}}>None.</div>}
+          {items.map(item=>(
+            <div key={item._rowId||item.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 12px",background:"#0d1117",border:"1px solid #1f2937",borderRadius:7,opacity:0.7}}>
+              <div style={{flex:1,fontSize:14,color:"#e2e8f0",minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{renderLabel(item)}</div>
+              <button onClick={()=>onReactivate(item)}
+                style={{background:"#10b98118",border:"1px solid #10b98130",borderRadius:5,color:"#10b981",padding:"3px 9px",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
+                Reactivate
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminGearTab = ({gear, onUpdateGear}) => {
   const [editId,  setEditId]  = useState(null);
   const [draft,   setDraft]   = useState(null);
@@ -25888,7 +26023,11 @@ const AdminGearTab = ({gear, onUpdateGear}) => {
   const GEAR_CATS = ["Camera","Lens","Audio","Lighting","Grip","Support","Storage","Playback","Broadcast","Other"];
 
   const save = () => { onUpdateGear(gear.map(g=>g.id===editId?{...g,...draft}:g)); setEditId(null); };
-  const del  = id => { if(window.confirm("Remove this gear item?")) onUpdateGear(gear.filter(g=>g.id!==id)); };
+  // Marks inactive rather than removing — see InactiveItemsSection's own
+  // comment. Stays resolvable for any past setup/production that already
+  // referenced it, just stops being offered for new ones.
+  const del  = id => onUpdateGear(gear.map(g=>g.id===id?{...g,active:false}:g));
+  const reactivate = id => onUpdateGear(gear.map(g=>g.id===id?{...g,active:true}:g));
   const add  = () => {
     if(!newItem.name.trim()) return;
     onUpdateGear([...gear, {...newItem, id:uid()}]);
@@ -25896,7 +26035,9 @@ const AdminGearTab = ({gear, onUpdateGear}) => {
     setShowAdd(false);
   };
 
-  const byCat = GEAR_CATS.reduce((a,c)=>({...a,[c]:gear.filter(g=>g.category===c)}),{});
+  const activeGear = gear.filter(g=>g.active!==false);
+  const inactiveGear = gear.filter(g=>g.active===false);
+  const byCat = GEAR_CATS.reduce((a,c)=>({...a,[c]:activeGear.filter(g=>g.category===c)}),{});
 
   return (
     <div>
@@ -25996,7 +26137,8 @@ const AdminGearTab = ({gear, onUpdateGear}) => {
           </div>
         </div>
       ))}
-      {gear.length===0&&<div style={{textAlign:"center",padding:40,color: "#838ba0",fontSize:16}}>No gear items yet. Add your first piece of equipment above.</div>}
+      {activeGear.length===0&&<div style={{textAlign:"center",padding:40,color: "#838ba0",fontSize:16}}>No gear items yet. Add your first piece of equipment above.</div>}
+      <InactiveItemsSection items={inactiveGear} onReactivate={item=>reactivate(item.id)} renderLabel={item=>`${item.name}${item.category?` · ${item.category}`:""}`}/>
     </div>
   );
 };
@@ -26166,7 +26308,8 @@ const AdminWorkstationsTab = ({workstations, team, onUpdateWorkstations}) => {
   const [newWS,   setNewWS]   = useState({name:"",location:"TBD",machineType:"Mac Studio",serialNumber:"TBD",assignedTo:null,available:true});
 
   const save = () => { onUpdateWorkstations(workstations.map(w=>w.id===editId?{...w,...draft}:w)); setEditId(null); };
-  const del  = id => { if(window.confirm("Remove this workstation?")) onUpdateWorkstations(workstations.filter(w=>w.id!==id)); };
+  const del  = id => onUpdateWorkstations(workstations.map(w=>w.id!==id?w:{...w,active:false}));
+  const reactivate = id => onUpdateWorkstations(workstations.map(w=>w.id!==id?w:{...w,active:true}));
   const add  = () => {
     if(!newWS.name.trim()) return;
     onUpdateWorkstations([...workstations, {...newWS, id:uid()}]);
@@ -26174,7 +26317,9 @@ const AdminWorkstationsTab = ({workstations, team, onUpdateWorkstations}) => {
     setShowAdd(false);
   };
 
-  const byType = MACHINE_TYPES.reduce((a,t)=>({...a,[t]:workstations.filter(w=>w.machineType===t)}),{});
+  const activeWorkstations = workstations.filter(w=>w.active!==false);
+  const inactiveWorkstations = workstations.filter(w=>w.active===false);
+  const byType = MACHINE_TYPES.reduce((a,t)=>({...a,[t]:activeWorkstations.filter(w=>w.machineType===t)}),{});
   const inputStyle = {width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 10px",fontSize:14,outline:"none",fontFamily:"'DM Sans',sans-serif"};
   const labelStyle = {fontSize:13,color: "#8e97a6",marginBottom:3,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"};
 
@@ -26281,7 +26426,7 @@ const AdminWorkstationsTab = ({workstations, team, onUpdateWorkstations}) => {
                         <button onClick={save} style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"6px 14px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>Save</button>
                         <button onClick={()=>setEditId(null)} style={{background:"#1f2937",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"6px 12px",fontSize:14,fontWeight:700,cursor:"pointer"}}>Cancel</button>
                         <button onClick={()=>del(w.id)} style={{background:"none",border:"none",color:"#ef444470",cursor:"pointer",fontSize:13,fontWeight:700}}
-                          onMouseEnter={e=>e.currentTarget.style.color="#ef4444"} onMouseLeave={e=>e.currentTarget.style.color="#ef444470"}>Remove</button>
+                          onMouseEnter={e=>e.currentTarget.style.color="#ef4444"} onMouseLeave={e=>e.currentTarget.style.color="#ef444470"}>Mark Inactive</button>
                       </div>
                     </div>
                   ):(
@@ -26306,7 +26451,8 @@ const AdminWorkstationsTab = ({workstations, team, onUpdateWorkstations}) => {
           </div>
         </div>
       ))}
-      {workstations.length===0&&<div style={{textAlign:"center",padding:40,color: "#838ba0",fontSize:16}}>No workstations yet. Add your first one above.</div>}
+      {activeWorkstations.length===0&&<div style={{textAlign:"center",padding:40,color: "#838ba0",fontSize:16}}>No workstations yet. Add your first one above.</div>}
+      <InactiveItemsSection items={inactiveWorkstations} onReactivate={item=>reactivate(item.id)} renderLabel={w=>`${w.name}${w.location?` · ${w.location}`:""}`}/>
     </div>
   );
 };
@@ -26320,12 +26466,8 @@ const AdminTalentTab = ({talentRoster, onUpdateTalentRoster}) => {
   const [newT,    setNewT]    = useState({name:"",category:TALENT_CATEGORIES?.[0]||"Athlete",bio:"",photoKey:null});
 
   const save = () => { onUpdateTalentRoster(talentRoster.map(t=>t.id===editId?{...t,...draft}:t)); setEditId(null); setDraft(null); };
-  const del  = id => {
-    if(!window.confirm("Remove this person from the talent pool?")) return;
-    const t = talentRoster.find(x=>x.id===id);
-    if(t?.photoKey) deleteSetupPhoto(t.photoKey);
-    onUpdateTalentRoster(talentRoster.filter(t=>t.id!==id));
-  };
+  const del  = id => onUpdateTalentRoster(talentRoster.map(t=>t.id!==id?t:{...t,active:false}));
+  const reactivate = id => onUpdateTalentRoster(talentRoster.map(t=>t.id!==id?t:{...t,active:true}));
   const add = () => {
     if(!newT.name.trim()) return;
     onUpdateTalentRoster([...talentRoster, {...newT, id:`tal-${uid()}`, lastBookedAt:null}]);
@@ -26333,7 +26475,9 @@ const AdminTalentTab = ({talentRoster, onUpdateTalentRoster}) => {
     setShowAdd(false);
   };
 
-  const filtered = talentRoster.filter(t=>!search||t.name.toLowerCase().includes(search.toLowerCase())||t.category.toLowerCase().includes(search.toLowerCase()));
+  const matchesSearch = t=>!search||t.name.toLowerCase().includes(search.toLowerCase())||t.category.toLowerCase().includes(search.toLowerCase());
+  const filtered = talentRoster.filter(t=>t.active!==false&&matchesSearch(t));
+  const inactiveTalent = talentRoster.filter(t=>t.active===false&&matchesSearch(t));
   const inputStyle = {width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 10px",fontSize:14,outline:"none",fontFamily:"'DM Sans',sans-serif"};
   const labelStyle = {fontSize:13,color: "#8e97a6",marginBottom:3,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"};
   const CATS = TALENT_CATEGORIES||["Athlete","Executive","Host","Actor","Model","Musician","Influencer"];
@@ -26414,7 +26558,7 @@ const AdminTalentTab = ({talentRoster, onUpdateTalentRoster}) => {
                     <button onClick={save} style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"6px 16px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>Save</button>
                     <button onClick={()=>{setEditId(null);setDraft(null);}} style={{background:"#1f2937",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"6px 14px",fontSize:14,fontWeight:700,cursor:"pointer"}}>Cancel</button>
                     <button onClick={()=>del(t.id)} style={{marginLeft:"auto",background:"none",border:"none",color:"#ef444470",cursor:"pointer",fontSize:13,fontWeight:700}}
-                      onMouseEnter={e=>e.currentTarget.style.color="#ef4444"} onMouseLeave={e=>e.currentTarget.style.color="#ef444470"}>Remove</button>
+                      onMouseEnter={e=>e.currentTarget.style.color="#ef4444"} onMouseLeave={e=>e.currentTarget.style.color="#ef444470"}>Mark Inactive</button>
                   </div>
                 </div>
               </div>
@@ -26439,6 +26583,7 @@ const AdminTalentTab = ({talentRoster, onUpdateTalentRoster}) => {
         ))}
         {filtered.length===0&&<div style={{textAlign:"center",padding:40,color: "#838ba0",fontSize:16}}>No talent found.</div>}
       </div>
+      <InactiveItemsSection items={inactiveTalent} onReactivate={item=>reactivate(item.id)} renderLabel={t=>`${t.name}${t.category?` · ${t.category}`:""}`}/>
     </div>
   );
 };
@@ -26586,12 +26731,11 @@ const AdminSpacesTab = ({spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta}) 
     setEditId(null);
   };
   const del = idx => {
-    if(window.confirm(`Remove "${spaces[idx]}"?`)) {
-      const name = spaces[idx];
-      onUpdateSpaces(spaces.filter((_,i)=>i!==idx));
-      const newMeta = {...spaceMeta}; delete newMeta[name]; onUpdateSpaceMeta(newMeta);
-    }
+    const name = spaces[idx];
+    onUpdateSpaceMeta({...spaceMeta, [name]:{...(spaceMeta[name]||{}), active:false}});
+    setEditId(null);
   };
+  const reactivate = name => onUpdateSpaceMeta({...spaceMeta, [name]:{...(spaceMeta[name]||{}), active:true}});
   const add = () => {
     if(!newSpace.name.trim()||spaces.includes(newSpace.name.trim())) return;
     const name = newSpace.name.trim();
@@ -26643,7 +26787,7 @@ const AdminSpacesTab = ({spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta}) 
               <select value={newSpace.linkedGreenRoom} onChange={e=>setNewSpace(p=>({...p,linkedGreenRoom:e.target.value}))}
                 style={{background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:14,outline:"none"}}>
                 <option value="">None</option>
-                {spaces.filter(s=>spaceMeta[s]?.isGreenRoom).map(s=><option key={s}>{s}</option>)}
+                {spaces.filter(s=>spaceMeta[s]?.isGreenRoom&&spaceMeta[s]?.active!==false).map(s=><option key={s}>{s}</option>)}
               </select>
             </div>
           )}
@@ -26657,6 +26801,7 @@ const AdminSpacesTab = ({spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta}) 
       <div style={{display:"flex",flexDirection:"column",gap:4}}>
         {spaces.map((name,idx)=>{
           const meta = spaceMeta[name]||{};
+          if(meta.active===false) return null;
           const typeLabel = meta.isHMU?"HMU Station":meta.isGreenRoom?"Green Room":meta.isPCR?"PCR":"Shoot Space";
           const typeColor = meta.isHMU?"#ec4899":meta.isGreenRoom?"#22c55e":meta.isPCR?"#f97316":"#6366f1";
           return (
@@ -26678,7 +26823,7 @@ const AdminSpacesTab = ({spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta}) 
                       <select value={draft.linkedGreenRoom||""} onChange={e=>setDraft(p=>({...p,linkedGreenRoom:e.target.value}))}
                         style={{background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:14,outline:"none"}}>
                         <option value="">None</option>
-                        {spaces.filter(s=>spaceMeta[s]?.isGreenRoom&&s!==name).map(s=><option key={s}>{s}</option>)}
+                        {spaces.filter(s=>spaceMeta[s]?.isGreenRoom&&spaceMeta[s]?.active!==false&&s!==name).map(s=><option key={s}>{s}</option>)}
                       </select>
                     </div>
                   )}
@@ -26686,7 +26831,7 @@ const AdminSpacesTab = ({spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta}) 
                     <button onClick={save} style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"6px 16px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>Save</button>
                     <button onClick={()=>setEditId(null)} style={{background:"#1f2937",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"6px 14px",fontSize:14,cursor:"pointer"}}>Cancel</button>
                     <button onClick={()=>del(idx)} style={{marginLeft:"auto",background:"none",border:"none",color:"#ef444460",cursor:"pointer",fontSize:13,fontWeight:700,padding:0}}
-                      onMouseEnter={e=>e.currentTarget.style.color="#ef4444"} onMouseLeave={e=>e.currentTarget.style.color="#ef444460"}>Remove</button>
+                      onMouseEnter={e=>e.currentTarget.style.color="#ef4444"} onMouseLeave={e=>e.currentTarget.style.color="#ef444460"}>Mark Inactive</button>
                   </div>
                 </div>
               ):(
@@ -26705,15 +26850,22 @@ const AdminSpacesTab = ({spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta}) 
           );
         })}
       </div>
+      <InactiveItemsSection
+        items={spaces.filter(s=>spaceMeta[s]?.active===false).map(name=>({id:name, name}))}
+        onReactivate={item=>reactivate(item.id)}
+        renderLabel={item=>item.name}/>
     </div>
   );
 };
 
 // ─── Admin: Setup Types (shared library) ──────────────────────────────────────
-const AdminSetupsTab = ({setupTypes=[], team, onAddSetupType, onUpdateSetupType, onDeleteSetupType, furnitureList=[], propsList=[], screenContentOptions={}, mediaCards=[]}) => {
+const AdminSetupsTab = ({setupTypes=[], team, onAddSetupType, onUpdateSetupType, onDeleteSetupType, furnitureList=[], propsList=[], screenContentOptions={}, mediaCards=[], gearList=[]}) => {
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  const activeSetupTypes = setupTypes.filter(t=>t.active!==false);
+  const inactiveSetupTypes = setupTypes.filter(t=>t.active===false);
+  const refCtx = {gearList, furnitureList, propsList, screenContentOptions};
 
   return (
     <div>
@@ -26737,28 +26889,25 @@ const AdminSetupsTab = ({setupTypes=[], team, onAddSetupType, onUpdateSetupType,
         </div>
       )}
 
-      {setupTypes.length===0&&!showAdd&&<div style={{fontSize:16,color: "#838ba0",textAlign:"center",padding:"24px 0"}}>No setup types yet.</div>}
+      {activeSetupTypes.length===0&&!showAdd&&<div style={{fontSize:16,color: "#838ba0",textAlign:"center",padding:"24px 0"}}>No setup types yet.</div>}
 
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {setupTypes.map(t=>(
+        {activeSetupTypes.map(t=>{
+          const inactiveRefs = findInactiveSetupRefs(t, refCtx);
+          return (
           <div key={t.id} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:10,overflow:"hidden"}}>
             <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px"}}>
               {t.floorplanPhotoKey ? <SetupPhotoThumb photoKey={t.floorplanPhotoKey} size={40}/> : <div style={{width:40,height:40,borderRadius:7,background:"#1f2937",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,flexShrink:0}}>🎬</div>}
               <div style={{minWidth:0,flex:1}}>
-                <div style={{fontSize:17,fontWeight:700,color:"#e2e8f0"}}>{t.name}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{fontSize:17,fontWeight:700,color:"#e2e8f0"}}>{t.name}</div>
+                  <InactiveRefBanner refs={inactiveRefs}/>
+                </div>
                 <div style={{fontSize:13,color: "#9ca3af",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.description||`${(t.roles||[]).length} roles · ${(t.equipmentIds||[]).length} gear items`}</div>
               </div>
-              <Btn small onClick={()=>{setEditId(editId===t.id?null:t.id);setShowAdd(false);setConfirmDeleteId(null);}}>{editId===t.id?"Close":"Edit"}</Btn>
-              {confirmDeleteId===t.id
-                ? <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-                    <span style={{fontSize:13,color:"#f59e0b"}}>Delete?</span>
-                    <button onClick={()=>{onDeleteSetupType(t.id);setConfirmDeleteId(null);}}
-                      style={{background:"#ef444420",border:"1px solid #ef444450",borderRadius:5,color:"#ef4444",padding:"3px 10px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Yes</button>
-                    <button onClick={()=>setConfirmDeleteId(null)}
-                      style={{background:"#1f2937",border:"1px solid #374151",borderRadius:5,color:"#9ca3af",padding:"3px 10px",fontSize:13,fontWeight:700,cursor:"pointer"}}>No</button>
-                  </div>
-                : <button onClick={()=>setConfirmDeleteId(t.id)}
-                    style={{background:"none",border:"none",color:"#6b7280",cursor:"pointer",fontSize:19,padding:"4px",lineHeight:1}} title="Delete setup type">🗑</button>}
+              <Btn small onClick={()=>{setEditId(editId===t.id?null:t.id);setShowAdd(false);}}>{editId===t.id?"Close":"Edit"}</Btn>
+              <button onClick={()=>onUpdateSetupType({...t, active:false})}
+                style={{background:"none",border:"none",color:"#6b7280",cursor:"pointer",fontSize:19,padding:"4px",lineHeight:1}} title="Mark inactive">🗑</button>
             </div>
             {editId===t.id&&(
               <div style={{borderTop:"1px solid #1f2937",padding:16}}>
@@ -26768,8 +26917,10 @@ const AdminSetupsTab = ({setupTypes=[], team, onAddSetupType, onUpdateSetupType,
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
+      <InactiveItemsSection items={inactiveSetupTypes} onReactivate={item=>onUpdateSetupType({...item, active:true})} renderLabel={t=>t.name}/>
     </div>
   );
 };
@@ -27594,7 +27745,7 @@ const BLANK_PRESET = () => ({
   notes:"",
 });
 
-const ProductionPresetsAdmin = ({presets=[], onUpdatePresets, setupTypes=[], team=[], spaces=[], lists={}}) => {
+const ProductionPresetsAdmin = ({presets=[], onUpdatePresets, setupTypes=[], team=[], spaces=[], lists={}, gear=[], furniture=[], props_=[], screenContent={}}) => {
   const [showForm, setShowForm] = useState(false);
   const [editId,   setEditId]   = useState(null);
   const [draft,    setDraft]    = useState(null);
@@ -27610,7 +27761,11 @@ const ProductionPresetsAdmin = ({presets=[], onUpdatePresets, setupTypes=[], tea
     const updated = editId ? presets.map(p=>p.id===editId?{...draft}:p) : [...presets,{...draft}];
     onUpdatePresets(updated); cancel();
   };
-  const del = id => onUpdatePresets(presets.filter(p=>p.id!==id));
+  const del = id => onUpdatePresets(presets.map(p=>p.id!==id?p:{...p,active:false}));
+  const reactivate = id => onUpdatePresets(presets.map(p=>p.id!==id?p:{...p,active:true}));
+  const activePresets = presets.filter(p=>p.active!==false);
+  const inactivePresets = presets.filter(p=>p.active===false);
+  const presetRefCtx = {gearList:gear, furnitureList:furniture, propsList:props_, screenContentOptions:screenContent};
 
   const upd   = patch => setDraft(d=>({...d,...patch}));
   const updS  = patch => setDraft(d=>({...d,sections:{...d.sections,...patch}}));
@@ -27725,7 +27880,7 @@ const ProductionPresetsAdmin = ({presets=[], onUpdatePresets, setupTypes=[], tea
                 <label style={sub}>Add from library:</label>
                 <select value="" onChange={e=>{const st=setupTypes.find(x=>x.id===e.target.value);if(st)applySetupType(st);}} style={{...sel,width:"auto",flex:1}}>
                   <option value="">— Select a setup type to add —</option>
-                  {setupTypes.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                  {setupTypes.filter(s=>s.active!==false).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
                 <button onClick={()=>updS({setups:[...(draft.sections.setups||[]),{id:uid(),name:"Custom Setup",setupTypeId:null,crewInternal:[],crewExternal:[],equipmentIds:[],externalGear:[],mediaCardIds:[],furnitureIds:[],propIds:[],recordingSpecs:{},screenContent:{},notes:""}]})}
                   style={{background:"#111827",border:"1px dashed #374151",borderRadius:6,color:"#6b7280",padding:"5px 12px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
@@ -27899,14 +28054,15 @@ const ProductionPresetsAdmin = ({presets=[], onUpdatePresets, setupTypes=[], tea
       )}
 
       {/* ── Saved Presets List ── */}
-      {presets.length===0&&!showForm&&(
+      {activePresets.length===0&&!showForm&&(
         <div style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:10,padding:"32px 24px",textAlign:"center",color:"#4b5563",fontSize:16}}>
           No presets yet. Click "+ New Preset" to build one, or save from an existing production.
         </div>
       )}
-      {presets.length>0&&(
+      {activePresets.length>0&&(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {presets.map(p=>{
+          {activePresets.map(p=>{
+            const inactiveRefs = findInactivePresetRefs(p, presetRefCtx);
             const setup    = (p.sections?.setups||[]).length;
             const crewInt  = (p.sections?.crew?.internal||[]).length;
             const crewExt  = (p.sections?.crew?.external||[]).length;
@@ -27925,7 +28081,10 @@ const ProductionPresetsAdmin = ({presets=[], onUpdatePresets, setupTypes=[], tea
             return (
               <div key={p.id} style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:10,padding:"14px 16px",display:"flex",alignItems:"flex-start",gap:12}}>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:17,fontWeight:700,color:"#f1f5f9",marginBottom:4}}>{p.name}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                    <div style={{fontSize:17,fontWeight:700,color:"#f1f5f9"}}>{p.name}</div>
+                    <InactiveRefBanner refs={inactiveRefs}/>
+                  </div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
                     {chips.map(c=><span key={c} style={{fontSize:12,color:"#9ca3af",background:"#1f2937",borderRadius:4,padding:"2px 7px"}}>{c}</span>)}
                   </div>
@@ -27933,13 +28092,14 @@ const ProductionPresetsAdmin = ({presets=[], onUpdatePresets, setupTypes=[], tea
                 </div>
                 <div style={{display:"flex",gap:5,flexShrink:0}}>
                   <button onClick={()=>openEdit(p)} style={{background:"#1f2937",border:"1px solid #374151",borderRadius:6,color:"#9ca3af",padding:"5px 12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Edit</button>
-                  <button onClick={()=>del(p.id)} style={{background:"#ef444415",border:"1px solid #ef444440",borderRadius:6,color:"#ef4444",padding:"5px 12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Delete</button>
+                  <button onClick={()=>del(p.id)} style={{background:"#ef444415",border:"1px solid #ef444440",borderRadius:6,color:"#ef4444",padding:"5px 12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Mark Inactive</button>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+      <InactiveItemsSection items={inactivePresets} onReactivate={item=>reactivate(item.id)} renderLabel={p=>p.name}/>
     </div>
   );
 };
@@ -27984,7 +28144,7 @@ const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, g
       {tab==="props"  &&<AdminPropsFurnitureTab furniture={furniture} onUpdateFurniture={onUpdateFurniture} props_={props_} onUpdateProps={onUpdateProps}/>}
       {tab==="screen" &&<AdminScreenContentTab screenContent={screenContent} onUpdate={onUpdateScreenContent}/>}
       {tab==="spaces" &&<AdminSpacesTab spaces={spaces} spaceMeta={spaceMeta} onUpdateSpaces={onUpdateSpaces} onUpdateSpaceMeta={onUpdateSpaceMeta}/>}
-      {tab==="setups" &&<AdminSetupsTab setupTypes={setupTypes} team={team} onAddSetupType={onAddSetupType} onUpdateSetupType={onUpdateSetupType} onDeleteSetupType={onDeleteSetupType} furnitureList={furniture} propsList={props_} screenContentOptions={screenContent} mediaCards={[]}/>}
+      {tab==="setups" &&<AdminSetupsTab setupTypes={setupTypes} team={team} onAddSetupType={onAddSetupType} onUpdateSetupType={onUpdateSetupType} onDeleteSetupType={onDeleteSetupType} furnitureList={furniture} propsList={props_} screenContentOptions={screenContent} mediaCards={[]} gearList={gear}/>}
       {tab==="workstations" &&<AdminWorkstationsTab workstations={workstations} team={team} onUpdateWorkstations={onUpdateWorkstations}/>}
       {tab==="talent" &&<AdminTalentTab talentRoster={talentRoster} onUpdateTalentRoster={onUpdateTalentRoster}/>}
       {tab==="resources" &&<AdminResourceSettingsTab resourceConfig={resourceConfig} onUpdateResourceConfig={onUpdateResourceConfig}/>}
@@ -27996,6 +28156,7 @@ const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, g
         <ProductionPresetsAdmin
           presets={presets} onUpdatePresets={onUpdatePresets}
           setupTypes={setupTypes} team={team} spaces={spaces||[]} gear={gear||[]}
+          furniture={furniture||[]} props_={props_||[]} screenContent={screenContent||{}}
           lists={lists}/>
       )}
 
@@ -30192,7 +30353,7 @@ function App() {
           meta[row.space_name] = {
             isHMU: row.is_hmu, isGreenRoom: row.is_green_room, isPCR: row.is_pcr,
             suggestHMU: row.suggest_hmu, linkedGreenRoom: row.linked_green_room||undefined,
-            crewCallOffsetMs: row.crew_call_offset_ms,
+            crewCallOffsetMs: row.crew_call_offset_ms, active: row.active!==false,
           };
         });
         setStudioSpaceMeta(meta);
@@ -30601,7 +30762,7 @@ function App() {
       setStudioSpaceMeta(prev=>({...prev, [row.space_name]: {
         isHMU: row.is_hmu, isGreenRoom: row.is_green_room, isPCR: row.is_pcr,
         suggestHMU: row.suggest_hmu, linkedGreenRoom: row.linked_green_room||undefined,
-        crewCallOffsetMs: row.crew_call_offset_ms,
+        crewCallOffsetMs: row.crew_call_offset_ms, active: row.active!==false,
       }}));
     };
     const mergeSpaceMetaDelete = payload => {
