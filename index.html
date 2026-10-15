@@ -18969,13 +18969,11 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     ), /* @__PURE__ */ React.createElement("button", { style: addBtn, onClick: onAdd }, "+ Add")));
   };
   var AdminListsTab = ({ lists, onUpdateLists }) => {
-    const {
-      workstreams = WORKSTREAMS,
-      businessUnits = BUSINESS_UNITS,
-      productionTypes = PRODUCTION_TYPES,
-      deliverableStatuses = [...DELIVERABLE_STATUSES],
-      animBatchStatuses = [...ANIM_ROUND_STATUSES]
-    } = lists;
+    const workstreams = lists.workstreams?.length ? lists.workstreams : WORKSTREAMS;
+    const businessUnits = lists.businessUnits?.length ? lists.businessUnits : BUSINESS_UNITS;
+    const productionTypes = lists.productionTypes?.length ? lists.productionTypes : PRODUCTION_TYPES;
+    const deliverableStatuses = lists.deliverableStatuses?.length ? lists.deliverableStatuses : [...DELIVERABLE_STATUSES];
+    const animBatchStatuses = lists.animBatchStatuses?.length ? lists.animBatchStatuses : [...ANIM_ROUND_STATUSES];
     const [ws, setWS] = (0, import_react.useState)(() => [...workstreams]);
     const [bu, setBU_] = (0, import_react.useState)(() => [...businessUnits]);
     const [pt, setPT] = (0, import_react.useState)(() => [...productionTypes]);
@@ -19078,7 +19076,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       const s = {};
       categories.forEach((cat) => {
         const key = CREW_ROLE_CATEGORY_LIST_KEYS[cat];
-        s[key] = [...lists[key] || CREW_ROLE_CATEGORIES_DEFAULT[cat]];
+        s[key] = [...lists[key] && lists[key].length ? lists[key] : CREW_ROLE_CATEGORIES_DEFAULT[cat]];
       });
       return s;
     });
@@ -19208,7 +19206,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const updS = (patch) => setDraft((d) => ({ ...d, sections: { ...d.sections, ...patch } }));
     const updC = (patch) => setDraft((d) => ({ ...d, sections: { ...d.sections, crew: { ...d.sections.crew, ...patch } } }));
     const updG = (patch) => setDraft((d) => ({ ...d, sections: { ...d.sections, gear: { ...d.sections.gear, ...patch } } }));
-    const productionTypes = lists.productionTypes || PRODUCTION_TYPES;
+    const productionTypes = lists.productionTypes?.length ? lists.productionTypes : PRODUCTION_TYPES;
     const applySetupType = (st) => {
       if (!st) return;
       const newSetup = {

@@ -27275,11 +27275,15 @@ const AdminListSection = ({title, icon, items, newVal, setNew, onAdd, onRemove, 
 };
 
 const AdminListsTab = ({lists, onUpdateLists}) => {
-  const {
-    workstreams=WORKSTREAMS, businessUnits=BUSINESS_UNITS, productionTypes=PRODUCTION_TYPES,
-    deliverableStatuses=[...DELIVERABLE_STATUSES],
-    animBatchStatuses=[...ANIM_ROUND_STATUSES],
-  } = lists;
+  // Destructuring defaults only fire on undefined, same gap as
+  // AdminCrewRolesTab's — see its comment. An uncustomized list loads from
+  // Supabase as [] (not undefined), so plain destructuring defaults would
+  // silently show nothing instead of the intended defaults.
+  const workstreams = lists.workstreams?.length ? lists.workstreams : WORKSTREAMS;
+  const businessUnits = lists.businessUnits?.length ? lists.businessUnits : BUSINESS_UNITS;
+  const productionTypes = lists.productionTypes?.length ? lists.productionTypes : PRODUCTION_TYPES;
+  const deliverableStatuses = lists.deliverableStatuses?.length ? lists.deliverableStatuses : [...DELIVERABLE_STATUSES];
+  const animBatchStatuses = lists.animBatchStatuses?.length ? lists.animBatchStatuses : [...ANIM_ROUND_STATUSES];
 
   const [ws,  setWS]  = useState(()=>[...workstreams]);
   const [bu,  setBU_] = useState(()=>[...businessUnits]);
@@ -27353,7 +27357,12 @@ const AdminCrewRolesTab = ({lists, onUpdateLists}) => {
     const s = {};
     categories.forEach(cat=>{
       const key = CREW_ROLE_CATEGORY_LIST_KEYS[cat];
-      s[key] = [...(lists[key]||CREW_ROLE_CATEGORIES_DEFAULT[cat])];
+      // ||'s fallback only fires on undefined, not on an empty array — and
+      // since the read cutover, an uncustomized category loads from
+      // Supabase as [] (not undefined), so this used to silently show
+      // nothing instead of the intended defaults. .length check treats
+      // empty the same as missing.
+      s[key] = [...((lists[key]&&lists[key].length) ? lists[key] : CREW_ROLE_CATEGORIES_DEFAULT[cat])];
     });
     return s;
   });
@@ -27488,7 +27497,8 @@ const ProductionPresetsAdmin = ({presets=[], onUpdatePresets, setupTypes=[], tea
   const updC  = patch => setDraft(d=>({...d,sections:{...d.sections,crew:{...d.sections.crew,...patch}}}));
   const updG  = patch => setDraft(d=>({...d,sections:{...d.sections,gear:{...d.sections.gear,...patch}}}));
 
-  const productionTypes = lists.productionTypes||PRODUCTION_TYPES;
+  // Same empty-array-isn't-undefined gap as AdminCrewRolesTab/AdminListsTab.
+  const productionTypes = lists.productionTypes?.length ? lists.productionTypes : PRODUCTION_TYPES;
 
   // Apply a setup type to the setups section
   const applySetupType = st => {
