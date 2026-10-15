@@ -15177,7 +15177,7 @@ const READ_FROM_NORMALIZED_PHASE3 = false;
 // shadow-write — addWorkReviewSession/updateWorkReviewSession only ever
 // touched window.storage. Found while scoping the Phase 3 read cutover.
 // Off until verified live the same way as everything else.
-const SHADOW_WRITE_WORK_REVIEW_SESSIONS = false;
+const SHADOW_WRITE_WORK_REVIEW_SESSIONS = true;
 
 // Phase 3 — the remaining app_kv-backed collections (see production_schema_new_tables.sql's
 // Phase 3 section and the "what else should be its own table" conversation).
