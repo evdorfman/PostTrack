@@ -20949,7 +20949,19 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         if (id == null) return;
         setter((prev) => prev.some((x) => x.id === id) ? prev.filter((x) => x.id !== id) : prev);
       };
-      const channel = sb.channel("posttrack-realtime").on("postgres_changes", { event: "INSERT", schema: "public", table: "projects" }, mergeUpsert(setProjects, rowToProject)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "projects" }, mergeUpsert(setProjects, rowToProject)).on("postgres_changes", { event: "DELETE", schema: "public", table: "projects" }, mergeDelete(setProjects)).on("postgres_changes", { event: "INSERT", schema: "public", table: "team_members" }, mergeUpsert(setTeamRoster, rowToTeamMember)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "team_members" }, mergeUpsert(setTeamRoster, rowToTeamMember)).on("postgres_changes", { event: "DELETE", schema: "public", table: "team_members" }, mergeDelete(setTeamRoster)).on("postgres_changes", { event: "INSERT", schema: "public", table: "studio_bookings" }, mergeUpsert(setStudioBookings, rowToBooking)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "studio_bookings" }, mergeUpsert(setStudioBookings, rowToBooking)).on("postgres_changes", { event: "DELETE", schema: "public", table: "studio_bookings" }, mergeDelete(setStudioBookings)).subscribe();
+      const mergeProjectUpsert = (payload) => {
+        const incoming = rowToProject(payload.new);
+        setProjects((prev) => {
+          const idx = prev.findIndex((x) => x.id === incoming.id);
+          if (idx === -1) return [...prev, incoming];
+          const merged = { ...incoming, deliverables: prev[idx].deliverables, productions: prev[idx].productions };
+          if (JSON.stringify(prev[idx]) === JSON.stringify(merged)) return prev;
+          const next = prev.slice();
+          next[idx] = merged;
+          return next;
+        });
+      };
+      const channel = sb.channel("posttrack-realtime").on("postgres_changes", { event: "INSERT", schema: "public", table: "projects" }, mergeProjectUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "projects" }, mergeProjectUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "projects" }, mergeDelete(setProjects)).on("postgres_changes", { event: "INSERT", schema: "public", table: "team_members" }, mergeUpsert(setTeamRoster, rowToTeamMember)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "team_members" }, mergeUpsert(setTeamRoster, rowToTeamMember)).on("postgres_changes", { event: "DELETE", schema: "public", table: "team_members" }, mergeDelete(setTeamRoster)).on("postgres_changes", { event: "INSERT", schema: "public", table: "studio_bookings" }, mergeUpsert(setStudioBookings, rowToBooking)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "studio_bookings" }, mergeUpsert(setStudioBookings, rowToBooking)).on("postgres_changes", { event: "DELETE", schema: "public", table: "studio_bookings" }, mergeDelete(setStudioBookings)).subscribe();
       return () => {
         sb.removeChannel(channel);
       };
