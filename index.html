@@ -20375,7 +20375,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         viewNavMountedRef.current = true;
         return;
       }
-      updateRoute({ view }, { push: true });
+      updateRoute({ view, dtab: null, antab: null, itab: null, rtab: null, atab: null, agear: null, intab: null }, { push: true });
     }, [view]);
     const [toast, setToast] = (0, import_react.useState)(null);
     const pushOffset = usePushOffset();
