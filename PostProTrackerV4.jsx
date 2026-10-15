@@ -29292,6 +29292,27 @@ function App() {
     }catch(e){ console.warn("[routing] self-heal failed:", e); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
+  // One-time cleanup, also on mount only: the view-switch effect below
+  // clears every OTHER view's sub-tab param whenever `view` actually
+  // *changes* — but that never fires for a URL that's simply loaded (or
+  // reloaded) already carrying leftover params from every view ever
+  // visited (e.g. from before that clearing existed), since nothing
+  // changes `view` in that case for the effect to react to. This clears
+  // everything except whichever single param belongs to the view the
+  // page is *currently* on, once, right on load.
+  useEffect(()=>{
+    try{
+      const clears = {dtab:null, antab:null, itab:null, rtab:null, atab:null, agear:null, intab:null};
+      if(view==="deliverables") delete clears.dtab;
+      else if(view==="animations") delete clears.antab;
+      else if(view==="ingest") delete clears.itab;
+      else if(view==="resources") delete clears.rtab;
+      else if(view==="admin"){ delete clears.atab; delete clears.agear; }
+      else if(view==="intake") delete clears.intab;
+      updateRoute(clears, {push:false});
+    }catch(e){ console.warn("[routing] param cleanup failed:", e); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
   // Pushing a new URL ourselves (open/close a project, switch the top nav)
   // never fires popstate — only the browser's own back/forward does — so
   // this effect only has to handle the latter. Re-resolves the whole route

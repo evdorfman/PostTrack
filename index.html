@@ -20343,6 +20343,22 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       }
     }, []);
     (0, import_react.useEffect)(() => {
+      try {
+        const clears = { dtab: null, antab: null, itab: null, rtab: null, atab: null, agear: null, intab: null };
+        if (view === "deliverables") delete clears.dtab;
+        else if (view === "animations") delete clears.antab;
+        else if (view === "ingest") delete clears.itab;
+        else if (view === "resources") delete clears.rtab;
+        else if (view === "admin") {
+          delete clears.atab;
+          delete clears.agear;
+        } else if (view === "intake") delete clears.intab;
+        updateRoute(clears, { push: false });
+      } catch (e) {
+        console.warn("[routing] param cleanup failed:", e);
+      }
+    }, []);
+    (0, import_react.useEffect)(() => {
       const onPopState = () => {
         const r = parseRoute();
         setView(r.view || "projects");
