@@ -30177,7 +30177,7 @@ function App() {
     // this cleanup running before the next effect call.
     const timer = setTimeout(()=>{
       sb.from("projects").upsert(real.map(projectToRow)).then(({error})=>reportSbError("Project", error));
-    }, 500);
+    }, 2000);
     return ()=>clearTimeout(timer);
   },[projects]);
 
@@ -30413,7 +30413,7 @@ function App() {
   // deliverable's row id (same useRef-Map pattern as logFieldChangeBatched
   // above) so edits to different deliverables debounce independently.
   const delWriteTimersRef = useRef(new Map());
-  const DEL_WRITE_DEBOUNCE_MS = 500;
+  const DEL_WRITE_DEBOUNCE_MS = 2000;
 
   const updateDel=useCallback((projectId,delId,field,value)=>{
     const prevProj = projectsRef.current.find(p=>p.id===projectId);

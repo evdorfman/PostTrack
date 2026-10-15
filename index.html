@@ -21265,7 +21265,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       if (!real.length) return;
       const timer = setTimeout(() => {
         sb.from("projects").upsert(real.map(projectToRow)).then(({ error }) => reportSbError("Project", error));
-      }, 500);
+      }, 2e3);
       return () => clearTimeout(timer);
     }, [projects]);
     (0, import_react.useEffect)(() => {
@@ -21448,7 +21448,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [navSidebarWidth, navSidebarHandle] = useResizableWidth("posttrack-nav-sidebar-width", 480, { min: 320, max: 720 });
     const activeSidebarWidth = sidebarRequestedWidth ? navSidebarWidth : 0;
     const delWriteTimersRef = (0, import_react.useRef)(/* @__PURE__ */ new Map());
-    const DEL_WRITE_DEBOUNCE_MS = 500;
+    const DEL_WRITE_DEBOUNCE_MS = 2e3;
     const updateDel = (0, import_react.useCallback)((projectId, delId, field, value) => {
       const prevProj = projectsRef.current.find((p) => p.id === projectId);
       const prevDel = prevProj?.deliverables.find((d) => d.id === delId);
