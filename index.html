@@ -20581,6 +20581,14 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         return;
       }
       updateRoute({ view, dtab: null, antab: null, itab: null, rtab: null, atab: null, agear: null, intab: null, pjtab: null }, { push: true });
+      setDeliverablesInitialTab("active");
+      setAnimationInitialTab("active");
+      setIngestInitialTab("sheet");
+      setResourcesInitialTab("utilization");
+      setIntakeInitialTab("smartsheet");
+      setProjectsInitialTab("active");
+      setAdminInitialTab("team");
+      setAdminInitialGearSubTab("equipment");
     }, [view]);
     const [toast, setToast] = (0, import_react.useState)(null);
     const pushOffset = usePushOffset();
