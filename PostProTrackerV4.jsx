@@ -381,18 +381,19 @@ const ROUTE_VIEWS = ["projects","studio","calendar","deliverables","animations",
 // not the domain root — a pushed/replaced URL missing that prefix 404s the
 // moment anything actually reaches the server for it (a hard refresh, a
 // pasted link, or a back/forward navigation the browser can't satisfy from
-// its own history alone). Computed once from wherever this page actually
-// loaded from rather than hardcoded, so a repo rename doesn't silently
-// break this again. Strips a trailing view-name segment, if present, so it
-// resolves to the same base whether the browser is currently sitting on
-// the bare root or on e.g. /PostTrack/studio.
-const ROUTE_BASE_PATH = (()=>{
-  try{
-    const segs = window.location.pathname.split("/").filter(Boolean);
-    if(segs.length && ROUTE_VIEWS.includes(segs[segs.length-1])) segs.pop();
-    return segs.length ? "/"+segs.join("/") : "";
-  }catch(e){ return ""; }
-})();
+// its own history alone). Pinned rather than inferred from the current
+// URL: an earlier version of this tried to infer it dynamically (stripping
+// a trailing view-name segment), reasoning that would survive a repo
+// rename — but it turned out actively dangerous. A stray base-less URL
+// (e.g. from the stale-cache window right after this routing code first
+// shipped) looks, to that inference, like "the base path IS the view
+// name" once the view segment is stripped off, leaving an empty inferred
+// base — and every link generated from then on kept perpetuating that
+// same broken, base-less URL, since the inference trusted the already-
+// wrong current URL as ground truth. A hardcoded value can't self-corrupt
+// that way. Update this (and the matching value in 404.html) if the repo
+// is ever renamed or moved again.
+const ROUTE_BASE_PATH = "/PostTrack";
 function parseRoute(){
   try{
     let path = window.location.pathname;
@@ -29101,19 +29102,42 @@ function App() {
   // call (rather than tracking each piece in React state) means whichever
   // params the caller doesn't mention are simply preserved as-is.
   const updateRoute = useCallback((overrides, {push=false}={})=>{
-    const current = parseRoute();
-    const next = {
-      view: overrides.view!==undefined ? overrides.view : (current.view || viewRef.current || "projects"),
-      projectId: overrides.projectId!==undefined ? overrides.projectId : current.projectId,
-      ptab: overrides.ptab!==undefined ? overrides.ptab : current.ptab,
-      pitem: overrides.pitem!==undefined ? overrides.pitem : current.pitem,
-      atab: overrides.atab!==undefined ? overrides.atab : current.atab,
-      agear: overrides.agear!==undefined ? overrides.agear : current.agear,
-    };
-    const url = buildRouteUrl(next);
-    if(url === window.location.pathname+window.location.search) return;
-    if(push) window.history.pushState({}, "", url);
-    else window.history.replaceState({}, "", url);
+    // A history.*State call throwing (seen in at least one sandboxed/file://
+    // context, and plausibly some other embedded/odd-browser situation)
+    // must never be allowed to crash the whole app — this is cosmetic URL
+    // bookkeeping, not anything the app's own state depends on, so a
+    // failure here is a silent no-op rather than a thrown error.
+    try{
+      const current = parseRoute();
+      const next = {
+        view: overrides.view!==undefined ? overrides.view : (current.view || viewRef.current || "projects"),
+        projectId: overrides.projectId!==undefined ? overrides.projectId : current.projectId,
+        ptab: overrides.ptab!==undefined ? overrides.ptab : current.ptab,
+        pitem: overrides.pitem!==undefined ? overrides.pitem : current.pitem,
+        atab: overrides.atab!==undefined ? overrides.atab : current.atab,
+        agear: overrides.agear!==undefined ? overrides.agear : current.agear,
+      };
+      const url = buildRouteUrl(next);
+      if(url === window.location.pathname+window.location.search) return;
+      if(push) window.history.pushState({}, "", url);
+      else window.history.replaceState({}, "", url);
+    }catch(e){ console.warn("[routing] updateRoute failed:", e); }
+  },[]);
+  // One-time self-heal for anyone currently sitting on a URL missing the
+  // ROUTE_BASE_PATH prefix — e.g. a leftover bare /calendar from the brief
+  // window before that constant was pinned (see its comment for how that
+  // happened). parseRoute() still parses a prefix-less URL correctly (it
+  // only fails to strip a prefix that isn't there), so this just re-emits
+  // the same route through buildRouteUrl, which always includes the
+  // correct prefix, via a single replaceState — no visible effect for
+  // anyone who wasn't already on a broken URL.
+  useEffect(()=>{
+    try{
+      if(!window.location.pathname.startsWith(ROUTE_BASE_PATH)){
+        window.history.replaceState({}, "", buildRouteUrl(parseRoute()));
+      }
+    }catch(e){ console.warn("[routing] self-heal failed:", e); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
   // Pushing a new URL ourselves (open/close a project, switch the top nav)
   // never fires popstate — only the browser's own back/forward does — so
