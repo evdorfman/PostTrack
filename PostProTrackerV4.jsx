@@ -15384,15 +15384,20 @@ const reviewRoundToRow = (r, deliverableRowId) => ({
   ...(isUuid(r.id) ? {id: r.id} : {}),
   deliverable_id: deliverableRowId,
   label: r.label||null, deadline: r.deadline||null, reviewers: r.reviewers||[], status: r.status||null, notes: r.notes||null,
-  // Omitted entirely (not set to null) when the local round's
-  // workReviewSessionId isn't a real uuid — which is every round today,
-  // since reads still come from the legacy JSON where this is always a
-  // client-generated numeric id. An UPDATE only touches fields present in
-  // the request body, so omitting it leaves whatever's already correctly
-  // backfilled in the new table alone; sending null here would silently
-  // wipe out that grouping the moment any OTHER field on the same round
-  // gets edited, since this function always builds the full row either way.
+  // work_review_session_id is omitted entirely (not set to null) when the
+  // local round's workReviewSessionId isn't a real uuid yet — an UPDATE
+  // only touches fields present in the request body, so omitting it leaves
+  // whatever's already correctly linked in the new table alone; sending
+  // null here would silently wipe out that grouping the moment any OTHER
+  // field on the same round gets edited, since this function always builds
+  // the full row either way.
   ...(isUuid(r.workReviewSessionId) ? {work_review_session_id: r.workReviewSessionId} : {}),
+  // legacy_work_review_session_id records the plain local id for the
+  // writeRoundDiff-side remap below, covering the brand-new-session case:
+  // a round and its work review session can be created in the very same
+  // user action, so at the moment this round is first inserted the
+  // session's real uuid may not exist yet (its own insert hasn't resolved).
+  ...((!isUuid(r.workReviewSessionId) && r.workReviewSessionId!=null) ? {legacy_work_review_session_id: r.workReviewSessionId} : {}),
 });
 
 const rowToProduction = row => ({
@@ -15807,7 +15812,21 @@ const computeRoundDiff = (oldRounds, newRounds) => {
 // actually rejects — so each op's result is checked individually rather
 // than trusting Promise.all to catch a failure on its own.
 const writeRoundDiff = (sbClient, deliverableRowId, diff) => Promise.all([
-  ...diff.toInsert.map(r=>addReviewRoundRow(sbClient, deliverableRowId, r)),
+  ...diff.toInsert.map(r=>addReviewRoundRow(sbClient, deliverableRowId, r).then(({data,error})=>{
+    // Round-side half of the new-session/new-round race (see
+    // reviewRoundToRow's legacy_work_review_session_id comment): if this
+    // round's own session insert happened to resolve first, its real uuid
+    // is already sitting in work_review_sessions by now — link it
+    // immediately instead of leaving it to the session-side remap in
+    // addWorkReviewSession, which only catches the opposite ordering.
+    if(!error && data && !isUuid(r.workReviewSessionId) && r.workReviewSessionId!=null){
+      sbClient.from("work_review_sessions").select("id").eq("legacy_id", r.workReviewSessionId).maybeSingle()
+        .then(({data:sessionRow})=>{
+          if(sessionRow?.id) sbClient.from("review_rounds").update({work_review_session_id: sessionRow.id}).eq("id", data.id).then(()=>{});
+        });
+    }
+    return {error};
+  })),
   ...diff.toUpdate.map(({rowId,patch})=>updateReviewRoundRow(sbClient, rowId, patch)),
   ...diff.toDelete.map(r=>deleteReviewRoundRow(sbClient, r.id)),
 ]).then(results=>{
@@ -29988,6 +30007,14 @@ function App() {
         if(error){ console.warn("[shadow write] addWorkReviewSession failed:", error); return; }
         if(!data) return;
         setWorkReviewSessions(prev=>prev.map(s=>s.id===withId.id?{...s,_rowId:data.id}:s));
+        // Session-side half of the new-session/new-round race (see
+        // reviewRoundToRow's legacy_work_review_session_id comment): a
+        // round attached to this brand-new session may have already
+        // inserted before this resolved, carrying only the local numeric
+        // id since the real uuid didn't exist yet — link any such rounds now.
+        sb.from("review_rounds").update({work_review_session_id: data.id})
+          .eq("legacy_work_review_session_id", withId.id).is("work_review_session_id", null)
+          .then(({error})=>{ if(error) console.warn("[shadow write] work review session remap failed:", error); });
       }).catch(e=>console.warn("[shadow write] addWorkReviewSession failed:", e));
     }
     return withId;
