@@ -10062,14 +10062,23 @@ const ACTIVE_STAGES = [
 // productions, everything) and opens it in the same project modal used
 // everywhere else — nothing about viewing an old project is different,
 // it's just not preloaded.
-const ProjectsArchiveTab = ({onOpenArchived, onSearch}) => {
+const ProjectsArchiveTab = ({onOpenArchived, onSearch, onRevive}) => {
   const [query, setQuery] = useState("");
   const [range, setRange] = useState(quarterYearRanges()[0]);
   const [results, setResults] = useState(null);
   const [busy, setBusy] = useState(false);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [revivingId, setRevivingId] = useState(null);
   const PAGE_SIZE = 50;
+
+  const handleRevive = async (e, projectId) => {
+    e.stopPropagation(); // don't also trigger the row's own open-project click
+    setRevivingId(projectId);
+    const ok = await onRevive(projectId);
+    setRevivingId(null);
+    if(ok) setResults(prev=>prev?.filter(p=>p.id!==projectId)||prev);
+  };
 
   const runSearch = async (nextOffset=0) => {
     setBusy(true);
@@ -10109,6 +10118,10 @@ const ProjectsArchiveTab = ({onOpenArchived, onSearch}) => {
             </div>
             <Chip label={p.status||"Closed"} color="#374151" xs/>
             <div style={{fontSize:13,color:"#4b5563",whiteSpace:"nowrap"}}>Closed {fmtDT(p.closedAt)}</div>
+            <button onClick={e=>handleRevive(e,p.id)} disabled={revivingId===p.id}
+              style={{background:"#10b98118",border:"1px solid #10b98130",borderRadius:6,color:"#10b981",padding:"4px 11px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap",opacity:revivingId===p.id?0.6:1}}>
+              {revivingId===p.id?"Reviving…":"↩ Revive"}
+            </button>
           </div>
         ))}
       </div>
@@ -10122,7 +10135,7 @@ const ProjectsArchiveTab = ({onOpenArchived, onSearch}) => {
   );
 };
 
-const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateDel, statsFilter=null, onClearStatsFilter, navSidebarWidth, navSidebarHandle, projectsLoaded=true, onOpenArchivedProject, onSearchArchivedProjects, initialTab, onTabChange}) => {
+const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateDel, statsFilter=null, onClearStatsFilter, navSidebarWidth, navSidebarHandle, projectsLoaded=true, onOpenArchivedProject, onSearchArchivedProjects, onReviveArchivedProject, initialTab, onTabChange}) => {
   // "Active" is the existing content below, unchanged. "Archive" is new —
   // see the projects-load effect's own comment for why closed-out
   // projects don't load into `projects` at all (so there's nothing for
@@ -10191,7 +10204,7 @@ const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateD
     return (
       <div>
         {subTabBar}
-        <ProjectsArchiveTab onOpenArchived={onOpenArchivedProject} onSearch={onSearchArchivedProjects}/>
+        <ProjectsArchiveTab onOpenArchived={onOpenArchivedProject} onSearch={onSearchArchivedProjects} onRevive={onReviveArchivedProject}/>
       </div>
     );
   }
@@ -31746,6 +31759,27 @@ function App() {
     const {data, error} = await q;
     return {data: (data||[]).map(rowToProject), error};
   },[]);
+  // Revives a project straight from the Archive list, without opening it
+  // first — the Close Out panel's own Revive button goes through
+  // updateProject instead (see its "not in the active set" branch), which
+  // only works because that project is the one currently open in
+  // archivedProjectView; reviving from the list has no such snapshot to
+  // key off, so this writes directly and adds the fetched result into
+  // `projects` itself, rather than trying to force it through that
+  // narrower path.
+  const reviveArchivedProject = useCallback(async (projectId) => {
+    if(!sb) return false;
+    const {error:updateErr} = await sb.from("projects").update({closed_at:null, status:"In Production"}).eq("id", projectId);
+    if(updateErr){ reportSbError("Revive project", updateErr); return false; }
+    const {data:projRow, error:fetchErr} = await sb.from("projects").select("*").eq("id", projectId).single();
+    if(fetchErr || !projRow){ reportSbError("Revive project", fetchErr||{message:"Project not found after reviving."}); return false; }
+    const {deliverables, productions} = await fetchDeliverablesAndProductionsFor(projectId);
+    const revived = {...rowToProject(projRow), deliverables, productions};
+    setProjects(prev=>prev.some(p=>p.id===projectId) ? prev : [...prev, revived]);
+    logActivity({entityType:"project", entityLabel:revived.name, projectId, action:"status_changed", detail:"status → In Production (revived from archive)"});
+    return true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
   // Resolves a `?project=` deep link once the real project data has loaded
   // (it's fetched async from Supabase, so it may not exist yet at mount —
   // see projectsLoaded's own comment). Runs at most once: if it's not in
@@ -31938,7 +31972,7 @@ function App() {
               });
             }}
           />}
-          {view==="projects"&&<ProjectsView key={`projects:${popstateGen}`} initialTab={projectsInitialTab} onTabChange={tab=>updateRoute({pjtab:tab})} onOpenArchivedProject={openArchivedProject} onSearchArchivedProjects={searchArchivedProjects} projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} statsFilter={statsFilter} onClearStatsFilter={()=>setStatsFilter(null)} navSidebarWidth={navSidebarWidth} navSidebarHandle={navSidebarHandle} projectsLoaded={projectsLoaded}/>}
+          {view==="projects"&&<ProjectsView key={`projects:${popstateGen}`} initialTab={projectsInitialTab} onTabChange={tab=>updateRoute({pjtab:tab})} onOpenArchivedProject={openArchivedProject} onSearchArchivedProjects={searchArchivedProjects} onReviveArchivedProject={reviveArchivedProject} projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} statsFilter={statsFilter} onClearStatsFilter={()=>setStatsFilter(null)} navSidebarWidth={navSidebarWidth} navSidebarHandle={navSidebarHandle} projectsLoaded={projectsLoaded}/>}
           {view==="studio"&&<StudioTab projects={allProjects} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} team={allTeam} onOpenProject={openProject} talentRoster={talentRoster} onUpdateProject={updateProject} mediaCards={mediaCards} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="kanban"&&kanbanMode==="status"&&<KanbanStatus projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="kanban"&&kanbanMode==="editor"&&<KanbanEditor projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
