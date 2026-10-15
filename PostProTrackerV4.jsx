@@ -15166,6 +15166,12 @@ const READ_FROM_NORMALIZED_DELIVERABLES_PRODUCTIONS = true;
 // actually resolve in.
 const READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS = true;
 
+// Read cutover, step three — all 18 remaining collections at once (same
+// batch grouping as their shadow-write flags). Off by default. Same
+// single-writer guarantee as step two: the legacy app_kv-based load is
+// skipped (not raced against) whenever this is true.
+const READ_FROM_NORMALIZED_PHASE3 = false;
+
 // Phase 3 — the remaining app_kv-backed collections (see production_schema_new_tables.sql's
 // Phase 3 section and the "what else should be its own table" conversation).
 // Same independent-rollback reasoning as every flag above: each collection
@@ -15520,17 +15526,28 @@ const talentToRow = t => ({
 });
 
 // Nudges and BEC requests are append-only (no edit/delete path exists in the
-// app today — see the research this landed in), so they only need a row
-// builder for INSERT, not a full round-trip pair.
+// app today — see the research this landed in), so the write side only
+// needed a row builder for INSERT. The read-cutover side still needs the
+// other direction (rowToX) to reconstruct local objects from the table.
 const nudgeToRow = n => ({
   legacy_id: typeof n.id==="number" ? n.id : null,
   task_key: n.taskKey||null, project_id: n.projectId||null, task_id: n.taskId||null,
   task_label: n.taskLabel||null, tab: n.tab||null, to_member_id: n.toMemberId||null,
 });
+const rowToNudge = row => ({
+  id: row.legacy_id ?? row.id,
+  taskKey: row.task_key, projectId: row.project_id, taskId: row.task_id,
+  taskLabel: row.task_label, tab: row.tab, toMemberId: row.to_member_id, createdAt: row.created_at,
+});
 const becRequestToRow = b => ({
   legacy_id: typeof b.id==="number" ? b.id : null,
   reservation_id: b.reservationId||null, project_id: b.projectId||null, action: b.action||null,
   received_at: b.receivedAt||null, parsed: b.parsed||{},
+});
+const rowToBecRequest = row => ({
+  id: row.legacy_id ?? row.id,
+  reservationId: row.reservation_id, projectId: row.project_id, action: row.action,
+  receivedAt: row.received_at, parsed: row.parsed||{},
 });
 
 // intakes' ~48 free-text fields round-trip through the jsonb `fields` column
@@ -29359,32 +29376,32 @@ function App() {
       safeGet(SCREEN_CONTENT_STORAGE_KEY),
       safeGet(CUSTOM_TASKS_STORAGE_KEY),
     ]).then(([g,s,m,st,tr,nd,rc,ls,furn,prps,sc,ct])=>{
-      try { if(g?.value) setGearList(JSON.parse(g.value)); }   catch(e){}
-      try { if(s?.value) setStudioSpaces(JSON.parse(s.value)); } catch(e){}
-      try { if(m?.value) setStudioSpaceMeta(JSON.parse(m.value)); } catch(e){}
+      try { if(g?.value && !READ_FROM_NORMALIZED_PHASE3) setGearList(JSON.parse(g.value)); }   catch(e){}
+      try { if(s?.value && !READ_FROM_NORMALIZED_PHASE3) setStudioSpaces(JSON.parse(s.value)); } catch(e){}
+      try { if(m?.value && !READ_FROM_NORMALIZED_PHASE3) setStudioSpaceMeta(JSON.parse(m.value)); } catch(e){}
       try { if(st?.value && !READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS) setSetupTypes(JSON.parse(st.value)); } catch(e){}
-      try { if(tr?.value) setTalentRoster(JSON.parse(tr.value)); } catch(e){}
-      try { if(nd?.value) setNudges(JSON.parse(nd.value)); } catch(e){}
-      try { if(rc?.value) setResourceConfig(prev=>({...prev,...JSON.parse(rc.value)})); } catch(e){}
-      try { if(ls?.value) setLists(prev=>({...prev,...JSON.parse(ls.value)})); } catch(e){}
-      try { if(furn?.value) setFurnitureList(JSON.parse(furn.value)); } catch(e){}
-      try { if(prps?.value) setPropsList(JSON.parse(prps.value)); } catch(e){}
-      try { if(sc?.value) setScreenContentOptions(JSON.parse(sc.value)); } catch(e){}
+      try { if(tr?.value && !READ_FROM_NORMALIZED_PHASE3) setTalentRoster(JSON.parse(tr.value)); } catch(e){}
+      try { if(nd?.value && !READ_FROM_NORMALIZED_PHASE3) setNudges(JSON.parse(nd.value)); } catch(e){}
+      try { if(rc?.value && !READ_FROM_NORMALIZED_PHASE3) setResourceConfig(prev=>({...prev,...JSON.parse(rc.value)})); } catch(e){}
+      try { if(ls?.value && !READ_FROM_NORMALIZED_PHASE3) setLists(prev=>({...prev,...JSON.parse(ls.value)})); } catch(e){}
+      try { if(furn?.value && !READ_FROM_NORMALIZED_PHASE3) setFurnitureList(JSON.parse(furn.value)); } catch(e){}
+      try { if(prps?.value && !READ_FROM_NORMALIZED_PHASE3) setPropsList(JSON.parse(prps.value)); } catch(e){}
+      try { if(sc?.value && !READ_FROM_NORMALIZED_PHASE3) setScreenContentOptions(JSON.parse(sc.value)); } catch(e){}
       try { if(ct?.value && !READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS) setCustomTasks(JSON.parse(ct.value)); } catch(e){}
       setSetupTypesLoaded(true);
       setCustomTasksLoaded(true);
       setAdminDataLoaded(true);
       // Load unavailability separately (added after the main Promise.all)
-      safeGet(UNAVAILABILITY_STORAGE_KEY).then(uv=>{ try{if(uv?.value)setUnavailability(JSON.parse(uv.value));}catch(e){} }).catch(()=>{}).finally(()=>setUnavailabilityLoaded(true));
+      safeGet(UNAVAILABILITY_STORAGE_KEY).then(uv=>{ try{if(uv?.value && !READ_FROM_NORMALIZED_PHASE3)setUnavailability(JSON.parse(uv.value));}catch(e){} }).catch(()=>{}).finally(()=>setUnavailabilityLoaded(true));
       // Load production presets
       safeGet(PRESET_STORAGE_KEY).then(ps=>{ try{if(ps?.value && !READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS)setAppPresets(JSON.parse(ps.value));}catch(e){} }).catch(()=>{}).finally(()=>setProductionPresetsLoaded(true));
-      safeGet(VENDOR_STORAGE_KEY).then(vc=>{ try{if(vc?.value){ const list=JSON.parse(vc.value); if(Array.isArray(list)&&list.length>0) setVendorCompanies(list); }}catch(e){} }).catch(()=>{}).finally(()=>setVendorCompaniesLoaded(true));
-      safeGet(REVIEWER_NAMES_STORAGE_KEY).then(rn=>{ try{if(rn?.value){ const list=JSON.parse(rn.value); if(Array.isArray(list)) setReviewerNames(list); }}catch(e){} }).catch(()=>{}).finally(()=>setReviewerNamesLoaded(true));
+      safeGet(VENDOR_STORAGE_KEY).then(vc=>{ try{if(vc?.value && !READ_FROM_NORMALIZED_PHASE3){ const list=JSON.parse(vc.value); if(Array.isArray(list)&&list.length>0) setVendorCompanies(list); }}catch(e){} }).catch(()=>{}).finally(()=>setVendorCompaniesLoaded(true));
+      safeGet(REVIEWER_NAMES_STORAGE_KEY).then(rn=>{ try{if(rn?.value && !READ_FROM_NORMALIZED_PHASE3){ const list=JSON.parse(rn.value); if(Array.isArray(list)) setReviewerNames(list); }}catch(e){} }).catch(()=>{}).finally(()=>setReviewerNamesLoaded(true));
       safeGet(WORK_REVIEW_SESSIONS_STORAGE_KEY).then(wr=>{ try{if(wr?.value){ const list=JSON.parse(wr.value); if(Array.isArray(list)) setWorkReviewSessions(list); }}catch(e){} }).catch(()=>{});
-      safeGet(INTAKE_STORAGE_KEY).then(iv=>{ try{if(iv?.value){ const list=JSON.parse(iv.value); if(Array.isArray(list)) setIntakes(list); }}catch(e){} }).catch(()=>{}).finally(()=>setIntakesLoaded(true));
-      safeGet(BEC_REQUEST_STORAGE_KEY).then(bv=>{ try{if(bv?.value){ const list=JSON.parse(bv.value); if(Array.isArray(list)) setBecRequests(list); }}catch(e){} }).catch(()=>{}).finally(()=>setBecRequestsLoaded(true));
-      safeGet(MEDIA_CARDS_STORAGE_KEY).then(mv=>{ try{if(mv?.value){ const list=JSON.parse(mv.value); if(Array.isArray(list)) setMediaCards(list); }}catch(e){} }).catch(()=>{}).finally(()=>setMediaCardsLoaded(true));
-      safeGet(TAB_LOCKS_STORAGE_KEY, true).then(tl=>{ try{if(tl?.value) setTabLocks(JSON.parse(tl.value)); }catch(e){} }).catch(()=>{}).finally(()=>setTabLocksLoaded(true));
+      safeGet(INTAKE_STORAGE_KEY).then(iv=>{ try{if(iv?.value && !READ_FROM_NORMALIZED_PHASE3){ const list=JSON.parse(iv.value); if(Array.isArray(list)) setIntakes(list); }}catch(e){} }).catch(()=>{}).finally(()=>setIntakesLoaded(true));
+      safeGet(BEC_REQUEST_STORAGE_KEY).then(bv=>{ try{if(bv?.value && !READ_FROM_NORMALIZED_PHASE3){ const list=JSON.parse(bv.value); if(Array.isArray(list)) setBecRequests(list); }}catch(e){} }).catch(()=>{}).finally(()=>setBecRequestsLoaded(true));
+      safeGet(MEDIA_CARDS_STORAGE_KEY).then(mv=>{ try{if(mv?.value && !READ_FROM_NORMALIZED_PHASE3){ const list=JSON.parse(mv.value); if(Array.isArray(list)) setMediaCards(list); }}catch(e){} }).catch(()=>{}).finally(()=>setMediaCardsLoaded(true));
+      safeGet(TAB_LOCKS_STORAGE_KEY, true).then(tl=>{ try{if(tl?.value && !READ_FROM_NORMALIZED_PHASE3) setTabLocks(JSON.parse(tl.value)); }catch(e){} }).catch(()=>{}).finally(()=>setTabLocksLoaded(true));
     });
   },[]);
 
@@ -29449,6 +29466,85 @@ function App() {
       sb.from("production_presets").select("*").then(({data,error})=>{
         if(error){ console.warn("[read cutover] failed to load production_presets:", error); return; }
         if(data) setAppPresets(data.map(rowToProductionPreset));
+      });
+    }
+    // Read cutover, step three — see READ_FROM_NORMALIZED_PHASE3's comment.
+    if(READ_FROM_NORMALIZED_PHASE3){
+      const loadList = (table, setter, mapRow) => sb.from(table).select("*").then(({data,error})=>{
+        if(error){ console.warn(`[read cutover] failed to load ${table}:`, error); return; }
+        if(data) setter(data.map(mapRow));
+      });
+      loadList("gear", setGearList, rowToGear);
+      loadList("furniture", setFurnitureList, rowToFurniture);
+      loadList("props", setPropsList, rowToProp);
+      loadList("talent_roster", setTalentRoster, rowToTalent);
+      loadList("nudges", setNudges, rowToNudge);
+      loadList("unavailability", setUnavailability, rowToUnavailability);
+      loadList("intakes", setIntakes, rowToIntake);
+      loadList("bec_requests", setBecRequests, rowToBecRequest);
+      loadList("media_cards", setMediaCards, rowToMediaCard);
+      loadList("workstations", setWorkstations, rowToWorkstation);
+      sb.from("vendor_companies").select("name").then(({data,error})=>{
+        if(error){ console.warn("[read cutover] failed to load vendor_companies:", error); return; }
+        if(data && data.length) setVendorCompanies(data.map(r=>r.name));
+      });
+      sb.from("reviewer_names").select("name").then(({data,error})=>{
+        if(error){ console.warn("[read cutover] failed to load reviewer_names:", error); return; }
+        if(data) setReviewerNames(data.map(r=>r.name));
+      });
+      sb.from("studio_spaces").select("name").then(({data,error})=>{
+        if(error){ console.warn("[read cutover] failed to load studio_spaces:", error); return; }
+        if(data && data.length) setStudioSpaces(data.map(r=>r.name));
+      });
+      sb.from("screen_content_options").select("*").then(({data,error})=>{
+        if(error){ console.warn("[read cutover] failed to load screen_content_options:", error); return; }
+        if(!data) return;
+        const byCategory = {windowWall:[], vpWall:[], frameTv:[]};
+        data.forEach(row=>{ if(byCategory[row.category]) byCategory[row.category].push(rowToScreenContentOption(row)); });
+        setScreenContentOptions(byCategory);
+      });
+      sb.from("studio_space_meta").select("*").then(({data,error})=>{
+        if(error){ console.warn("[read cutover] failed to load studio_space_meta:", error); return; }
+        if(!data) return;
+        const meta = {};
+        data.forEach(row=>{
+          meta[row.space_name] = {
+            isHMU: row.is_hmu, isGreenRoom: row.is_green_room, isPCR: row.is_pcr,
+            suggestHMU: row.suggest_hmu, linkedGreenRoom: row.linked_green_room||undefined,
+            crewCallOffsetMs: row.crew_call_offset_ms,
+          };
+        });
+        setStudioSpaceMeta(meta);
+      });
+      sb.from("app_lists").select("*").eq("id", 1).then(({data,error})=>{
+        if(error){ console.warn("[read cutover] failed to load app_lists:", error); return; }
+        const row = data?.[0]; if(!row) return;
+        setLists({
+          workstreams: row.workstreams||[], businessUnits: row.business_units||[], productionTypes: row.production_types||[],
+          deliverableStatuses: row.deliverable_statuses||[], animBatchStatuses: row.anim_batch_statuses||[],
+          adminRoles: row.admin_roles||[], designRoles: row.design_roles||[],
+          productionRoles: row.production_roles||[], postProductionRoles: row.post_production_roles||[],
+        });
+      });
+      sb.from("resource_config").select("*").eq("id", 1).then(({data,error})=>{
+        if(error){ console.warn("[read cutover] failed to load resource_config:", error); return; }
+        const row = data?.[0]; if(!row) return;
+        setResourceConfig(prev=>({
+          ...prev,
+          deliverableTypeHours: row.deliverable_type_hours||prev.deliverableTypeHours,
+          statusRemainingPct: row.status_remaining_pct||prev.statusRemainingPct,
+          mediaTaskHours: row.media_task_hours||prev.mediaTaskHours,
+          ingestRemainingPct: row.ingest_remaining_pct||prev.ingestRemainingPct,
+          assignablePercent: row.assignable_percent ?? prev.assignablePercent,
+          defaultHoursPerAnimation: row.default_hours_per_animation ?? prev.defaultHoursPerAnimation,
+          hoursPerShoot: row.hours_per_shoot ?? prev.hoursPerShoot,
+          hoursPerDeliverable: row.hours_per_deliverable ?? prev.hoursPerDeliverable,
+        }));
+      });
+      sb.from("tab_locks").select("*").eq("id", 1).then(({data,error})=>{
+        if(error){ console.warn("[read cutover] failed to load tab_locks:", error); return; }
+        const row = data?.[0]; if(!row) return;
+        setTabLocks(row.locks||{});
       });
     }
   },[authed]);

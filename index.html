@@ -9973,6 +9973,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
   var SHADOW_WRITE_CUSTOM_TASKS = true;
   var READ_FROM_NORMALIZED_DELIVERABLES_PRODUCTIONS = true;
   var READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS = true;
+  var READ_FROM_NORMALIZED_PHASE3 = false;
   var SHADOW_WRITE_GEAR = true;
   var SHADOW_WRITE_FURNITURE = true;
   var SHADOW_WRITE_PROPS = true;
@@ -10356,6 +10357,14 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     notes: t.notes || null,
     done: !!t.done
   });
+  var rowToGear = (row) => ({
+    id: row.legacy_id ?? row.id,
+    _rowId: row.id,
+    name: row.name,
+    category: row.category,
+    quantity: row.quantity || 1,
+    notes: row.notes || ""
+  });
   var gearToRow = (g) => ({
     ...g._rowId ? { id: g._rowId } : {},
     legacy_id: typeof g.id === "number" ? g.id : null,
@@ -10364,23 +10373,40 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     quantity: g.quantity || 1,
     notes: g.notes || null
   });
+  var rowToFurniture = (row) => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category || "Furniture" });
   var furnitureToRow = (f) => ({
     ...f._rowId ? { id: f._rowId } : {},
     legacy_id: f.id != null ? String(f.id) : null,
     name: f.name || null,
     category: f.category || "Furniture"
   });
+  var rowToProp = (row) => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category || "Prop" });
   var propToRow = (p) => ({
     ...p._rowId ? { id: p._rowId } : {},
     legacy_id: p.id != null ? String(p.id) : null,
     name: p.name || null,
     category: p.category || "Prop"
   });
+  var rowToScreenContentOption = (row) => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name });
   var screenContentOptionToRow = (item, category) => ({
     ...item._rowId ? { id: item._rowId } : {},
     legacy_id: item.id != null ? String(item.id) : null,
     category,
     name: item.name || null
+  });
+  var rowToUnavailability = (row) => ({
+    id: row.legacy_id ?? row.id,
+    _rowId: row.id,
+    memberId: row.member_id,
+    type: row.type,
+    label: row.label,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    allDay: row.all_day,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    notes: row.notes || "",
+    createdAt: row.created_at
   });
   var unavailabilityToRow = (u) => ({
     ...u._rowId ? { id: u._rowId } : {},
@@ -10394,6 +10420,15 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     start_time: u.startTime || null,
     end_time: u.endTime || null,
     notes: u.notes || null
+  });
+  var rowToTalent = (row) => ({
+    id: row.legacy_id ?? row.id,
+    _rowId: row.id,
+    name: row.name,
+    category: row.category,
+    bio: row.bio || "",
+    photoKey: row.photo_key,
+    lastBookedAt: row.last_booked_at
   });
   var talentToRow = (t) => ({
     ...t._rowId ? { id: t._rowId } : {},
@@ -10413,6 +10448,16 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     tab: n.tab || null,
     to_member_id: n.toMemberId || null
   });
+  var rowToNudge = (row) => ({
+    id: row.legacy_id ?? row.id,
+    taskKey: row.task_key,
+    projectId: row.project_id,
+    taskId: row.task_id,
+    taskLabel: row.task_label,
+    tab: row.tab,
+    toMemberId: row.to_member_id,
+    createdAt: row.created_at
+  });
   var becRequestToRow = (b) => ({
     legacy_id: typeof b.id === "number" ? b.id : null,
     reservation_id: b.reservationId || null,
@@ -10420,6 +10465,22 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     action: b.action || null,
     received_at: b.receivedAt || null,
     parsed: b.parsed || {}
+  });
+  var rowToBecRequest = (row) => ({
+    id: row.legacy_id ?? row.id,
+    reservationId: row.reservation_id,
+    projectId: row.project_id,
+    action: row.action,
+    receivedAt: row.received_at,
+    parsed: row.parsed || {}
+  });
+  var rowToIntake = (row) => ({
+    id: row.legacy_id ?? row.id,
+    _rowId: row.id,
+    dateReceived: row.date_received,
+    status: row.status,
+    assignedProjectId: row.assigned_project_id,
+    ...row.fields || {}
   });
   var intakeToRow = (i) => {
     const { id, _rowId, dateReceived, status, assignedProjectId, ...fields } = i;
@@ -10432,6 +10493,23 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
       fields
     };
   };
+  var rowToMediaCard = (row) => ({
+    id: row.legacy_id ?? row.id,
+    _rowId: row.id,
+    label: row.label,
+    category: row.category,
+    type: row.type,
+    format: row.format,
+    capacityGB: row.capacity_gb,
+    manufacturer: row.manufacturer,
+    model: row.model,
+    folderName: row.folder_name,
+    status: row.status,
+    assignedTo: row.assigned_to,
+    projectRef: row.project_ref,
+    homeLocation: row.home_location,
+    notes: row.notes
+  });
   var mediaCardToRow = (m) => ({
     ...m._rowId ? { id: m._rowId } : {},
     legacy_id: m.id != null ? String(m.id) : null,
@@ -10448,6 +10526,16 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     project_ref: m.projectRef || null,
     home_location: m.homeLocation || null,
     notes: m.notes || null
+  });
+  var rowToWorkstation = (row) => ({
+    id: row.legacy_id ?? row.id,
+    _rowId: row.id,
+    name: row.name,
+    location: row.location,
+    machineType: row.machine_type,
+    serialNumber: row.serial_number,
+    assignedTo: row.assigned_to,
+    available: row.available
   });
   var workstationToRow = (w) => ({
     ...w._rowId ? { id: w._rowId } : {},
@@ -20424,15 +20512,15 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         safeGet(CUSTOM_TASKS_STORAGE_KEY)
       ]).then(([g, s, m, st, tr, nd, rc, ls, furn, prps, sc, ct]) => {
         try {
-          if (g?.value) setGearList(JSON.parse(g.value));
+          if (g?.value && !READ_FROM_NORMALIZED_PHASE3) setGearList(JSON.parse(g.value));
         } catch (e) {
         }
         try {
-          if (s?.value) setStudioSpaces(JSON.parse(s.value));
+          if (s?.value && !READ_FROM_NORMALIZED_PHASE3) setStudioSpaces(JSON.parse(s.value));
         } catch (e) {
         }
         try {
-          if (m?.value) setStudioSpaceMeta(JSON.parse(m.value));
+          if (m?.value && !READ_FROM_NORMALIZED_PHASE3) setStudioSpaceMeta(JSON.parse(m.value));
         } catch (e) {
         }
         try {
@@ -20440,31 +20528,31 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         } catch (e) {
         }
         try {
-          if (tr?.value) setTalentRoster(JSON.parse(tr.value));
+          if (tr?.value && !READ_FROM_NORMALIZED_PHASE3) setTalentRoster(JSON.parse(tr.value));
         } catch (e) {
         }
         try {
-          if (nd?.value) setNudges(JSON.parse(nd.value));
+          if (nd?.value && !READ_FROM_NORMALIZED_PHASE3) setNudges(JSON.parse(nd.value));
         } catch (e) {
         }
         try {
-          if (rc?.value) setResourceConfig((prev) => ({ ...prev, ...JSON.parse(rc.value) }));
+          if (rc?.value && !READ_FROM_NORMALIZED_PHASE3) setResourceConfig((prev) => ({ ...prev, ...JSON.parse(rc.value) }));
         } catch (e) {
         }
         try {
-          if (ls?.value) setLists((prev) => ({ ...prev, ...JSON.parse(ls.value) }));
+          if (ls?.value && !READ_FROM_NORMALIZED_PHASE3) setLists((prev) => ({ ...prev, ...JSON.parse(ls.value) }));
         } catch (e) {
         }
         try {
-          if (furn?.value) setFurnitureList(JSON.parse(furn.value));
+          if (furn?.value && !READ_FROM_NORMALIZED_PHASE3) setFurnitureList(JSON.parse(furn.value));
         } catch (e) {
         }
         try {
-          if (prps?.value) setPropsList(JSON.parse(prps.value));
+          if (prps?.value && !READ_FROM_NORMALIZED_PHASE3) setPropsList(JSON.parse(prps.value));
         } catch (e) {
         }
         try {
-          if (sc?.value) setScreenContentOptions(JSON.parse(sc.value));
+          if (sc?.value && !READ_FROM_NORMALIZED_PHASE3) setScreenContentOptions(JSON.parse(sc.value));
         } catch (e) {
         }
         try {
@@ -20476,7 +20564,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         setAdminDataLoaded(true);
         safeGet(UNAVAILABILITY_STORAGE_KEY).then((uv) => {
           try {
-            if (uv?.value) setUnavailability(JSON.parse(uv.value));
+            if (uv?.value && !READ_FROM_NORMALIZED_PHASE3) setUnavailability(JSON.parse(uv.value));
           } catch (e) {
           }
         }).catch(() => {
@@ -20490,7 +20578,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         }).finally(() => setProductionPresetsLoaded(true));
         safeGet(VENDOR_STORAGE_KEY).then((vc) => {
           try {
-            if (vc?.value) {
+            if (vc?.value && !READ_FROM_NORMALIZED_PHASE3) {
               const list = JSON.parse(vc.value);
               if (Array.isArray(list) && list.length > 0) setVendorCompanies(list);
             }
@@ -20500,7 +20588,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         }).finally(() => setVendorCompaniesLoaded(true));
         safeGet(REVIEWER_NAMES_STORAGE_KEY).then((rn) => {
           try {
-            if (rn?.value) {
+            if (rn?.value && !READ_FROM_NORMALIZED_PHASE3) {
               const list = JSON.parse(rn.value);
               if (Array.isArray(list)) setReviewerNames(list);
             }
@@ -20520,7 +20608,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         });
         safeGet(INTAKE_STORAGE_KEY).then((iv) => {
           try {
-            if (iv?.value) {
+            if (iv?.value && !READ_FROM_NORMALIZED_PHASE3) {
               const list = JSON.parse(iv.value);
               if (Array.isArray(list)) setIntakes(list);
             }
@@ -20530,7 +20618,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         }).finally(() => setIntakesLoaded(true));
         safeGet(BEC_REQUEST_STORAGE_KEY).then((bv) => {
           try {
-            if (bv?.value) {
+            if (bv?.value && !READ_FROM_NORMALIZED_PHASE3) {
               const list = JSON.parse(bv.value);
               if (Array.isArray(list)) setBecRequests(list);
             }
@@ -20540,7 +20628,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         }).finally(() => setBecRequestsLoaded(true));
         safeGet(MEDIA_CARDS_STORAGE_KEY).then((mv) => {
           try {
-            if (mv?.value) {
+            if (mv?.value && !READ_FROM_NORMALIZED_PHASE3) {
               const list = JSON.parse(mv.value);
               if (Array.isArray(list)) setMediaCards(list);
             }
@@ -20550,7 +20638,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         }).finally(() => setMediaCardsLoaded(true));
         safeGet(TAB_LOCKS_STORAGE_KEY, true).then((tl) => {
           try {
-            if (tl?.value) setTabLocks(JSON.parse(tl.value));
+            if (tl?.value && !READ_FROM_NORMALIZED_PHASE3) setTabLocks(JSON.parse(tl.value));
           } catch (e) {
           }
         }).catch(() => {
@@ -20623,6 +20711,124 @@ Never delete without explicit confirmation. Be conversational and use studio ter
             return;
           }
           if (data) setAppPresets(data.map(rowToProductionPreset));
+        });
+      }
+      if (READ_FROM_NORMALIZED_PHASE3) {
+        const loadList = (table, setter, mapRow) => sb.from(table).select("*").then(({ data, error }) => {
+          if (error) {
+            console.warn(`[read cutover] failed to load ${table}:`, error);
+            return;
+          }
+          if (data) setter(data.map(mapRow));
+        });
+        loadList("gear", setGearList, rowToGear);
+        loadList("furniture", setFurnitureList, rowToFurniture);
+        loadList("props", setPropsList, rowToProp);
+        loadList("talent_roster", setTalentRoster, rowToTalent);
+        loadList("nudges", setNudges, rowToNudge);
+        loadList("unavailability", setUnavailability, rowToUnavailability);
+        loadList("intakes", setIntakes, rowToIntake);
+        loadList("bec_requests", setBecRequests, rowToBecRequest);
+        loadList("media_cards", setMediaCards, rowToMediaCard);
+        loadList("workstations", setWorkstations, rowToWorkstation);
+        sb.from("vendor_companies").select("name").then(({ data, error }) => {
+          if (error) {
+            console.warn("[read cutover] failed to load vendor_companies:", error);
+            return;
+          }
+          if (data && data.length) setVendorCompanies(data.map((r) => r.name));
+        });
+        sb.from("reviewer_names").select("name").then(({ data, error }) => {
+          if (error) {
+            console.warn("[read cutover] failed to load reviewer_names:", error);
+            return;
+          }
+          if (data) setReviewerNames(data.map((r) => r.name));
+        });
+        sb.from("studio_spaces").select("name").then(({ data, error }) => {
+          if (error) {
+            console.warn("[read cutover] failed to load studio_spaces:", error);
+            return;
+          }
+          if (data && data.length) setStudioSpaces(data.map((r) => r.name));
+        });
+        sb.from("screen_content_options").select("*").then(({ data, error }) => {
+          if (error) {
+            console.warn("[read cutover] failed to load screen_content_options:", error);
+            return;
+          }
+          if (!data) return;
+          const byCategory = { windowWall: [], vpWall: [], frameTv: [] };
+          data.forEach((row) => {
+            if (byCategory[row.category]) byCategory[row.category].push(rowToScreenContentOption(row));
+          });
+          setScreenContentOptions(byCategory);
+        });
+        sb.from("studio_space_meta").select("*").then(({ data, error }) => {
+          if (error) {
+            console.warn("[read cutover] failed to load studio_space_meta:", error);
+            return;
+          }
+          if (!data) return;
+          const meta = {};
+          data.forEach((row) => {
+            meta[row.space_name] = {
+              isHMU: row.is_hmu,
+              isGreenRoom: row.is_green_room,
+              isPCR: row.is_pcr,
+              suggestHMU: row.suggest_hmu,
+              linkedGreenRoom: row.linked_green_room || void 0,
+              crewCallOffsetMs: row.crew_call_offset_ms
+            };
+          });
+          setStudioSpaceMeta(meta);
+        });
+        sb.from("app_lists").select("*").eq("id", 1).then(({ data, error }) => {
+          if (error) {
+            console.warn("[read cutover] failed to load app_lists:", error);
+            return;
+          }
+          const row = data?.[0];
+          if (!row) return;
+          setLists({
+            workstreams: row.workstreams || [],
+            businessUnits: row.business_units || [],
+            productionTypes: row.production_types || [],
+            deliverableStatuses: row.deliverable_statuses || [],
+            animBatchStatuses: row.anim_batch_statuses || [],
+            adminRoles: row.admin_roles || [],
+            designRoles: row.design_roles || [],
+            productionRoles: row.production_roles || [],
+            postProductionRoles: row.post_production_roles || []
+          });
+        });
+        sb.from("resource_config").select("*").eq("id", 1).then(({ data, error }) => {
+          if (error) {
+            console.warn("[read cutover] failed to load resource_config:", error);
+            return;
+          }
+          const row = data?.[0];
+          if (!row) return;
+          setResourceConfig((prev) => ({
+            ...prev,
+            deliverableTypeHours: row.deliverable_type_hours || prev.deliverableTypeHours,
+            statusRemainingPct: row.status_remaining_pct || prev.statusRemainingPct,
+            mediaTaskHours: row.media_task_hours || prev.mediaTaskHours,
+            ingestRemainingPct: row.ingest_remaining_pct || prev.ingestRemainingPct,
+            assignablePercent: row.assignable_percent ?? prev.assignablePercent,
+            defaultHoursPerAnimation: row.default_hours_per_animation ?? prev.defaultHoursPerAnimation,
+            hoursPerShoot: row.hours_per_shoot ?? prev.hoursPerShoot,
+            hoursPerDeliverable: row.hours_per_deliverable ?? prev.hoursPerDeliverable
+          }));
+        });
+        sb.from("tab_locks").select("*").eq("id", 1).then(({ data, error }) => {
+          if (error) {
+            console.warn("[read cutover] failed to load tab_locks:", error);
+            return;
+          }
+          const row = data?.[0];
+          if (!row) return;
+          setTabLocks(row.locks || {});
         });
       }
     }, [authed]);
