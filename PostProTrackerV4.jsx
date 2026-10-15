@@ -30034,7 +30034,15 @@ function App() {
       .on("postgres_changes", {event:"UPDATE", schema:"public", table:"resource_config"}, mergeResourceConfigUpsert)
       .on("postgres_changes", {event:"INSERT", schema:"public", table:"tab_locks"}, mergeTabLocksUpsert)
       .on("postgres_changes", {event:"UPDATE", schema:"public", table:"tab_locks"}, mergeTabLocksUpsert)
-      .subscribe();
+      .subscribe((status, err)=>{
+        // Surfaced because a bad status here (a table missing from the
+        // supabase_realtime publication, or a dropped connection) fails
+        // silently otherwise — every handler above just never fires, with
+        // nothing in the console to say why.
+        if(status==="CHANNEL_ERROR" || status==="TIMED_OUT" || status==="CLOSED"){
+          console.warn("[realtime] channel status:", status, err||"");
+        }
+      });
     return ()=>{ sb.removeChannel(channel); };
   },[authed]);
 
