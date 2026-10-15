@@ -15251,26 +15251,18 @@ const rowToProject = row => ({
   // on the next reload.
   inPipeline: row.in_pipeline||false,
 });
-// _rowId is purely local bookkeeping for the shadow-write pass (which row
-// in the new normalized table a deliverable/production corresponds to) —
-// it must never reach the legacy JSON column. This save path does a raw
-// pass-through of the whole object otherwise, so without stripping it
-// here, a tagged _rowId gets permanently baked into projects.deliverables/
-// projects.productions the moment this effect next fires, and every
-// "fresh" load reads that same stale value right back out — surviving
-// even a full tab close/reopen, since nothing about loading is actually
-// fresh when the staleness lives inside the data itself. Found live: a
-// production's shadow write kept silently targeting a row id that no
-// longer existed (from before a backfill re-run), no matter how many
-// times the tab was reloaded, because the stale id had already been
-// saved into its own JSON.
-const stripRowId = arr => (arr||[]).map(({_rowId, ...rest}) => rest);
 
+// deliverables/productions are deliberately NOT included here — migration
+// complete, reads come entirely from their own tables (see
+// READ_FROM_NORMALIZED_DELIVERABLES_PRODUCTIONS), and continuing to write
+// those two legacy JSON columns on every project save would just be dead
+// weight. Leaving the columns themselves in place (not dropped) in case
+// anything needs to roll back to them.
 const projectToRow = p => ({
   id: p.id, project_code: p.projectCode||null, name: p.name, requester: p.requester||null,
   year: p.year||null, status: p.status, workstream: p.workstream||null, business_unit: p.businessUnit||null,
   deadline: p.deadline||null, brief_notes: p.briefNotes||null, keywords: p.keywords||[],
-  assignees: p.assignees||{}, deliverables: stripRowId(p.deliverables), productions: stripRowId(p.productions),
+  assignees: p.assignees||{},
   shoots: p.shoots||[], notes: p.notes||[], ingest_dates: p.ingestDates||[],
   closed_at: p.closedAt||null,
   bxtv_refs: p.bxtvRefs||[], bxtv_meta: p.bxtvMeta||null,
@@ -28997,7 +28989,6 @@ function App() {
       }
       return list;
     });
-    window.storage?.set(MEDIA_CARDS_STORAGE_KEY, JSON.stringify(list)).catch(()=>{});
   },[]);
   const [view,setView]=useState(()=>{
     try { return localStorage.getItem("posttrack-last-view") || "projects"; } catch(e){ return "projects"; }
@@ -29154,7 +29145,6 @@ function App() {
   };
   const saveGear   = g => {
     setGearList(g);
-    window.storage?.set("posttrack-admin-gear",   JSON.stringify(g)).catch(()=>{});
     if(SHADOW_WRITE_GEAR && sb){
       writeListDiff(sb, "gear", computeListDiff(gearList, g, gearToRow), gearToRow).then(inserted=>{
         if(!inserted.length) return;
@@ -29164,17 +29154,14 @@ function App() {
   };
   const saveSpaces = s => {
     setStudioSpaces(s);
-    window.storage?.set("posttrack-admin-spaces", JSON.stringify(s)).catch(()=>{});
     if(SHADOW_WRITE_STUDIO_SPACES && sb) writeStringListDiff(sb, "studio_spaces", computeStringListDiff(studioSpaces, s));
   };
   const saveMeta   = m => {
     setStudioSpaceMeta(m);
-    window.storage?.set("posttrack-admin-meta",  JSON.stringify(m)).catch(()=>{});
     if(SHADOW_WRITE_STUDIO_SPACES && sb) writeSpaceMetaDiff(sb, computeSpaceMetaDiff(studioSpaceMeta, m));
   };
   const saveWorkstations = w => {
     setWorkstations(w);
-    window.storage?.set("posttrack-admin-workstations", JSON.stringify(w)).catch(()=>{});
     if(SHADOW_WRITE_WORKSTATIONS && sb){
       writeListDiff(sb, "workstations", computeListDiff(workstations, w, workstationToRow), workstationToRow).then(inserted=>{
         if(!inserted.length) return;
@@ -29182,13 +29169,12 @@ function App() {
       });
     }
   };
-  const saveNudges = n => { setNudges(n); window.storage?.set(NUDGES_STORAGE_KEY, JSON.stringify(n), true).catch(()=>{}); };
+  const saveNudges = n => { setNudges(n); };
   // Props & Furniture lists
   const [furnitureList, setFurnitureList] = useState(DEFAULT_FURNITURE_LIST);
   const [propsList,     setPropsList]     = useState(DEFAULT_PROPS_LIST);
   const saveFurniture = f => {
     setFurnitureList(f);
-    window.storage?.set(FURNITURE_STORAGE_KEY, JSON.stringify(f)).catch(()=>{});
     if(SHADOW_WRITE_FURNITURE && sb){
       writeListDiff(sb, "furniture", computeListDiff(furnitureList, f, furnitureToRow), furnitureToRow).then(inserted=>{
         if(!inserted.length) return;
@@ -29198,7 +29184,6 @@ function App() {
   };
   const saveProps_    = p => {
     setPropsList(p);
-    window.storage?.set(PROPS_STORAGE_KEY,     JSON.stringify(p)).catch(()=>{});
     if(SHADOW_WRITE_PROPS && sb){
       writeListDiff(sb, "props", computeListDiff(propsList, p, propToRow), propToRow).then(inserted=>{
         if(!inserted.length) return;
@@ -29209,7 +29194,6 @@ function App() {
   const [screenContentOptions, setScreenContentOptions] = useState(DEFAULT_SCREEN_CONTENT_OPTIONS);
   const saveScreenContentOptions = s => {
     setScreenContentOptions(s);
-    window.storage?.set(SCREEN_CONTENT_STORAGE_KEY, JSON.stringify(s)).catch(()=>{});
     if(SHADOW_WRITE_SCREEN_CONTENT && sb){
       ["windowWall","vpWall","frameTv"].forEach(cat=>{
         const toRow = item => screenContentOptionToRow(item, cat);
@@ -29224,7 +29208,10 @@ function App() {
   };
   const [customTasks, setCustomTasks] = useState([]);
   const [customTasksLoaded, setCustomTasksLoaded] = useState(false);
-  const saveCustomTasks = t => { setCustomTasks(t); window.storage?.set(CUSTOM_TASKS_STORAGE_KEY, JSON.stringify(t)).catch(()=>{}); };
+  // Migration complete — reads come entirely from the custom_tasks table
+  // (READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS), so this no longer writes
+  // the legacy app_kv blob.
+  const saveCustomTasks = t => { setCustomTasks(t); };
   const addCustomTask    = task   => {
     saveCustomTasks([...customTasks, task]);
     logActivity({entityType:"task", entityLabel:task.title||"Task", projectId:task.projectId||null, action:"created"});
@@ -29257,7 +29244,7 @@ function App() {
     }
   };
   const [unavailability, setUnavailability] = useState([]);
-  const saveUnavailability = u => { setUnavailability(u); window.storage?.set(UNAVAILABILITY_STORAGE_KEY, JSON.stringify(u)).catch(()=>{}); };
+  const saveUnavailability = u => { setUnavailability(u); };
   const addUnavailability    = entry => {
     saveUnavailability([...unavailability, entry]);
     if(SHADOW_WRITE_UNAVAILABILITY && sb){
@@ -29280,7 +29267,6 @@ function App() {
   const RESOURCE_CONFIG_STORAGE_KEY = "posttrack-resource-config";
   const saveResourceConfig = c => {
     setResourceConfig(c);
-    window.storage?.set(RESOURCE_CONFIG_STORAGE_KEY, JSON.stringify(c), true).catch(()=>{});
     if(SHADOW_WRITE_RESOURCE_CONFIG && sb) writeResourceConfigRow(sb, c);
   };
   // Admin-editable dropdown lists (Workstream, Business Unit, Production Type)
@@ -29291,7 +29277,6 @@ function App() {
   });
   const saveLists = l => {
     setLists(l);
-    window.storage?.set(LISTS_STORAGE_KEY, JSON.stringify(l)).catch(()=>{});
     if(SHADOW_WRITE_APP_LISTS && sb) writeAppListsRow(sb, l);
   };
   // Which job roles can see the Resourcing nav tab / a project's Budget tab.
@@ -29302,7 +29287,6 @@ function App() {
   const [tabLocks, setTabLocks] = useState({});
   const saveTabLocks = t => {
     setTabLocks(t);
-    window.storage?.set(TAB_LOCKS_STORAGE_KEY, JSON.stringify(t), true).catch(()=>{});
     if(SHADOW_WRITE_TAB_LOCKS && sb) writeTabLocksRow(sb, t);
   };
   // Sends (or re-sends) a nudge for one task to one or more recipients. Any
@@ -29321,7 +29305,8 @@ function App() {
   };
   // Setup Types are a shared, studio-wide library — explicitly marked shared so the
   // whole team sees the same templates (unlike the personal-by-default lists above).
-  const saveSetupTypes = st => { setSetupTypes(st); window.storage?.set(SETUP_TYPES_STORAGE_KEY, JSON.stringify(st), true).catch(()=>{}); };
+  // Migration complete — reads come entirely from the setup_types table.
+  const saveSetupTypes = st => { setSetupTypes(st); };
   const addSetupType    = tpl => {
     saveSetupTypes([...setupTypes, tpl]);
     // Shadow write — see SHADOW_WRITE_SETUP_TYPES's comment near the other
@@ -29357,7 +29342,6 @@ function App() {
   // Talent roster — shared so the whole team sees the same roster and booking history.
   const saveTalentRoster = tr => {
     setTalentRoster(tr);
-    window.storage?.set(TALENT_STORAGE_KEY, JSON.stringify(tr), true).catch(()=>{});
     if(SHADOW_WRITE_TALENT_ROSTER && sb){
       writeListDiff(sb, "talent_roster", computeListDiff(talentRoster, tr, talentToRow), talentToRow).then(inserted=>{
         if(!inserted.length) return;
@@ -29908,10 +29892,10 @@ function App() {
   // against, which a frozen closure over `appPresets` couldn't give it.
   const appPresetsRef = useRef(appPresets);
   useEffect(()=>{ appPresetsRef.current = appPresets; },[appPresets]);
+  // Migration complete — reads come entirely from the production_presets table.
   const saveAppPresets = useCallback(ps=>{
     const prevPresets = appPresetsRef.current;
     setAppPresets(ps);
-    window.storage?.set(PRESET_STORAGE_KEY, JSON.stringify(ps)).catch(()=>{});
     // Shadow write — see SHADOW_WRITE_PRODUCTION_PRESETS's comment near the
     // other flags. Same diff-then-write shape as productions, since this
     // always hands over the whole replacement array.
@@ -29943,20 +29927,16 @@ function App() {
 
   // Vendor/company list for external crew & rental gear — starts with defaults, grows as new ones are added
   const DEFAULT_VENDORS = ["AbelCine","Crews Control"];
-  const VENDOR_STORAGE_KEY = "vendor-companies-v1";
+  const VENDOR_STORAGE_KEY = "vendor-companies-v1";  // still referenced by the now-dead legacy mount-effect load guarded behind !READ_FROM_NORMALIZED_PHASE3
   const [vendorCompanies, setVendorCompanies] = useState(DEFAULT_VENDORS);
-  const saveVendorCompanies = useCallback(list=>{
-    setVendorCompanies(list);
-    window.storage?.set(VENDOR_STORAGE_KEY, JSON.stringify(list)).catch(()=>{});
-  },[]);
-  // Add a new company to the list if it's not already there
+  // Add a new company to the list if it's not already there. Migration
+  // complete — reads come entirely from the vendor_companies table.
   const addVendorCompany = useCallback(name=>{
     const trimmed = name?.trim();
     if(!trimmed) return;
     setVendorCompanies(prev=>{
       if(prev.some(c=>c.toLowerCase()===trimmed.toLowerCase())) return prev;
       const next = [...prev, trimmed];
-      window.storage?.set(VENDOR_STORAGE_KEY, JSON.stringify(next)).catch(()=>{});
       if(SHADOW_WRITE_VENDOR_COMPANIES && sb){
         sb.from("vendor_companies").insert({name:trimmed}).then(({error})=>{ if(error) console.warn("[shadow write] addVendorCompany failed:", error); });
       }
@@ -29975,7 +29955,6 @@ function App() {
     setReviewerNames(prev=>{
       if(prev.some(c=>c.toLowerCase()===trimmed.toLowerCase())) return prev;
       const next = [...prev, trimmed];
-      window.storage?.set(REVIEWER_NAMES_STORAGE_KEY, JSON.stringify(next)).catch(()=>{});
       if(SHADOW_WRITE_REVIEWER_NAMES && sb){
         sb.from("reviewer_names").insert({name:trimmed}).then(({error})=>{ if(error) console.warn("[shadow write] addReviewerName failed:", error); });
       }
@@ -29989,19 +29968,13 @@ function App() {
   // attached deliverable gets its own decoupled copy of the round info so
   // per-deliverable status tracking still works independently afterward.
   const WORK_REVIEW_SESSIONS_STORAGE_KEY = "work-review-sessions-v1";
+  // Migration complete — reads come entirely from the work_review_sessions
+  // table, so none of these write the legacy app_kv blob anymore.
   const [workReviewSessions, setWorkReviewSessions] = useState([]);
   const [workReviewSessionsLoaded, setWorkReviewSessionsLoaded] = useState(false);
-  const saveWorkReviewSessions = useCallback(list=>{
-    setWorkReviewSessions(list);
-    window.storage?.set(WORK_REVIEW_SESSIONS_STORAGE_KEY, JSON.stringify(list)).catch(()=>{});
-  },[]);
   const addWorkReviewSession = useCallback(session=>{
     const withId = {id:uid(), reviewers:[], notes:"", ...session};
-    setWorkReviewSessions(prev=>{
-      const next = [...prev, withId];
-      window.storage?.set(WORK_REVIEW_SESSIONS_STORAGE_KEY, JSON.stringify(next)).catch(()=>{});
-      return next;
-    });
+    setWorkReviewSessions(prev=>[...prev, withId]);
     if(SHADOW_WRITE_WORK_REVIEW_SESSIONS && sb){
       addWorkReviewSessionRow(sb, withId).then(({data,error})=>{
         if(error){ console.warn("[shadow write] addWorkReviewSession failed:", error); return; }
@@ -30022,7 +29995,6 @@ function App() {
   const updateWorkReviewSession = useCallback((id,patch)=>{
     setWorkReviewSessions(prev=>{
       const next = prev.map(s=>s.id===id?{...s,...patch}:s);
-      window.storage?.set(WORK_REVIEW_SESSIONS_STORAGE_KEY, JSON.stringify(next)).catch(()=>{});
       if(SHADOW_WRITE_WORK_REVIEW_SESSIONS && sb){
         const existing = prev.find(s=>s.id===id);
         if(existing?._rowId){
@@ -30055,14 +30027,12 @@ function App() {
       }
       return list;
     });
-    window.storage?.set(INTAKE_STORAGE_KEY, JSON.stringify(list)).catch(()=>{});
   },[]);
   // GCS/BEC booking request history — one entry per paste (create or update),
   // browsable but never edited, same idea as the Intake list above.
   const [becRequests, setBecRequests] = useState([]);
   const saveBecRequests = useCallback(list=>{
     setBecRequests(list);
-    window.storage?.set(BEC_REQUEST_STORAGE_KEY, JSON.stringify(list)).catch(()=>{});
   },[]);
   // Pending "create project from intake" — stores pre-fill data + intakeId
   const [createFromIntake, setCreateFromIntake] = useState(null);

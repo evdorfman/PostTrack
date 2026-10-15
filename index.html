@@ -10071,7 +10071,6 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     // on the next reload.
     inPipeline: row.in_pipeline || false
   });
-  var stripRowId = (arr) => (arr || []).map(({ _rowId, ...rest }) => rest);
   var projectToRow = (p) => ({
     id: p.id,
     project_code: p.projectCode || null,
@@ -10085,8 +10084,6 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     brief_notes: p.briefNotes || null,
     keywords: p.keywords || [],
     assignees: p.assignees || {},
-    deliverables: stripRowId(p.deliverables),
-    productions: stripRowId(p.productions),
     shoots: p.shoots || [],
     notes: p.notes || [],
     ingest_dates: p.ingestDates || [],
@@ -20126,8 +20123,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         }
         return list;
       });
-      window.storage?.set(MEDIA_CARDS_STORAGE_KEY, JSON.stringify(list)).catch(() => {
-      });
     }, []);
     const [view, setView] = (0, import_react.useState)(() => {
       try {
@@ -20265,8 +20260,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     };
     const saveGear = (g) => {
       setGearList(g);
-      window.storage?.set("posttrack-admin-gear", JSON.stringify(g)).catch(() => {
-      });
       if (SHADOW_WRITE_GEAR && sb) {
         writeListDiff(sb, "gear", computeListDiff(gearList, g, gearToRow), gearToRow).then((inserted) => {
           if (!inserted.length) return;
@@ -20279,20 +20272,14 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     };
     const saveSpaces = (s) => {
       setStudioSpaces(s);
-      window.storage?.set("posttrack-admin-spaces", JSON.stringify(s)).catch(() => {
-      });
       if (SHADOW_WRITE_STUDIO_SPACES && sb) writeStringListDiff(sb, "studio_spaces", computeStringListDiff(studioSpaces, s));
     };
     const saveMeta = (m) => {
       setStudioSpaceMeta(m);
-      window.storage?.set("posttrack-admin-meta", JSON.stringify(m)).catch(() => {
-      });
       if (SHADOW_WRITE_STUDIO_SPACES && sb) writeSpaceMetaDiff(sb, computeSpaceMetaDiff(studioSpaceMeta, m));
     };
     const saveWorkstations = (w) => {
       setWorkstations(w);
-      window.storage?.set("posttrack-admin-workstations", JSON.stringify(w)).catch(() => {
-      });
       if (SHADOW_WRITE_WORKSTATIONS && sb) {
         writeListDiff(sb, "workstations", computeListDiff(workstations, w, workstationToRow), workstationToRow).then((inserted) => {
           if (!inserted.length) return;
@@ -20305,15 +20292,11 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     };
     const saveNudges = (n) => {
       setNudges(n);
-      window.storage?.set(NUDGES_STORAGE_KEY, JSON.stringify(n), true).catch(() => {
-      });
     };
     const [furnitureList, setFurnitureList] = (0, import_react.useState)(DEFAULT_FURNITURE_LIST);
     const [propsList, setPropsList] = (0, import_react.useState)(DEFAULT_PROPS_LIST);
     const saveFurniture = (f) => {
       setFurnitureList(f);
-      window.storage?.set(FURNITURE_STORAGE_KEY, JSON.stringify(f)).catch(() => {
-      });
       if (SHADOW_WRITE_FURNITURE && sb) {
         writeListDiff(sb, "furniture", computeListDiff(furnitureList, f, furnitureToRow), furnitureToRow).then((inserted) => {
           if (!inserted.length) return;
@@ -20326,8 +20309,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     };
     const saveProps_ = (p) => {
       setPropsList(p);
-      window.storage?.set(PROPS_STORAGE_KEY, JSON.stringify(p)).catch(() => {
-      });
       if (SHADOW_WRITE_PROPS && sb) {
         writeListDiff(sb, "props", computeListDiff(propsList, p, propToRow), propToRow).then((inserted) => {
           if (!inserted.length) return;
@@ -20341,8 +20322,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [screenContentOptions, setScreenContentOptions] = (0, import_react.useState)(DEFAULT_SCREEN_CONTENT_OPTIONS);
     const saveScreenContentOptions = (s) => {
       setScreenContentOptions(s);
-      window.storage?.set(SCREEN_CONTENT_STORAGE_KEY, JSON.stringify(s)).catch(() => {
-      });
       if (SHADOW_WRITE_SCREEN_CONTENT && sb) {
         ["windowWall", "vpWall", "frameTv"].forEach((cat) => {
           const toRow = (item) => screenContentOptionToRow(item, cat);
@@ -20360,8 +20339,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [customTasksLoaded, setCustomTasksLoaded] = (0, import_react.useState)(false);
     const saveCustomTasks = (t) => {
       setCustomTasks(t);
-      window.storage?.set(CUSTOM_TASKS_STORAGE_KEY, JSON.stringify(t)).catch(() => {
-      });
     };
     const addCustomTask = (task) => {
       saveCustomTasks([...customTasks, task]);
@@ -20399,8 +20376,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [unavailability, setUnavailability] = (0, import_react.useState)([]);
     const saveUnavailability = (u) => {
       setUnavailability(u);
-      window.storage?.set(UNAVAILABILITY_STORAGE_KEY, JSON.stringify(u)).catch(() => {
-      });
     };
     const addUnavailability = (entry) => {
       saveUnavailability([...unavailability, entry]);
@@ -20427,8 +20402,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const RESOURCE_CONFIG_STORAGE_KEY = "posttrack-resource-config";
     const saveResourceConfig = (c) => {
       setResourceConfig(c);
-      window.storage?.set(RESOURCE_CONFIG_STORAGE_KEY, JSON.stringify(c), true).catch(() => {
-      });
       if (SHADOW_WRITE_RESOURCE_CONFIG && sb) writeResourceConfigRow(sb, c);
     };
     const [lists, setLists] = (0, import_react.useState)({
@@ -20438,16 +20411,12 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     });
     const saveLists = (l) => {
       setLists(l);
-      window.storage?.set(LISTS_STORAGE_KEY, JSON.stringify(l)).catch(() => {
-      });
       if (SHADOW_WRITE_APP_LISTS && sb) writeAppListsRow(sb, l);
     };
     const TAB_LOCKS_STORAGE_KEY = "posttrack-tab-locks";
     const [tabLocks, setTabLocks] = (0, import_react.useState)({});
     const saveTabLocks = (t) => {
       setTabLocks(t);
-      window.storage?.set(TAB_LOCKS_STORAGE_KEY, JSON.stringify(t), true).catch(() => {
-      });
       if (SHADOW_WRITE_TAB_LOCKS && sb) writeTabLocksRow(sb, t);
     };
     const addNudge = (projectId, taskId, taskLabel, tab, toMemberIds) => {
@@ -20464,8 +20433,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     };
     const saveSetupTypes = (st) => {
       setSetupTypes(st);
-      window.storage?.set(SETUP_TYPES_STORAGE_KEY, JSON.stringify(st), true).catch(() => {
-      });
     };
     const addSetupType = (tpl) => {
       saveSetupTypes([...setupTypes, tpl]);
@@ -20501,8 +20468,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     };
     const saveTalentRoster = (tr) => {
       setTalentRoster(tr);
-      window.storage?.set(TALENT_STORAGE_KEY, JSON.stringify(tr), true).catch(() => {
-      });
       if (SHADOW_WRITE_TALENT_ROSTER && sb) {
         writeListDiff(sb, "talent_roster", computeListDiff(talentRoster, tr, talentToRow), talentToRow).then((inserted) => {
           if (!inserted.length) return;
@@ -21097,8 +21062,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const saveAppPresets = (0, import_react.useCallback)((ps) => {
       const prevPresets = appPresetsRef.current;
       setAppPresets(ps);
-      window.storage?.set(PRESET_STORAGE_KEY, JSON.stringify(ps)).catch(() => {
-      });
       if (SHADOW_WRITE_PRODUCTION_PRESETS && sb) {
         writePresetDiff(sb, computePresetDiff(prevPresets, ps)).then((inserted) => {
           if (!inserted.length) return;
@@ -21125,19 +21088,12 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const DEFAULT_VENDORS = ["AbelCine", "Crews Control"];
     const VENDOR_STORAGE_KEY = "vendor-companies-v1";
     const [vendorCompanies, setVendorCompanies] = (0, import_react.useState)(DEFAULT_VENDORS);
-    const saveVendorCompanies = (0, import_react.useCallback)((list) => {
-      setVendorCompanies(list);
-      window.storage?.set(VENDOR_STORAGE_KEY, JSON.stringify(list)).catch(() => {
-      });
-    }, []);
     const addVendorCompany = (0, import_react.useCallback)((name) => {
       const trimmed = name?.trim();
       if (!trimmed) return;
       setVendorCompanies((prev) => {
         if (prev.some((c) => c.toLowerCase() === trimmed.toLowerCase())) return prev;
         const next = [...prev, trimmed];
-        window.storage?.set(VENDOR_STORAGE_KEY, JSON.stringify(next)).catch(() => {
-        });
         if (SHADOW_WRITE_VENDOR_COMPANIES && sb) {
           sb.from("vendor_companies").insert({ name: trimmed }).then(({ error }) => {
             if (error) console.warn("[shadow write] addVendorCompany failed:", error);
@@ -21154,8 +21110,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       setReviewerNames((prev) => {
         if (prev.some((c) => c.toLowerCase() === trimmed.toLowerCase())) return prev;
         const next = [...prev, trimmed];
-        window.storage?.set(REVIEWER_NAMES_STORAGE_KEY, JSON.stringify(next)).catch(() => {
-        });
         if (SHADOW_WRITE_REVIEWER_NAMES && sb) {
           sb.from("reviewer_names").insert({ name: trimmed }).then(({ error }) => {
             if (error) console.warn("[shadow write] addReviewerName failed:", error);
@@ -21167,19 +21121,9 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const WORK_REVIEW_SESSIONS_STORAGE_KEY = "work-review-sessions-v1";
     const [workReviewSessions, setWorkReviewSessions] = (0, import_react.useState)([]);
     const [workReviewSessionsLoaded, setWorkReviewSessionsLoaded] = (0, import_react.useState)(false);
-    const saveWorkReviewSessions = (0, import_react.useCallback)((list) => {
-      setWorkReviewSessions(list);
-      window.storage?.set(WORK_REVIEW_SESSIONS_STORAGE_KEY, JSON.stringify(list)).catch(() => {
-      });
-    }, []);
     const addWorkReviewSession = (0, import_react.useCallback)((session) => {
       const withId = { id: uid(), reviewers: [], notes: "", ...session };
-      setWorkReviewSessions((prev) => {
-        const next = [...prev, withId];
-        window.storage?.set(WORK_REVIEW_SESSIONS_STORAGE_KEY, JSON.stringify(next)).catch(() => {
-        });
-        return next;
-      });
+      setWorkReviewSessions((prev) => [...prev, withId]);
       if (SHADOW_WRITE_WORK_REVIEW_SESSIONS && sb) {
         addWorkReviewSessionRow(sb, withId).then(({ data, error }) => {
           if (error) {
@@ -21198,8 +21142,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const updateWorkReviewSession = (0, import_react.useCallback)((id, patch) => {
       setWorkReviewSessions((prev) => {
         const next = prev.map((s) => s.id === id ? { ...s, ...patch } : s);
-        window.storage?.set(WORK_REVIEW_SESSIONS_STORAGE_KEY, JSON.stringify(next)).catch(() => {
-        });
         if (SHADOW_WRITE_WORK_REVIEW_SESSIONS && sb) {
           const existing = prev.find((s) => s.id === id);
           if (existing?._rowId) {
@@ -21229,14 +21171,10 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         }
         return list;
       });
-      window.storage?.set(INTAKE_STORAGE_KEY, JSON.stringify(list)).catch(() => {
-      });
     }, []);
     const [becRequests, setBecRequests] = (0, import_react.useState)([]);
     const saveBecRequests = (0, import_react.useCallback)((list) => {
       setBecRequests(list);
-      window.storage?.set(BEC_REQUEST_STORAGE_KEY, JSON.stringify(list)).catch(() => {
-      });
     }, []);
     const [createFromIntake, setCreateFromIntake] = (0, import_react.useState)(null);
     const [showSeedData, setShowSeedData] = (0, import_react.useState)(() => {
