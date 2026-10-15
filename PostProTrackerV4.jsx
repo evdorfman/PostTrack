@@ -427,10 +427,11 @@ function parseRoute(){
       itab: q.get("itab") || null,    // Ingest: sheet | dashboard
       rtab: q.get("rtab") || null,    // Resources: utilization | editorcal | kanban
       intab: q.get("intab") || null,  // Intake: smartsheet | gcs
+      pjtab: q.get("pjtab") || null,  // Projects: active | archive
     };
-  }catch(e){ return {view:null,projectId:null,ptab:null,pitem:null,atab:null,agear:null,dtab:null,antab:null,itab:null,rtab:null,intab:null}; }
+  }catch(e){ return {view:null,projectId:null,ptab:null,pitem:null,atab:null,agear:null,dtab:null,antab:null,itab:null,rtab:null,intab:null,pjtab:null}; }
 }
-function buildRouteUrl({view, projectId, ptab, pitem, atab, agear, dtab, antab, itab, rtab, intab}){
+function buildRouteUrl({view, projectId, ptab, pitem, atab, agear, dtab, antab, itab, rtab, intab, pjtab}){
   const path = ROUTE_BASE_PATH+"/"+(view||"projects");
   const q = new URLSearchParams();
   if(projectId!=null) q.set("project", projectId);
@@ -442,6 +443,7 @@ function buildRouteUrl({view, projectId, ptab, pitem, atab, agear, dtab, antab, 
   if(antab) q.set("antab", antab);
   if(itab) q.set("itab", itab);
   if(rtab) q.set("rtab", rtab);
+  if(pjtab) q.set("pjtab", pjtab);
   if(intab) q.set("intab", intab);
   const qs = q.toString();
   return path + (qs?`?${qs}`:"");
@@ -10052,7 +10054,93 @@ const ACTIVE_STAGES = [
   {key:"On Hold",      statuses:["On Hold"],         color: "#9ca3af"},
 ];
 
-const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateDel, statsFilter=null, onClearStatsFilter, navSidebarWidth, navSidebarHandle, projectsLoaded=true}) => {
+// Search over closed-out projects — kept forever, but never loaded into
+// the main app by default (see the projects-load effect's own comment),
+// so this is the only way to reach one: on-demand, paginated, same shape
+// as Admin → Issues' archive search (quarterYearRanges' own comment).
+// Opening a result fetches that one project's full detail (deliverables,
+// productions, everything) and opens it in the same project modal used
+// everywhere else — nothing about viewing an old project is different,
+// it's just not preloaded.
+const ProjectsArchiveTab = ({onOpenArchived, onSearch}) => {
+  const [query, setQuery] = useState("");
+  const [range, setRange] = useState(quarterYearRanges()[0]);
+  const [results, setResults] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const PAGE_SIZE = 50;
+
+  const runSearch = async (nextOffset=0) => {
+    setBusy(true);
+    const {data, error} = await onSearch({query, startDate:range.start, endDate:range.end, limit:PAGE_SIZE, offset:nextOffset});
+    setBusy(false);
+    if(error){ console.error("[projects] archive search failed:", error); return; }
+    setResults(prev => nextOffset===0 ? (data||[]) : [...(prev||[]), ...(data||[])]);
+    setHasMore((data||[]).length===PAGE_SIZE);
+    setOffset(nextOffset);
+  };
+  useEffect(()=>{ runSearch(0); },[]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+        <input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter") runSearch(0);}}
+          placeholder="Search project name or requester…"
+          style={{flex:"1 1 240px",background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"8px 12px",fontSize:16,outline:"none",fontFamily:"'DM Sans',sans-serif"}}/>
+        <select value={range.label} onChange={e=>setRange(quarterYearRanges().find(r=>r.label===e.target.value))}
+          style={{background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"8px 10px",fontSize:16,outline:"none"}}>
+          {quarterYearRanges().map(r=><option key={r.label} value={r.label} style={{background:"#0d1117"}}>{r.label}</option>)}
+        </select>
+        <button onClick={()=>runSearch(0)} disabled={busy}
+          style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"8px 18px",fontSize:15,fontWeight:700,cursor:"pointer",opacity:busy?0.6:1}}>
+          {busy?"Searching…":"Search"}
+        </button>
+      </div>
+      {results&&results.length===0&&<div style={{textAlign:"center",color:"#4b5563",padding:"32px 0",fontSize:16}}>No closed projects match.</div>}
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {(results||[]).map(p=>(
+          <div key={p.id} onClick={()=>onOpenArchived(p.id)}
+            style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:"#111827",border:"1px solid #1f2937",borderRadius:10,cursor:"pointer"}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor="#374151"} onMouseLeave={e=>e.currentTarget.style.borderColor="#1f2937"}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:16,fontWeight:700,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+              <div style={{fontSize:13,color:"#6b7280"}}>{p.requester||"—"}{p.workstream?` · ${p.workstream}`:""}{p.businessUnit?` · ${p.businessUnit}`:""}</div>
+            </div>
+            <Chip label={p.status||"Closed"} color="#374151" xs/>
+            <div style={{fontSize:13,color:"#4b5563",whiteSpace:"nowrap"}}>Closed {fmtDT(p.closedAt)}</div>
+          </div>
+        ))}
+      </div>
+      {hasMore&&(
+        <button onClick={()=>runSearch(offset+PAGE_SIZE)} disabled={busy}
+          style={{width:"100%",marginTop:12,background:"#1f2937",border:"none",borderRadius:7,color:"#9ca3af",padding:"9px 0",fontSize:15,fontWeight:700,cursor:"pointer"}}>
+          {busy?"Loading…":"Load more"}
+        </button>
+      )}
+    </div>
+  );
+};
+
+const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateDel, statsFilter=null, onClearStatsFilter, navSidebarWidth, navSidebarHandle, projectsLoaded=true, onOpenArchivedProject, onSearchArchivedProjects, initialTab, onTabChange}) => {
+  // "Active" is the existing content below, unchanged. "Archive" is new —
+  // see the projects-load effect's own comment for why closed-out
+  // projects don't load into `projects` at all (so there's nothing for
+  // this view's own filtering to find even if it tried); the Archive tab
+  // searches for them on demand instead, same shape as Admin → Issues'
+  // archive search.
+  const [subTab, setSubTab] = useState(initialTab||"active");
+  useEffect(()=>{ onTabChange?.(subTab); },[subTab]);
+  const subTabBar = (
+    <div style={{display:"flex",gap:4,marginBottom:18,borderBottom:"1px solid #1f2937",paddingBottom:12}}>
+      {[["active","Projects"],["archive","Archive"]].map(([id,label])=>(
+        <button key={id} onClick={()=>setSubTab(id)}
+          style={{background:subTab===id?"#1f2937":"transparent",border:"none",borderRadius:7,color:subTab===id?"#f1f5f9":"#6b7280",padding:"6px 18px",fontSize:16,fontWeight:subTab===id?800:600,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
   const [search,setSearch]       = useState("");
   const [fsWS,setFsWS]           = useState("All");
   const [fsBU,setFsBU]           = useState("All");
@@ -10099,8 +10187,18 @@ const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateD
 
   const selStyle = {background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"7px 11px",fontSize:16,outline:"none",fontFamily:"'DM Sans',sans-serif"};
 
+  if(subTab==="archive"){
+    return (
+      <div>
+        {subTabBar}
+        <ProjectsArchiveTab onOpenArchived={onOpenArchivedProject} onSearch={onSearchArchivedProjects}/>
+      </div>
+    );
+  }
+
   return (
     <div onClick={()=>sidebarProjectId&&setSidebarProjectId(null)}>
+      {subTabBar}
       {/* Stats filter banner — shown when a stat tile has been clicked */}
       {statsFilter&&(
         <div style={{display:"flex",alignItems:"center",gap:10,background:"#6366f112",border:"1px solid #6366f140",borderRadius:8,padding:"9px 14px",marginBottom:14}}>
@@ -27915,11 +28013,12 @@ const IssueReportCard = ({r, onToggleResolve}) => {
   );
 };
 
-// Quick quarter/year range buttons for the archive search, matching the
-// "active, then this year by quarter, then previous years" mental model —
-// each just computes an ISO start/end and hands it to the search, no
-// actual grouping/partitioning needed server-side at this app's scale.
-const issueQuarterRanges = () => {
+// Quick quarter/year range buttons, shared by every archive search in the
+// app (Admin → Issues, Projects → Archive) — matches the "active, then
+// this year by quarter, then previous years" mental model. Each just
+// computes an ISO start/end and hands it to the relevant search; no actual
+// grouping/partitioning needed server-side at this app's scale.
+const quarterYearRanges = () => {
   const now = new Date();
   const y = now.getFullYear();
   const ranges = [];
@@ -27948,7 +28047,7 @@ const issueQuarterRanges = () => {
 const AdminIssuesTab = ({issueReports=[], onResolve, onSearchResolved}) => {
   const [showArchive, setShowArchive] = useState(false);
   const [query, setQuery] = useState("");
-  const [range, setRange] = useState(issueQuarterRanges()[0]);
+  const [range, setRange] = useState(quarterYearRanges()[0]);
   const [results, setResults] = useState(null);
   const [busy, setBusy] = useState(false);
   const [offset, setOffset] = useState(0);
@@ -27985,9 +28084,9 @@ const AdminIssuesTab = ({issueReports=[], onResolve, onSearchResolved}) => {
               <input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter") runSearch(0);}}
                 placeholder="Search message, name, or email…"
                 style={{flex:"1 1 220px",background:"#0a0f1a",border:"1px solid #374151",borderRadius:7,color:"#e2e8f0",padding:"7px 11px",fontSize:14,outline:"none"}}/>
-              <select value={range.label} onChange={e=>setRange(issueQuarterRanges().find(r=>r.label===e.target.value))}
+              <select value={range.label} onChange={e=>setRange(quarterYearRanges().find(r=>r.label===e.target.value))}
                 style={{background:"#0a0f1a",border:"1px solid #374151",borderRadius:7,color:"#e2e8f0",padding:"7px 9px",fontSize:14,outline:"none"}}>
-                {issueQuarterRanges().map(r=><option key={r.label} value={r.label} style={{background:"#0d1117"}}>{r.label}</option>)}
+                {quarterYearRanges().map(r=><option key={r.label} value={r.label} style={{background:"#0d1117"}}>{r.label}</option>)}
               </select>
               <button onClick={()=>runSearch(0)} disabled={busy}
                 style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"7px 16px",fontSize:14,fontWeight:700,cursor:"pointer",opacity:busy?0.6:1}}>
@@ -29350,6 +29449,7 @@ function App() {
         itab: overrides.itab!==undefined ? overrides.itab : current.itab,
         rtab: overrides.rtab!==undefined ? overrides.rtab : current.rtab,
         intab: overrides.intab!==undefined ? overrides.intab : current.intab,
+        pjtab: overrides.pjtab!==undefined ? overrides.pjtab : current.pjtab,
       };
       const url = buildRouteUrl(next);
       if(url === window.location.pathname+window.location.search) return;
@@ -29383,13 +29483,14 @@ function App() {
   // page is *currently* on, once, right on load.
   useEffect(()=>{
     try{
-      const clears = {dtab:null, antab:null, itab:null, rtab:null, atab:null, agear:null, intab:null};
+      const clears = {dtab:null, antab:null, itab:null, rtab:null, atab:null, agear:null, intab:null, pjtab:null};
       if(view==="deliverables") delete clears.dtab;
       else if(view==="animations") delete clears.antab;
       else if(view==="ingest") delete clears.itab;
       else if(view==="resources") delete clears.rtab;
       else if(view==="admin"){ delete clears.atab; delete clears.agear; }
       else if(view==="intake") delete clears.intab;
+      else if(view==="projects") delete clears.pjtab;
       updateRoute(clears, {push:false});
     }catch(e){ console.warn("[routing] param cleanup failed:", e); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -29404,10 +29505,14 @@ function App() {
       setView(r.view || "projects");
       if(r.projectId!=null){
         const p = allProjectsRef.current.find(pr=>pr.id===r.projectId);
-        if(p){ setSelected(p); setInitialTab(r.ptab?{tab:r.ptab,itemId:r.pitem}:null); }
-        else setSelected(null);
+        if(p){ setSelected(p); setArchivedProjectView(null); setInitialTab(r.ptab?{tab:r.ptab,itemId:r.pitem}:null); }
+        // Not in the active set — may be a closed/archived project (those
+        // never load into allProjects, same reasoning as the deep-link
+        // resolution effect).
+        else openArchivedProject(r.projectId, {push:false});
       } else {
         setSelected(null);
+        setArchivedProjectView(null);
       }
       setAdminInitialTab(r.atab || "team");
       setAdminInitialGearSubTab(r.agear || "equipment");
@@ -29416,6 +29521,7 @@ function App() {
       setIngestInitialTab(r.itab || "sheet");
       setResourcesInitialTab(r.rtab || "utilization");
       setIntakeInitialTab(r.intab || "smartsheet");
+      setProjectsInitialTab(r.pjtab || "active");
       setPopstateGen(g=>g+1);
     };
     window.addEventListener("popstate", onPopState);
@@ -29440,7 +29546,7 @@ function App() {
   const viewNavMountedRef = useRef(false);
   useEffect(()=>{
     if(!viewNavMountedRef.current){ viewNavMountedRef.current = true; return; }
-    updateRoute({view, dtab:null, antab:null, itab:null, rtab:null, atab:null, agear:null, intab:null}, {push:true});
+    updateRoute({view, dtab:null, antab:null, itab:null, rtab:null, atab:null, agear:null, intab:null, pjtab:null}, {push:true});
   },[view]);
   const [toast, setToast] = useState(null);
   // How far the main app content should shift right to make room for whichever
@@ -29921,29 +30027,54 @@ function App() {
       if(!error && data && data.length) setTeamRoster(data.map(rowToTeamMember));
       setTeamRosterLoaded(true);
     });
-    sb.from("projects").select("*").then(({data,error})=>{
+    // .is("closed_at", null) — only active (not closed-out) projects load
+    // into memory by default, regardless of how many years of closed ones
+    // pile up in the table (nothing is ever deleted — see closedAt's own
+    // comment and the "Reopen" flow it supports). Closed projects are kept
+    // forever and reachable only via the Projects view's Archive tab,
+    // which fetches a project's full detail on demand (ProjectsArchiveTab/
+    // openArchivedProject) rather than ever being preloaded here.
+    sb.from("projects").select("*").is("closed_at", null).then(({data,error})=>{
       if(error || !data){ projectsLoadedRef.current = true; setProjectsLoaded(true); return; }
       const finish = projectsArr => { setProjects(projectsArr); projectsLoadedRef.current = true; setProjectsLoaded(true); };
       if(!READ_FROM_NORMALIZED_DELIVERABLES_PRODUCTIONS){ finish(data.map(rowToProject)); return; }
       // Read cutover: deliverables/review_rounds/productions come from
       // their own tables, reassembled into the exact nested shape every
       // component already expects — see assembleNormalizedProjectData's
-      // own doc comment for why that shape has to match exactly.
-      Promise.all([
-        sb.from("deliverables").select("*"),
-        sb.from("review_rounds").select("*"),
-        sb.from("productions").select("*"),
-      ]).then(([delRes, roundRes, prodRes])=>{
-        if(delRes.error || roundRes.error || prodRes.error){
-          console.warn("[read cutover] failed to load normalized deliverables/productions, falling back to legacy JSON:", delRes.error||roundRes.error||prodRes.error);
+      // own doc comment for why that shape has to match exactly. Scoped
+      // to just the active projects' own rows (review_rounds has no
+      // project_id of its own, only deliverable_id, so that one has to
+      // wait on the deliverables fetch resolving first to know which
+      // deliverable ids are in scope) — same reasoning as the projects
+      // fetch above: a closed project's deliverables/productions/rounds
+      // shouldn't load into memory just because they still exist.
+      const activeProjectIds = data.map(r=>r.id);
+      if(!activeProjectIds.length){ finish([]); return; }
+      sb.from("deliverables").select("*").in("project_id", activeProjectIds).then(delRes=>{
+        if(delRes.error){
+          console.warn("[read cutover] failed to load normalized deliverables/productions, falling back to legacy JSON:", delRes.error);
           finish(data.map(rowToProject));
           return;
         }
-        const {deliverablesByProject, productionsByProject} = assembleNormalizedProjectData(delRes.data||[], roundRes.data||[], prodRes.data||[]);
-        finish(data.map(row=>{
-          const p = rowToProject(row);
-          return {...p, deliverables: deliverablesByProject[row.id]||[], productions: productionsByProject[row.id]||[]};
-        }));
+        const activeDelIds = (delRes.data||[]).map(d=>d.id);
+        Promise.all([
+          activeDelIds.length ? sb.from("review_rounds").select("*").in("deliverable_id", activeDelIds) : Promise.resolve({data:[],error:null}),
+          sb.from("productions").select("*").in("project_id", activeProjectIds),
+        ]).then(([roundRes, prodRes])=>{
+          if(roundRes.error || prodRes.error){
+            console.warn("[read cutover] failed to load normalized deliverables/productions, falling back to legacy JSON:", roundRes.error||prodRes.error);
+            finish(data.map(rowToProject));
+            return;
+          }
+          const {deliverablesByProject, productionsByProject} = assembleNormalizedProjectData(delRes.data||[], roundRes.data||[], prodRes.data||[]);
+          finish(data.map(row=>{
+            const p = rowToProject(row);
+            return {...p, deliverables: deliverablesByProject[row.id]||[], productions: productionsByProject[row.id]||[]};
+          }));
+        }).catch(e=>{
+          console.warn("[read cutover] failed to load normalized deliverables/productions, falling back to legacy JSON:", e);
+          finish(data.map(rowToProject));
+        });
       }).catch(e=>{
         console.warn("[read cutover] failed to load normalized deliverables/productions, falling back to legacy JSON:", e);
         finish(data.map(rowToProject));
@@ -30244,12 +30375,29 @@ function App() {
     // change that happens to broadcast.
     const mergeProjectUpsert = payload => {
       const incoming = rowToProject(payload.new);
+      if(payload.new.closed_at){
+        // Closed elsewhere — the active set never loads closed projects
+        // in the first place (see the projects fetch's own comment), so
+        // drop it if it's somehow here, otherwise there's nothing to do.
+        setProjects(prev=>prev.some(x=>x.id===incoming.id) ? prev.filter(x=>x.id!==incoming.id) : prev);
+        return;
+      }
       setProjects(prev=>{
         const idx = prev.findIndex(x=>x.id===incoming.id);
-        if(idx===-1) return [...prev, incoming];
-        const merged = {...incoming, deliverables: prev[idx].deliverables, productions: prev[idx].productions};
-        if(JSON.stringify(prev[idx])===JSON.stringify(merged)) return prev;
-        const next = prev.slice(); next[idx] = merged; return next;
+        if(idx!==-1){
+          const merged = {...incoming, deliverables: prev[idx].deliverables, productions: prev[idx].productions};
+          if(JSON.stringify(prev[idx])===JSON.stringify(merged)) return prev;
+          const next = prev.slice(); next[idx] = merged; return next;
+        }
+        // Not currently loaded and not closed — either a brand new
+        // project (fine, deliverables/productions correctly start empty)
+        // or one just reopened elsewhere, whose deliverables/productions
+        // were never loaded since closed projects don't load them. Add
+        // it now so it doesn't just silently not appear, then fetch its
+        // real deliverables/productions right after so a reopen doesn't
+        // look emptied out.
+        fetchProjectDeliverablesAndProductions(incoming.id);
+        return [...prev, incoming];
       });
     };
     // Phase 2 — see REALTIME_PHASE2's comment near the other flags. Every
@@ -30954,6 +31102,7 @@ function App() {
   const [ingestInitialTab, setIngestInitialTab] = useState(()=> initialRoute.view==="ingest" ? (initialRoute.itab||"sheet") : "sheet");
   const [resourcesInitialTab, setResourcesInitialTab] = useState(()=> initialRoute.view==="resources" ? (initialRoute.rtab||"utilization") : "utilization");
   const [intakeInitialTab, setIntakeInitialTab] = useState(()=> initialRoute.view==="intake" ? (initialRoute.intab||"smartsheet") : "smartsheet");
+  const [projectsInitialTab, setProjectsInitialTab] = useState(()=> initialRoute.view==="projects" ? (initialRoute.pjtab||"active") : "active");
   const [addingProject,setAddingProject]=useState(false);
   const [statsFilter,setStatsFilter]=useState(null); // {label, ids:Set<id>} — set by StatsBar tiles
   // Sidebar portal target: a DOM node owned by App, sized here, that regular
@@ -31506,28 +31655,107 @@ function App() {
   const [initialTab,setInitialTab]=useState(null);
   const closeProject = useCallback(()=>{
     setSelected(null);
+    setArchivedProjectView(null);
     updateRoute({projectId:null, ptab:null, pitem:null}, {push:true});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
+  // Fetches and assembles one project's deliverables/productions/rounds —
+  // same scoped-fetch shape as the main projects-load effect's own
+  // comment, just for one project instead of every active one. Shared by
+  // the two call sites below rather than duplicated between them.
+  const fetchDeliverablesAndProductionsFor = useCallback(async (projectId)=>{
+    if(!sb) return {deliverables:[], productions:[]};
+    const {data:delRows, error:delErr} = await sb.from("deliverables").select("*").eq("project_id", projectId);
+    if(delErr){ console.warn("[fetch] deliverables failed:", delErr); return {deliverables:[], productions:[]}; }
+    const delIds = (delRows||[]).map(d=>d.id);
+    const [roundRes, prodRes] = await Promise.all([
+      delIds.length ? sb.from("review_rounds").select("*").in("deliverable_id", delIds) : Promise.resolve({data:[],error:null}),
+      sb.from("productions").select("*").eq("project_id", projectId),
+    ]);
+    if(roundRes.error || prodRes.error){ console.warn("[fetch] rounds/productions failed:", roundRes.error||prodRes.error); return {deliverables:[], productions:[]}; }
+    const {deliverablesByProject, productionsByProject} = assembleNormalizedProjectData(delRows||[], roundRes.data||[], prodRes.data||[]);
+    return {deliverables: deliverablesByProject[projectId]||[], productions: productionsByProject[projectId]||[]};
+  },[]);
+  // Used for a project that's locally present but has none loaded yet —
+  // a project reopening via realtime (mergeProjectUpsert, above: closed
+  // projects never load their deliverables/productions in the first
+  // place, so reopening one elsewhere would otherwise make it look
+  // emptied out locally).
+  const fetchProjectDeliverablesAndProductions = useCallback(async (projectId)=>{
+    const {deliverables, productions} = await fetchDeliverablesAndProductionsFor(projectId);
+    setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p, deliverables, productions}));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+  // Viewing a project opened from the Projects Archive (ProjectsArchiveTab)
+  // rather than the active list — holds a standalone fetched snapshot
+  // instead of adding the project into `projects`/allProjects, since a
+  // closed project genuinely shouldn't be in the active set (it would
+  // then show up in every dropdown/calendar/search that iterates
+  // allProjects expecting only active projects). liveSelected below falls
+  // back to this when `selected` isn't found in allProjects at all.
+  const [archivedProjectView, setArchivedProjectView] = useState(null);
+  // Returns whether the project was actually found, so callers that need
+  // to know (the deep-link resolution effect, deciding whether to fall
+  // back to clearing a stale link) don't have to inspect state separately.
+  const openArchivedProject = useCallback(async (projectId, {push=true}={})=>{
+    if(!sb) return false;
+    const {data:projRow, error} = await sb.from("projects").select("*").eq("id", projectId).single();
+    if(error || !projRow){ if(push) reportSbError("Open archived project", error||{message:"Project not found."}); return false; }
+    const {deliverables, productions} = await fetchDeliverablesAndProductionsFor(projectId);
+    setArchivedProjectView({...rowToProject(projRow), deliverables, productions});
+    setSelected({id:projectId});
+    setInitialTab(null);
+    updateRoute({projectId, ptab:null, pitem:null}, {push});
+    return true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+  // On-demand search over closed-out projects — backs the Projects view's
+  // Archive tab. Same shape as searchResolvedIssues: a one-shot, paginated
+  // query, never held in realtime-synced state, so years of closed
+  // projects never cost anything until actually searched for. Only
+  // project-level fields are searched/returned here (name/requester,
+  // closedAt) — opening a result (openArchivedProject) is what fetches
+  // its full deliverables/productions.
+  const searchArchivedProjects = useCallback(async ({query="", startDate=null, endDate=null, limit=50, offset=0}={}) => {
+    if(!sb) return {data:[], error:{message:"Not connected."}};
+    let q = sb.from("projects").select("*").not("closed_at","is",null).order("closed_at",{ascending:false}).range(offset, offset+limit-1);
+    if(startDate) q = q.gte("closed_at", startDate);
+    if(endDate) q = q.lte("closed_at", endDate);
+    if(query.trim()) q = q.or(`name.ilike.%${query.trim()}%,requester.ilike.%${query.trim()}%`);
+    const {data, error} = await q;
+    return {data: (data||[]).map(rowToProject), error};
+  },[]);
   // Resolves a `?project=` deep link once the real project data has loaded
   // (it's fetched async from Supabase, so it may not exist yet at mount —
-  // see projectsLoaded's own comment). Runs at most once: if the id isn't
-  // found once loading finishes (a stale/bad link), it gives up rather than
-  // retrying forever. Sets selected/initialTab directly rather than through
-  // openProject so it doesn't re-push a URL that's already correct.
+  // see projectsLoaded's own comment). Runs at most once: if it's not in
+  // the active set, it may still be a closed/archived project — those
+  // never load into allProjects, so openArchivedProject is tried as a
+  // fallback before giving up on a genuinely stale/bad link. Sets
+  // selected/initialTab directly (the active-project branch, not the
+  // archived one, which has its own route push built in) rather than
+  // through openProject, so it doesn't re-push a URL that's already correct.
   const deepLinkResolvedRef = useRef(false);
   useEffect(()=>{
     if(deepLinkResolvedRef.current || !initialRoute.projectId || !projectsLoaded) return;
     deepLinkResolvedRef.current = true;
     const p = allProjects.find(pr=>pr.id===initialRoute.projectId);
     if(p){ setSelected(p); setInitialTab(initialRoute.ptab?{tab:initialRoute.ptab,itemId:initialRoute.pitem}:null); }
-    else updateRoute({projectId:null, ptab:null, pitem:null}, {push:false});
+    else openArchivedProject(initialRoute.projectId, {push:false}).then(found=>{
+      if(!found) updateRoute({projectId:null, ptab:null, pitem:null}, {push:false});
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[projectsLoaded, allProjects]);
 
   const filtered=useMemo(()=>projects,[projects]);
 
-  const liveSelected=selected?allProjects.find(p=>p.id===selected.id)||null:null;
+  // Falls back to the standalone archived-project snapshot (see
+  // archivedProjectView's own comment) when `selected` isn't in the
+  // active set at all — the only way that happens is a closed project
+  // opened from the Projects Archive, since every other path to
+  // `selected` only ever points at an active, already-loaded project.
+  const liveSelected=selected
+    ? (allProjects.find(p=>p.id===selected.id) || (archivedProjectView?.id===selected.id ? archivedProjectView : null))
+    : null;
 
   const VIEWS=[{id:"projects",l:"Projects"},{id:"studio",l:"Studio"},{id:"calendar",l:"Calendar"},{id:"deliverables",l:"Deliverables"},{id:"animations",l:"Animation"},{id:"ingest",l:"Ingest"},{id:"resources",l:"Resources"},{id:"myview",l:"My View"},{id:"admin",l:"⚙ Admin"},{id:"pipeline",l:"Pipeline"},{id:"intake",l:"Intake"}]
     .filter(v=>v.id!=="admin"||isAdmin)
@@ -31689,7 +31917,7 @@ function App() {
               });
             }}
           />}
-          {view==="projects"&&<ProjectsView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} statsFilter={statsFilter} onClearStatsFilter={()=>setStatsFilter(null)} navSidebarWidth={navSidebarWidth} navSidebarHandle={navSidebarHandle} projectsLoaded={projectsLoaded}/>}
+          {view==="projects"&&<ProjectsView key={`projects:${popstateGen}`} initialTab={projectsInitialTab} onTabChange={tab=>updateRoute({pjtab:tab})} onOpenArchivedProject={openArchivedProject} onSearchArchivedProjects={searchArchivedProjects} projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} statsFilter={statsFilter} onClearStatsFilter={()=>setStatsFilter(null)} navSidebarWidth={navSidebarWidth} navSidebarHandle={navSidebarHandle} projectsLoaded={projectsLoaded}/>}
           {view==="studio"&&<StudioTab projects={allProjects} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} team={allTeam} onOpenProject={openProject} talentRoster={talentRoster} onUpdateProject={updateProject} mediaCards={mediaCards} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="kanban"&&kanbanMode==="status"&&<KanbanStatus projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="kanban"&&kanbanMode==="editor"&&<KanbanEditor projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}

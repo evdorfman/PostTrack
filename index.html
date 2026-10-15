@@ -760,14 +760,16 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         // Ingest: sheet | dashboard
         rtab: q.get("rtab") || null,
         // Resources: utilization | editorcal | kanban
-        intab: q.get("intab") || null
+        intab: q.get("intab") || null,
         // Intake: smartsheet | gcs
+        pjtab: q.get("pjtab") || null
+        // Projects: active | archive
       };
     } catch (e) {
-      return { view: null, projectId: null, ptab: null, pitem: null, atab: null, agear: null, dtab: null, antab: null, itab: null, rtab: null, intab: null };
+      return { view: null, projectId: null, ptab: null, pitem: null, atab: null, agear: null, dtab: null, antab: null, itab: null, rtab: null, intab: null, pjtab: null };
     }
   }
-  function buildRouteUrl({ view, projectId, ptab, pitem, atab, agear, dtab, antab, itab, rtab, intab }) {
+  function buildRouteUrl({ view, projectId, ptab, pitem, atab, agear, dtab, antab, itab, rtab, intab, pjtab }) {
     const path = ROUTE_BASE_PATH + "/" + (view || "projects");
     const q = new URLSearchParams();
     if (projectId != null) q.set("project", projectId);
@@ -779,6 +781,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     if (antab) q.set("antab", antab);
     if (itab) q.set("itab", itab);
     if (rtab) q.set("rtab", rtab);
+    if (pjtab) q.set("pjtab", pjtab);
     if (intab) q.set("intab", intab);
     const qs = q.toString();
     return path + (qs ? `?${qs}` : "");
@@ -6716,7 +6719,92 @@ Brief content: ${content}`;
     { key: "Post", statuses: ["Post", "In Review"], color: "#8b5cf6" },
     { key: "On Hold", statuses: ["On Hold"], color: "#9ca3af" }
   ];
-  var ProjectsView = ({ projects, team, onOpenProject, onUpdateProject, onUpdateDel, statsFilter = null, onClearStatsFilter, navSidebarWidth, navSidebarHandle, projectsLoaded = true }) => {
+  var ProjectsArchiveTab = ({ onOpenArchived, onSearch }) => {
+    const [query, setQuery] = (0, import_react.useState)("");
+    const [range, setRange] = (0, import_react.useState)(quarterYearRanges()[0]);
+    const [results, setResults] = (0, import_react.useState)(null);
+    const [busy, setBusy] = (0, import_react.useState)(false);
+    const [offset, setOffset] = (0, import_react.useState)(0);
+    const [hasMore, setHasMore] = (0, import_react.useState)(false);
+    const PAGE_SIZE = 50;
+    const runSearch = async (nextOffset = 0) => {
+      setBusy(true);
+      const { data, error } = await onSearch({ query, startDate: range.start, endDate: range.end, limit: PAGE_SIZE, offset: nextOffset });
+      setBusy(false);
+      if (error) {
+        console.error("[projects] archive search failed:", error);
+        return;
+      }
+      setResults((prev) => nextOffset === 0 ? data || [] : [...prev || [], ...data || []]);
+      setHasMore((data || []).length === PAGE_SIZE);
+      setOffset(nextOffset);
+    };
+    (0, import_react.useEffect)(() => {
+      runSearch(0);
+    }, []);
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        value: query,
+        onChange: (e) => setQuery(e.target.value),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") runSearch(0);
+        },
+        placeholder: "Search project name or requester\u2026",
+        style: { flex: "1 1 240px", background: "#111827", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "8px 12px", fontSize: 16, outline: "none", fontFamily: "'DM Sans',sans-serif" }
+      }
+    ), /* @__PURE__ */ React.createElement(
+      "select",
+      {
+        value: range.label,
+        onChange: (e) => setRange(quarterYearRanges().find((r) => r.label === e.target.value)),
+        style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "8px 10px", fontSize: 16, outline: "none" }
+      },
+      quarterYearRanges().map((r) => /* @__PURE__ */ React.createElement("option", { key: r.label, value: r.label, style: { background: "#0d1117" } }, r.label))
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => runSearch(0),
+        disabled: busy,
+        style: { background: "#6366f1", border: "none", borderRadius: 7, color: "#fff", padding: "8px 18px", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }
+      },
+      busy ? "Searching\u2026" : "Search"
+    )), results && results.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#4b5563", padding: "32px 0", fontSize: 16 } }, "No closed projects match."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, (results || []).map((p) => /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: p.id,
+        onClick: () => onOpenArchived(p.id),
+        style: { display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", background: "#111827", border: "1px solid #1f2937", borderRadius: 10, cursor: "pointer" },
+        onMouseEnter: (e) => e.currentTarget.style.borderColor = "#374151",
+        onMouseLeave: (e) => e.currentTarget.style.borderColor = "#1f2937"
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280" } }, p.requester || "\u2014", p.workstream ? ` \xB7 ${p.workstream}` : "", p.businessUnit ? ` \xB7 ${p.businessUnit}` : "")),
+      /* @__PURE__ */ React.createElement(Chip, { label: p.status || "Closed", color: "#374151", xs: true }),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#4b5563", whiteSpace: "nowrap" } }, "Closed ", fmtDT(p.closedAt))
+    ))), hasMore && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => runSearch(offset + PAGE_SIZE),
+        disabled: busy,
+        style: { width: "100%", marginTop: 12, background: "#1f2937", border: "none", borderRadius: 7, color: "#9ca3af", padding: "9px 0", fontSize: 15, fontWeight: 700, cursor: "pointer" }
+      },
+      busy ? "Loading\u2026" : "Load more"
+    ));
+  };
+  var ProjectsView = ({ projects, team, onOpenProject, onUpdateProject, onUpdateDel, statsFilter = null, onClearStatsFilter, navSidebarWidth, navSidebarHandle, projectsLoaded = true, onOpenArchivedProject, onSearchArchivedProjects, initialTab, onTabChange }) => {
+    const [subTab, setSubTab] = (0, import_react.useState)(initialTab || "active");
+    (0, import_react.useEffect)(() => {
+      onTabChange?.(subTab);
+    }, [subTab]);
+    const subTabBar = /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, marginBottom: 18, borderBottom: "1px solid #1f2937", paddingBottom: 12 } }, [["active", "Projects"], ["archive", "Archive"]].map(([id, label]) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: id,
+        onClick: () => setSubTab(id),
+        style: { background: subTab === id ? "#1f2937" : "transparent", border: "none", borderRadius: 7, color: subTab === id ? "#f1f5f9" : "#6b7280", padding: "6px 18px", fontSize: 16, fontWeight: subTab === id ? 800 : 600, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" }
+      },
+      label
+    )));
     const [search, setSearch] = (0, import_react.useState)("");
     const [fsWS, setFsWS] = (0, import_react.useState)("All");
     const [fsBU, setFsBU] = (0, import_react.useState)("All");
@@ -6753,7 +6841,10 @@ Brief content: ${content}`;
     const onHold = displayFiltered.filter((p) => p.status === "On Hold" && !p.closedAt);
     const inactive = displayFiltered.filter((p) => ["Delivered", "Canceled"].includes(p.status) || p.closedAt);
     const selStyle = { background: "#111827", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "7px 11px", fontSize: 16, outline: "none", fontFamily: "'DM Sans',sans-serif" };
-    return /* @__PURE__ */ React.createElement("div", { onClick: () => sidebarProjectId && setSidebarProjectId(null) }, statsFilter && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, background: "#6366f112", border: "1px solid #6366f140", borderRadius: 8, padding: "9px 14px", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: "#818cf8", flex: 1 } }, statsFilter.label), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#6b7280" } }, displayFiltered.length, " project", displayFiltered.length !== 1 ? "s" : ""), /* @__PURE__ */ React.createElement(
+    if (subTab === "archive") {
+      return /* @__PURE__ */ React.createElement("div", null, subTabBar, /* @__PURE__ */ React.createElement(ProjectsArchiveTab, { onOpenArchived: onOpenArchivedProject, onSearch: onSearchArchivedProjects }));
+    }
+    return /* @__PURE__ */ React.createElement("div", { onClick: () => sidebarProjectId && setSidebarProjectId(null) }, subTabBar, statsFilter && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, background: "#6366f112", border: "1px solid #6366f140", borderRadius: 8, padding: "9px 14px", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: "#818cf8", flex: 1 } }, statsFilter.label), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#6b7280" } }, displayFiltered.length, " project", displayFiltered.length !== 1 ? "s" : ""), /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: (e) => {
@@ -19534,7 +19625,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       r.resolved ? "Reopen" : "\u2713 Resolve"
     )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#e2e8f0", marginBottom: 6, whiteSpace: "pre-wrap" } }, r.message), r.context && Object.keys(r.context).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#4b5563", fontFamily: "monospace" } }, JSON.stringify(r.context)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#4b5563", marginTop: 4 } }, fmtDT(r.created_at), r.resolved_at ? ` \xB7 resolved ${fmtDT(r.resolved_at)}` : ""));
   };
-  var issueQuarterRanges = () => {
+  var quarterYearRanges = () => {
     const now2 = /* @__PURE__ */ new Date();
     const y = now2.getFullYear();
     const ranges = [];
@@ -19551,7 +19642,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
   var AdminIssuesTab = ({ issueReports = [], onResolve, onSearchResolved }) => {
     const [showArchive, setShowArchive] = (0, import_react.useState)(false);
     const [query, setQuery] = (0, import_react.useState)("");
-    const [range, setRange] = (0, import_react.useState)(issueQuarterRanges()[0]);
+    const [range, setRange] = (0, import_react.useState)(quarterYearRanges()[0]);
     const [results, setResults] = (0, import_react.useState)(null);
     const [busy, setBusy] = (0, import_react.useState)(false);
     const [offset, setOffset] = (0, import_react.useState)(0);
@@ -19594,10 +19685,10 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       "select",
       {
         value: range.label,
-        onChange: (e) => setRange(issueQuarterRanges().find((r) => r.label === e.target.value)),
+        onChange: (e) => setRange(quarterYearRanges().find((r) => r.label === e.target.value)),
         style: { background: "#0a0f1a", border: "1px solid #374151", borderRadius: 7, color: "#e2e8f0", padding: "7px 9px", fontSize: 14, outline: "none" }
       },
-      issueQuarterRanges().map((r) => /* @__PURE__ */ React.createElement("option", { key: r.label, value: r.label, style: { background: "#0d1117" } }, r.label))
+      quarterYearRanges().map((r) => /* @__PURE__ */ React.createElement("option", { key: r.label, value: r.label, style: { background: "#0d1117" } }, r.label))
     ), /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -20397,7 +20488,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           antab: overrides.antab !== void 0 ? overrides.antab : current.antab,
           itab: overrides.itab !== void 0 ? overrides.itab : current.itab,
           rtab: overrides.rtab !== void 0 ? overrides.rtab : current.rtab,
-          intab: overrides.intab !== void 0 ? overrides.intab : current.intab
+          intab: overrides.intab !== void 0 ? overrides.intab : current.intab,
+          pjtab: overrides.pjtab !== void 0 ? overrides.pjtab : current.pjtab
         };
         const url = buildRouteUrl(next);
         if (url === window.location.pathname + window.location.search) return;
@@ -20418,7 +20510,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     }, []);
     (0, import_react.useEffect)(() => {
       try {
-        const clears = { dtab: null, antab: null, itab: null, rtab: null, atab: null, agear: null, intab: null };
+        const clears = { dtab: null, antab: null, itab: null, rtab: null, atab: null, agear: null, intab: null, pjtab: null };
         if (view === "deliverables") delete clears.dtab;
         else if (view === "animations") delete clears.antab;
         else if (view === "ingest") delete clears.itab;
@@ -20427,6 +20519,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           delete clears.atab;
           delete clears.agear;
         } else if (view === "intake") delete clears.intab;
+        else if (view === "projects") delete clears.pjtab;
         updateRoute(clears, { push: false });
       } catch (e) {
         console.warn("[routing] param cleanup failed:", e);
@@ -20440,10 +20533,12 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           const p = allProjectsRef.current.find((pr) => pr.id === r.projectId);
           if (p) {
             setSelected(p);
+            setArchivedProjectView(null);
             setInitialTab(r.ptab ? { tab: r.ptab, itemId: r.pitem } : null);
-          } else setSelected(null);
+          } else openArchivedProject(r.projectId, { push: false });
         } else {
           setSelected(null);
+          setArchivedProjectView(null);
         }
         setAdminInitialTab(r.atab || "team");
         setAdminInitialGearSubTab(r.agear || "equipment");
@@ -20452,6 +20547,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         setIngestInitialTab(r.itab || "sheet");
         setResourcesInitialTab(r.rtab || "utilization");
         setIntakeInitialTab(r.intab || "smartsheet");
+        setProjectsInitialTab(r.pjtab || "active");
         setPopstateGen((g) => g + 1);
       };
       window.addEventListener("popstate", onPopState);
@@ -20463,7 +20559,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         viewNavMountedRef.current = true;
         return;
       }
-      updateRoute({ view, dtab: null, antab: null, itab: null, rtab: null, atab: null, agear: null, intab: null }, { push: true });
+      updateRoute({ view, dtab: null, antab: null, itab: null, rtab: null, atab: null, agear: null, intab: null, pjtab: null }, { push: true });
     }, [view]);
     const [toast, setToast] = (0, import_react.useState)(null);
     const pushOffset = usePushOffset();
@@ -20991,7 +21087,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         if (!error && data && data.length) setTeamRoster(data.map(rowToTeamMember));
         setTeamRosterLoaded(true);
       });
-      sb.from("projects").select("*").then(({ data, error }) => {
+      sb.from("projects").select("*").is("closed_at", null).then(({ data, error }) => {
         if (error || !data) {
           projectsLoadedRef.current = true;
           setProjectsLoaded(true);
@@ -21006,21 +21102,36 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           finish(data.map(rowToProject));
           return;
         }
-        Promise.all([
-          sb.from("deliverables").select("*"),
-          sb.from("review_rounds").select("*"),
-          sb.from("productions").select("*")
-        ]).then(([delRes, roundRes, prodRes]) => {
-          if (delRes.error || roundRes.error || prodRes.error) {
-            console.warn("[read cutover] failed to load normalized deliverables/productions, falling back to legacy JSON:", delRes.error || roundRes.error || prodRes.error);
+        const activeProjectIds = data.map((r) => r.id);
+        if (!activeProjectIds.length) {
+          finish([]);
+          return;
+        }
+        sb.from("deliverables").select("*").in("project_id", activeProjectIds).then((delRes) => {
+          if (delRes.error) {
+            console.warn("[read cutover] failed to load normalized deliverables/productions, falling back to legacy JSON:", delRes.error);
             finish(data.map(rowToProject));
             return;
           }
-          const { deliverablesByProject, productionsByProject } = assembleNormalizedProjectData(delRes.data || [], roundRes.data || [], prodRes.data || []);
-          finish(data.map((row) => {
-            const p = rowToProject(row);
-            return { ...p, deliverables: deliverablesByProject[row.id] || [], productions: productionsByProject[row.id] || [] };
-          }));
+          const activeDelIds = (delRes.data || []).map((d) => d.id);
+          Promise.all([
+            activeDelIds.length ? sb.from("review_rounds").select("*").in("deliverable_id", activeDelIds) : Promise.resolve({ data: [], error: null }),
+            sb.from("productions").select("*").in("project_id", activeProjectIds)
+          ]).then(([roundRes, prodRes]) => {
+            if (roundRes.error || prodRes.error) {
+              console.warn("[read cutover] failed to load normalized deliverables/productions, falling back to legacy JSON:", roundRes.error || prodRes.error);
+              finish(data.map(rowToProject));
+              return;
+            }
+            const { deliverablesByProject, productionsByProject } = assembleNormalizedProjectData(delRes.data || [], roundRes.data || [], prodRes.data || []);
+            finish(data.map((row) => {
+              const p = rowToProject(row);
+              return { ...p, deliverables: deliverablesByProject[row.id] || [], productions: productionsByProject[row.id] || [] };
+            }));
+          }).catch((e) => {
+            console.warn("[read cutover] failed to load normalized deliverables/productions, falling back to legacy JSON:", e);
+            finish(data.map(rowToProject));
+          });
         }).catch((e) => {
           console.warn("[read cutover] failed to load normalized deliverables/productions, falling back to legacy JSON:", e);
           finish(data.map(rowToProject));
@@ -21313,14 +21424,21 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       };
       const mergeProjectUpsert = (payload) => {
         const incoming = rowToProject(payload.new);
+        if (payload.new.closed_at) {
+          setProjects((prev) => prev.some((x) => x.id === incoming.id) ? prev.filter((x) => x.id !== incoming.id) : prev);
+          return;
+        }
         setProjects((prev) => {
           const idx = prev.findIndex((x) => x.id === incoming.id);
-          if (idx === -1) return [...prev, incoming];
-          const merged = { ...incoming, deliverables: prev[idx].deliverables, productions: prev[idx].productions };
-          if (JSON.stringify(prev[idx]) === JSON.stringify(merged)) return prev;
-          const next = prev.slice();
-          next[idx] = merged;
-          return next;
+          if (idx !== -1) {
+            const merged = { ...incoming, deliverables: prev[idx].deliverables, productions: prev[idx].productions };
+            if (JSON.stringify(prev[idx]) === JSON.stringify(merged)) return prev;
+            const next = prev.slice();
+            next[idx] = merged;
+            return next;
+          }
+          fetchProjectDeliverablesAndProductions(incoming.id);
+          return [...prev, incoming];
         });
       };
       const mergeUpsertByRowId = (setter, mapRow) => (payload) => {
@@ -21836,6 +21954,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [ingestInitialTab, setIngestInitialTab] = (0, import_react.useState)(() => initialRoute.view === "ingest" ? initialRoute.itab || "sheet" : "sheet");
     const [resourcesInitialTab, setResourcesInitialTab] = (0, import_react.useState)(() => initialRoute.view === "resources" ? initialRoute.rtab || "utilization" : "utilization");
     const [intakeInitialTab, setIntakeInitialTab] = (0, import_react.useState)(() => initialRoute.view === "intake" ? initialRoute.intab || "smartsheet" : "smartsheet");
+    const [projectsInitialTab, setProjectsInitialTab] = (0, import_react.useState)(() => initialRoute.view === "projects" ? initialRoute.pjtab || "active" : "active");
     const [addingProject, setAddingProject] = (0, import_react.useState)(false);
     const [statsFilter, setStatsFilter] = (0, import_react.useState)(null);
     const [sidebarSlotNode, setSidebarSlotNode] = (0, import_react.useState)(null);
@@ -22303,7 +22422,55 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [initialTab, setInitialTab] = (0, import_react.useState)(null);
     const closeProject = (0, import_react.useCallback)(() => {
       setSelected(null);
+      setArchivedProjectView(null);
       updateRoute({ projectId: null, ptab: null, pitem: null }, { push: true });
+    }, []);
+    const fetchDeliverablesAndProductionsFor = (0, import_react.useCallback)(async (projectId) => {
+      if (!sb) return { deliverables: [], productions: [] };
+      const { data: delRows, error: delErr } = await sb.from("deliverables").select("*").eq("project_id", projectId);
+      if (delErr) {
+        console.warn("[fetch] deliverables failed:", delErr);
+        return { deliverables: [], productions: [] };
+      }
+      const delIds = (delRows || []).map((d) => d.id);
+      const [roundRes, prodRes] = await Promise.all([
+        delIds.length ? sb.from("review_rounds").select("*").in("deliverable_id", delIds) : Promise.resolve({ data: [], error: null }),
+        sb.from("productions").select("*").eq("project_id", projectId)
+      ]);
+      if (roundRes.error || prodRes.error) {
+        console.warn("[fetch] rounds/productions failed:", roundRes.error || prodRes.error);
+        return { deliverables: [], productions: [] };
+      }
+      const { deliverablesByProject, productionsByProject } = assembleNormalizedProjectData(delRows || [], roundRes.data || [], prodRes.data || []);
+      return { deliverables: deliverablesByProject[projectId] || [], productions: productionsByProject[projectId] || [] };
+    }, []);
+    const fetchProjectDeliverablesAndProductions = (0, import_react.useCallback)(async (projectId) => {
+      const { deliverables, productions } = await fetchDeliverablesAndProductionsFor(projectId);
+      setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, deliverables, productions }));
+    }, []);
+    const [archivedProjectView, setArchivedProjectView] = (0, import_react.useState)(null);
+    const openArchivedProject = (0, import_react.useCallback)(async (projectId, { push = true } = {}) => {
+      if (!sb) return false;
+      const { data: projRow, error } = await sb.from("projects").select("*").eq("id", projectId).single();
+      if (error || !projRow) {
+        if (push) reportSbError("Open archived project", error || { message: "Project not found." });
+        return false;
+      }
+      const { deliverables, productions } = await fetchDeliverablesAndProductionsFor(projectId);
+      setArchivedProjectView({ ...rowToProject(projRow), deliverables, productions });
+      setSelected({ id: projectId });
+      setInitialTab(null);
+      updateRoute({ projectId, ptab: null, pitem: null }, { push });
+      return true;
+    }, []);
+    const searchArchivedProjects = (0, import_react.useCallback)(async ({ query = "", startDate = null, endDate = null, limit = 50, offset = 0 } = {}) => {
+      if (!sb) return { data: [], error: { message: "Not connected." } };
+      let q = sb.from("projects").select("*").not("closed_at", "is", null).order("closed_at", { ascending: false }).range(offset, offset + limit - 1);
+      if (startDate) q = q.gte("closed_at", startDate);
+      if (endDate) q = q.lte("closed_at", endDate);
+      if (query.trim()) q = q.or(`name.ilike.%${query.trim()}%,requester.ilike.%${query.trim()}%`);
+      const { data, error } = await q;
+      return { data: (data || []).map(rowToProject), error };
     }, []);
     const deepLinkResolvedRef = (0, import_react.useRef)(false);
     (0, import_react.useEffect)(() => {
@@ -22313,10 +22480,12 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       if (p) {
         setSelected(p);
         setInitialTab(initialRoute.ptab ? { tab: initialRoute.ptab, itemId: initialRoute.pitem } : null);
-      } else updateRoute({ projectId: null, ptab: null, pitem: null }, { push: false });
+      } else openArchivedProject(initialRoute.projectId, { push: false }).then((found) => {
+        if (!found) updateRoute({ projectId: null, ptab: null, pitem: null }, { push: false });
+      });
     }, [projectsLoaded, allProjects]);
     const filtered = (0, import_react.useMemo)(() => projects, [projects]);
-    const liveSelected = selected ? allProjects.find((p) => p.id === selected.id) || null : null;
+    const liveSelected = selected ? allProjects.find((p) => p.id === selected.id) || (archivedProjectView?.id === selected.id ? archivedProjectView : null) : null;
     const VIEWS = [{ id: "projects", l: "Projects" }, { id: "studio", l: "Studio" }, { id: "calendar", l: "Calendar" }, { id: "deliverables", l: "Deliverables" }, { id: "animations", l: "Animation" }, { id: "ingest", l: "Ingest" }, { id: "resources", l: "Resources" }, { id: "myview", l: "My View" }, { id: "admin", l: "\u2699 Admin" }, { id: "pipeline", l: "Pipeline" }, { id: "intake", l: "Intake" }].filter((v) => v.id !== "admin" || isAdmin).filter((v) => v.id !== "resources" || canAccessTab("resourcing"));
     const NAV_VIEWS = VIEWS;
     const inp = { background: "#111827", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "6px 10px", fontSize: 16, outline: "none", fontFamily: "'DM Sans',sans-serif" };
@@ -22413,7 +22582,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           });
         }
       }
-    ), view === "projects" && /* @__PURE__ */ React.createElement(ProjectsView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, statsFilter, onClearStatsFilter: () => setStatsFilter(null), navSidebarWidth, navSidebarHandle, projectsLoaded }), view === "studio" && /* @__PURE__ */ React.createElement(StudioTab, { projects: allProjects, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, team: allTeam, onOpenProject: openProject, talentRoster, onUpdateProject: updateProject, mediaCards, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "kanban" && kanbanMode === "status" && /* @__PURE__ */ React.createElement(KanbanStatus, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "kanban" && kanbanMode === "editor" && /* @__PURE__ */ React.createElement(KanbanEditor, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "calendar" && /* @__PURE__ */ React.createElement(CalendarView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, unavailability, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "deliverables" && /* @__PURE__ */ React.createElement(DeliverablesTab, { key: `deliverables:${popstateGen}`, initialTab: deliverablesInitialTab, onTabChange: (tab) => updateRoute({ dtab: tab }), projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "ingest" && /* @__PURE__ */ React.createElement(IngestView, { key: `ingest:${popstateGen}`, initialTab: ingestInitialTab, onTabChange: (tab) => updateRoute({ itab: tab }), projects: allProjects, team: allTeam, onUpdateProject: updateProject, onAddDel: addDel, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "resources" && /* @__PURE__ */ React.createElement(ResourceView, { key: `resources:${popstateGen}`, initialTab: resourcesInitialTab, onTabChange: (tab) => updateRoute({ rtab: tab }), projects: allProjects, team: allTeam, studioBookings: allStudioBookings, resourceConfig, onUpdateProject: updateProject, unavailability, onUpdateDel: updateDel }), view === "myview" && /* @__PURE__ */ React.createElement(MyView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, showToast, nudges, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, unavailability, onAddUnavailability: addUnavailability, onDeleteUnavailability: deleteUnavailability, currentMember, isAdmin, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "admin" && /* @__PURE__ */ React.createElement(
+    ), view === "projects" && /* @__PURE__ */ React.createElement(ProjectsView, { key: `projects:${popstateGen}`, initialTab: projectsInitialTab, onTabChange: (tab) => updateRoute({ pjtab: tab }), onOpenArchivedProject: openArchivedProject, onSearchArchivedProjects: searchArchivedProjects, projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, statsFilter, onClearStatsFilter: () => setStatsFilter(null), navSidebarWidth, navSidebarHandle, projectsLoaded }), view === "studio" && /* @__PURE__ */ React.createElement(StudioTab, { projects: allProjects, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, team: allTeam, onOpenProject: openProject, talentRoster, onUpdateProject: updateProject, mediaCards, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "kanban" && kanbanMode === "status" && /* @__PURE__ */ React.createElement(KanbanStatus, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "kanban" && kanbanMode === "editor" && /* @__PURE__ */ React.createElement(KanbanEditor, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "calendar" && /* @__PURE__ */ React.createElement(CalendarView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, unavailability, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "deliverables" && /* @__PURE__ */ React.createElement(DeliverablesTab, { key: `deliverables:${popstateGen}`, initialTab: deliverablesInitialTab, onTabChange: (tab) => updateRoute({ dtab: tab }), projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "ingest" && /* @__PURE__ */ React.createElement(IngestView, { key: `ingest:${popstateGen}`, initialTab: ingestInitialTab, onTabChange: (tab) => updateRoute({ itab: tab }), projects: allProjects, team: allTeam, onUpdateProject: updateProject, onAddDel: addDel, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "resources" && /* @__PURE__ */ React.createElement(ResourceView, { key: `resources:${popstateGen}`, initialTab: resourcesInitialTab, onTabChange: (tab) => updateRoute({ rtab: tab }), projects: allProjects, team: allTeam, studioBookings: allStudioBookings, resourceConfig, onUpdateProject: updateProject, unavailability, onUpdateDel: updateDel }), view === "myview" && /* @__PURE__ */ React.createElement(MyView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, showToast, nudges, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, unavailability, onAddUnavailability: addUnavailability, onDeleteUnavailability: deleteUnavailability, currentMember, isAdmin, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "admin" && /* @__PURE__ */ React.createElement(
       AdminView,
       {
         key: `admin:${popstateGen}`,
