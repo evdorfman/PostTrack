@@ -29314,10 +29314,21 @@ function App() {
   // the very first run (mount) since the initial URL, if any, already
   // reflects this same view via initialRoute above — pushing again there
   // would add a redundant history entry for the page the user just loaded.
+  // Explicitly clears every OTHER view's own sub-tab param (dtab/antab/
+  // itab/rtab/atab/agear/intab) — updateRoute only ever preserves params
+  // it isn't told about, so without this, each one set by visiting its
+  // view would never get cleared again and they'd all pile up in the URL
+  // forever (every view's leftover tab param showing at once, none of
+  // them actually meaningful outside their own view). The one belonging
+  // to whichever view is being switched TO gets set right back a moment
+  // later by that view's own mount (its onTabChange firing with its
+  // initial/default tab), so clearing it here too is harmless. project/
+  // ptab/pitem are deliberately left alone — the project modal can stay
+  // open across a view switch, so those still need to survive it.
   const viewNavMountedRef = useRef(false);
   useEffect(()=>{
     if(!viewNavMountedRef.current){ viewNavMountedRef.current = true; return; }
-    updateRoute({view}, {push:true});
+    updateRoute({view, dtab:null, antab:null, itab:null, rtab:null, atab:null, agear:null, intab:null}, {push:true});
   },[view]);
   const [toast, setToast] = useState(null);
   // How far the main app content should shift right to make room for whichever
