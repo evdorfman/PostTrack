@@ -15170,7 +15170,7 @@ const READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS = true;
 // batch grouping as their shadow-write flags). Off by default. Same
 // single-writer guarantee as step two: the legacy app_kv-based load is
 // skipped (not raced against) whenever this is true.
-const READ_FROM_NORMALIZED_PHASE3 = false;
+const READ_FROM_NORMALIZED_PHASE3 = true;
 
 // work_review_sessions got its schema + a one-time backfill during the
 // "Let's address work review" work, but never actually got wired for live
