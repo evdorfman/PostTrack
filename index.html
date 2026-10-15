@@ -19666,6 +19666,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const y = now2.getFullYear();
     const ranges = [];
     const qStart = (year, q) => new Date(Date.UTC(year, (q - 1) * 3, 1)).toISOString();
+    ranges.push({ label: `${y}`, start: new Date(Date.UTC(y, 0, 1)).toISOString(), end: new Date(Date.UTC(y + 1, 0, 1)).toISOString() });
     for (let q = 4; q >= 1; q--) {
       const start = qStart(y, q), end = q === 4 ? new Date(Date.UTC(y + 1, 0, 1)).toISOString() : qStart(y, q + 1);
       if (new Date(start) <= now2) ranges.push({ label: `Q${q} ${y}`, start, end });
