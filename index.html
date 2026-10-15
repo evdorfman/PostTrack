@@ -6719,7 +6719,7 @@ Brief content: ${content}`;
     { key: "Post", statuses: ["Post", "In Review"], color: "#8b5cf6" },
     { key: "On Hold", statuses: ["On Hold"], color: "#9ca3af" }
   ];
-  var ProjectsArchiveTab = ({ onOpenArchived, onSearch, onRevive }) => {
+  var ProjectsArchiveTab = ({ onOpenArchived, onSearch, onRevive, activeProjectIds }) => {
     const [query, setQuery] = (0, import_react.useState)("");
     const [range, setRange] = (0, import_react.useState)(quarterYearRanges()[0]);
     const [results, setResults] = (0, import_react.useState)(null);
@@ -6777,28 +6777,31 @@ Brief content: ${content}`;
         style: { background: "#6366f1", border: "none", borderRadius: 7, color: "#fff", padding: "8px 18px", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }
       },
       busy ? "Searching\u2026" : "Search"
-    )), results && results.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#4b5563", padding: "32px 0", fontSize: 16 } }, "No closed projects match."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, (results || []).map((p) => /* @__PURE__ */ React.createElement(
-      "div",
-      {
-        key: p.id,
-        onClick: () => onOpenArchived(p.id),
-        style: { display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", background: "#111827", border: "1px solid #1f2937", borderRadius: 10, cursor: "pointer" },
-        onMouseEnter: (e) => e.currentTarget.style.borderColor = "#374151",
-        onMouseLeave: (e) => e.currentTarget.style.borderColor = "#1f2937"
-      },
-      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280" } }, p.requester || "\u2014", p.workstream ? ` \xB7 ${p.workstream}` : "", p.businessUnit ? ` \xB7 ${p.businessUnit}` : "")),
-      /* @__PURE__ */ React.createElement(Chip, { label: p.status || "Closed", color: "#374151", xs: true }),
-      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#4b5563", whiteSpace: "nowrap" } }, "Closed ", fmtDT(p.closedAt)),
-      /* @__PURE__ */ React.createElement(
-        "button",
+    )), (() => {
+      const visible = (results || []).filter((p) => !activeProjectIds?.has(p.id));
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, results && visible.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#4b5563", padding: "32px 0", fontSize: 16 } }, "No closed projects match."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, visible.map((p) => /* @__PURE__ */ React.createElement(
+        "div",
         {
-          onClick: (e) => handleRevive(e, p.id),
-          disabled: revivingId === p.id,
-          style: { background: "#10b98118", border: "1px solid #10b98130", borderRadius: 6, color: "#10b981", padding: "4px 11px", fontSize: 13, fontWeight: 700, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap", opacity: revivingId === p.id ? 0.6 : 1 }
+          key: p.id,
+          onClick: () => onOpenArchived(p.id),
+          style: { display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", background: "#111827", border: "1px solid #1f2937", borderRadius: 10, cursor: "pointer" },
+          onMouseEnter: (e) => e.currentTarget.style.borderColor = "#374151",
+          onMouseLeave: (e) => e.currentTarget.style.borderColor = "#1f2937"
         },
-        revivingId === p.id ? "Reviving\u2026" : "\u21A9 Revive"
-      )
-    ))), hasMore && /* @__PURE__ */ React.createElement(
+        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280" } }, p.requester || "\u2014", p.workstream ? ` \xB7 ${p.workstream}` : "", p.businessUnit ? ` \xB7 ${p.businessUnit}` : "")),
+        /* @__PURE__ */ React.createElement(Chip, { label: p.status || "Closed", color: "#374151", xs: true }),
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#4b5563", whiteSpace: "nowrap" } }, "Closed ", fmtDT(p.closedAt)),
+        /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: (e) => handleRevive(e, p.id),
+            disabled: revivingId === p.id,
+            style: { background: "#10b98118", border: "1px solid #10b98130", borderRadius: 6, color: "#10b981", padding: "4px 11px", fontSize: 13, fontWeight: 700, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap", opacity: revivingId === p.id ? 0.6 : 1 }
+          },
+          revivingId === p.id ? "Reviving\u2026" : "\u21A9 Revive"
+        )
+      ))));
+    })(), hasMore && /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => runSearch(offset + PAGE_SIZE),
@@ -6854,12 +6857,13 @@ Brief content: ${content}`;
       return matchQ && matchWS && matchBU && matchY && matchP && matchE && matchSt;
     }), [projects, search, fsWS, fsBU, fsYear, fsProducer, fsStatus]);
     const displayFiltered = statsFilter ? projects.filter((p) => statsFilter.ids.has(p.id)) : filtered;
+    const activeProjectIds = (0, import_react.useMemo)(() => new Set(projects.map((p) => p.id)), [projects]);
     const active = displayFiltered.filter((p) => ["New Request", "Ideation", "Pre-Pro", "In Production", "Post", "In Review"].includes(p.status) && !p.closedAt);
     const onHold = displayFiltered.filter((p) => p.status === "On Hold" && !p.closedAt);
     const inactive = displayFiltered.filter((p) => ["Delivered", "Canceled"].includes(p.status) || p.closedAt);
     const selStyle = { background: "#111827", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "7px 11px", fontSize: 16, outline: "none", fontFamily: "'DM Sans',sans-serif" };
     if (subTab === "archive") {
-      return /* @__PURE__ */ React.createElement("div", null, subTabBar, /* @__PURE__ */ React.createElement(ProjectsArchiveTab, { onOpenArchived: onOpenArchivedProject, onSearch: onSearchArchivedProjects, onRevive: onReviveArchivedProject }));
+      return /* @__PURE__ */ React.createElement("div", null, subTabBar, /* @__PURE__ */ React.createElement(ProjectsArchiveTab, { onOpenArchived: onOpenArchivedProject, onSearch: onSearchArchivedProjects, onRevive: onReviveArchivedProject, activeProjectIds }));
     }
     return /* @__PURE__ */ React.createElement("div", { onClick: () => sidebarProjectId && setSidebarProjectId(null) }, subTabBar, statsFilter && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, background: "#6366f112", border: "1px solid #6366f140", borderRadius: 8, padding: "9px 14px", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: "#818cf8", flex: 1 } }, statsFilter.label), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#6b7280" } }, displayFiltered.length, " project", displayFiltered.length !== 1 ? "s" : ""), /* @__PURE__ */ React.createElement(
       "button",
