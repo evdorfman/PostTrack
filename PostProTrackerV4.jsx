@@ -15184,7 +15184,7 @@ const SHADOW_WRITE_WORK_REVIEW_SESSIONS = true;
 // Off until verified live, same staged approach as every other flag here —
 // this one got a real regression (see mergeProjectUpsert's comment) from a
 // change nearby, so it's getting the same caution.
-const REALTIME_PHASE2 = false;
+const REALTIME_PHASE2 = true;
 
 // Phase 3 — the remaining app_kv-backed collections (see production_schema_new_tables.sql's
 // Phase 3 section and the "what else should be its own table" conversation).
