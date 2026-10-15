@@ -19478,7 +19478,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       return /* @__PURE__ */ React.createElement("div", { key: p.id, style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 } }, p.name), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, chips.map((c) => /* @__PURE__ */ React.createElement("span", { key: c, style: { fontSize: 12, color: "#9ca3af", background: "#1f2937", borderRadius: 4, padding: "2px 7px" } }, c))), p.notes && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#4b5563", marginTop: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.notes)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => openEdit(p), style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 6, color: "#9ca3af", padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "Edit"), /* @__PURE__ */ React.createElement("button", { onClick: () => del(p.id), style: { background: "#ef444415", border: "1px solid #ef444440", borderRadius: 6, color: "#ef4444", padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "Delete")));
     })));
   };
-  var AdminView = ({ team, onUpdateTeam, projects = [], nudges = [], onOpenProject, gear, onUpdateGear, mediaCards = [], onUpdateMediaCards, furniture = [], onUpdateFurniture, props_ = [], onUpdateProps, screenContent = {}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes = [], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations = [], onUpdateWorkstations, talentRoster = [], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists = {}, onUpdateLists, presets = [], onUpdatePresets, tabLocks = {}, onUpdateTabLocks, issueReports = [], onResolveIssue, initialTab, initialGearSubTab, onTabChange }) => {
+  var AdminView = ({ team, onUpdateTeam, projects = [], nudges = [], onOpenProject, gear, onUpdateGear, mediaCards = [], onUpdateMediaCards, furniture = [], onUpdateFurniture, props_ = [], onUpdateProps, screenContent = {}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes = [], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations = [], onUpdateWorkstations, talentRoster = [], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists = {}, onUpdateLists, presets = [], onUpdatePresets, tabLocks = {}, onUpdateTabLocks, issueReports = [], onResolveIssue, onSearchResolvedIssues, initialTab, initialGearSubTab, onTabChange }) => {
     const [gearSubTab, setGearSubTab] = (0, import_react.useState)(initialGearSubTab || "equipment");
     const [tab, setTab] = (0, import_react.useState)(initialTab || "team");
     (0, import_react.useEffect)(() => {
@@ -19521,29 +19521,103 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         gear: gear || [],
         lists
       }
-    ), tab === "access" && /* @__PURE__ */ React.createElement(AdminAccessTab, { tabLocks, onUpdateTabLocks }), tab === "issues" && /* @__PURE__ */ React.createElement(AdminIssuesTab, { issueReports, onResolve: onResolveIssue }));
+    ), tab === "access" && /* @__PURE__ */ React.createElement(AdminAccessTab, { tabLocks, onUpdateTabLocks }), tab === "issues" && /* @__PURE__ */ React.createElement(AdminIssuesTab, { issueReports, onResolve: onResolveIssue, onSearchResolved: onSearchResolvedIssues }));
   };
-  var AdminIssuesTab = ({ issueReports = [], onResolve }) => {
-    const [showResolved, setShowResolved] = (0, import_react.useState)(false);
-    const visible = showResolved ? issueReports : issueReports.filter((r) => !r.resolved);
-    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#838ba0" } }, `App errors are logged here automatically; "Report an Issue" messages come from anyone in the app's user menu.`), /* @__PURE__ */ React.createElement(
+  var IssueReportCard = ({ r, onToggleResolve }) => {
+    const isReport = r.source === "user_report";
+    return /* @__PURE__ */ React.createElement("div", { style: { background: "#111827", border: `1px solid ${r.resolved ? "#1f2937" : isReport ? "#6366f140" : "#ef444440"}`, borderRadius: 10, padding: 14, opacity: r.resolved ? 0.6 : 1 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement(Chip, { label: isReport ? "Report" : "App Error", color: isReport ? "#6366f1" : "#ef4444", xs: true }), r.reporter_name && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: "#e2e8f0" } }, r.reporter_name), r.reporter_email && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#6b7280" } }, r.reporter_email)), /* @__PURE__ */ React.createElement(
       "button",
       {
-        onClick: () => setShowResolved((v) => !v),
-        style: { background: showResolved ? "#1f2937" : "transparent", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "6px 14px", fontSize: 14, fontWeight: 700, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }
+        onClick: () => onToggleResolve?.(r.id, !r.resolved),
+        style: { background: r.resolved ? "#1f2937" : "#10b98118", border: `1px solid ${r.resolved ? "#374151" : "#10b98140"}`, borderRadius: 6, color: r.resolved ? "#9ca3af" : "#10b981", padding: "3px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }
       },
-      showResolved ? "Hide resolved" : "Show resolved"
-    )), visible.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#838ba0", padding: "32px 0", fontSize: 16 } }, showResolved ? "Nothing here yet." : "No open issues. \u{1F389}"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, visible.map((r) => {
-      const isReport = r.source === "user_report";
-      return /* @__PURE__ */ React.createElement("div", { key: r.id, style: { background: "#111827", border: `1px solid ${r.resolved ? "#1f2937" : isReport ? "#6366f140" : "#ef444440"}`, borderRadius: 10, padding: 14, opacity: r.resolved ? 0.6 : 1 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement(Chip, { label: isReport ? "Report" : "App Error", color: isReport ? "#6366f1" : "#ef4444", xs: true }), r.reporter_name && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: "#e2e8f0" } }, r.reporter_name), r.reporter_email && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#6b7280" } }, r.reporter_email)), /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          onClick: () => onResolve?.(r.id, !r.resolved),
-          style: { background: r.resolved ? "#1f2937" : "#10b98118", border: `1px solid ${r.resolved ? "#374151" : "#10b98140"}`, borderRadius: 6, color: r.resolved ? "#9ca3af" : "#10b981", padding: "3px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }
+      r.resolved ? "Reopen" : "\u2713 Resolve"
+    )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#e2e8f0", marginBottom: 6, whiteSpace: "pre-wrap" } }, r.message), r.context && Object.keys(r.context).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#4b5563", fontFamily: "monospace" } }, JSON.stringify(r.context)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#4b5563", marginTop: 4 } }, fmtDT(r.created_at), r.resolved_at ? ` \xB7 resolved ${fmtDT(r.resolved_at)}` : ""));
+  };
+  var issueQuarterRanges = () => {
+    const now2 = /* @__PURE__ */ new Date();
+    const y = now2.getFullYear();
+    const ranges = [];
+    const qStart = (year, q) => new Date(Date.UTC(year, (q - 1) * 3, 1)).toISOString();
+    for (let q = 4; q >= 1; q--) {
+      const start = qStart(y, q), end = q === 4 ? new Date(Date.UTC(y + 1, 0, 1)).toISOString() : qStart(y, q + 1);
+      if (new Date(start) <= now2) ranges.push({ label: `Q${q} ${y}`, start, end });
+    }
+    ranges.push({ label: `${y - 1}`, start: new Date(Date.UTC(y - 1, 0, 1)).toISOString(), end: new Date(Date.UTC(y, 0, 1)).toISOString() });
+    ranges.push({ label: `${y - 2}`, start: new Date(Date.UTC(y - 2, 0, 1)).toISOString(), end: new Date(Date.UTC(y - 1, 0, 1)).toISOString() });
+    ranges.push({ label: "Everything", start: null, end: null });
+    return ranges;
+  };
+  var AdminIssuesTab = ({ issueReports = [], onResolve, onSearchResolved }) => {
+    const [showArchive, setShowArchive] = (0, import_react.useState)(false);
+    const [query, setQuery] = (0, import_react.useState)("");
+    const [range, setRange] = (0, import_react.useState)(issueQuarterRanges()[0]);
+    const [results, setResults] = (0, import_react.useState)(null);
+    const [busy, setBusy] = (0, import_react.useState)(false);
+    const [offset, setOffset] = (0, import_react.useState)(0);
+    const [hasMore, setHasMore] = (0, import_react.useState)(false);
+    const PAGE_SIZE = 50;
+    const runSearch = async (nextOffset = 0) => {
+      setBusy(true);
+      const { data, error } = await onSearchResolved({ query, startDate: range.start, endDate: range.end, limit: PAGE_SIZE, offset: nextOffset });
+      setBusy(false);
+      if (error) {
+        console.error("[issue_reports] search failed:", error);
+        return;
+      }
+      setResults((prev) => nextOffset === 0 ? data || [] : [...prev || [], ...data || []]);
+      setHasMore((data || []).length === PAGE_SIZE);
+      setOffset(nextOffset);
+    };
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#838ba0", marginBottom: 14 } }, `App errors are logged here automatically; "Report an Issue" messages come from anyone in the app's user menu.`), issueReports.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#838ba0", padding: "32px 0", fontSize: 16 } }, "No open issues. \u{1F389}"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 } }, issueReports.map((r) => /* @__PURE__ */ React.createElement(IssueReportCard, { key: r.id, r, onToggleResolve: onResolve }))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid #1f2937", paddingTop: 16 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => {
+          setShowArchive((v) => !v);
+          if (!showArchive && results === null) runSearch(0);
         },
-        r.resolved ? "Reopen" : "\u2713 Resolve"
-      )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#e2e8f0", marginBottom: 6, whiteSpace: "pre-wrap" } }, r.message), r.context && Object.keys(r.context).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#4b5563", fontFamily: "monospace" } }, JSON.stringify(r.context)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#4b5563", marginTop: 4 } }, fmtDT(r.created_at)));
-    })));
+        style: { background: "transparent", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "7px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer" }
+      },
+      showArchive ? "\u25B2 Hide resolved archive" : "\u25BC Search resolved archive"
+    ), showArchive && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        value: query,
+        onChange: (e) => setQuery(e.target.value),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") runSearch(0);
+        },
+        placeholder: "Search message, name, or email\u2026",
+        style: { flex: "1 1 220px", background: "#0a0f1a", border: "1px solid #374151", borderRadius: 7, color: "#e2e8f0", padding: "7px 11px", fontSize: 14, outline: "none" }
+      }
+    ), /* @__PURE__ */ React.createElement(
+      "select",
+      {
+        value: range.label,
+        onChange: (e) => setRange(issueQuarterRanges().find((r) => r.label === e.target.value)),
+        style: { background: "#0a0f1a", border: "1px solid #374151", borderRadius: 7, color: "#e2e8f0", padding: "7px 9px", fontSize: 14, outline: "none" }
+      },
+      issueQuarterRanges().map((r) => /* @__PURE__ */ React.createElement("option", { key: r.label, value: r.label, style: { background: "#0d1117" } }, r.label))
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => runSearch(0),
+        disabled: busy,
+        style: { background: "#6366f1", border: "none", borderRadius: 7, color: "#fff", padding: "7px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }
+      },
+      busy ? "Searching\u2026" : "Search"
+    )), results && results.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#4b5563", padding: "20px 0", fontSize: 15 } }, "No resolved issues match."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, (results || []).map((r) => /* @__PURE__ */ React.createElement(IssueReportCard, { key: r.id, r, onToggleResolve: (id, resolved) => {
+      onResolve(id, resolved);
+      if (!resolved) setResults((prev) => prev?.filter((x) => x.id !== id) || prev);
+    } }))), hasMore && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => runSearch(offset + PAGE_SIZE),
+        disabled: busy,
+        style: { width: "100%", marginTop: 10, background: "#1f2937", border: "none", borderRadius: 7, color: "#9ca3af", padding: "8px 0", fontSize: 14, fontWeight: 700, cursor: "pointer" }
+      },
+      busy ? "Loading\u2026" : "Load more"
+    ))));
   };
   var passwordComplexityError = (pw) => {
     if (pw.length < 8) return "Password must be at least 8 characters.";
@@ -21225,6 +21299,18 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         if (id == null) return;
         setter((prev) => prev.some((x) => x.id === id) ? prev.filter((x) => x.id !== id) : prev);
       };
+      const mergeIssueReportUpsert = (payload) => {
+        const incoming = payload.new;
+        setIssueReports((prev) => {
+          if (incoming.resolved) return prev.some((x) => x.id === incoming.id) ? prev.filter((x) => x.id !== incoming.id) : prev;
+          const idx = prev.findIndex((x) => x.id === incoming.id);
+          if (idx === -1) return [incoming, ...prev];
+          if (JSON.stringify(prev[idx]) === JSON.stringify(incoming)) return prev;
+          const next = prev.slice();
+          next[idx] = incoming;
+          return next;
+        });
+      };
       const mergeProjectUpsert = (payload) => {
         const incoming = rowToProject(payload.new);
         setProjects((prev) => {
@@ -21428,7 +21514,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         if (!REALTIME_PHASE2) return;
         setTabLocks(payload.new?.locks || {});
       };
-      const channel = sb.channel("posttrack-realtime").on("postgres_changes", { event: "INSERT", schema: "public", table: "projects" }, mergeProjectUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "projects" }, mergeProjectUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "projects" }, mergeDelete(setProjects)).on("postgres_changes", { event: "INSERT", schema: "public", table: "team_members" }, mergeUpsert(setTeamRoster, rowToTeamMember)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "team_members" }, mergeUpsert(setTeamRoster, rowToTeamMember)).on("postgres_changes", { event: "DELETE", schema: "public", table: "team_members" }, mergeDelete(setTeamRoster)).on("postgres_changes", { event: "INSERT", schema: "public", table: "studio_bookings" }, mergeUpsert(setStudioBookings, rowToBooking)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "studio_bookings" }, mergeUpsert(setStudioBookings, rowToBooking)).on("postgres_changes", { event: "DELETE", schema: "public", table: "studio_bookings" }, mergeDelete(setStudioBookings)).on("postgres_changes", { event: "INSERT", schema: "public", table: "deliverables" }, mergeDeliverableUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "deliverables" }, mergeDeliverableUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "deliverables" }, mergeDeliverableDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "productions" }, mergeProductionUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "productions" }, mergeProductionUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "productions" }, mergeProductionDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "review_rounds" }, mergeReviewRoundUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "review_rounds" }, mergeReviewRoundUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "review_rounds" }, mergeReviewRoundDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "work_review_sessions" }, mergeUpsertByRowId(setWorkReviewSessions, rowToWorkReviewSession)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "work_review_sessions" }, mergeUpsertByRowId(setWorkReviewSessions, rowToWorkReviewSession)).on("postgres_changes", { event: "DELETE", schema: "public", table: "work_review_sessions" }, mergeDeleteByRowId(setWorkReviewSessions)).on("postgres_changes", { event: "INSERT", schema: "public", table: "setup_types" }, mergeUpsertByRowId(setSetupTypes, rowToSetupType)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "setup_types" }, mergeUpsertByRowId(setSetupTypes, rowToSetupType)).on("postgres_changes", { event: "DELETE", schema: "public", table: "setup_types" }, mergeDeleteByRowId(setSetupTypes)).on("postgres_changes", { event: "INSERT", schema: "public", table: "production_presets" }, mergeUpsertByRowId(setAppPresets, rowToProductionPreset)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "production_presets" }, mergeUpsertByRowId(setAppPresets, rowToProductionPreset)).on("postgres_changes", { event: "DELETE", schema: "public", table: "production_presets" }, mergeDeleteByRowId(setAppPresets)).on("postgres_changes", { event: "INSERT", schema: "public", table: "custom_tasks" }, mergeUpsertByRowId(setCustomTasks, rowToCustomTask)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "custom_tasks" }, mergeUpsertByRowId(setCustomTasks, rowToCustomTask)).on("postgres_changes", { event: "DELETE", schema: "public", table: "custom_tasks" }, mergeDeleteByRowId(setCustomTasks)).on("postgres_changes", { event: "INSERT", schema: "public", table: "gear" }, mergeUpsertByRowId(setGearList, rowToGear)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "gear" }, mergeUpsertByRowId(setGearList, rowToGear)).on("postgres_changes", { event: "DELETE", schema: "public", table: "gear" }, mergeDeleteByRowId(setGearList)).on("postgres_changes", { event: "INSERT", schema: "public", table: "furniture" }, mergeUpsertByRowId(setFurnitureList, rowToFurniture)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "furniture" }, mergeUpsertByRowId(setFurnitureList, rowToFurniture)).on("postgres_changes", { event: "DELETE", schema: "public", table: "furniture" }, mergeDeleteByRowId(setFurnitureList)).on("postgres_changes", { event: "INSERT", schema: "public", table: "props" }, mergeUpsertByRowId(setPropsList, rowToProp)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "props" }, mergeUpsertByRowId(setPropsList, rowToProp)).on("postgres_changes", { event: "DELETE", schema: "public", table: "props" }, mergeDeleteByRowId(setPropsList)).on("postgres_changes", { event: "INSERT", schema: "public", table: "screen_content_options" }, mergeScreenContentUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "screen_content_options" }, mergeScreenContentUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "screen_content_options" }, mergeScreenContentDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "unavailability" }, mergeUpsertByRowId(setUnavailability, rowToUnavailability)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "unavailability" }, mergeUpsertByRowId(setUnavailability, rowToUnavailability)).on("postgres_changes", { event: "DELETE", schema: "public", table: "unavailability" }, mergeDeleteByRowId(setUnavailability)).on("postgres_changes", { event: "INSERT", schema: "public", table: "talent_roster" }, mergeUpsertByRowId(setTalentRoster, rowToTalent)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "talent_roster" }, mergeUpsertByRowId(setTalentRoster, rowToTalent)).on("postgres_changes", { event: "DELETE", schema: "public", table: "talent_roster" }, mergeDeleteByRowId(setTalentRoster)).on("postgres_changes", { event: "INSERT", schema: "public", table: "nudges" }, mergeUpsertByRowId(setNudges, rowToNudge)).on("postgres_changes", { event: "DELETE", schema: "public", table: "nudges" }, mergeDeleteByRowId(setNudges)).on("postgres_changes", { event: "INSERT", schema: "public", table: "intakes" }, mergeUpsertByRowId(setIntakes, rowToIntake)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "intakes" }, mergeUpsertByRowId(setIntakes, rowToIntake)).on("postgres_changes", { event: "DELETE", schema: "public", table: "intakes" }, mergeDeleteByRowId(setIntakes)).on("postgres_changes", { event: "INSERT", schema: "public", table: "bec_requests" }, mergeUpsertByRowId(setBecRequests, rowToBecRequest)).on("postgres_changes", { event: "INSERT", schema: "public", table: "media_cards" }, mergeUpsertByRowId(setMediaCards, rowToMediaCard)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "media_cards" }, mergeUpsertByRowId(setMediaCards, rowToMediaCard)).on("postgres_changes", { event: "DELETE", schema: "public", table: "media_cards" }, mergeDeleteByRowId(setMediaCards)).on("postgres_changes", { event: "INSERT", schema: "public", table: "workstations" }, mergeUpsertByRowId(setWorkstations, rowToWorkstation)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "workstations" }, mergeUpsertByRowId(setWorkstations, rowToWorkstation)).on("postgres_changes", { event: "DELETE", schema: "public", table: "workstations" }, mergeDeleteByRowId(setWorkstations)).on("postgres_changes", { event: "INSERT", schema: "public", table: "vendor_companies" }, mergeStringUpsert(setVendorCompanies)).on("postgres_changes", { event: "DELETE", schema: "public", table: "vendor_companies" }, mergeStringDelete(setVendorCompanies)).on("postgres_changes", { event: "INSERT", schema: "public", table: "reviewer_names" }, mergeStringUpsert(setReviewerNames)).on("postgres_changes", { event: "DELETE", schema: "public", table: "reviewer_names" }, mergeStringDelete(setReviewerNames)).on("postgres_changes", { event: "INSERT", schema: "public", table: "studio_spaces" }, mergeStringUpsert(setStudioSpaces)).on("postgres_changes", { event: "DELETE", schema: "public", table: "studio_spaces" }, mergeStringDelete(setStudioSpaces)).on("postgres_changes", { event: "INSERT", schema: "public", table: "studio_space_meta" }, mergeSpaceMetaUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "studio_space_meta" }, mergeSpaceMetaUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "studio_space_meta" }, mergeSpaceMetaDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "app_lists" }, mergeAppListsUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "app_lists" }, mergeAppListsUpsert).on("postgres_changes", { event: "INSERT", schema: "public", table: "resource_config" }, mergeResourceConfigUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "resource_config" }, mergeResourceConfigUpsert).on("postgres_changes", { event: "INSERT", schema: "public", table: "tab_locks" }, mergeTabLocksUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "tab_locks" }, mergeTabLocksUpsert).on("postgres_changes", { event: "INSERT", schema: "public", table: "issue_reports" }, mergeUpsert(setIssueReports, (row) => row)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "issue_reports" }, mergeUpsert(setIssueReports, (row) => row)).on("postgres_changes", { event: "DELETE", schema: "public", table: "issue_reports" }, mergeDelete(setIssueReports)).subscribe((status, err) => {
+      const channel = sb.channel("posttrack-realtime").on("postgres_changes", { event: "INSERT", schema: "public", table: "projects" }, mergeProjectUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "projects" }, mergeProjectUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "projects" }, mergeDelete(setProjects)).on("postgres_changes", { event: "INSERT", schema: "public", table: "team_members" }, mergeUpsert(setTeamRoster, rowToTeamMember)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "team_members" }, mergeUpsert(setTeamRoster, rowToTeamMember)).on("postgres_changes", { event: "DELETE", schema: "public", table: "team_members" }, mergeDelete(setTeamRoster)).on("postgres_changes", { event: "INSERT", schema: "public", table: "studio_bookings" }, mergeUpsert(setStudioBookings, rowToBooking)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "studio_bookings" }, mergeUpsert(setStudioBookings, rowToBooking)).on("postgres_changes", { event: "DELETE", schema: "public", table: "studio_bookings" }, mergeDelete(setStudioBookings)).on("postgres_changes", { event: "INSERT", schema: "public", table: "deliverables" }, mergeDeliverableUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "deliverables" }, mergeDeliverableUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "deliverables" }, mergeDeliverableDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "productions" }, mergeProductionUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "productions" }, mergeProductionUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "productions" }, mergeProductionDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "review_rounds" }, mergeReviewRoundUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "review_rounds" }, mergeReviewRoundUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "review_rounds" }, mergeReviewRoundDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "work_review_sessions" }, mergeUpsertByRowId(setWorkReviewSessions, rowToWorkReviewSession)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "work_review_sessions" }, mergeUpsertByRowId(setWorkReviewSessions, rowToWorkReviewSession)).on("postgres_changes", { event: "DELETE", schema: "public", table: "work_review_sessions" }, mergeDeleteByRowId(setWorkReviewSessions)).on("postgres_changes", { event: "INSERT", schema: "public", table: "setup_types" }, mergeUpsertByRowId(setSetupTypes, rowToSetupType)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "setup_types" }, mergeUpsertByRowId(setSetupTypes, rowToSetupType)).on("postgres_changes", { event: "DELETE", schema: "public", table: "setup_types" }, mergeDeleteByRowId(setSetupTypes)).on("postgres_changes", { event: "INSERT", schema: "public", table: "production_presets" }, mergeUpsertByRowId(setAppPresets, rowToProductionPreset)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "production_presets" }, mergeUpsertByRowId(setAppPresets, rowToProductionPreset)).on("postgres_changes", { event: "DELETE", schema: "public", table: "production_presets" }, mergeDeleteByRowId(setAppPresets)).on("postgres_changes", { event: "INSERT", schema: "public", table: "custom_tasks" }, mergeUpsertByRowId(setCustomTasks, rowToCustomTask)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "custom_tasks" }, mergeUpsertByRowId(setCustomTasks, rowToCustomTask)).on("postgres_changes", { event: "DELETE", schema: "public", table: "custom_tasks" }, mergeDeleteByRowId(setCustomTasks)).on("postgres_changes", { event: "INSERT", schema: "public", table: "gear" }, mergeUpsertByRowId(setGearList, rowToGear)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "gear" }, mergeUpsertByRowId(setGearList, rowToGear)).on("postgres_changes", { event: "DELETE", schema: "public", table: "gear" }, mergeDeleteByRowId(setGearList)).on("postgres_changes", { event: "INSERT", schema: "public", table: "furniture" }, mergeUpsertByRowId(setFurnitureList, rowToFurniture)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "furniture" }, mergeUpsertByRowId(setFurnitureList, rowToFurniture)).on("postgres_changes", { event: "DELETE", schema: "public", table: "furniture" }, mergeDeleteByRowId(setFurnitureList)).on("postgres_changes", { event: "INSERT", schema: "public", table: "props" }, mergeUpsertByRowId(setPropsList, rowToProp)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "props" }, mergeUpsertByRowId(setPropsList, rowToProp)).on("postgres_changes", { event: "DELETE", schema: "public", table: "props" }, mergeDeleteByRowId(setPropsList)).on("postgres_changes", { event: "INSERT", schema: "public", table: "screen_content_options" }, mergeScreenContentUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "screen_content_options" }, mergeScreenContentUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "screen_content_options" }, mergeScreenContentDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "unavailability" }, mergeUpsertByRowId(setUnavailability, rowToUnavailability)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "unavailability" }, mergeUpsertByRowId(setUnavailability, rowToUnavailability)).on("postgres_changes", { event: "DELETE", schema: "public", table: "unavailability" }, mergeDeleteByRowId(setUnavailability)).on("postgres_changes", { event: "INSERT", schema: "public", table: "talent_roster" }, mergeUpsertByRowId(setTalentRoster, rowToTalent)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "talent_roster" }, mergeUpsertByRowId(setTalentRoster, rowToTalent)).on("postgres_changes", { event: "DELETE", schema: "public", table: "talent_roster" }, mergeDeleteByRowId(setTalentRoster)).on("postgres_changes", { event: "INSERT", schema: "public", table: "nudges" }, mergeUpsertByRowId(setNudges, rowToNudge)).on("postgres_changes", { event: "DELETE", schema: "public", table: "nudges" }, mergeDeleteByRowId(setNudges)).on("postgres_changes", { event: "INSERT", schema: "public", table: "intakes" }, mergeUpsertByRowId(setIntakes, rowToIntake)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "intakes" }, mergeUpsertByRowId(setIntakes, rowToIntake)).on("postgres_changes", { event: "DELETE", schema: "public", table: "intakes" }, mergeDeleteByRowId(setIntakes)).on("postgres_changes", { event: "INSERT", schema: "public", table: "bec_requests" }, mergeUpsertByRowId(setBecRequests, rowToBecRequest)).on("postgres_changes", { event: "INSERT", schema: "public", table: "media_cards" }, mergeUpsertByRowId(setMediaCards, rowToMediaCard)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "media_cards" }, mergeUpsertByRowId(setMediaCards, rowToMediaCard)).on("postgres_changes", { event: "DELETE", schema: "public", table: "media_cards" }, mergeDeleteByRowId(setMediaCards)).on("postgres_changes", { event: "INSERT", schema: "public", table: "workstations" }, mergeUpsertByRowId(setWorkstations, rowToWorkstation)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "workstations" }, mergeUpsertByRowId(setWorkstations, rowToWorkstation)).on("postgres_changes", { event: "DELETE", schema: "public", table: "workstations" }, mergeDeleteByRowId(setWorkstations)).on("postgres_changes", { event: "INSERT", schema: "public", table: "vendor_companies" }, mergeStringUpsert(setVendorCompanies)).on("postgres_changes", { event: "DELETE", schema: "public", table: "vendor_companies" }, mergeStringDelete(setVendorCompanies)).on("postgres_changes", { event: "INSERT", schema: "public", table: "reviewer_names" }, mergeStringUpsert(setReviewerNames)).on("postgres_changes", { event: "DELETE", schema: "public", table: "reviewer_names" }, mergeStringDelete(setReviewerNames)).on("postgres_changes", { event: "INSERT", schema: "public", table: "studio_spaces" }, mergeStringUpsert(setStudioSpaces)).on("postgres_changes", { event: "DELETE", schema: "public", table: "studio_spaces" }, mergeStringDelete(setStudioSpaces)).on("postgres_changes", { event: "INSERT", schema: "public", table: "studio_space_meta" }, mergeSpaceMetaUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "studio_space_meta" }, mergeSpaceMetaUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "studio_space_meta" }, mergeSpaceMetaDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "app_lists" }, mergeAppListsUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "app_lists" }, mergeAppListsUpsert).on("postgres_changes", { event: "INSERT", schema: "public", table: "resource_config" }, mergeResourceConfigUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "resource_config" }, mergeResourceConfigUpsert).on("postgres_changes", { event: "INSERT", schema: "public", table: "tab_locks" }, mergeTabLocksUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "tab_locks" }, mergeTabLocksUpsert).on("postgres_changes", { event: "INSERT", schema: "public", table: "issue_reports" }, mergeIssueReportUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "issue_reports" }, mergeIssueReportUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "issue_reports" }, mergeDelete(setIssueReports)).subscribe((status, err) => {
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
           console.warn("[realtime] channel status:", status, err || "");
         }
@@ -21611,7 +21697,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [issueReports, setIssueReports] = (0, import_react.useState)([]);
     (0, import_react.useEffect)(() => {
       if (!authed || !sb) return;
-      sb.from("issue_reports").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+      sb.from("issue_reports").select("*").eq("resolved", false).order("created_at", { ascending: false }).then(({ data, error }) => {
         if (error) {
           console.error("[issue_reports] load failed:", error);
           return;
@@ -21620,10 +21706,24 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       });
     }, [authed]);
     const resolveIssueReport = (0, import_react.useCallback)((id, resolved) => {
-      setIssueReports((prev) => prev.map((r) => r.id !== id ? r : { ...r, resolved, resolved_at: resolved ? (/* @__PURE__ */ new Date()).toISOString() : null }));
-      if (sb) sb.from("issue_reports").update({ resolved, resolved_at: resolved ? (/* @__PURE__ */ new Date()).toISOString() : null }).eq("id", id).then(({ error }) => {
-        if (error) reportSbError("Issue update", error);
+      if (resolved) {
+        setIssueReports((prev) => prev.filter((r) => r.id !== id));
+      }
+      if (sb) sb.from("issue_reports").update({ resolved, resolved_at: resolved ? (/* @__PURE__ */ new Date()).toISOString() : null }).eq("id", id).select().single().then(({ data, error }) => {
+        if (error) {
+          reportSbError("Issue update", error);
+          return;
+        }
+        if (!resolved && data) setIssueReports((prev) => prev.some((r) => r.id === id) ? prev : [data, ...prev]);
       });
+    }, []);
+    const searchResolvedIssues = (0, import_react.useCallback)(async ({ query = "", startDate = null, endDate = null, limit = 50, offset = 0 } = {}) => {
+      if (!sb) return { data: [], error: { message: "Not connected." } };
+      let q = sb.from("issue_reports").select("*").eq("resolved", true).order("created_at", { ascending: false }).range(offset, offset + limit - 1);
+      if (startDate) q = q.gte("created_at", startDate);
+      if (endDate) q = q.lte("created_at", endDate);
+      if (query.trim()) q = q.or(`message.ilike.%${query.trim()}%,reporter_name.ilike.%${query.trim()}%,reporter_email.ilike.%${query.trim()}%`);
+      return q;
     }, []);
     const addWorkReviewSession = (0, import_react.useCallback)((session) => {
       const withId = { id: uid(), reviewers: [], notes: "", ...session };
@@ -22356,7 +22456,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         tabLocks,
         onUpdateTabLocks: saveTabLocks,
         issueReports,
-        onResolveIssue: resolveIssueReport
+        onResolveIssue: resolveIssueReport,
+        onSearchResolvedIssues: searchResolvedIssues
       }
     )))), liveSelected && /* @__PURE__ */ React.createElement(ProjectOverviewErrorBoundary, { key: `${liveSelected.id}:${popstateGen}`, onClose: closeProject }, /* @__PURE__ */ React.createElement(ProjectOverview, { project: liveSelected, team: allTeam, allProjects, onClose: closeProject, onTabChange: (tab, delId) => updateRoute({ ptab: tab, pitem: delId ?? null }), onUpdateDel: updateDel, onAddDel: addDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, initialTab: initialTab?.tab, initialShootId: initialTab?.itemId, initialItemId: initialTab?.itemId, studioBookings: allStudioBookings, mediaCards, setupTypes, onAddSetupType: addSetupType, talentRoster, onUpdateTalentRoster: saveTalentRoster, nudges, onAddNudge: addNudge, furnitureList, propsList, screenContentOptions, gearList, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, appPresets, onSaveAppPresets: saveAppPresets, vendorCompanies, addVendorCompany, intakes, becRequests, canAccessBudget: canAccessTab("budget"), reviewerNames, addReviewerName, workReviewSessions, addWorkReviewSession, updateWorkReviewSession, lists })), addingProject && /* @__PURE__ */ React.createElement(AddProjectModal, { team: allTeam, existingProjects: allProjects, onClose: () => setAddingProject(false), onAdd: addProject }), createFromIntake && /* @__PURE__ */ React.createElement(
       AddProjectModal,
