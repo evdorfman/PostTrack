@@ -408,10 +408,20 @@ function parseRoute(){
       pitem: pitem ? (Number.isNaN(+pitem) ? pitem : +pitem) : null,
       atab: q.get("atab") || null,
       agear: q.get("agear") || null,
+      // One param per view with its own internal sub-tab, same pattern as
+      // atab/agear for Admin — each view's local tab state is seeded from
+      // its own param on load and kept in sync on change, so each sub-tab
+      // is its own deep-linkable page without restructuring how any of
+      // these components manage their own state.
+      dtab: q.get("dtab") || null,    // Deliverables: active | completed | metrics
+      antab: q.get("antab") || null,  // Animation: active | completed | metrics
+      itab: q.get("itab") || null,    // Ingest: sheet | dashboard
+      rtab: q.get("rtab") || null,    // Resources: utilization | editorcal | kanban
+      intab: q.get("intab") || null,  // Intake: smartsheet | gcs
     };
-  }catch(e){ return {view:null,projectId:null,ptab:null,pitem:null,atab:null,agear:null}; }
+  }catch(e){ return {view:null,projectId:null,ptab:null,pitem:null,atab:null,agear:null,dtab:null,antab:null,itab:null,rtab:null,intab:null}; }
 }
-function buildRouteUrl({view, projectId, ptab, pitem, atab, agear}){
+function buildRouteUrl({view, projectId, ptab, pitem, atab, agear, dtab, antab, itab, rtab, intab}){
   const path = ROUTE_BASE_PATH+"/"+(view||"projects");
   const q = new URLSearchParams();
   if(projectId!=null) q.set("project", projectId);
@@ -419,6 +429,11 @@ function buildRouteUrl({view, projectId, ptab, pitem, atab, agear}){
   if(pitem!=null) q.set("pitem", pitem);
   if(atab) q.set("atab", atab);
   if(agear) q.set("agear", agear);
+  if(dtab) q.set("dtab", dtab);
+  if(antab) q.set("antab", antab);
+  if(itab) q.set("itab", itab);
+  if(rtab) q.set("rtab", rtab);
+  if(intab) q.set("intab", intab);
   const qs = q.toString();
   return path + (qs?`?${qs}`:"");
 }
@@ -8403,8 +8418,9 @@ const IntakeCard = ({intake, projects, onUpdateIntake, onDeleteIntake, onCreateP
 };
 
 // ── Main Intake tab view ───────────────────────────────────────────────────────
-const IntakeView = ({intakes, onSaveIntakes, allProjects, onUpdateProject, onCreateFromIntake, onAssignIntake, becRequests=[], onBECBooking, onOpenProject}) => {
-  const [intakeTab, setIntakeTab] = useState("smartsheet"); // "smartsheet" | "gcs"
+const IntakeView = ({intakes, onSaveIntakes, allProjects, onUpdateProject, onCreateFromIntake, onAssignIntake, becRequests=[], onBECBooking, onOpenProject, initialTab, onTabChange}) => {
+  const [intakeTab, setIntakeTab] = useState(initialTab||"smartsheet"); // "smartsheet" | "gcs"
+  useEffect(()=>{ onTabChange?.(intakeTab); },[intakeTab]);
   const [statusFilter, setStatusFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [showPaste, setShowPaste] = useState(false);
@@ -9280,8 +9296,9 @@ const AnimationGroupSidebar = ({row, onClose}) => {
 };
 
 // Main AnimationView — structure matches DeliverablesTab
-const AnimationView = ({allProjects, team, sidebarSlotNode, onSidebarWidthChange}) => {
-  const [subTab, setSubTab] = useState("active");
+const AnimationView = ({allProjects, team, sidebarSlotNode, onSidebarWidthChange, initialTab, onTabChange}) => {
+  const [subTab, setSubTab] = useState(initialTab||"active");
+  useEffect(()=>{ onTabChange?.(subTab); },[subTab]);
   const [groupBy, setGroupBy] = useState("animator");
   const [selected, setSelected] = useState(null);
   const sidebarWidth = selected ? 420 : 0;
@@ -12316,8 +12333,9 @@ const DelInfoPopup = ({del, team, onClose}) => {
 };
 
 // ─── Deliverables Tab (global) ────────────────────────────────────────────────
-const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDel, onUpdateProject, talentRoster=[], sidebarSlotNode, onSidebarWidthChange}) => {
-  const [subTab, setSubTab] = useState("active");
+const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDel, onUpdateProject, talentRoster=[], sidebarSlotNode, onSidebarWidthChange, initialTab, onTabChange}) => {
+  const [subTab, setSubTab] = useState(initialTab||"active");
+  useEffect(()=>{ onTabChange?.(subTab); },[subTab]);
   const [search, setSearch] = useState("");
   const [groupBy, setGroupBy] = useState("editor"); // editor | producer
   const [popupDel, setPopupDel] = useState(null);       // read-only popup (production-sourced deliverables only)
@@ -22034,8 +22052,9 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
   );
 };
 
-const ResourceView = ({projects, team, studioBookings=[], resourceConfig, onUpdateProject, unavailability=[], onUpdateDel}) => {
-  const [subView, setSubView]       = useState("utilization");
+const ResourceView = ({projects, team, studioBookings=[], resourceConfig, onUpdateProject, unavailability=[], onUpdateDel, initialTab, onTabChange}) => {
+  const [subView, setSubView]       = useState(initialTab||"utilization");
+  useEffect(()=>{ onTabChange?.(subView); },[subView]);
   const [weekOffset, setWeekOffset] = useState(0);
   const [expandedId, setExpandedId] = useState(null);
   const [roleFilter, setRoleFilter] = useState("All");
@@ -27095,8 +27114,9 @@ const IngestTrackingSheet = ({ingests, onUpdateRow, projects=[], team=[], onAddR
   );
 };
 
-const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onDeleteDel, talentRoster=[], sidebarSlotNode, onSidebarWidthChange}) => {
-  const [tab, setTab] = useState("sheet");
+const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onDeleteDel, talentRoster=[], sidebarSlotNode, onSidebarWidthChange, initialTab, onTabChange}) => {
+  const [tab, setTab] = useState(initialTab||"sheet");
+  useEffect(()=>{ onTabChange?.(tab); },[tab]);
   const ingests = useMemo(()=>gatherIngests(projects,team),[projects,team]);
 
   const rowKeyOf = row => row._source==="production" ? `production:${row._productionId}` : `manual:${row._id}`;
@@ -29116,6 +29136,11 @@ function App() {
         pitem: overrides.pitem!==undefined ? overrides.pitem : current.pitem,
         atab: overrides.atab!==undefined ? overrides.atab : current.atab,
         agear: overrides.agear!==undefined ? overrides.agear : current.agear,
+        dtab: overrides.dtab!==undefined ? overrides.dtab : current.dtab,
+        antab: overrides.antab!==undefined ? overrides.antab : current.antab,
+        itab: overrides.itab!==undefined ? overrides.itab : current.itab,
+        rtab: overrides.rtab!==undefined ? overrides.rtab : current.rtab,
+        intab: overrides.intab!==undefined ? overrides.intab : current.intab,
       };
       const url = buildRouteUrl(next);
       if(url === window.location.pathname+window.location.search) return;
@@ -29156,6 +29181,11 @@ function App() {
       }
       setAdminInitialTab(r.atab || "team");
       setAdminInitialGearSubTab(r.agear || "equipment");
+      setDeliverablesInitialTab(r.dtab || "active");
+      setAnimationInitialTab(r.antab || "active");
+      setIngestInitialTab(r.itab || "sheet");
+      setResourcesInitialTab(r.rtab || "utilization");
+      setIntakeInitialTab(r.intab || "smartsheet");
       setPopstateGen(g=>g+1);
     };
     window.addEventListener("popstate", onPopState);
@@ -30567,6 +30597,16 @@ function App() {
   // force AdminView to remount and pick them up again.
   const [adminInitialTab, setAdminInitialTab] = useState(()=> initialRoute.view==="admin" ? (initialRoute.atab||"team") : "team");
   const [adminInitialGearSubTab, setAdminInitialGearSubTab] = useState(()=> initialRoute.view==="admin" ? (initialRoute.agear||"equipment") : "equipment");
+  // Same pattern as adminInitialTab above, one per view with its own
+  // internal sub-tab — each view's local tab state only ever reads an
+  // initial value via a prop, so this is what seeds it from a deep link on
+  // first mount, and what the popstate handler updates before bumping
+  // popstateGen to force that view to remount and pick the new value up.
+  const [deliverablesInitialTab, setDeliverablesInitialTab] = useState(()=> initialRoute.view==="deliverables" ? (initialRoute.dtab||"active") : "active");
+  const [animationInitialTab, setAnimationInitialTab] = useState(()=> initialRoute.view==="animations" ? (initialRoute.antab||"active") : "active");
+  const [ingestInitialTab, setIngestInitialTab] = useState(()=> initialRoute.view==="ingest" ? (initialRoute.itab||"sheet") : "sheet");
+  const [resourcesInitialTab, setResourcesInitialTab] = useState(()=> initialRoute.view==="resources" ? (initialRoute.rtab||"utilization") : "utilization");
+  const [intakeInitialTab, setIntakeInitialTab] = useState(()=> initialRoute.view==="intake" ? (initialRoute.intab||"smartsheet") : "smartsheet");
   const [addingProject,setAddingProject]=useState(false);
   const [statsFilter,setStatsFilter]=useState(null); // {label, ids:Set<id>} — set by StatsBar tiles
   // Sidebar portal target: a DOM node owned by App, sized here, that regular
@@ -31273,8 +31313,11 @@ function App() {
           <StatsBar projects={allProjects} team={allTeam} setView={v=>{setView(v);if(v!=="projects")setStatsFilter(null);}} onOpenProject={openProject} onSetStatsFilter={setStatsFilter} workReviewSessions={workReviewSessions}/>
           {view==="workReview"&&<WorkReviewView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} workReviewSessions={workReviewSessions} updateWorkReviewSession={updateWorkReviewSession}/>}
           {view==="pipeline"&&<PipelineView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject}/>}
-          {view==="animations"&&<AnimationView allProjects={allProjects} team={allTeam} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
+          {view==="animations"&&<AnimationView key={`animations:${popstateGen}`} initialTab={animationInitialTab} onTabChange={tab=>updateRoute({antab:tab})} allProjects={allProjects} team={allTeam} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="intake"&&<IntakeView
+            key={`intake:${popstateGen}`}
+            initialTab={intakeInitialTab}
+            onTabChange={tab=>updateRoute({intab:tab})}
             intakes={intakes}
             onSaveIntakes={saveIntakes}
             allProjects={allProjects}
@@ -31303,9 +31346,9 @@ function App() {
           {view==="kanban"&&kanbanMode==="status"&&<KanbanStatus projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="kanban"&&kanbanMode==="editor"&&<KanbanEditor projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="calendar"&&<CalendarView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} unavailability={unavailability} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
-          {view==="deliverables"&&<DeliverablesTab projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
-          {view==="ingest"&&<IngestView projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
-          {view==="resources"&&<ResourceView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
+          {view==="deliverables"&&<DeliverablesTab key={`deliverables:${popstateGen}`} initialTab={deliverablesInitialTab} onTabChange={tab=>updateRoute({dtab:tab})} projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
+          {view==="ingest"&&<IngestView key={`ingest:${popstateGen}`} initialTab={ingestInitialTab} onTabChange={tab=>updateRoute({itab:tab})} projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
+          {view==="resources"&&<ResourceView key={`resources:${popstateGen}`} initialTab={resourcesInitialTab} onTabChange={tab=>updateRoute({rtab:tab})} projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
           {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability} currentMember={currentMember} isAdmin={isAdmin} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="admin"&&<AdminView
             key={`admin:${popstateGen}`}
