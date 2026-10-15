@@ -728,6 +728,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   };
   var _uid = 400;
   var uid = () => ++_uid;
+  var reportErrorGlobal = (label, error) => {
+    if (error) console.warn(`[shadow write] ${label} failed:`, error);
+  };
   var ROUTE_VIEWS = ["projects", "studio", "calendar", "deliverables", "animations", "ingest", "resources", "myview", "admin", "pipeline", "intake", "workreview", "kanban"];
   var ROUTE_BASE_PATH = "/PostTrack";
   function parseRoute() {
@@ -4784,6 +4787,7 @@ Brief content: ${content}`;
     }
     componentDidCatch(error, info) {
       console.error("ProjectOverview crashed:", error, info);
+      reportErrorGlobal(`ProjectOverview crashed: ${error?.message || error}`, { message: info?.componentStack || "(no stack)" });
     }
     render() {
       if (this.state.hasError) return /* @__PURE__ */ React.createElement("div", { onClick: this.props.onClose, style: { position: "fixed", inset: 0, background: "#000d", zIndex: 1e3, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 } }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { background: "#0d1117", border: "1px solid #ef444440", borderRadius: 16, padding: 32, maxWidth: 440, textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 38, marginBottom: 12 } }, "\u26A0\uFE0F"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 8 } }, "Something went wrong"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#9ca3af", marginBottom: 20 } }, "This project view hit an error and couldn't load. Nothing else was affected \u2014 close this and try again."), /* @__PURE__ */ React.createElement("button", { onClick: this.props.onClose, style: { background: "#6366f1", border: "none", borderRadius: 8, color: "#fff", padding: "10px 24px", fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, "Close")));
@@ -10681,7 +10685,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     ...diff.toDelete.map((x) => sbClient.from(table).delete().eq("id", x._rowId).then(({ error }) => ({ kind: "delete", legacyId: x.id, error })))
   ]).then((results) => {
     results.forEach(({ error }) => {
-      if (error) console.warn(`[shadow write] ${table} diff op failed:`, error);
+      if (error) reportErrorGlobal(`${table} diff op`, error);
     });
     return results.filter((r) => r.kind === "insert" && !r.error && r.data).map((r) => ({ legacyId: r.legacyId, rowId: r.data.id }));
   });
@@ -10697,7 +10701,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     ...diff.toDelete.map((name) => sbClient.from(table).delete().eq("name", name).then(({ error }) => ({ error })))
   ]).then((results) => {
     results.forEach(({ error }) => {
-      if (error) console.warn(`[shadow write] ${table} diff op failed:`, error);
+      if (error) reportErrorGlobal(`${table} diff op`, error);
     });
   });
   var spaceMetaToRow = (spaceName, m) => ({
@@ -10717,14 +10721,14 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
   var writeSpaceMetaDiff = (sbClient, diff) => {
     const spaceNames = [.../* @__PURE__ */ new Set([...diff.toUpsert.map((r) => r.space_name), ...diff.toDelete])];
     const ensureSpaces = spaceNames.length ? sbClient.from("studio_spaces").upsert(spaceNames.map((name) => ({ name })), { onConflict: "name", ignoreDuplicates: true }).then(({ error }) => {
-      if (error) console.warn("[shadow write] studio_spaces ensure-exists failed:", error);
+      if (error) reportErrorGlobal("studio_spaces ensure-exists", error);
     }) : Promise.resolve();
     return ensureSpaces.then(() => Promise.all([
       ...diff.toUpsert.length ? [sbClient.from("studio_space_meta").upsert(diff.toUpsert).then(({ error }) => ({ error }))] : [],
       ...diff.toDelete.map((name) => sbClient.from("studio_space_meta").delete().eq("space_name", name).then(({ error }) => ({ error })))
     ])).then((results) => {
       results.forEach(({ error }) => {
-        if (error) console.warn("[shadow write] studio_space_meta diff op failed:", error);
+        if (error) reportErrorGlobal("studio_space_meta diff op", error);
       });
     });
   };
@@ -10740,7 +10744,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     production_roles: lists.productionRoles || [],
     post_production_roles: lists.postProductionRoles || []
   }).then(({ error }) => {
-    if (error) console.warn("[shadow write] app_lists failed:", error);
+    if (error) reportErrorGlobal("app_lists", error);
   });
   var writeResourceConfigRow = (sbClient, rc) => sbClient.from("resource_config").upsert({
     id: 1,
@@ -10753,10 +10757,10 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     hours_per_shoot: rc.hoursPerShoot ?? null,
     hours_per_deliverable: rc.hoursPerDeliverable ?? null
   }).then(({ error }) => {
-    if (error) console.warn("[shadow write] resource_config failed:", error);
+    if (error) reportErrorGlobal("resource_config", error);
   });
   var writeTabLocksRow = (sbClient, locks) => sbClient.from("tab_locks").upsert({ id: 1, locks: locks || {} }).then(({ error }) => {
-    if (error) console.warn("[shadow write] tab_locks failed:", error);
+    if (error) reportErrorGlobal("tab_locks", error);
   });
   var assembleNormalizedProjectData = (deliverableRows, roundRows, productionRows) => {
     const roundsByDeliverable = {};
@@ -10819,7 +10823,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     ...diff.toDelete.map((r) => deleteReviewRoundRow(sbClient, r.id))
   ]).then((results) => {
     results.forEach(({ error }) => {
-      if (error) console.warn("[shadow write] round diff op failed:", error);
+      if (error) reportErrorGlobal("round diff op", error);
     });
   });
   var computeProductionDiff = (oldProds, newProds) => {
@@ -10854,7 +10858,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     ...diff.toDelete.map((p) => deleteProductionRow(sbClient, p._rowId).then(({ error }) => ({ kind: "delete", legacyId: p.id, error })))
   ]).then((results) => {
     results.forEach(({ error }) => {
-      if (error) console.warn("[shadow write] production diff op failed:", error);
+      if (error) reportErrorGlobal("production diff op", error);
     });
     return results.filter((r) => r.kind === "insert" && !r.error && r.data).map((r) => ({ legacyId: r.legacyId, rowId: r.data.id }));
   });
@@ -10895,7 +10899,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     ...diff.toDelete.map((p) => deleteProductionPresetRow(sbClient, p._rowId).then(({ error }) => ({ kind: "delete", legacyId: p.id, error })))
   ]).then((results) => {
     results.forEach(({ error }) => {
-      if (error) console.warn("[shadow write] preset diff op failed:", error);
+      if (error) reportErrorGlobal("preset diff op", error);
     });
     return results.filter((r) => r.kind === "insert" && !r.error && r.data).map((r) => ({ legacyId: r.legacyId, rowId: r.data.id }));
   });
@@ -19476,13 +19480,14 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       return /* @__PURE__ */ React.createElement("div", { key: p.id, style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 } }, p.name), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, chips.map((c) => /* @__PURE__ */ React.createElement("span", { key: c, style: { fontSize: 12, color: "#9ca3af", background: "#1f2937", borderRadius: 4, padding: "2px 7px" } }, c))), p.notes && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#4b5563", marginTop: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.notes)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => openEdit(p), style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 6, color: "#9ca3af", padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "Edit"), /* @__PURE__ */ React.createElement("button", { onClick: () => del(p.id), style: { background: "#ef444415", border: "1px solid #ef444440", borderRadius: 6, color: "#ef4444", padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "Delete")));
     })));
   };
-  var AdminView = ({ team, onUpdateTeam, projects = [], nudges = [], onOpenProject, gear, onUpdateGear, mediaCards = [], onUpdateMediaCards, furniture = [], onUpdateFurniture, props_ = [], onUpdateProps, screenContent = {}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes = [], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations = [], onUpdateWorkstations, talentRoster = [], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists = {}, onUpdateLists, presets = [], onUpdatePresets, tabLocks = {}, onUpdateTabLocks, initialTab, initialGearSubTab, onTabChange }) => {
+  var AdminView = ({ team, onUpdateTeam, projects = [], nudges = [], onOpenProject, gear, onUpdateGear, mediaCards = [], onUpdateMediaCards, furniture = [], onUpdateFurniture, props_ = [], onUpdateProps, screenContent = {}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes = [], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations = [], onUpdateWorkstations, talentRoster = [], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists = {}, onUpdateLists, presets = [], onUpdatePresets, tabLocks = {}, onUpdateTabLocks, issueReports = [], onResolveIssue, initialTab, initialGearSubTab, onTabChange }) => {
     const [gearSubTab, setGearSubTab] = (0, import_react.useState)(initialGearSubTab || "equipment");
     const [tab, setTab] = (0, import_react.useState)(initialTab || "team");
     (0, import_react.useEffect)(() => {
       onTabChange?.(tab, gearSubTab);
     }, [tab, gearSubTab]);
-    const tabs = [{ id: "team", l: "\u{1F465} Team" }, { id: "gear", l: "\u{1F392} Gear" }, { id: "props", l: "\u{1FA91} Props & Furniture" }, { id: "screen", l: "\u{1F4FA} Screen Content" }, { id: "spaces", l: "\u{1F4CD} Spaces" }, { id: "setups", l: "\u{1F3AC} Setups" }, { id: "workstations", l: "\u{1F4BB} Workstations" }, { id: "talent", l: "\u{1F3A4} Talent" }, { id: "resources", l: "\u{1F4CA} Resources" }, { id: "lists", l: "\u{1F5C2} Metadata" }, { id: "crewRoles", l: "\u{1F3A5} Crew Roles" }, { id: "presets", l: "\u2B50 Production Presets" }, { id: "access", l: "\u{1F512} Access" }];
+    const unresolvedIssueCount = issueReports.filter((r) => !r.resolved).length;
+    const tabs = [{ id: "team", l: "\u{1F465} Team" }, { id: "gear", l: "\u{1F392} Gear" }, { id: "props", l: "\u{1FA91} Props & Furniture" }, { id: "screen", l: "\u{1F4FA} Screen Content" }, { id: "spaces", l: "\u{1F4CD} Spaces" }, { id: "setups", l: "\u{1F3AC} Setups" }, { id: "workstations", l: "\u{1F4BB} Workstations" }, { id: "talent", l: "\u{1F3A4} Talent" }, { id: "resources", l: "\u{1F4CA} Resources" }, { id: "lists", l: "\u{1F5C2} Metadata" }, { id: "crewRoles", l: "\u{1F3A5} Crew Roles" }, { id: "presets", l: "\u2B50 Production Presets" }, { id: "access", l: "\u{1F512} Access" }, { id: "issues", l: `\u{1F41E} Issues${unresolvedIssueCount ? ` (${unresolvedIssueCount})` : ""}` }];
     return /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 26, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Admin"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#8e97a6" } }, "Manage your team roster, equipment inventory, and studio spaces.")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 8, marginBottom: 20 } }, tabs.map((t) => /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -19518,7 +19523,29 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         gear: gear || [],
         lists
       }
-    ), tab === "access" && /* @__PURE__ */ React.createElement(AdminAccessTab, { tabLocks, onUpdateTabLocks }));
+    ), tab === "access" && /* @__PURE__ */ React.createElement(AdminAccessTab, { tabLocks, onUpdateTabLocks }), tab === "issues" && /* @__PURE__ */ React.createElement(AdminIssuesTab, { issueReports, onResolve: onResolveIssue }));
+  };
+  var AdminIssuesTab = ({ issueReports = [], onResolve }) => {
+    const [showResolved, setShowResolved] = (0, import_react.useState)(false);
+    const visible = showResolved ? issueReports : issueReports.filter((r) => !r.resolved);
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#838ba0" } }, `App errors are logged here automatically; "Report an Issue" messages come from anyone in the app's user menu.`), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setShowResolved((v) => !v),
+        style: { background: showResolved ? "#1f2937" : "transparent", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "6px 14px", fontSize: 14, fontWeight: 700, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }
+      },
+      showResolved ? "Hide resolved" : "Show resolved"
+    )), visible.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#838ba0", padding: "32px 0", fontSize: 16 } }, showResolved ? "Nothing here yet." : "No open issues. \u{1F389}"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, visible.map((r) => {
+      const isReport = r.source === "user_report";
+      return /* @__PURE__ */ React.createElement("div", { key: r.id, style: { background: "#111827", border: `1px solid ${r.resolved ? "#1f2937" : isReport ? "#6366f140" : "#ef444440"}`, borderRadius: 10, padding: 14, opacity: r.resolved ? 0.6 : 1 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement(Chip, { label: isReport ? "Report" : "App Error", color: isReport ? "#6366f1" : "#ef4444", xs: true }), r.reporter_name && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: "#e2e8f0" } }, r.reporter_name), r.reporter_email && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#6b7280" } }, r.reporter_email)), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => onResolve?.(r.id, !r.resolved),
+          style: { background: r.resolved ? "#1f2937" : "#10b98118", border: `1px solid ${r.resolved ? "#374151" : "#10b98140"}`, borderRadius: 6, color: r.resolved ? "#9ca3af" : "#10b981", padding: "3px 10px", fontSize: 13, fontWeight: 700, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }
+        },
+        r.resolved ? "Reopen" : "\u2713 Resolve"
+      )), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#e2e8f0", marginBottom: 6, whiteSpace: "pre-wrap" } }, r.message), r.context && Object.keys(r.context).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#4b5563", fontFamily: "monospace" } }, JSON.stringify(r.context)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#4b5563", marginTop: 4 } }, fmtDT(r.created_at)));
+    })));
   };
   var passwordComplexityError = (pw) => {
     if (pw.length < 8) return "Password must be at least 8 characters.";
@@ -19860,6 +19887,45 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       },
       "Create My Profile \u2192"
     ))));
+  };
+  var ReportIssueModal = ({ onSubmit, onClose }) => {
+    const [message, setMessage] = (0, import_react.useState)("");
+    const [busy, setBusy] = (0, import_react.useState)(false);
+    const [sent, setSent] = (0, import_react.useState)(false);
+    const [err, setErr] = (0, import_react.useState)("");
+    const submit = async () => {
+      if (!message.trim()) return;
+      setBusy(true);
+      setErr("");
+      const { error } = await onSubmit(message.trim());
+      setBusy(false);
+      if (error) {
+        setErr(error.message || "Couldn't send \u2014 try again.");
+        return;
+      }
+      setSent(true);
+    };
+    const lbl = { fontSize: 13, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 6, display: "block" };
+    const inp = { width: "100%", background: "#0a0f1a", border: "1px solid #374151", borderRadius: 8, color: "#f1f5f9", padding: "9px 12px", fontSize: 17, outline: "none", fontFamily: "'DM Sans',sans-serif", colorScheme: "dark" };
+    return /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 5e3, background: "#000c", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }, onClick: onClose }, /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 16, padding: 32, width: "100%", maxWidth: 480, boxShadow: "0 24px 80px #000c" }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 4 } }, "\u{1F41E} Report an Issue"), sent ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#9ca3af", margin: "16px 0 20px" } }, "Sent \u2014 thanks, this'll get looked at."), /* @__PURE__ */ React.createElement("button", { onClick: onClose, style: { width: "100%", background: "#1f2937", border: "none", borderRadius: 8, color: "#e2e8f0", padding: "10px 0", fontSize: 16, fontWeight: 700, cursor: "pointer" } }, "Close")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#9ca3af", marginBottom: 18 } }, "What happened? Be as specific as you can \u2014 what you were doing, what you expected, what happened instead."), /* @__PURE__ */ React.createElement("label", { style: lbl }, "Description"), /* @__PURE__ */ React.createElement(
+      "textarea",
+      {
+        autoFocus: true,
+        value: message,
+        onChange: (e) => setMessage(e.target.value),
+        rows: 6,
+        placeholder: "e.g. Clicked Save on a deliverable's title and it didn't stick after a refresh\u2026",
+        style: { ...inp, resize: "vertical", marginBottom: 14, fontFamily: "'DM Sans',sans-serif" }
+      }
+    ), err && /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 14, marginBottom: 12 } }, err), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ React.createElement("button", { onClick: onClose, style: { flex: 1, background: "#1f2937", border: "none", borderRadius: 8, color: "#9ca3af", padding: "10px 0", fontSize: 16, fontWeight: 700, cursor: "pointer" } }, "Cancel"), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: submit,
+        disabled: !message.trim() || busy,
+        style: { flex: 1, background: "#6366f1", border: "none", borderRadius: 8, color: "#fff", padding: "10px 0", fontSize: 16, fontWeight: 700, cursor: "pointer", opacity: !message.trim() || busy ? 0.5 : 1 }
+      },
+      busy ? "Sending\u2026" : "Send"
+    )))));
   };
   var MyProfileModal = ({ member, onSubmit, onClose }) => {
     const [name, setName] = (0, import_react.useState)(member.name || "");
@@ -20379,6 +20445,28 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       console.error(`[Supabase] ${label} failed:`, error);
       const detail = error.message || error.details || error.hint || error.code || "unknown error";
       showToast({ msg: `${label} failed: ${detail}`, color: "#ef4444" });
+      if (sb) {
+        sb.from("issue_reports").insert({
+          source: "app_error",
+          reporter_email: authUser?.email || null,
+          reporter_name: currentMember?.name || null,
+          message: `${label} failed: ${detail}`,
+          context: { label, view: viewRef.current || null, error_code: error.code || null, error_details: error.details || null, error_hint: error.hint || null }
+        }).then(({ error: logErr }) => {
+          if (logErr) console.error("[issue_reports] failed to log:", logErr);
+        });
+      }
+    };
+    reportErrorGlobal = reportSbError;
+    const submitIssueReport = async (message) => {
+      if (!sb) return { error: { message: "Not connected." } };
+      return sb.from("issue_reports").insert({
+        source: "user_report",
+        reporter_email: authUser?.email || null,
+        reporter_name: currentMember?.name || null,
+        message,
+        context: { view }
+      });
     };
     const logActivity = ({ entityType, entityLabel, action, detail, projectId }) => {
       const au = authUserRef.current;
@@ -20520,12 +20608,12 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       if (SHADOW_WRITE_CUSTOM_TASKS && sb) {
         addCustomTaskRow(sb, task).then(({ data, error }) => {
           if (error) {
-            console.warn("[shadow write] addCustomTask failed:", error);
+            reportSbError("addCustomTask", error);
             return;
           }
           if (!data) return;
           setCustomTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, _rowId: data.id } : t));
-        }).catch((e) => console.warn("[shadow write] addCustomTask failed:", e));
+        }).catch((e) => reportSbError("addCustomTask", e));
       }
     };
     const updateCustomTask = (task) => {
@@ -20534,8 +20622,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       if (SHADOW_WRITE_CUSTOM_TASKS && sb && prev?._rowId) {
         const { id: _id, legacy_id: _legacyId, project_id: _projectId, ...patch } = customTaskToRow(task);
         updateCustomTaskRow(sb, prev._rowId, patch).then(({ error }) => {
-          if (error) console.warn("[shadow write] updateCustomTask failed:", error);
-        }).catch((e) => console.warn("[shadow write] updateCustomTask failed:", e));
+          if (error) reportSbError("updateCustomTask", error);
+        }).catch((e) => reportSbError("updateCustomTask", e));
       }
     };
     const deleteCustomTask = (taskId) => {
@@ -20543,8 +20631,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       saveCustomTasks(customTasks.filter((t) => t.id !== taskId));
       if (SHADOW_WRITE_CUSTOM_TASKS && sb && prev?._rowId) {
         deleteCustomTaskRow(sb, prev._rowId).then(({ error }) => {
-          if (error) console.warn("[shadow write] deleteCustomTask failed:", error);
-        }).catch((e) => console.warn("[shadow write] deleteCustomTask failed:", e));
+          if (error) reportSbError("deleteCustomTask", error);
+        }).catch((e) => reportSbError("deleteCustomTask", e));
       }
     };
     const [unavailability, setUnavailability] = (0, import_react.useState)([]);
@@ -20556,12 +20644,12 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       if (SHADOW_WRITE_UNAVAILABILITY && sb) {
         sb.from("unavailability").insert(unavailabilityToRow(entry)).select().single().then(({ data, error }) => {
           if (error) {
-            console.warn("[shadow write] addUnavailability failed:", error);
+            reportSbError("addUnavailability", error);
             return;
           }
           if (!data) return;
           setUnavailability((prev) => prev.map((u) => u.id === entry.id ? { ...u, _rowId: data.id } : u));
-        }).catch((e) => console.warn("[shadow write] addUnavailability failed:", e));
+        }).catch((e) => reportSbError("addUnavailability", e));
       }
     };
     const deleteUnavailability = (id) => {
@@ -20569,8 +20657,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       saveUnavailability(unavailability.filter((u) => u.id !== id));
       if (SHADOW_WRITE_UNAVAILABILITY && sb && prev?._rowId) {
         sb.from("unavailability").delete().eq("id", prev._rowId).then(({ error }) => {
-          if (error) console.warn("[shadow write] deleteUnavailability failed:", error);
-        }).catch((e) => console.warn("[shadow write] deleteUnavailability failed:", e));
+          if (error) reportSbError("deleteUnavailability", error);
+        }).catch((e) => reportSbError("deleteUnavailability", e));
       }
     };
     const RESOURCE_CONFIG_STORAGE_KEY = "posttrack-resource-config";
@@ -20601,7 +20689,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       showToast({ msg: `Nudge sent for "${taskLabel}"`, color: "#f59e0b" });
       if (SHADOW_WRITE_NUDGES && sb) {
         sb.from("nudges").insert(fresh.map(nudgeToRow)).then(({ error }) => {
-          if (error) console.warn("[shadow write] addNudge failed:", error);
+          if (error) reportSbError("addNudge", error);
         });
       }
     };
@@ -20613,12 +20701,12 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       if (SHADOW_WRITE_SETUP_TYPES && sb) {
         addSetupTypeRow(sb, tpl).then(({ data, error }) => {
           if (error) {
-            console.warn("[shadow write] addSetupType failed:", error);
+            reportSbError("addSetupType", error);
             return;
           }
           if (!data) return;
           setSetupTypes((prev) => prev.map((t) => t.id === tpl.id ? { ...t, _rowId: data.id } : t));
-        }).catch((e) => console.warn("[shadow write] addSetupType failed:", e));
+        }).catch((e) => reportSbError("addSetupType", e));
       }
     };
     const updateSetupType = (tpl) => {
@@ -20627,8 +20715,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       if (SHADOW_WRITE_SETUP_TYPES && sb && prev?._rowId) {
         const { id: _id, legacy_id: _legacyId, ...patch } = setupTypeToRow(tpl);
         updateSetupTypeRow(sb, prev._rowId, patch).then(({ error }) => {
-          if (error) console.warn("[shadow write] updateSetupType failed:", error);
-        }).catch((e) => console.warn("[shadow write] updateSetupType failed:", e));
+          if (error) reportSbError("updateSetupType", error);
+        }).catch((e) => reportSbError("updateSetupType", e));
       }
     };
     const deleteSetupType = (id) => {
@@ -20636,8 +20724,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       saveSetupTypes(setupTypes.filter((t) => t.id !== id));
       if (SHADOW_WRITE_SETUP_TYPES && sb && prev?._rowId) {
         deleteSetupTypeRow(sb, prev._rowId).then(({ error }) => {
-          if (error) console.warn("[shadow write] deleteSetupType failed:", error);
-        }).catch((e) => console.warn("[shadow write] deleteSetupType failed:", e));
+          if (error) reportSbError("deleteSetupType", error);
+        }).catch((e) => reportSbError("deleteSetupType", e));
       }
     };
     const saveTalentRoster = (tr) => {
@@ -21326,7 +21414,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         if (!REALTIME_PHASE2) return;
         setTabLocks(payload.new?.locks || {});
       };
-      const channel = sb.channel("posttrack-realtime").on("postgres_changes", { event: "INSERT", schema: "public", table: "projects" }, mergeProjectUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "projects" }, mergeProjectUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "projects" }, mergeDelete(setProjects)).on("postgres_changes", { event: "INSERT", schema: "public", table: "team_members" }, mergeUpsert(setTeamRoster, rowToTeamMember)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "team_members" }, mergeUpsert(setTeamRoster, rowToTeamMember)).on("postgres_changes", { event: "DELETE", schema: "public", table: "team_members" }, mergeDelete(setTeamRoster)).on("postgres_changes", { event: "INSERT", schema: "public", table: "studio_bookings" }, mergeUpsert(setStudioBookings, rowToBooking)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "studio_bookings" }, mergeUpsert(setStudioBookings, rowToBooking)).on("postgres_changes", { event: "DELETE", schema: "public", table: "studio_bookings" }, mergeDelete(setStudioBookings)).on("postgres_changes", { event: "INSERT", schema: "public", table: "deliverables" }, mergeDeliverableUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "deliverables" }, mergeDeliverableUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "deliverables" }, mergeDeliverableDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "productions" }, mergeProductionUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "productions" }, mergeProductionUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "productions" }, mergeProductionDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "review_rounds" }, mergeReviewRoundUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "review_rounds" }, mergeReviewRoundUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "review_rounds" }, mergeReviewRoundDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "work_review_sessions" }, mergeUpsertByRowId(setWorkReviewSessions, rowToWorkReviewSession)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "work_review_sessions" }, mergeUpsertByRowId(setWorkReviewSessions, rowToWorkReviewSession)).on("postgres_changes", { event: "DELETE", schema: "public", table: "work_review_sessions" }, mergeDeleteByRowId(setWorkReviewSessions)).on("postgres_changes", { event: "INSERT", schema: "public", table: "setup_types" }, mergeUpsertByRowId(setSetupTypes, rowToSetupType)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "setup_types" }, mergeUpsertByRowId(setSetupTypes, rowToSetupType)).on("postgres_changes", { event: "DELETE", schema: "public", table: "setup_types" }, mergeDeleteByRowId(setSetupTypes)).on("postgres_changes", { event: "INSERT", schema: "public", table: "production_presets" }, mergeUpsertByRowId(setAppPresets, rowToProductionPreset)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "production_presets" }, mergeUpsertByRowId(setAppPresets, rowToProductionPreset)).on("postgres_changes", { event: "DELETE", schema: "public", table: "production_presets" }, mergeDeleteByRowId(setAppPresets)).on("postgres_changes", { event: "INSERT", schema: "public", table: "custom_tasks" }, mergeUpsertByRowId(setCustomTasks, rowToCustomTask)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "custom_tasks" }, mergeUpsertByRowId(setCustomTasks, rowToCustomTask)).on("postgres_changes", { event: "DELETE", schema: "public", table: "custom_tasks" }, mergeDeleteByRowId(setCustomTasks)).on("postgres_changes", { event: "INSERT", schema: "public", table: "gear" }, mergeUpsertByRowId(setGearList, rowToGear)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "gear" }, mergeUpsertByRowId(setGearList, rowToGear)).on("postgres_changes", { event: "DELETE", schema: "public", table: "gear" }, mergeDeleteByRowId(setGearList)).on("postgres_changes", { event: "INSERT", schema: "public", table: "furniture" }, mergeUpsertByRowId(setFurnitureList, rowToFurniture)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "furniture" }, mergeUpsertByRowId(setFurnitureList, rowToFurniture)).on("postgres_changes", { event: "DELETE", schema: "public", table: "furniture" }, mergeDeleteByRowId(setFurnitureList)).on("postgres_changes", { event: "INSERT", schema: "public", table: "props" }, mergeUpsertByRowId(setPropsList, rowToProp)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "props" }, mergeUpsertByRowId(setPropsList, rowToProp)).on("postgres_changes", { event: "DELETE", schema: "public", table: "props" }, mergeDeleteByRowId(setPropsList)).on("postgres_changes", { event: "INSERT", schema: "public", table: "screen_content_options" }, mergeScreenContentUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "screen_content_options" }, mergeScreenContentUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "screen_content_options" }, mergeScreenContentDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "unavailability" }, mergeUpsertByRowId(setUnavailability, rowToUnavailability)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "unavailability" }, mergeUpsertByRowId(setUnavailability, rowToUnavailability)).on("postgres_changes", { event: "DELETE", schema: "public", table: "unavailability" }, mergeDeleteByRowId(setUnavailability)).on("postgres_changes", { event: "INSERT", schema: "public", table: "talent_roster" }, mergeUpsertByRowId(setTalentRoster, rowToTalent)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "talent_roster" }, mergeUpsertByRowId(setTalentRoster, rowToTalent)).on("postgres_changes", { event: "DELETE", schema: "public", table: "talent_roster" }, mergeDeleteByRowId(setTalentRoster)).on("postgres_changes", { event: "INSERT", schema: "public", table: "nudges" }, mergeUpsertByRowId(setNudges, rowToNudge)).on("postgres_changes", { event: "DELETE", schema: "public", table: "nudges" }, mergeDeleteByRowId(setNudges)).on("postgres_changes", { event: "INSERT", schema: "public", table: "intakes" }, mergeUpsertByRowId(setIntakes, rowToIntake)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "intakes" }, mergeUpsertByRowId(setIntakes, rowToIntake)).on("postgres_changes", { event: "DELETE", schema: "public", table: "intakes" }, mergeDeleteByRowId(setIntakes)).on("postgres_changes", { event: "INSERT", schema: "public", table: "bec_requests" }, mergeUpsertByRowId(setBecRequests, rowToBecRequest)).on("postgres_changes", { event: "INSERT", schema: "public", table: "media_cards" }, mergeUpsertByRowId(setMediaCards, rowToMediaCard)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "media_cards" }, mergeUpsertByRowId(setMediaCards, rowToMediaCard)).on("postgres_changes", { event: "DELETE", schema: "public", table: "media_cards" }, mergeDeleteByRowId(setMediaCards)).on("postgres_changes", { event: "INSERT", schema: "public", table: "workstations" }, mergeUpsertByRowId(setWorkstations, rowToWorkstation)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "workstations" }, mergeUpsertByRowId(setWorkstations, rowToWorkstation)).on("postgres_changes", { event: "DELETE", schema: "public", table: "workstations" }, mergeDeleteByRowId(setWorkstations)).on("postgres_changes", { event: "INSERT", schema: "public", table: "vendor_companies" }, mergeStringUpsert(setVendorCompanies)).on("postgres_changes", { event: "DELETE", schema: "public", table: "vendor_companies" }, mergeStringDelete(setVendorCompanies)).on("postgres_changes", { event: "INSERT", schema: "public", table: "reviewer_names" }, mergeStringUpsert(setReviewerNames)).on("postgres_changes", { event: "DELETE", schema: "public", table: "reviewer_names" }, mergeStringDelete(setReviewerNames)).on("postgres_changes", { event: "INSERT", schema: "public", table: "studio_spaces" }, mergeStringUpsert(setStudioSpaces)).on("postgres_changes", { event: "DELETE", schema: "public", table: "studio_spaces" }, mergeStringDelete(setStudioSpaces)).on("postgres_changes", { event: "INSERT", schema: "public", table: "studio_space_meta" }, mergeSpaceMetaUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "studio_space_meta" }, mergeSpaceMetaUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "studio_space_meta" }, mergeSpaceMetaDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "app_lists" }, mergeAppListsUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "app_lists" }, mergeAppListsUpsert).on("postgres_changes", { event: "INSERT", schema: "public", table: "resource_config" }, mergeResourceConfigUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "resource_config" }, mergeResourceConfigUpsert).on("postgres_changes", { event: "INSERT", schema: "public", table: "tab_locks" }, mergeTabLocksUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "tab_locks" }, mergeTabLocksUpsert).subscribe((status, err) => {
+      const channel = sb.channel("posttrack-realtime").on("postgres_changes", { event: "INSERT", schema: "public", table: "projects" }, mergeProjectUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "projects" }, mergeProjectUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "projects" }, mergeDelete(setProjects)).on("postgres_changes", { event: "INSERT", schema: "public", table: "team_members" }, mergeUpsert(setTeamRoster, rowToTeamMember)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "team_members" }, mergeUpsert(setTeamRoster, rowToTeamMember)).on("postgres_changes", { event: "DELETE", schema: "public", table: "team_members" }, mergeDelete(setTeamRoster)).on("postgres_changes", { event: "INSERT", schema: "public", table: "studio_bookings" }, mergeUpsert(setStudioBookings, rowToBooking)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "studio_bookings" }, mergeUpsert(setStudioBookings, rowToBooking)).on("postgres_changes", { event: "DELETE", schema: "public", table: "studio_bookings" }, mergeDelete(setStudioBookings)).on("postgres_changes", { event: "INSERT", schema: "public", table: "deliverables" }, mergeDeliverableUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "deliverables" }, mergeDeliverableUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "deliverables" }, mergeDeliverableDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "productions" }, mergeProductionUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "productions" }, mergeProductionUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "productions" }, mergeProductionDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "review_rounds" }, mergeReviewRoundUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "review_rounds" }, mergeReviewRoundUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "review_rounds" }, mergeReviewRoundDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "work_review_sessions" }, mergeUpsertByRowId(setWorkReviewSessions, rowToWorkReviewSession)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "work_review_sessions" }, mergeUpsertByRowId(setWorkReviewSessions, rowToWorkReviewSession)).on("postgres_changes", { event: "DELETE", schema: "public", table: "work_review_sessions" }, mergeDeleteByRowId(setWorkReviewSessions)).on("postgres_changes", { event: "INSERT", schema: "public", table: "setup_types" }, mergeUpsertByRowId(setSetupTypes, rowToSetupType)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "setup_types" }, mergeUpsertByRowId(setSetupTypes, rowToSetupType)).on("postgres_changes", { event: "DELETE", schema: "public", table: "setup_types" }, mergeDeleteByRowId(setSetupTypes)).on("postgres_changes", { event: "INSERT", schema: "public", table: "production_presets" }, mergeUpsertByRowId(setAppPresets, rowToProductionPreset)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "production_presets" }, mergeUpsertByRowId(setAppPresets, rowToProductionPreset)).on("postgres_changes", { event: "DELETE", schema: "public", table: "production_presets" }, mergeDeleteByRowId(setAppPresets)).on("postgres_changes", { event: "INSERT", schema: "public", table: "custom_tasks" }, mergeUpsertByRowId(setCustomTasks, rowToCustomTask)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "custom_tasks" }, mergeUpsertByRowId(setCustomTasks, rowToCustomTask)).on("postgres_changes", { event: "DELETE", schema: "public", table: "custom_tasks" }, mergeDeleteByRowId(setCustomTasks)).on("postgres_changes", { event: "INSERT", schema: "public", table: "gear" }, mergeUpsertByRowId(setGearList, rowToGear)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "gear" }, mergeUpsertByRowId(setGearList, rowToGear)).on("postgres_changes", { event: "DELETE", schema: "public", table: "gear" }, mergeDeleteByRowId(setGearList)).on("postgres_changes", { event: "INSERT", schema: "public", table: "furniture" }, mergeUpsertByRowId(setFurnitureList, rowToFurniture)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "furniture" }, mergeUpsertByRowId(setFurnitureList, rowToFurniture)).on("postgres_changes", { event: "DELETE", schema: "public", table: "furniture" }, mergeDeleteByRowId(setFurnitureList)).on("postgres_changes", { event: "INSERT", schema: "public", table: "props" }, mergeUpsertByRowId(setPropsList, rowToProp)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "props" }, mergeUpsertByRowId(setPropsList, rowToProp)).on("postgres_changes", { event: "DELETE", schema: "public", table: "props" }, mergeDeleteByRowId(setPropsList)).on("postgres_changes", { event: "INSERT", schema: "public", table: "screen_content_options" }, mergeScreenContentUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "screen_content_options" }, mergeScreenContentUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "screen_content_options" }, mergeScreenContentDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "unavailability" }, mergeUpsertByRowId(setUnavailability, rowToUnavailability)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "unavailability" }, mergeUpsertByRowId(setUnavailability, rowToUnavailability)).on("postgres_changes", { event: "DELETE", schema: "public", table: "unavailability" }, mergeDeleteByRowId(setUnavailability)).on("postgres_changes", { event: "INSERT", schema: "public", table: "talent_roster" }, mergeUpsertByRowId(setTalentRoster, rowToTalent)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "talent_roster" }, mergeUpsertByRowId(setTalentRoster, rowToTalent)).on("postgres_changes", { event: "DELETE", schema: "public", table: "talent_roster" }, mergeDeleteByRowId(setTalentRoster)).on("postgres_changes", { event: "INSERT", schema: "public", table: "nudges" }, mergeUpsertByRowId(setNudges, rowToNudge)).on("postgres_changes", { event: "DELETE", schema: "public", table: "nudges" }, mergeDeleteByRowId(setNudges)).on("postgres_changes", { event: "INSERT", schema: "public", table: "intakes" }, mergeUpsertByRowId(setIntakes, rowToIntake)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "intakes" }, mergeUpsertByRowId(setIntakes, rowToIntake)).on("postgres_changes", { event: "DELETE", schema: "public", table: "intakes" }, mergeDeleteByRowId(setIntakes)).on("postgres_changes", { event: "INSERT", schema: "public", table: "bec_requests" }, mergeUpsertByRowId(setBecRequests, rowToBecRequest)).on("postgres_changes", { event: "INSERT", schema: "public", table: "media_cards" }, mergeUpsertByRowId(setMediaCards, rowToMediaCard)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "media_cards" }, mergeUpsertByRowId(setMediaCards, rowToMediaCard)).on("postgres_changes", { event: "DELETE", schema: "public", table: "media_cards" }, mergeDeleteByRowId(setMediaCards)).on("postgres_changes", { event: "INSERT", schema: "public", table: "workstations" }, mergeUpsertByRowId(setWorkstations, rowToWorkstation)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "workstations" }, mergeUpsertByRowId(setWorkstations, rowToWorkstation)).on("postgres_changes", { event: "DELETE", schema: "public", table: "workstations" }, mergeDeleteByRowId(setWorkstations)).on("postgres_changes", { event: "INSERT", schema: "public", table: "vendor_companies" }, mergeStringUpsert(setVendorCompanies)).on("postgres_changes", { event: "DELETE", schema: "public", table: "vendor_companies" }, mergeStringDelete(setVendorCompanies)).on("postgres_changes", { event: "INSERT", schema: "public", table: "reviewer_names" }, mergeStringUpsert(setReviewerNames)).on("postgres_changes", { event: "DELETE", schema: "public", table: "reviewer_names" }, mergeStringDelete(setReviewerNames)).on("postgres_changes", { event: "INSERT", schema: "public", table: "studio_spaces" }, mergeStringUpsert(setStudioSpaces)).on("postgres_changes", { event: "DELETE", schema: "public", table: "studio_spaces" }, mergeStringDelete(setStudioSpaces)).on("postgres_changes", { event: "INSERT", schema: "public", table: "studio_space_meta" }, mergeSpaceMetaUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "studio_space_meta" }, mergeSpaceMetaUpsert).on("postgres_changes", { event: "DELETE", schema: "public", table: "studio_space_meta" }, mergeSpaceMetaDelete).on("postgres_changes", { event: "INSERT", schema: "public", table: "app_lists" }, mergeAppListsUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "app_lists" }, mergeAppListsUpsert).on("postgres_changes", { event: "INSERT", schema: "public", table: "resource_config" }, mergeResourceConfigUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "resource_config" }, mergeResourceConfigUpsert).on("postgres_changes", { event: "INSERT", schema: "public", table: "tab_locks" }, mergeTabLocksUpsert).on("postgres_changes", { event: "UPDATE", schema: "public", table: "tab_locks" }, mergeTabLocksUpsert).on("postgres_changes", { event: "INSERT", schema: "public", table: "issue_reports" }, mergeUpsert(setIssueReports, (row) => row)).on("postgres_changes", { event: "UPDATE", schema: "public", table: "issue_reports" }, mergeUpsert(setIssueReports, (row) => row)).on("postgres_changes", { event: "DELETE", schema: "public", table: "issue_reports" }, mergeDelete(setIssueReports)).subscribe((status, err) => {
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
           console.warn("[realtime] channel status:", status, err || "");
         }
@@ -21397,6 +21485,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       return (currentMember?.roles || []).some((r) => allowed.includes(r));
     };
     const [showMyProfile, setShowMyProfile] = (0, import_react.useState)(false);
+    const [showReportIssue, setShowReportIssue] = (0, import_react.useState)(false);
     const [showUserMenu, setShowUserMenu] = (0, import_react.useState)(false);
     const userMenuBtnRef = (0, import_react.useRef)(null);
     const userMenuRef = (0, import_react.useRef)(null);
@@ -21453,7 +21542,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
             const match = inserted.find((i) => String(i.legacyId) === String(p.id));
             return match ? { ...p, _rowId: match.rowId } : p;
           }));
-        }).catch((e) => console.warn("[shadow write] preset diff failed:", e));
+        }).catch((e) => reportSbError("preset diff", e));
       }
     }, []);
     (0, import_react.useEffect)(() => {
@@ -21480,7 +21569,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         const next = [...prev, trimmed];
         if (SHADOW_WRITE_VENDOR_COMPANIES && sb) {
           sb.from("vendor_companies").insert({ name: trimmed }).then(({ error }) => {
-            if (error) console.warn("[shadow write] addVendorCompany failed:", error);
+            if (error) reportSbError("addVendorCompany", error);
           });
         }
         return next;
@@ -21496,7 +21585,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         const next = [...prev, trimmed];
         if (SHADOW_WRITE_REVIEWER_NAMES && sb) {
           sb.from("reviewer_names").insert({ name: trimmed }).then(({ error }) => {
-            if (error) console.warn("[shadow write] addReviewerName failed:", error);
+            if (error) reportSbError("addReviewerName", error);
           });
         }
         return next;
@@ -21505,21 +21594,38 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const WORK_REVIEW_SESSIONS_STORAGE_KEY = "work-review-sessions-v1";
     const [workReviewSessions, setWorkReviewSessions] = (0, import_react.useState)([]);
     const [workReviewSessionsLoaded, setWorkReviewSessionsLoaded] = (0, import_react.useState)(false);
+    const [issueReports, setIssueReports] = (0, import_react.useState)([]);
+    (0, import_react.useEffect)(() => {
+      if (!authed || !sb) return;
+      sb.from("issue_reports").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+        if (error) {
+          console.error("[issue_reports] load failed:", error);
+          return;
+        }
+        setIssueReports(data || []);
+      });
+    }, [authed]);
+    const resolveIssueReport = (0, import_react.useCallback)((id, resolved) => {
+      setIssueReports((prev) => prev.map((r) => r.id !== id ? r : { ...r, resolved, resolved_at: resolved ? (/* @__PURE__ */ new Date()).toISOString() : null }));
+      if (sb) sb.from("issue_reports").update({ resolved, resolved_at: resolved ? (/* @__PURE__ */ new Date()).toISOString() : null }).eq("id", id).then(({ error }) => {
+        if (error) reportSbError("Issue update", error);
+      });
+    }, []);
     const addWorkReviewSession = (0, import_react.useCallback)((session) => {
       const withId = { id: uid(), reviewers: [], notes: "", ...session };
       setWorkReviewSessions((prev) => [...prev, withId]);
       if (SHADOW_WRITE_WORK_REVIEW_SESSIONS && sb) {
         addWorkReviewSessionRow(sb, withId).then(({ data, error }) => {
           if (error) {
-            console.warn("[shadow write] addWorkReviewSession failed:", error);
+            reportSbError("addWorkReviewSession", error);
             return;
           }
           if (!data) return;
           setWorkReviewSessions((prev) => prev.map((s) => s.id === withId.id ? { ...s, _rowId: data.id } : s));
           sb.from("review_rounds").update({ work_review_session_id: data.id }).eq("legacy_work_review_session_id", withId.id).is("work_review_session_id", null).then(({ error: error2 }) => {
-            if (error2) console.warn("[shadow write] work review session remap failed:", error2);
+            if (error2) reportSbError("work review session remap", error2);
           });
-        }).catch((e) => console.warn("[shadow write] addWorkReviewSession failed:", e));
+        }).catch((e) => reportSbError("addWorkReviewSession", e));
       }
       return withId;
     }, []);
@@ -21531,8 +21637,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           if (existing?._rowId) {
             const { id: _id, legacy_id: _legacyId, ...rowPatch } = workReviewSessionToRow({ ...existing, ...patch });
             updateWorkReviewSessionRow(sb, existing._rowId, rowPatch).then(({ error }) => {
-              if (error) console.warn("[shadow write] updateWorkReviewSession failed:", error);
-            }).catch((e) => console.warn("[shadow write] updateWorkReviewSession failed:", e));
+              if (error) reportSbError("updateWorkReviewSession", error);
+            }).catch((e) => reportSbError("updateWorkReviewSession", e));
           }
         }
         return next;
@@ -21635,7 +21741,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, deliverables: p.deliverables.map((d) => d.id !== delId ? d : applyFieldUpdate(d)) }));
       if (SHADOW_WRITE_DELIVERABLES && sb && prevDel?._rowId) {
         if (field === "rounds") {
-          writeRoundDiff(sb, prevDel._rowId, computeRoundDiff(prevDel.rounds || [], value || [])).catch((e) => console.warn("[shadow write] round diff failed:", e));
+          writeRoundDiff(sb, prevDel._rowId, computeRoundDiff(prevDel.rounds || [], value || [])).catch((e) => reportSbError("round diff", e));
         } else {
           const rowId = prevDel._rowId;
           const existingTimer = delWriteTimersRef.current.get(rowId);
@@ -21647,8 +21753,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
             const fullRow = deliverableToRow(latestDel, projectId);
             const { id: _id, legacy_id: _legacyId, project_id: _projectId, ...patch } = fullRow;
             updateDeliverableRow(sb, rowId, patch).then(({ error }) => {
-              if (error) console.warn("[shadow write] updateDel failed:", error);
-            }).catch((e) => console.warn("[shadow write] updateDel failed:", e));
+              if (error) reportSbError("updateDel", error);
+            }).catch((e) => reportSbError("updateDel", e));
           }, DEL_WRITE_DEBOUNCE_MS);
           delWriteTimersRef.current.set(rowId, timer);
         }
@@ -21697,12 +21803,12 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       if (SHADOW_WRITE_DELIVERABLES && sb) {
         addDeliverableRow(sb, projectId, newDel).then(({ data, error }) => {
           if (error) {
-            console.warn("[shadow write] addDel failed:", error);
+            reportSbError("addDel", error);
             return;
           }
           if (!data) return;
           setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, deliverables: p.deliverables.map((d) => d.id === newDel.id ? { ...d, _rowId: data.id } : d) }));
-        }).catch((e) => console.warn("[shadow write] addDel failed:", e));
+        }).catch((e) => reportSbError("addDel", e));
       }
       if (SEED_PROJECTS.some((p) => p.id === projectId)) {
         setSeedOverrides((prev) => {
@@ -21720,8 +21826,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, deliverables: p.deliverables.filter((d) => d.id !== delId) }));
       if (SHADOW_WRITE_DELIVERABLES && sb && del?._rowId) {
         deleteDeliverableRow(sb, del._rowId).then(({ error }) => {
-          if (error) console.warn("[shadow write] deleteDel failed:", error);
-        }).catch((e) => console.warn("[shadow write] deleteDel failed:", e));
+          if (error) reportSbError("deleteDel", error);
+        }).catch((e) => reportSbError("deleteDel", e));
       }
       if (SEED_PROJECTS.some((p) => p.id === projectId)) {
         setSeedOverrides((prev) => {
@@ -21821,7 +21927,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
                 const tag = insertedTags.find((t) => t.legacyId === pr.id);
                 return tag ? { ...pr, _rowId: tag.rowId } : pr;
               }) }));
-            }).catch((e) => console.warn("[shadow write] production diff failed:", e));
+            }).catch((e) => reportSbError("production diff", e));
           }, SAVE_DEBOUNCE_MS);
           productionsWriteRef.current.set(projectId, { timer, basePods });
         }
@@ -21941,7 +22047,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         saveBecRequests([entry, ...becRequests]);
         if (SHADOW_WRITE_BEC_REQUESTS && sb) {
           sb.from("bec_requests").insert(becRequestToRow(entry)).then(({ error }) => {
-            if (error) console.warn("[shadow write] bec_requests insert failed:", error);
+            if (error) reportSbError("bec_requests insert", error);
           });
         }
       };
@@ -22132,7 +22238,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       currentMember.name.split(" ").map((n) => n[0]).join("").slice(0, 2)
     ), showUserMenu && /* @__PURE__ */ React.createElement("div", { ref: userMenuRef, style: { position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 200, background: "#111827", border: "1px solid #1f2937", borderRadius: 9, padding: 6, minWidth: 170, boxShadow: "0 12px 32px #000a" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "6px 10px 8px", borderBottom: "1px solid #1f2937", marginBottom: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, currentMember.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#6b7280" } }, (currentMember.roles || [])[0])), [
       { label: "My View", icon: "\u{1F464}", onClick: () => setView("myview") },
-      { label: "Profile", icon: "\u2699", onClick: () => setShowMyProfile(true) }
+      { label: "Profile", icon: "\u2699", onClick: () => setShowMyProfile(true) },
+      { label: "Report an Issue", icon: "\u{1F41E}", onClick: () => setShowReportIssue(true) }
     ].map((item) => /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -22233,7 +22340,9 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         presets: appPresets,
         onUpdatePresets: saveAppPresets,
         tabLocks,
-        onUpdateTabLocks: saveTabLocks
+        onUpdateTabLocks: saveTabLocks,
+        issueReports,
+        onResolveIssue: resolveIssueReport
       }
     )))), liveSelected && /* @__PURE__ */ React.createElement(ProjectOverviewErrorBoundary, { key: `${liveSelected.id}:${popstateGen}`, onClose: closeProject }, /* @__PURE__ */ React.createElement(ProjectOverview, { project: liveSelected, team: allTeam, allProjects, onClose: closeProject, onTabChange: (tab, delId) => updateRoute({ ptab: tab, pitem: delId ?? null }), onUpdateDel: updateDel, onAddDel: addDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, initialTab: initialTab?.tab, initialShootId: initialTab?.itemId, initialItemId: initialTab?.itemId, studioBookings: allStudioBookings, mediaCards, setupTypes, onAddSetupType: addSetupType, talentRoster, onUpdateTalentRoster: saveTalentRoster, nudges, onAddNudge: addNudge, furnitureList, propsList, screenContentOptions, gearList, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, appPresets, onSaveAppPresets: saveAppPresets, vendorCompanies, addVendorCompany, intakes, becRequests, canAccessBudget: canAccessTab("budget"), reviewerNames, addReviewerName, workReviewSessions, addWorkReviewSession, updateWorkReviewSession, lists })), addingProject && /* @__PURE__ */ React.createElement(AddProjectModal, { team: allTeam, existingProjects: allProjects, onClose: () => setAddingProject(false), onAdd: addProject }), createFromIntake && /* @__PURE__ */ React.createElement(
       AddProjectModal,
@@ -22359,7 +22468,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           });
         }
       }
-    ), toast && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 600, background: toast.color, borderRadius: 10, padding: "12px 24px", fontSize: 17, fontWeight: 700, color: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,0.4)", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", pointerEvents: "none", animation: "fadeInUp 0.2s ease", maxWidth: "min(90vw,560px)", wordBreak: "break-word", textAlign: "center" } }, toast.msg), needsOnboarding && /* @__PURE__ */ React.createElement(OnboardingModal, { email: authUser.email, onSubmit: completeOnboarding, onSkip: () => setOnboardingDismissed(true) }), showMyProfile && currentMember && /* @__PURE__ */ React.createElement(MyProfileModal, { member: currentMember, onSubmit: updateMyProfile, onClose: () => setShowMyProfile(false) })));
+    ), toast && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 600, background: toast.color, borderRadius: 10, padding: "12px 24px", fontSize: 17, fontWeight: 700, color: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,0.4)", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", pointerEvents: "none", animation: "fadeInUp 0.2s ease", maxWidth: "min(90vw,560px)", wordBreak: "break-word", textAlign: "center" } }, toast.msg), needsOnboarding && /* @__PURE__ */ React.createElement(OnboardingModal, { email: authUser.email, onSubmit: completeOnboarding, onSkip: () => setOnboardingDismissed(true) }), showMyProfile && currentMember && /* @__PURE__ */ React.createElement(MyProfileModal, { member: currentMember, onSubmit: updateMyProfile, onClose: () => setShowMyProfile(false) }), showReportIssue && /* @__PURE__ */ React.createElement(ReportIssueModal, { onSubmit: submitIssueReport, onClose: () => setShowReportIssue(false) })));
   }
   window.App = App;
 })();

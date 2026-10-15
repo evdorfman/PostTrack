@@ -366,6 +366,15 @@ const DEFAULT_SCREEN_CONTENT_OPTIONS = {
 let _uid = 400;
 const uid = () => ++_uid;
 
+// Bridges the module-level data-write helpers further down (writeListDiff
+// and friends — plain functions outside any component, so they can't close
+// over component state) to the root component's reportSbError, which needs
+// sb/showToast/the current user, none of which exist at module scope. Set
+// on every render by the root component itself (see reportSbError's own
+// comment); defaults to a plain console.warn so nothing throws if this is
+// somehow ever called before first mount.
+let reportErrorGlobal = (label, error) => { if(error) console.warn(`[shadow write] ${label} failed:`, error); };
+
 // ─── URL routing ────────────────────────────────────────────────────────────
 // No router library — the app has never had one (confirmed: no prior use of
 // window.history/location.hash/URLSearchParams anywhere), so this is plain
@@ -6840,7 +6849,13 @@ const ProjectTeamPanel = ({project, lp, team, onUpdateProject}) => {
 class ProjectOverviewErrorBoundary extends React.Component {
   constructor(props){ super(props); this.state={hasError:false}; }
   static getDerivedStateFromError(){ return {hasError:true}; }
-  componentDidCatch(error,info){ console.error("ProjectOverview crashed:",error,info); }
+  componentDidCatch(error,info){
+    console.error("ProjectOverview crashed:",error,info);
+    // reportErrorGlobal rather than reportSbError directly — a class
+    // component can't call a hook-scoped function, same reason the
+    // module-level data-write helpers use it (see its own comment).
+    reportErrorGlobal(`ProjectOverview crashed: ${error?.message||error}`, {message: info?.componentStack||"(no stack)"});
+  }
   render(){
     if(this.state.hasError) return (
       <div onClick={this.props.onClose} style={{position:"fixed",inset:0,background:"#000d",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
@@ -15737,7 +15752,7 @@ const writeListDiff = (sbClient, table, diff, toRow) => Promise.all([
   ...diff.toUpdate.map(({rowId,patch,legacyId})=>sbClient.from(table).update(patch).eq("id", rowId).then(({error})=>({kind:"update", legacyId, error}))),
   ...diff.toDelete.map(x=>sbClient.from(table).delete().eq("id", x._rowId).then(({error})=>({kind:"delete", legacyId:x.id, error}))),
 ]).then(results=>{
-  results.forEach(({error})=>{ if(error) console.warn(`[shadow write] ${table} diff op failed:`, error); });
+  results.forEach(({error})=>{ if(error) reportErrorGlobal(`${table} diff op`, error); });
   return results.filter(r=>r.kind==="insert" && !r.error && r.data).map(r=>({legacyId:r.legacyId, rowId:r.data.id}));
 });
 
@@ -15758,7 +15773,7 @@ const writeStringListDiff = (sbClient, table, diff) => Promise.all([
   ...diff.toInsert.map(name=>sbClient.from(table).insert({name}).then(({error})=>({error}))),
   ...diff.toDelete.map(name=>sbClient.from(table).delete().eq("name", name).then(({error})=>({error}))),
 ]).then(results=>{
-  results.forEach(({error})=>{ if(error) console.warn(`[shadow write] ${table} diff op failed:`, error); });
+  results.forEach(({error})=>{ if(error) reportErrorGlobal(`${table} diff op`, error); });
 });
 
 // studio_space_meta is an object keyed by space name rather than an array —
@@ -15788,13 +15803,13 @@ const computeSpaceMetaDiff = (oldMeta, newMeta) => {
 const writeSpaceMetaDiff = (sbClient, diff) => {
   const spaceNames = [...new Set([...diff.toUpsert.map(r=>r.space_name), ...diff.toDelete])];
   const ensureSpaces = spaceNames.length
-    ? sbClient.from("studio_spaces").upsert(spaceNames.map(name=>({name})), {onConflict:"name", ignoreDuplicates:true}).then(({error})=>{ if(error) console.warn("[shadow write] studio_spaces ensure-exists failed:", error); })
+    ? sbClient.from("studio_spaces").upsert(spaceNames.map(name=>({name})), {onConflict:"name", ignoreDuplicates:true}).then(({error})=>{ if(error) reportErrorGlobal("studio_spaces ensure-exists", error); })
     : Promise.resolve();
   return ensureSpaces.then(()=>Promise.all([
     ...(diff.toUpsert.length ? [sbClient.from("studio_space_meta").upsert(diff.toUpsert).then(({error})=>({error}))] : []),
     ...diff.toDelete.map(name=>sbClient.from("studio_space_meta").delete().eq("space_name", name).then(({error})=>({error}))),
   ])).then(results=>{
-    results.forEach(({error})=>{ if(error) console.warn("[shadow write] studio_space_meta diff op failed:", error); });
+    results.forEach(({error})=>{ if(error) reportErrorGlobal("studio_space_meta diff op", error); });
   });
 };
 
@@ -15807,7 +15822,7 @@ const writeAppListsRow = (sbClient, lists) => sbClient.from("app_lists").upsert(
   deliverable_statuses: lists.deliverableStatuses||[], anim_batch_statuses: lists.animBatchStatuses||[],
   admin_roles: lists.adminRoles||[], design_roles: lists.designRoles||[],
   production_roles: lists.productionRoles||[], post_production_roles: lists.postProductionRoles||[],
-}).then(({error})=>{ if(error) console.warn("[shadow write] app_lists failed:", error); });
+}).then(({error})=>{ if(error) reportErrorGlobal("app_lists", error); });
 
 const writeResourceConfigRow = (sbClient, rc) => sbClient.from("resource_config").upsert({
   id: 1,
@@ -15816,10 +15831,10 @@ const writeResourceConfigRow = (sbClient, rc) => sbClient.from("resource_config"
   assignable_percent: rc.assignablePercent ?? null,
   default_hours_per_animation: rc.defaultHoursPerAnimation ?? null,
   hours_per_shoot: rc.hoursPerShoot ?? null, hours_per_deliverable: rc.hoursPerDeliverable ?? null,
-}).then(({error})=>{ if(error) console.warn("[shadow write] resource_config failed:", error); });
+}).then(({error})=>{ if(error) reportErrorGlobal("resource_config", error); });
 
 const writeTabLocksRow = (sbClient, locks) => sbClient.from("tab_locks").upsert({id: 1, locks: locks||{}})
-  .then(({error})=>{ if(error) console.warn("[shadow write] tab_locks failed:", error); });
+  .then(({error})=>{ if(error) reportErrorGlobal("tab_locks", error); });
 
 // Reassembles flat rows (as loaded from the three normalized tables) back
 // into the exact nested shape every existing component already reads off
@@ -15918,7 +15933,7 @@ const writeRoundDiff = (sbClient, deliverableRowId, diff) => Promise.all([
   ...diff.toUpdate.map(({rowId,patch})=>updateReviewRoundRow(sbClient, rowId, patch)),
   ...diff.toDelete.map(r=>deleteReviewRoundRow(sbClient, r.id)),
 ]).then(results=>{
-  results.forEach(({error})=>{ if(error) console.warn("[shadow write] round diff op failed:", error); });
+  results.forEach(({error})=>{ if(error) reportErrorGlobal("round diff op", error); });
 });
 
 // Productions have the exact same coarse-write problem review rounds did:
@@ -15975,7 +15990,7 @@ const writeProductionDiff = (sbClient, projectId, diff) => Promise.all([
   ...diff.toUpdate.map(({rowId,patch,legacyId})=>updateProductionRow(sbClient, rowId, patch).then(({error})=>({kind:"update", legacyId, error}))),
   ...diff.toDelete.map(p=>deleteProductionRow(sbClient, p._rowId).then(({error})=>({kind:"delete", legacyId:p.id, error}))),
 ]).then(results=>{
-  results.forEach(({error})=>{ if(error) console.warn("[shadow write] production diff op failed:", error); });
+  results.forEach(({error})=>{ if(error) reportErrorGlobal("production diff op", error); });
   return results.filter(r=>r.kind==="insert" && !r.error && r.data).map(r=>({legacyId:r.legacyId, rowId:r.data.id}));
 });
 
@@ -16022,7 +16037,7 @@ const writePresetDiff = (sbClient, diff) => Promise.all([
   ...diff.toUpdate.map(({rowId,patch,legacyId})=>updateProductionPresetRow(sbClient, rowId, patch).then(({error})=>({kind:"update", legacyId, error}))),
   ...diff.toDelete.map(p=>deleteProductionPresetRow(sbClient, p._rowId).then(({error})=>({kind:"delete", legacyId:p.id, error}))),
 ]).then(results=>{
-  results.forEach(({error})=>{ if(error) console.warn("[shadow write] preset diff op failed:", error); });
+  results.forEach(({error})=>{ if(error) reportErrorGlobal("preset diff op", error); });
   return results.filter(r=>r.kind==="insert" && !r.error && r.data).map(r=>({legacyId:r.legacyId, rowId:r.data.id}));
 });
 
@@ -27799,14 +27814,15 @@ const ProductionPresetsAdmin = ({presets=[], onUpdatePresets, setupTypes=[], tea
   );
 };
 
-const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, gear, onUpdateGear, mediaCards=[], onUpdateMediaCards, furniture=[], onUpdateFurniture, props_=[], onUpdateProps, screenContent={}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes=[], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations=[], onUpdateWorkstations, talentRoster=[], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists={}, onUpdateLists, presets=[], onUpdatePresets, tabLocks={}, onUpdateTabLocks, initialTab, initialGearSubTab, onTabChange}) => {
+const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, gear, onUpdateGear, mediaCards=[], onUpdateMediaCards, furniture=[], onUpdateFurniture, props_=[], onUpdateProps, screenContent={}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes=[], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations=[], onUpdateWorkstations, talentRoster=[], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists={}, onUpdateLists, presets=[], onUpdatePresets, tabLocks={}, onUpdateTabLocks, issueReports=[], onResolveIssue, initialTab, initialGearSubTab, onTabChange}) => {
   const [gearSubTab, setGearSubTab] = useState(initialGearSubTab||"equipment"); // "equipment" | "media"
   const [tab, setTab] = useState(initialTab||"team");
   // Notifies the URL-sync effect in the root component (via onTabChange) so
   // Admin's tab/sub-tab are deep-linkable — see initialTab/initialGearSubTab
   // above for the reverse (reading a deep link back in on mount).
   useEffect(()=>{ onTabChange?.(tab, gearSubTab); },[tab, gearSubTab]);
-  const tabs = [{id:"team",l:"👥 Team"},{id:"gear",l:"🎒 Gear"},{id:"props",l:"🪑 Props & Furniture"},{id:"screen",l:"📺 Screen Content"},{id:"spaces",l:"📍 Spaces"},{id:"setups",l:"🎬 Setups"},{id:"workstations",l:"💻 Workstations"},{id:"talent",l:"🎤 Talent"},{id:"resources",l:"📊 Resources"},{id:"lists",l:"🗂 Metadata"},{id:"crewRoles",l:"🎥 Crew Roles"},{id:"presets",l:"⭐ Production Presets"},{id:"access",l:"🔒 Access"}];
+  const unresolvedIssueCount = issueReports.filter(r=>!r.resolved).length;
+  const tabs = [{id:"team",l:"👥 Team"},{id:"gear",l:"🎒 Gear"},{id:"props",l:"🪑 Props & Furniture"},{id:"screen",l:"📺 Screen Content"},{id:"spaces",l:"📍 Spaces"},{id:"setups",l:"🎬 Setups"},{id:"workstations",l:"💻 Workstations"},{id:"talent",l:"🎤 Talent"},{id:"resources",l:"📊 Resources"},{id:"lists",l:"🗂 Metadata"},{id:"crewRoles",l:"🎥 Crew Roles"},{id:"presets",l:"⭐ Production Presets"},{id:"access",l:"🔒 Access"},{id:"issues",l:`🐞 Issues${unresolvedIssueCount?` (${unresolvedIssueCount})`:""}`}];
 
   return (
     <div style={{maxWidth:900,margin:"0 auto"}}>
@@ -27855,6 +27871,58 @@ const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, g
 
       {/* ── ACCESS TAB ── */}
       {tab==="access"&&<AdminAccessTab tabLocks={tabLocks} onUpdateTabLocks={onUpdateTabLocks}/>}
+
+      {/* ── ISSUES TAB ── */}
+      {tab==="issues"&&<AdminIssuesTab issueReports={issueReports} onResolve={onResolveIssue}/>}
+    </div>
+  );
+};
+
+// ─── Admin → Issues — app errors (auto-logged whenever a Supabase write
+// fails) and user-submitted "Report an Issue" messages in one feed, newest
+// first, since with only one person supporting this app, both need to land
+// somewhere that gets checked rather than a console only the person who hit
+// them happened to have open.
+const AdminIssuesTab = ({issueReports=[], onResolve}) => {
+  const [showResolved, setShowResolved] = useState(false);
+  const visible = showResolved ? issueReports : issueReports.filter(r=>!r.resolved);
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div style={{fontSize:16,color:"#838ba0"}}>App errors are logged here automatically; "Report an Issue" messages come from anyone in the app's user menu.</div>
+        <button onClick={()=>setShowResolved(v=>!v)}
+          style={{background:showResolved?"#1f2937":"transparent",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"6px 14px",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
+          {showResolved?"Hide resolved":"Show resolved"}
+        </button>
+      </div>
+      {visible.length===0&&<div style={{textAlign:"center",color:"#838ba0",padding:"32px 0",fontSize:16}}>
+        {showResolved?"Nothing here yet.":"No open issues. 🎉"}
+      </div>}
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {visible.map(r=>{
+          const isReport = r.source==="user_report";
+          return (
+            <div key={r.id} style={{background:"#111827",border:`1px solid ${r.resolved?"#1f2937":isReport?"#6366f140":"#ef444440"}`,borderRadius:10,padding:14,opacity:r.resolved?0.6:1}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:6}}>
+                <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
+                  <Chip label={isReport?"Report":"App Error"} color={isReport?"#6366f1":"#ef4444"} xs/>
+                  {r.reporter_name&&<span style={{fontSize:14,fontWeight:700,color:"#e2e8f0"}}>{r.reporter_name}</span>}
+                  {r.reporter_email&&<span style={{fontSize:13,color:"#6b7280"}}>{r.reporter_email}</span>}
+                </div>
+                <button onClick={()=>onResolve?.(r.id, !r.resolved)}
+                  style={{background:r.resolved?"#1f2937":"#10b98118",border:`1px solid ${r.resolved?"#374151":"#10b98140"}`,borderRadius:6,color:r.resolved?"#9ca3af":"#10b981",padding:"3px 10px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
+                  {r.resolved?"Reopen":"✓ Resolve"}
+                </button>
+              </div>
+              <div style={{fontSize:15,color:"#e2e8f0",marginBottom:6,whiteSpace:"pre-wrap"}}>{r.message}</div>
+              {r.context&&Object.keys(r.context).length>0&&(
+                <div style={{fontSize:12,color:"#4b5563",fontFamily:"monospace"}}>{JSON.stringify(r.context)}</div>
+              )}
+              <div style={{fontSize:12,color:"#4b5563",marginTop:4}}>{fmtDT(r.created_at)}</div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
@@ -28620,6 +28688,56 @@ const OnboardingModal = ({email, onSubmit, onSkip}) => {
 // RLS "update self or admin" policy lets any authenticated user update the
 // row where auth_user_id matches their own id, so this needs no admin
 // involvement, unlike the rest of the Admin panel.
+// ─── Report an Issue — lets anyone flag a problem straight to the one
+// person supporting this app, without a separate channel to set up or
+// remember to check. Lands in issue_reports as a 'user_report', alongside
+// the automatically-logged 'app_error' entries, in Admin → Issues.
+const ReportIssueModal = ({onSubmit, onClose}) => {
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [err, setErr] = useState("");
+  const submit = async () => {
+    if(!message.trim()) return;
+    setBusy(true); setErr("");
+    const {error} = await onSubmit(message.trim());
+    setBusy(false);
+    if(error){ setErr(error.message||"Couldn't send — try again."); return; }
+    setSent(true);
+  };
+  const lbl={fontSize:13,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.08em",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:6,display:"block"};
+  const inp={width:"100%",background:"#0a0f1a",border:"1px solid #374151",borderRadius:8,color:"#f1f5f9",padding:"9px 12px",fontSize:17,outline:"none",fontFamily:"'DM Sans',sans-serif",colorScheme:"dark"};
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:5000,background:"#000c",display:"flex",alignItems:"center",justifyContent:"center",padding:24}} onClick={onClose}>
+      <div style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:16,padding:32,width:"100%",maxWidth:480,boxShadow:"0 24px 80px #000c"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontSize:22,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:4}}>🐞 Report an Issue</div>
+        {sent ? (
+          <>
+            <div style={{fontSize:16,color:"#9ca3af",margin:"16px 0 20px"}}>Sent — thanks, this'll get looked at.</div>
+            <button onClick={onClose} style={{width:"100%",background:"#1f2937",border:"none",borderRadius:8,color:"#e2e8f0",padding:"10px 0",fontSize:16,fontWeight:700,cursor:"pointer"}}>Close</button>
+          </>
+        ) : (
+          <>
+            <div style={{fontSize:15,color:"#9ca3af",marginBottom:18}}>What happened? Be as specific as you can — what you were doing, what you expected, what happened instead.</div>
+            <label style={lbl}>Description</label>
+            <textarea autoFocus value={message} onChange={e=>setMessage(e.target.value)} rows={6}
+              placeholder="e.g. Clicked Save on a deliverable's title and it didn't stick after a refresh…"
+              style={{...inp,resize:"vertical",marginBottom:14,fontFamily:"'DM Sans',sans-serif"}}/>
+            {err&&<div style={{color:"#ef4444",fontSize:14,marginBottom:12}}>{err}</div>}
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={onClose} style={{flex:1,background:"#1f2937",border:"none",borderRadius:8,color:"#9ca3af",padding:"10px 0",fontSize:16,fontWeight:700,cursor:"pointer"}}>Cancel</button>
+              <button onClick={submit} disabled={!message.trim()||busy}
+                style={{flex:1,background:"#6366f1",border:"none",borderRadius:8,color:"#fff",padding:"10px 0",fontSize:16,fontWeight:700,cursor:"pointer",opacity:(!message.trim()||busy)?0.5:1}}>
+                {busy?"Sending…":"Send"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const MyProfileModal = ({member, onSubmit, onClose}) => {
   const [name,setName] = useState(member.name||"");
   const [department,setDepartment] = useState(member.department||DEPT_OPTIONS[0]);
@@ -29280,12 +29398,44 @@ function App() {
   // .then(()=>{}) — a failed write (missing table, RLS denial, schema
   // mismatch) used to fail completely silently, which is exactly how the
   // studio_bookings gap went unnoticed. Now it logs to console AND toasts,
-  // so "it doesn't look like it's saving" comes with an actual reason.
+  // so "it doesn't look like it's saving" comes with an actual reason —
+  // and now also logs to issue_reports, so with only one person supporting
+  // this app, failures from anyone's session surface in one place (Admin →
+  // Issues) instead of only in whichever browser's devtools console
+  // happened to be open when it occurred.
   const reportSbError = (label, error) => {
     if(!error) return;
     console.error(`[Supabase] ${label} failed:`, error);
     const detail = error.message || error.details || error.hint || error.code || "unknown error";
     showToast({msg:`${label} failed: ${detail}`, color:"#ef4444"});
+    if(sb){
+      sb.from("issue_reports").insert({
+        source: "app_error",
+        reporter_email: authUser?.email || null,
+        reporter_name: currentMember?.name || null,
+        message: `${label} failed: ${detail}`,
+        context: {label, view: viewRef.current||null, error_code: error.code||null, error_details: error.details||null, error_hint: error.hint||null},
+      }).then(({error:logErr})=>{ if(logErr) console.error("[issue_reports] failed to log:", logErr); });
+    }
+  };
+  // Module-level helpers (writeListDiff and friends, outside this
+  // component) can't call reportSbError directly — see reportErrorGlobal's
+  // own comment. Reassigned on every render so it always reflects the
+  // current closure (current sb/showToast/authUser/currentMember).
+  reportErrorGlobal = reportSbError;
+
+  // Backs the "Report an Issue" modal — writes a 'user_report' row rather
+  // than going through reportSbError (which is for the app's own failures,
+  // not something a person is telling it).
+  const submitIssueReport = async (message) => {
+    if(!sb) return {error:{message:"Not connected."}};
+    return sb.from("issue_reports").insert({
+      source: "user_report",
+      reporter_email: authUser?.email || null,
+      reporter_name: currentMember?.name || null,
+      message,
+      context: {view},
+    });
   };
 
   // Best-effort activity log — a write here failing shouldn't block or toast
@@ -29425,10 +29575,10 @@ function App() {
     // Shadow write — see SHADOW_WRITE_CUSTOM_TASKS's comment near the other flags.
     if(SHADOW_WRITE_CUSTOM_TASKS && sb){
       addCustomTaskRow(sb, task).then(({data,error})=>{
-        if(error){ console.warn("[shadow write] addCustomTask failed:", error); return; }
+        if(error){ reportSbError("addCustomTask", error); return; }
         if(!data) return;
         setCustomTasks(prev=>prev.map(t=>t.id===task.id?{...t,_rowId:data.id}:t));
-      }).catch(e=>console.warn("[shadow write] addCustomTask failed:", e));
+      }).catch(e=>reportSbError("addCustomTask", e));
     }
   };
   const updateCustomTask = task   => {
@@ -29437,8 +29587,8 @@ function App() {
     if(SHADOW_WRITE_CUSTOM_TASKS && sb && prev?._rowId){
       const {id:_id, legacy_id:_legacyId, project_id:_projectId, ...patch} = customTaskToRow(task);
       updateCustomTaskRow(sb, prev._rowId, patch)
-        .then(({error})=>{ if(error) console.warn("[shadow write] updateCustomTask failed:", error); })
-        .catch(e=>console.warn("[shadow write] updateCustomTask failed:", e));
+        .then(({error})=>{ if(error) reportSbError("updateCustomTask", error); })
+        .catch(e=>reportSbError("updateCustomTask", e));
     }
   };
   const deleteCustomTask = taskId => {
@@ -29446,8 +29596,8 @@ function App() {
     saveCustomTasks(customTasks.filter(t=>t.id!==taskId));
     if(SHADOW_WRITE_CUSTOM_TASKS && sb && prev?._rowId){
       deleteCustomTaskRow(sb, prev._rowId)
-        .then(({error})=>{ if(error) console.warn("[shadow write] deleteCustomTask failed:", error); })
-        .catch(e=>console.warn("[shadow write] deleteCustomTask failed:", e));
+        .then(({error})=>{ if(error) reportSbError("deleteCustomTask", error); })
+        .catch(e=>reportSbError("deleteCustomTask", e));
     }
   };
   const [unavailability, setUnavailability] = useState([]);
@@ -29456,10 +29606,10 @@ function App() {
     saveUnavailability([...unavailability, entry]);
     if(SHADOW_WRITE_UNAVAILABILITY && sb){
       sb.from("unavailability").insert(unavailabilityToRow(entry)).select().single().then(({data,error})=>{
-        if(error){ console.warn("[shadow write] addUnavailability failed:", error); return; }
+        if(error){ reportSbError("addUnavailability", error); return; }
         if(!data) return;
         setUnavailability(prev=>prev.map(u=>u.id===entry.id?{...u,_rowId:data.id}:u));
-      }).catch(e=>console.warn("[shadow write] addUnavailability failed:", e));
+      }).catch(e=>reportSbError("addUnavailability", e));
     }
   };
   const deleteUnavailability = id    => {
@@ -29467,8 +29617,8 @@ function App() {
     saveUnavailability(unavailability.filter(u=>u.id!==id));
     if(SHADOW_WRITE_UNAVAILABILITY && sb && prev?._rowId){
       sb.from("unavailability").delete().eq("id", prev._rowId)
-        .then(({error})=>{ if(error) console.warn("[shadow write] deleteUnavailability failed:", error); })
-        .catch(e=>console.warn("[shadow write] deleteUnavailability failed:", e));
+        .then(({error})=>{ if(error) reportSbError("deleteUnavailability", error); })
+        .catch(e=>reportSbError("deleteUnavailability", e));
     }
   };
   const RESOURCE_CONFIG_STORAGE_KEY = "posttrack-resource-config";
@@ -29507,7 +29657,7 @@ function App() {
     showToast({msg:`Nudge sent for "${taskLabel}"`, color:"#f59e0b"});
     // Shadow write — insert-only, no delete/update path exists for nudges today.
     if(SHADOW_WRITE_NUDGES && sb){
-      sb.from("nudges").insert(fresh.map(nudgeToRow)).then(({error})=>{ if(error) console.warn("[shadow write] addNudge failed:", error); });
+      sb.from("nudges").insert(fresh.map(nudgeToRow)).then(({error})=>{ if(error) reportSbError("addNudge", error); });
     }
   };
   // Setup Types are a shared, studio-wide library — explicitly marked shared so the
@@ -29521,10 +29671,10 @@ function App() {
     // insert resolves, same as addDel does for deliverables.
     if(SHADOW_WRITE_SETUP_TYPES && sb){
       addSetupTypeRow(sb, tpl).then(({data,error})=>{
-        if(error){ console.warn("[shadow write] addSetupType failed:", error); return; }
+        if(error){ reportSbError("addSetupType", error); return; }
         if(!data) return;
         setSetupTypes(prev=>prev.map(t=>t.id===tpl.id?{...t,_rowId:data.id}:t));
-      }).catch(e=>console.warn("[shadow write] addSetupType failed:", e));
+      }).catch(e=>reportSbError("addSetupType", e));
     }
   };
   const updateSetupType = tpl => {
@@ -29533,8 +29683,8 @@ function App() {
     if(SHADOW_WRITE_SETUP_TYPES && sb && prev?._rowId){
       const {id:_id, legacy_id:_legacyId, ...patch} = setupTypeToRow(tpl);
       updateSetupTypeRow(sb, prev._rowId, patch)
-        .then(({error})=>{ if(error) console.warn("[shadow write] updateSetupType failed:", error); })
-        .catch(e=>console.warn("[shadow write] updateSetupType failed:", e));
+        .then(({error})=>{ if(error) reportSbError("updateSetupType", error); })
+        .catch(e=>reportSbError("updateSetupType", e));
     }
   };
   const deleteSetupType = id  => {
@@ -29542,8 +29692,8 @@ function App() {
     saveSetupTypes(setupTypes.filter(t=>t.id!==id));
     if(SHADOW_WRITE_SETUP_TYPES && sb && prev?._rowId){
       deleteSetupTypeRow(sb, prev._rowId)
-        .then(({error})=>{ if(error) console.warn("[shadow write] deleteSetupType failed:", error); })
-        .catch(e=>console.warn("[shadow write] deleteSetupType failed:", e));
+        .then(({error})=>{ if(error) reportSbError("deleteSetupType", error); })
+        .catch(e=>reportSbError("deleteSetupType", e));
     }
   };
   // Talent roster — shared so the whole team sees the same roster and booking history.
@@ -30234,6 +30384,13 @@ function App() {
       .on("postgres_changes", {event:"UPDATE", schema:"public", table:"resource_config"}, mergeResourceConfigUpsert)
       .on("postgres_changes", {event:"INSERT", schema:"public", table:"tab_locks"}, mergeTabLocksUpsert)
       .on("postgres_changes", {event:"UPDATE", schema:"public", table:"tab_locks"}, mergeTabLocksUpsert)
+      // issue_reports — plain id-keyed, no legacy_id/_rowId split (brand
+      // new table, no migration involved), so the original mergeUpsert/
+      // mergeDelete (matching by .id, used for projects/team_members/
+      // studio_bookings) apply directly with an identity row-mapper.
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"issue_reports"}, mergeUpsert(setIssueReports, row=>row))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"issue_reports"}, mergeUpsert(setIssueReports, row=>row))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"issue_reports"}, mergeDelete(setIssueReports))
       .subscribe((status, err)=>{
         // Surfaced because a bad status here (a table missing from the
         // supabase_realtime publication, or a dropped connection) fails
@@ -30320,6 +30477,7 @@ function App() {
     return (currentMember?.roles||[]).some(r=>allowed.includes(r));
   };
   const [showMyProfile, setShowMyProfile] = useState(false);
+  const [showReportIssue, setShowReportIssue] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuBtnRef = useRef(null);
   const userMenuRef = useRef(null);
@@ -30412,7 +30570,7 @@ function App() {
           const match = inserted.find(i=>String(i.legacyId)===String(p.id));
           return match ? {...p, _rowId:match.rowId} : p;
         }));
-      }).catch(e=>console.warn("[shadow write] preset diff failed:", e));
+      }).catch(e=>reportSbError("preset diff", e));
     }
   },[]);
 
@@ -30444,7 +30602,7 @@ function App() {
       if(prev.some(c=>c.toLowerCase()===trimmed.toLowerCase())) return prev;
       const next = [...prev, trimmed];
       if(SHADOW_WRITE_VENDOR_COMPANIES && sb){
-        sb.from("vendor_companies").insert({name:trimmed}).then(({error})=>{ if(error) console.warn("[shadow write] addVendorCompany failed:", error); });
+        sb.from("vendor_companies").insert({name:trimmed}).then(({error})=>{ if(error) reportSbError("addVendorCompany", error); });
       }
       return next;
     });
@@ -30462,7 +30620,7 @@ function App() {
       if(prev.some(c=>c.toLowerCase()===trimmed.toLowerCase())) return prev;
       const next = [...prev, trimmed];
       if(SHADOW_WRITE_REVIEWER_NAMES && sb){
-        sb.from("reviewer_names").insert({name:trimmed}).then(({error})=>{ if(error) console.warn("[shadow write] addReviewerName failed:", error); });
+        sb.from("reviewer_names").insert({name:trimmed}).then(({error})=>{ if(error) reportSbError("addReviewerName", error); });
       }
       return next;
     });
@@ -30478,12 +30636,30 @@ function App() {
   // table, so none of these write the legacy app_kv blob anymore.
   const [workReviewSessions, setWorkReviewSessions] = useState([]);
   const [workReviewSessionsLoaded, setWorkReviewSessionsLoaded] = useState(false);
+  // App errors (auto-logged by reportSbError) and user-submitted reports
+  // (the "Report an Issue" modal), both in one table — see Admin → Issues.
+  // No legacy data/migration involved, so unlike most collections here this
+  // is a plain id-keyed array with no _rowId/legacy_id split needed.
+  const [issueReports, setIssueReports] = useState([]);
+  useEffect(()=>{
+    if(!authed || !sb) return;
+    sb.from("issue_reports").select("*").order("created_at",{ascending:false}).then(({data,error})=>{
+      if(error){ console.error("[issue_reports] load failed:", error); return; }
+      setIssueReports(data||[]);
+    });
+  },[authed]);
+  const resolveIssueReport = useCallback((id, resolved)=>{
+    setIssueReports(prev=>prev.map(r=>r.id!==id?r:{...r, resolved, resolved_at: resolved?new Date().toISOString():null}));
+    if(sb) sb.from("issue_reports").update({resolved, resolved_at: resolved?new Date().toISOString():null}).eq("id", id)
+      .then(({error})=>{ if(error) reportSbError("Issue update", error); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
   const addWorkReviewSession = useCallback(session=>{
     const withId = {id:uid(), reviewers:[], notes:"", ...session};
     setWorkReviewSessions(prev=>[...prev, withId]);
     if(SHADOW_WRITE_WORK_REVIEW_SESSIONS && sb){
       addWorkReviewSessionRow(sb, withId).then(({data,error})=>{
-        if(error){ console.warn("[shadow write] addWorkReviewSession failed:", error); return; }
+        if(error){ reportSbError("addWorkReviewSession", error); return; }
         if(!data) return;
         setWorkReviewSessions(prev=>prev.map(s=>s.id===withId.id?{...s,_rowId:data.id}:s));
         // Session-side half of the new-session/new-round race (see
@@ -30493,8 +30669,8 @@ function App() {
         // id since the real uuid didn't exist yet — link any such rounds now.
         sb.from("review_rounds").update({work_review_session_id: data.id})
           .eq("legacy_work_review_session_id", withId.id).is("work_review_session_id", null)
-          .then(({error})=>{ if(error) console.warn("[shadow write] work review session remap failed:", error); });
-      }).catch(e=>console.warn("[shadow write] addWorkReviewSession failed:", e));
+          .then(({error})=>{ if(error) reportSbError("work review session remap", error); });
+      }).catch(e=>reportSbError("addWorkReviewSession", e));
     }
     return withId;
   },[]);
@@ -30506,8 +30682,8 @@ function App() {
         if(existing?._rowId){
           const {id:_id, legacy_id:_legacyId, ...rowPatch} = workReviewSessionToRow({...existing, ...patch});
           updateWorkReviewSessionRow(sb, existing._rowId, rowPatch)
-            .then(({error})=>{ if(error) console.warn("[shadow write] updateWorkReviewSession failed:", error); })
-            .catch(e=>console.warn("[shadow write] updateWorkReviewSession failed:", e));
+            .then(({error})=>{ if(error) reportSbError("updateWorkReviewSession", error); })
+            .catch(e=>reportSbError("updateWorkReviewSession", e));
         }
       }
       return next;
@@ -30656,7 +30832,7 @@ function App() {
     if(SHADOW_WRITE_DELIVERABLES && sb && prevDel?._rowId){
       if(field==="rounds"){
         writeRoundDiff(sb, prevDel._rowId, computeRoundDiff(prevDel.rounds||[], value||[]))
-          .catch(e=>console.warn("[shadow write] round diff failed:", e));
+          .catch(e=>reportSbError("round diff", e));
       } else {
         const rowId = prevDel._rowId;
         const existingTimer = delWriteTimersRef.current.get(rowId);
@@ -30671,8 +30847,8 @@ function App() {
           const fullRow = deliverableToRow(latestDel, projectId);
           const {id:_id, legacy_id:_legacyId, project_id:_projectId, ...patch} = fullRow;
           updateDeliverableRow(sb, rowId, patch)
-            .then(({error})=>{ if(error) console.warn("[shadow write] updateDel failed:", error); })
-            .catch(e=>console.warn("[shadow write] updateDel failed:", e));
+            .then(({error})=>{ if(error) reportSbError("updateDel", error); })
+            .catch(e=>reportSbError("updateDel", e));
         }, DEL_WRITE_DEBOUNCE_MS);
         delWriteTimersRef.current.set(rowId, timer);
       }
@@ -30727,10 +30903,10 @@ function App() {
     // a _rowId to target without waiting on the id-mapping bootstrap effect.
     if(SHADOW_WRITE_DELIVERABLES && sb){
       addDeliverableRow(sb, projectId, newDel).then(({data,error})=>{
-        if(error){ console.warn("[shadow write] addDel failed:", error); return; }
+        if(error){ reportSbError("addDel", error); return; }
         if(!data) return;
         setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,deliverables:p.deliverables.map(d=>d.id===newDel.id?{...d,_rowId:data.id}:d)}));
-      }).catch(e=>console.warn("[shadow write] addDel failed:", e));
+      }).catch(e=>reportSbError("addDel", e));
     }
     if(SEED_PROJECTS.some(p=>p.id===projectId)){
       setSeedOverrides(prev=>{
@@ -30751,8 +30927,8 @@ function App() {
     // Shadow write.
     if(SHADOW_WRITE_DELIVERABLES && sb && del?._rowId){
       deleteDeliverableRow(sb, del._rowId)
-        .then(({error})=>{ if(error) console.warn("[shadow write] deleteDel failed:", error); })
-        .catch(e=>console.warn("[shadow write] deleteDel failed:", e));
+        .then(({error})=>{ if(error) reportSbError("deleteDel", error); })
+        .catch(e=>reportSbError("deleteDel", e));
     }
     if(SEED_PROJECTS.some(p=>p.id===projectId)){
       setSeedOverrides(prev=>{
@@ -30879,7 +31055,7 @@ function App() {
               const tag = insertedTags.find(t=>t.legacyId===pr.id);
               return tag ? {...pr, _rowId:tag.rowId} : pr;
             })}));
-          }).catch(e=>console.warn("[shadow write] production diff failed:", e));
+          }).catch(e=>reportSbError("production diff", e));
         }, SAVE_DEBOUNCE_MS);
         productionsWriteRef.current.set(projectId, {timer, basePods});
       }
@@ -31036,7 +31212,7 @@ function App() {
       saveBecRequests([entry, ...becRequests]);
       // Shadow write — insert-only, bec_requests is a pure append-only log (no edit/delete path).
       if(SHADOW_WRITE_BEC_REQUESTS && sb){
-        sb.from("bec_requests").insert(becRequestToRow(entry)).then(({error})=>{ if(error) console.warn("[shadow write] bec_requests insert failed:", error); });
+        sb.from("bec_requests").insert(becRequestToRow(entry)).then(({error})=>{ if(error) reportSbError("bec_requests insert", error); });
       }
     };
 
@@ -31250,6 +31426,7 @@ function App() {
                       {[
                         {label:"My View", icon:"👤", onClick:()=>setView("myview")},
                         {label:"Profile", icon:"⚙", onClick:()=>setShowMyProfile(true)},
+                        {label:"Report an Issue", icon:"🐞", onClick:()=>setShowReportIssue(true)},
                       ].map(item=>(
                         <button key={item.label} onClick={()=>{item.onClick();setShowUserMenu(false);}}
                           style={{width:"100%",display:"flex",alignItems:"center",gap:8,background:"none",border:"none",borderRadius:6,color:"#e2e8f0",padding:"7px 10px",fontSize:14,fontWeight:600,cursor:"pointer",textAlign:"left",fontFamily:"'DM Sans',sans-serif"}}
@@ -31370,6 +31547,7 @@ function App() {
             lists={lists} onUpdateLists={saveLists}
             presets={appPresets} onUpdatePresets={saveAppPresets}
             tabLocks={tabLocks} onUpdateTabLocks={saveTabLocks}
+            issueReports={issueReports} onResolveIssue={resolveIssueReport}
           />}
         </div>
         </div>
@@ -31479,6 +31657,7 @@ function App() {
         )}
         {needsOnboarding&&<OnboardingModal email={authUser.email} onSubmit={completeOnboarding} onSkip={()=>setOnboardingDismissed(true)}/>}
         {showMyProfile&&currentMember&&<MyProfileModal member={currentMember} onSubmit={updateMyProfile} onClose={()=>setShowMyProfile(false)}/>}
+        {showReportIssue&&<ReportIssueModal onSubmit={submitIssueReport} onClose={()=>setShowReportIssue(false)}/>}
       </div>
     </>
   );
