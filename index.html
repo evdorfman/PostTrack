@@ -9971,6 +9971,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
   var SHADOW_WRITE_SETUP_TYPES = true;
   var SHADOW_WRITE_PRODUCTION_PRESETS = true;
   var SHADOW_WRITE_CUSTOM_TASKS = true;
+  var READ_FROM_NORMALIZED_DELIVERABLES_PRODUCTIONS = false;
   var SHADOW_WRITE_GEAR = true;
   var SHADOW_WRITE_FURNITURE = true;
   var SHADOW_WRITE_PROPS = true;
@@ -10134,6 +10135,46 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
       extra
     };
   };
+  var rowToDeliverable = (row) => ({
+    id: row.legacy_id ?? row.id,
+    _rowId: row.id,
+    projectId: row.project_id,
+    title: row.title,
+    status: row.status,
+    deadline: row.deadline,
+    deliveredAt: row.delivered_at,
+    editorId: row.editor_id,
+    animatorId: row.animator_id,
+    producerId: row.producer_id,
+    deliverableType: row.deliverable_type,
+    aspectRatio: row.aspect_ratio,
+    quality: row.quality,
+    workstream: row.workstream,
+    businessUnit: row.business_unit,
+    frameLink: row.frame_link,
+    framePW: row.frame_pw,
+    frameInternalUrl: row.frame_internal_url,
+    videoLength: row.video_length,
+    filePath: row.file_path,
+    distPlatforms: row.dist_platforms || [],
+    useCaseLimitations: row.use_case_limitations || [],
+    approvedUses: row.approved_uses || [],
+    speakers: row.speakers || [],
+    keywords: row.keywords || [],
+    notes: row.notes || "",
+    totalRevisions: row.total_revisions || 0,
+    estimatedHoursOverride: row.estimated_hours_override,
+    containsAI: row.contains_ai || false,
+    aiTools: row.ai_tools || [],
+    greenscreen: row.greenscreen || false,
+    captionsNeeded: row.captions_needed || false,
+    srtDelivered: row.srt_delivered || false,
+    srtFrameUrl: row.srt_frame_url,
+    watermark: row.watermark || false,
+    bxtvLink: row.bxtv_link || null,
+    rounds: []
+    // populated by assembleNormalizedProjectData, never by this mapper alone
+  });
   var deliverableToRow = (d, projectId) => ({
     ...d._rowId ? { id: d._rowId } : {},
     legacy_id: typeof d.id === "number" ? d.id : null,
@@ -10173,6 +10214,16 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     bxtv_link: d.bxtvLink || null
   });
   var isUuid = (v) => typeof v === "string" && v.includes("-");
+  var rowToReviewRound = (row) => ({
+    id: row.id,
+    deliverableRowId: row.deliverable_id,
+    label: row.label,
+    deadline: row.deadline,
+    reviewers: row.reviewers || [],
+    status: row.status,
+    notes: row.notes || "",
+    workReviewSessionId: row.work_review_session_id
+  });
   var reviewRoundToRow = (r, deliverableRowId) => ({
     ...isUuid(r.id) ? { id: r.id } : {},
     deliverable_id: deliverableRowId,
@@ -10190,6 +10241,27 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     // wipe out that grouping the moment any OTHER field on the same round
     // gets edited, since this function always builds the full row either way.
     ...isUuid(r.workReviewSessionId) ? { work_review_session_id: r.workReviewSessionId } : {}
+  });
+  var rowToProduction = (row) => ({
+    id: row.legacy_id ?? row.id,
+    _rowId: row.id,
+    projectId: row.project_id,
+    title: row.title,
+    type: row.type,
+    location: row.location,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    booked: row.booked || false,
+    setupTypeId: row.setup_type_id,
+    schedule: row.schedule || [],
+    crewInternal: row.crew_internal || [],
+    crewExternal: row.crew_external || [],
+    equipmentIds: row.equipment_ids || [],
+    externalGear: row.external_gear || [],
+    mediaCardIds: row.media_card_ids || [],
+    scriptFile: row.script_file || null,
+    additionalDetails: row.additional_details || "",
+    ingest: row.ingest || {}
   });
   var productionToRow = (p, projectId) => ({
     ...p._rowId ? { id: p._rowId } : {},
@@ -10455,6 +10527,23 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
   var writeTabLocksRow = (sbClient, locks) => sbClient.from("tab_locks").upsert({ id: 1, locks: locks || {} }).then(({ error }) => {
     if (error) console.warn("[shadow write] tab_locks failed:", error);
   });
+  var assembleNormalizedProjectData = (deliverableRows, roundRows, productionRows) => {
+    const roundsByDeliverable = {};
+    roundRows.forEach((rr) => {
+      (roundsByDeliverable[rr.deliverable_id] ||= []).push(rowToReviewRound(rr));
+    });
+    const deliverablesByProject = {};
+    deliverableRows.forEach((dr) => {
+      const d = rowToDeliverable(dr);
+      d.rounds = roundsByDeliverable[dr.id] || [];
+      (deliverablesByProject[dr.project_id] ||= []).push(d);
+    });
+    const productionsByProject = {};
+    productionRows.forEach((pr) => {
+      (productionsByProject[pr.project_id] ||= []).push(rowToProduction(pr));
+    });
+    return { deliverablesByProject, productionsByProject };
+  };
   var addDeliverableRow = (sbClient, projectId, deliverable) => sbClient.from("deliverables").insert(deliverableToRow(deliverable, projectId)).select().single();
   var updateDeliverableRow = (sbClient, rowId, patch) => sbClient.from("deliverables").update(patch).eq("id", rowId);
   var deleteDeliverableRow = (sbClient, rowId) => sbClient.from("deliverables").delete().eq("id", rowId);
@@ -20438,9 +20527,39 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         setTeamRosterLoaded(true);
       });
       sb.from("projects").select("*").then(({ data, error }) => {
-        if (!error && data) setProjects(data.map(rowToProject));
-        projectsLoadedRef.current = true;
-        setProjectsLoaded(true);
+        if (error || !data) {
+          projectsLoadedRef.current = true;
+          setProjectsLoaded(true);
+          return;
+        }
+        const finish = (projectsArr) => {
+          setProjects(projectsArr);
+          projectsLoadedRef.current = true;
+          setProjectsLoaded(true);
+        };
+        if (!READ_FROM_NORMALIZED_DELIVERABLES_PRODUCTIONS) {
+          finish(data.map(rowToProject));
+          return;
+        }
+        Promise.all([
+          sb.from("deliverables").select("*"),
+          sb.from("review_rounds").select("*"),
+          sb.from("productions").select("*")
+        ]).then(([delRes, roundRes, prodRes]) => {
+          if (delRes.error || roundRes.error || prodRes.error) {
+            console.warn("[read cutover] failed to load normalized deliverables/productions, falling back to legacy JSON:", delRes.error || roundRes.error || prodRes.error);
+            finish(data.map(rowToProject));
+            return;
+          }
+          const { deliverablesByProject, productionsByProject } = assembleNormalizedProjectData(delRes.data || [], roundRes.data || [], prodRes.data || []);
+          finish(data.map((row) => {
+            const p = rowToProject(row);
+            return { ...p, deliverables: deliverablesByProject[row.id] || [], productions: productionsByProject[row.id] || [] };
+          }));
+        }).catch((e) => {
+          console.warn("[read cutover] failed to load normalized deliverables/productions, falling back to legacy JSON:", e);
+          finish(data.map(rowToProject));
+        });
       });
       sb.from("studio_bookings").select("*").then(({ data, error }) => {
         if (!error && data) setStudioBookings(data.map(rowToBooking));
