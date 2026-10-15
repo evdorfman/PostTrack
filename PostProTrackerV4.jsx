@@ -29572,6 +29572,25 @@ function App() {
   useEffect(()=>{
     if(!viewNavMountedRef.current){ viewNavMountedRef.current = true; return; }
     updateRoute({view, dtab:null, antab:null, itab:null, rtab:null, atab:null, agear:null, intab:null, pjtab:null}, {push:true});
+    // Clearing the URL params above isn't enough on its own — each view
+    // only re-seeds its own local sub-tab state (subTab/tab/etc.) from
+    // its initialTab PROP at mount, and since every view fully unmounts
+    // when you switch away (the {view==="x"&&<Component/>} conditional
+    // render), simply leaving e.g. projectsInitialTab wherever it last
+    // happened to be (set once from a deep link, or never touched again
+    // by an ordinary in-app tab click, which only updates the URL, not
+    // this state) means the NEXT time that view mounts, it seeds right
+    // back to that stale value instead of its default. Resetting all of
+    // them here means every view reliably starts at its default sub-tab
+    // on a normal switch, not "wherever you happened to leave it".
+    setDeliverablesInitialTab("active");
+    setAnimationInitialTab("active");
+    setIngestInitialTab("sheet");
+    setResourcesInitialTab("utilization");
+    setIntakeInitialTab("smartsheet");
+    setProjectsInitialTab("active");
+    setAdminInitialTab("team");
+    setAdminInitialGearSubTab("equipment");
   },[view]);
   const [toast, setToast] = useState(null);
   // How far the main app content should shift right to make room for whichever
