@@ -10062,7 +10062,7 @@ const ACTIVE_STAGES = [
 // productions, everything) and opens it in the same project modal used
 // everywhere else — nothing about viewing an old project is different,
 // it's just not preloaded.
-const ProjectsArchiveTab = ({onOpenArchived, onSearch, onRevive}) => {
+const ProjectsArchiveTab = ({onOpenArchived, onSearch, onRevive, activeProjectIds}) => {
   const [query, setQuery] = useState("");
   const [range, setRange] = useState(quarterYearRanges()[0]);
   const [results, setResults] = useState(null);
@@ -10106,9 +10106,16 @@ const ProjectsArchiveTab = ({onOpenArchived, onSearch, onRevive}) => {
           {busy?"Searching…":"Search"}
         </button>
       </div>
-      {results&&results.length===0&&<div style={{textAlign:"center",color:"#4b5563",padding:"32px 0",fontSize:16}}>No closed projects match.</div>}
+      {/* Excludes anything that's since become active again — not just
+          this tab's own Revive button (handled directly in handleRevive),
+          but also a revive done from inside an opened project's Close Out
+          panel, which this component has no direct way to hear about.
+          Deriving from the live active-projects prop instead of waiting
+          for a manual re-search means either path reflects immediately. */}
+      {(()=>{ const visible = (results||[]).filter(p=>!activeProjectIds?.has(p.id)); return <>
+      {results&&visible.length===0&&<div style={{textAlign:"center",color:"#4b5563",padding:"32px 0",fontSize:16}}>No closed projects match.</div>}
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {(results||[]).map(p=>(
+        {visible.map(p=>(
           <div key={p.id} onClick={()=>onOpenArchived(p.id)}
             style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:"#111827",border:"1px solid #1f2937",borderRadius:10,cursor:"pointer"}}
             onMouseEnter={e=>e.currentTarget.style.borderColor="#374151"} onMouseLeave={e=>e.currentTarget.style.borderColor="#1f2937"}>
@@ -10125,6 +10132,7 @@ const ProjectsArchiveTab = ({onOpenArchived, onSearch, onRevive}) => {
           </div>
         ))}
       </div>
+      </>; })()}
       {hasMore&&(
         <button onClick={()=>runSearch(offset+PAGE_SIZE)} disabled={busy}
           style={{width:"100%",marginTop:12,background:"#1f2937",border:"none",borderRadius:7,color:"#9ca3af",padding:"9px 0",fontSize:15,fontWeight:700,cursor:"pointer"}}>
@@ -10194,6 +10202,10 @@ const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateD
     ? projects.filter(p=>statsFilter.ids.has(p.id))
     : filtered;
 
+  // For the Archive tab (below) to exclude anything that's since become
+  // active again, regardless of which revive path put it there.
+  const activeProjectIds = useMemo(()=>new Set(projects.map(p=>p.id)),[projects]);
+
   const active   = displayFiltered.filter(p=>["New Request","Ideation","Pre-Pro","In Production","Post","In Review"].includes(p.status) && !p.closedAt);
   const onHold   = displayFiltered.filter(p=>p.status==="On Hold" && !p.closedAt);
   const inactive = displayFiltered.filter(p=>["Delivered","Canceled"].includes(p.status) || p.closedAt);
@@ -10204,7 +10216,7 @@ const ProjectsView = ({projects, team, onOpenProject, onUpdateProject, onUpdateD
     return (
       <div>
         {subTabBar}
-        <ProjectsArchiveTab onOpenArchived={onOpenArchivedProject} onSearch={onSearchArchivedProjects} onRevive={onReviveArchivedProject}/>
+        <ProjectsArchiveTab onOpenArchived={onOpenArchivedProject} onSearch={onSearchArchivedProjects} onRevive={onReviveArchivedProject} activeProjectIds={activeProjectIds}/>
       </div>
     );
   }
