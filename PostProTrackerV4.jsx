@@ -15156,7 +15156,7 @@ const SHADOW_WRITE_CUSTOM_TASKS = true;
 // sync and this can be flipped back off instantly with zero data loss if
 // anything looks wrong. Falls back to the legacy JSON on any fetch error
 // rather than risk showing an empty project list.
-const READ_FROM_NORMALIZED_DELIVERABLES_PRODUCTIONS = false;
+const READ_FROM_NORMALIZED_DELIVERABLES_PRODUCTIONS = true;
 
 // Phase 3 — the remaining app_kv-backed collections (see production_schema_new_tables.sql's
 // Phase 3 section and the "what else should be its own table" conversation).
