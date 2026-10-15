@@ -12470,11 +12470,77 @@ const DelInfoPopup = ({del, team, onClose}) => {
   );
 };
 
+// Search over delivered deliverables across every project, open or closed
+// — the Completed Archive tab, on-demand/paginated rather than preloaded,
+// same pattern as ProjectsArchiveTab/Admin → Issues' archive search (see
+// searchArchivedDeliverables' own comment for why project name/workstream/
+// BU come from an embedded join and text search is title-only).
+const DeliverablesArchiveSearch = ({onOpen, onSearch}) => {
+  const [query, setQuery] = useState("");
+  const [range, setRange] = useState(quarterYearRanges()[0]);
+  const [results, setResults] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const PAGE_SIZE = 50;
+
+  const runSearch = async (nextOffset=0) => {
+    setBusy(true);
+    const {data, error} = await onSearch({query, startDate:range.start, endDate:range.end, limit:PAGE_SIZE, offset:nextOffset});
+    setBusy(false);
+    if(error){ console.error("[deliverables] archive search failed:", error); return; }
+    setResults(prev => nextOffset===0 ? (data||[]) : [...(prev||[]), ...(data||[])]);
+    setHasMore((data||[]).length===PAGE_SIZE);
+    setOffset(nextOffset);
+  };
+  useEffect(()=>{ runSearch(0); },[]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+        <input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter") runSearch(0);}}
+          placeholder="Search deliverable title…"
+          style={{flex:"1 1 240px",background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"8px 12px",fontSize:16,outline:"none",fontFamily:"'DM Sans',sans-serif"}}/>
+        <select value={range.label} onChange={e=>setRange(quarterYearRanges().find(r=>r.label===e.target.value))}
+          style={{background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"8px 10px",fontSize:16,outline:"none"}}>
+          {quarterYearRanges().map(r=><option key={r.label} value={r.label} style={{background:"#0d1117"}}>{r.label}</option>)}
+        </select>
+        <button onClick={()=>runSearch(0)} disabled={busy}
+          style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"8px 18px",fontSize:15,fontWeight:700,cursor:"pointer",opacity:busy?0.6:1}}>
+          {busy?"Searching…":"Search"}
+        </button>
+      </div>
+      {results&&results.length===0&&<div style={{textAlign:"center",color:"#4b5563",padding:"32px 0",fontSize:16}}>No delivered deliverables match.</div>}
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {(results||[]).map(d=>(
+          <div key={d._rowId} onClick={()=>onOpen(d.projectId, d.id)}
+            style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#111827",border:"1px solid #1f2937",borderRadius:9,cursor:"pointer"}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor="#374151"} onMouseLeave={e=>e.currentTarget.style.borderColor="#1f2937"}>
+            <div style={{width:7,height:7,borderRadius:"50%",background:"#10b981",flexShrink:0}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:16,fontWeight:700,color:"#f1f5f9"}}>{d.title||"Untitled"}</div>
+              <div style={{fontSize:13,color:"#9ca3af"}}>{d.projectName} · {d.workstream} · {d.businessUnit}</div>
+            </div>
+            <Chip label={d.aspectRatio||"16:9"} color="#374151" xs/>
+            <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW} small/>
+            <span style={{fontSize:13,color:"#6b7280",whiteSpace:"nowrap"}}>Delivered {fmtDT(d.deliveredAt)}</span>
+          </div>
+        ))}
+      </div>
+      {hasMore&&(
+        <button onClick={()=>runSearch(offset+PAGE_SIZE)} disabled={busy}
+          style={{width:"100%",marginTop:12,background:"#1f2937",border:"none",borderRadius:7,color:"#9ca3af",padding:"9px 0",fontSize:15,fontWeight:700,cursor:"pointer"}}>
+          {busy?"Loading…":"Load more"}
+        </button>
+      )}
+    </div>
+  );
+};
+
 // ─── Deliverables Tab (global) ────────────────────────────────────────────────
-const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDel, onUpdateProject, talentRoster=[], sidebarSlotNode, onSidebarWidthChange, initialTab, onTabChange}) => {
+const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDel, onUpdateProject, talentRoster=[], sidebarSlotNode, onSidebarWidthChange, initialTab, onTabChange, onOpenArchivedDeliverable, onSearchArchivedDeliverables}) => {
   const [subTab, setSubTab] = useState(initialTab||"active");
   useEffect(()=>{ onTabChange?.(subTab); },[subTab]);
-  const [search, setSearch] = useState("");
   const [groupBy, setGroupBy] = useState("editor"); // editor | producer
   const [popupDel, setPopupDel] = useState(null);       // read-only popup (production-sourced deliverables only)
   const [sidebarSel, setSidebarSel] = useState(null);    // {delId, projectId} for the editable left sidebar
@@ -12510,13 +12576,6 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
   const editors   = team.filter(m=>m.roles.some(r=>["Editor","Animator","Designer"].includes(r)));
   const producers = team.filter(m=>m.roles.some(r=>["Producer","Project Manager","Post Project Manager"].includes(r)));
   const active    = allDels.filter(d=>!["Delivered","On Hold"].includes(d.status));
-  const completed = [...allDels.filter(d=>d.status==="Delivered")]
-    .sort((a,b)=>new Date(b.deadline)-new Date(a.deadline));
-
-  const filtCompleted = completed.filter(d=>{
-    const q=search.toLowerCase();
-    return !q||d.title.toLowerCase().includes(q)||d.projectName.toLowerCase().includes(q)||(d.workstream||"").toLowerCase().includes(q)||(d.businessUnit||"").toLowerCase().includes(q);
-  });
 
   // Bar chart helper
   const countBy=(arr,key)=>{
@@ -12706,69 +12765,7 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
 
       {/* ── Completed Archive — grouped by quarter then month ── */}
       {subTab==="completed"&&(
-        <div>
-          <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center"}}>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by title, project, workstream, BU…"
-              style={{background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"8px 12px",fontSize:17,outline:"none",flex:1}}/>
-            <div style={{fontSize:16,color: "#8e97a6",flexShrink:0}}>{filtCompleted.length} result{filtCompleted.length!==1?"s":""}</div>
-          </div>
-          {filtCompleted.length===0&&<div style={{textAlign:"center",color: "#8e97a6",padding:"40px 0",fontSize:19}}>No completed deliverables yet</div>}
-          {(()=>{
-            // Group by Year-Quarter, then by Month within each quarter
-            const MONTH_NAMES=["January","February","March","April","May","June","July","August","September","October","November","December"];
-            const groups={};
-            filtCompleted.forEach(d=>{
-              const dt=new Date(d.deadline);
-              const yr=dt.getFullYear();
-              const mo=dt.getMonth();
-              const q=Math.floor(mo/3)+1;
-              const qKey=`${yr}-Q${q}`;
-              const mKey=`${yr}-${String(mo).padStart(2,"0")}`;
-              if(!groups[qKey]) groups[qKey]={label:`${yr} Q${q}`,months:{}};
-              if(!groups[qKey].months[mKey]) groups[qKey].months[mKey]={label:`${MONTH_NAMES[mo]} ${yr}`,items:[]};
-              groups[qKey].months[mKey].items.push(d);
-            });
-            // Sort quarters desc
-            const sortedQs = Object.entries(groups).sort((a,b)=>b[0].localeCompare(a[0]));
-            return sortedQs.map(([qKey,qData])=>(
-              <div key={qKey} style={{marginBottom:24}}>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-                  <div style={{fontWeight:900,fontSize:22,color:"#6366f1",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em"}}>{qData.label}</div>
-                  <div style={{background:"#6366f120",color:"#6366f1",borderRadius:99,padding:"2px 10px",fontSize:14,fontWeight:800}}>{Object.values(qData.months).reduce((a,m)=>a+m.items.length,0)}</div>
-                </div>
-                {Object.entries(qData.months).sort((a,b)=>b[0].localeCompare(a[0])).map(([mKey,mData])=>(
-                  <div key={mKey} style={{marginBottom:14,marginLeft:8}}>
-                    <div style={{fontSize:16,fontWeight:700,color:"#9ca3af",marginBottom:6,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em",textTransform:"uppercase"}}>{mData.label} <span style={{color: "#838ba0",fontWeight:400}}>({mData.items.length})</span></div>
-                    <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                      {mData.items.map(d=>{
-                        const ed=team.find(m=>m.id===d.editorId);
-                        return (
-                          <div key={d.id} onClick={e=>{ e.stopPropagation(); if(d._fromProduction){ setPopupDel(d); return; } setUnlocked(false); setSidebarSel({delId:d.id, projectId:d.projectId}); }}
-                            style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#111827",border:"1px solid #1f2937",borderRadius:9,cursor:"pointer"}}
-                            onMouseEnter={e=>e.currentTarget.style.borderColor="#374151"}
-                            onMouseLeave={e=>e.currentTarget.style.borderColor="#1f2937"}>
-                            <div style={{width:7,height:7,borderRadius:"50%",background:"#10b981",flexShrink:0}}/>
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontSize:17,fontWeight:700,color:"#f1f5f9"}}>{d.title}</div>
-                              <div style={{fontSize:14,color: "#9ca3af"}}>{d.projectName} · {d.workstream} · {d.businessUnit}</div>
-                            </div>
-                            {ed&&<div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}><Av name={ed.name} size={18}/><span style={{fontSize:14,color:"#9ca3af"}}>{ed.name}</span></div>}
-                            <Chip label={d.status} color={DCOLOR[d.status]||"#10b981"} xs/>
-                            <Chip label={d.aspectRatio||"16:9"} color="#374151" xs/>
-                            {d.srtNeeded&&<Chip label="SRT" color="#06b6d4" xs/>}
-                            <DelFrameInfo frameLink={d.frameLink} framePW={d.framePW} small/>
-                            <span style={{fontSize:14,color: "#8e97a6",flexShrink:0}}>{fmtDate(d.deadline)}</span>
-                            <span style={{fontSize:14,color: "#8e97a6"}}>›</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ));
-          })()}
-        </div>
+        <DeliverablesArchiveSearch onOpen={onOpenArchivedDeliverable} onSearch={onSearchArchivedDeliverables}/>
       )}
 
       {/* ── Metrics ── */}
@@ -31762,15 +31759,15 @@ function App() {
   // Returns whether the project was actually found, so callers that need
   // to know (the deep-link resolution effect, deciding whether to fall
   // back to clearing a stale link) don't have to inspect state separately.
-  const openArchivedProject = useCallback(async (projectId, {push=true}={})=>{
+  const openArchivedProject = useCallback(async (projectId, {push=true, tab=null, itemId=null}={})=>{
     if(!sb) return false;
     const {data:projRow, error} = await sb.from("projects").select("*").eq("id", projectId).single();
     if(error || !projRow){ if(push) reportSbError("Open archived project", error||{message:"Project not found."}); return false; }
     const {deliverables, productions} = await fetchDeliverablesAndProductionsFor(projectId);
     setArchivedProjectView({...rowToProject(projRow), deliverables, productions});
     setSelected({id:projectId});
-    setInitialTab(null);
-    updateRoute({projectId, ptab:null, pitem:null}, {push});
+    setInitialTab(tab?{tab,itemId}:null);
+    updateRoute({projectId, ptab:tab||null, pitem:itemId??null}, {push});
     return true;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
@@ -31810,6 +31807,47 @@ function App() {
     logActivity({entityType:"project", entityLabel:revived.name, projectId, action:"status_changed", detail:"status → In Production (revived from archive)"});
     return true;
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+  // Opens a deliverable's parent project straight to its Deliverables tab
+  // with that one deliverable selected — used by the Deliverables archive
+  // search (DeliverablesArchiveSearch) below, where a result could belong
+  // to either an active project (most of the time) or a closed one (a
+  // project can still have some delivered deliverables without itself
+  // being closed out, so this isn't just "always archived"). Checks the
+  // live active set first and only falls back to openArchivedProject if
+  // it's genuinely not there.
+  const openProjectDeliverable = useCallback((projectId, deliverableId)=>{
+    const active = allProjectsRef.current.find(p=>p.id===projectId);
+    if(active){ openProject(active, "deliverables", deliverableId); return; }
+    openArchivedProject(projectId, {tab:"deliverables", itemId:deliverableId});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+  // On-demand search over delivered deliverables across every project
+  // (open or closed) — backs the Deliverables view's Completed Archive
+  // tab, same shape/pattern as the Issues and Projects archive searches.
+  // Embeds the parent project's name/workstream/business_unit via
+  // PostgREST's FK-based join rather than a second round trip; matches
+  // the existing (pre-archive) Completed tab's own behavior of always
+  // showing the PROJECT's workstream/BU, not a per-deliverable override,
+  // for consistency with what this already looked like. Text search is
+  // on the deliverable's own title only — filtering an OR search across
+  // the joined project's name too isn't worth PostgREST's embedded-
+  // resource filter syntax fragility for this.
+  const searchArchivedDeliverables = useCallback(async ({query="", startDate=null, endDate=null, limit=50, offset=0}={}) => {
+    if(!sb) return {data:[], error:{message:"Not connected."}};
+    let q = sb.from("deliverables").select("*, projects(id,name,workstream,business_unit)").eq("status","Delivered")
+      .order("delivered_at",{ascending:false}).range(offset, offset+limit-1);
+    if(startDate) q = q.gte("delivered_at", startDate);
+    if(endDate) q = q.lte("delivered_at", endDate);
+    if(query.trim()) q = q.ilike("title", `%${query.trim()}%`);
+    const {data, error} = await q;
+    if(error) return {data:[], error};
+    return {data:(data||[]).map(row=>({
+      ...rowToDeliverable(row),
+      projectName: row.projects?.name || "—",
+      workstream: row.projects?.workstream || "—",
+      businessUnit: row.projects?.business_unit || "—",
+    })), error:null};
   },[]);
   // Resolves a `?project=` deep link once the real project data has loaded
   // (it's fetched async from Supabase, so it may not exist yet at mount —
@@ -32008,7 +32046,7 @@ function App() {
           {view==="kanban"&&kanbanMode==="status"&&<KanbanStatus projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="kanban"&&kanbanMode==="editor"&&<KanbanEditor projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="calendar"&&<CalendarView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} unavailability={unavailability} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
-          {view==="deliverables"&&<DeliverablesTab key={`deliverables:${popstateGen}`} initialTab={deliverablesInitialTab} onTabChange={tab=>updateRoute({dtab:tab})} projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
+          {view==="deliverables"&&<DeliverablesTab key={`deliverables:${popstateGen}`} initialTab={deliverablesInitialTab} onTabChange={tab=>updateRoute({dtab:tab})} onOpenArchivedDeliverable={openProjectDeliverable} onSearchArchivedDeliverables={searchArchivedDeliverables} projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="ingest"&&<IngestView key={`ingest:${popstateGen}`} initialTab={ingestInitialTab} onTabChange={tab=>updateRoute({itab:tab})} projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="resources"&&<ResourceView key={`resources:${popstateGen}`} initialTab={resourcesInitialTab} onTabChange={tab=>updateRoute({rtab:tab})} projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
           {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability} currentMember={currentMember} isAdmin={isAdmin} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
