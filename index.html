@@ -9974,6 +9974,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
   var READ_FROM_NORMALIZED_DELIVERABLES_PRODUCTIONS = true;
   var READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS = true;
   var READ_FROM_NORMALIZED_PHASE3 = false;
+  var SHADOW_WRITE_WORK_REVIEW_SESSIONS = false;
   var SHADOW_WRITE_GEAR = true;
   var SHADOW_WRITE_FURNITURE = true;
   var SHADOW_WRITE_PROPS = true;
@@ -10216,6 +10217,17 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     bxtv_link: d.bxtvLink || null
   });
   var isUuid = (v) => typeof v === "string" && v.includes("-");
+  var workReviewSessionToRow = (s) => ({
+    ...s._rowId ? { id: s._rowId } : {},
+    legacy_id: typeof s.id === "number" ? s.id : null,
+    datetime: s.datetime || null,
+    location: s.location || null,
+    zoom_link: s.zoomLink || null,
+    reviewers: s.reviewers || [],
+    notes: s.notes || null
+  });
+  var addWorkReviewSessionRow = (sbClient, session) => sbClient.from("work_review_sessions").insert(workReviewSessionToRow(session)).select().single();
+  var updateWorkReviewSessionRow = (sbClient, rowId, patch) => sbClient.from("work_review_sessions").update(patch).eq("id", rowId);
   var rowToReviewRound = (row) => ({
     id: row.id,
     deliverableRowId: row.deliverable_id,
@@ -20605,7 +20617,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           } catch (e) {
           }
         }).catch(() => {
-        });
+        }).finally(() => setWorkReviewSessionsLoaded(true));
         safeGet(INTAKE_STORAGE_KEY).then((iv) => {
           try {
             if (iv?.value && !READ_FROM_NORMALIZED_PHASE3) {
@@ -21141,6 +21153,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     }, []);
     const WORK_REVIEW_SESSIONS_STORAGE_KEY = "work-review-sessions-v1";
     const [workReviewSessions, setWorkReviewSessions] = (0, import_react.useState)([]);
+    const [workReviewSessionsLoaded, setWorkReviewSessionsLoaded] = (0, import_react.useState)(false);
     const saveWorkReviewSessions = (0, import_react.useCallback)((list) => {
       setWorkReviewSessions(list);
       window.storage?.set(WORK_REVIEW_SESSIONS_STORAGE_KEY, JSON.stringify(list)).catch(() => {
@@ -21154,6 +21167,16 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         });
         return next;
       });
+      if (SHADOW_WRITE_WORK_REVIEW_SESSIONS && sb) {
+        addWorkReviewSessionRow(sb, withId).then(({ data, error }) => {
+          if (error) {
+            console.warn("[shadow write] addWorkReviewSession failed:", error);
+            return;
+          }
+          if (!data) return;
+          setWorkReviewSessions((prev) => prev.map((s) => s.id === withId.id ? { ...s, _rowId: data.id } : s));
+        }).catch((e) => console.warn("[shadow write] addWorkReviewSession failed:", e));
+      }
       return withId;
     }, []);
     const updateWorkReviewSession = (0, import_react.useCallback)((id, patch) => {
@@ -21161,9 +21184,21 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         const next = prev.map((s) => s.id === id ? { ...s, ...patch } : s);
         window.storage?.set(WORK_REVIEW_SESSIONS_STORAGE_KEY, JSON.stringify(next)).catch(() => {
         });
+        if (SHADOW_WRITE_WORK_REVIEW_SESSIONS && sb) {
+          const existing = prev.find((s) => s.id === id);
+          if (existing?._rowId) {
+            const { id: _id, legacy_id: _legacyId, ...rowPatch } = workReviewSessionToRow({ ...existing, ...patch });
+            updateWorkReviewSessionRow(sb, existing._rowId, rowPatch).then(({ error }) => {
+              if (error) console.warn("[shadow write] updateWorkReviewSession failed:", error);
+            }).catch((e) => console.warn("[shadow write] updateWorkReviewSession failed:", e));
+          }
+        }
         return next;
       });
     }, []);
+    (0, import_react.useEffect)(() => {
+      genericBootstrap("work_review_sessions", setWorkReviewSessions, SHADOW_WRITE_WORK_REVIEW_SESSIONS, workReviewSessionsLoaded);
+    }, [authed, workReviewSessionsLoaded]);
     const [intakes, setIntakes] = (0, import_react.useState)([]);
     const saveIntakes = (0, import_react.useCallback)((list) => {
       setIntakes((prev) => {
