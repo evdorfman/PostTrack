@@ -29738,9 +29738,27 @@ function App() {
       if(id==null) return;
       setter(prev=>prev.some(x=>x.id===id) ? prev.filter(x=>x.id!==id) : prev);
     };
+    // projects.deliverables/productions are frozen (writes stopped once the
+    // read cutover completed — see projectToRow), so a plain rowToProject()
+    // on a realtime payload would read stale/frozen arrays. mergeUpsert's
+    // generic "replace the whole object" behavior is wrong here specifically:
+    // preserve whatever's already locally loaded (from the real
+    // deliverables/productions tables, which have no realtime feed of their
+    // own yet) instead of clobbering it with every unrelated project-field
+    // change that happens to broadcast.
+    const mergeProjectUpsert = payload => {
+      const incoming = rowToProject(payload.new);
+      setProjects(prev=>{
+        const idx = prev.findIndex(x=>x.id===incoming.id);
+        if(idx===-1) return [...prev, incoming];
+        const merged = {...incoming, deliverables: prev[idx].deliverables, productions: prev[idx].productions};
+        if(JSON.stringify(prev[idx])===JSON.stringify(merged)) return prev;
+        const next = prev.slice(); next[idx] = merged; return next;
+      });
+    };
     const channel = sb.channel("posttrack-realtime")
-      .on("postgres_changes", {event:"INSERT", schema:"public", table:"projects"}, mergeUpsert(setProjects, rowToProject))
-      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"projects"}, mergeUpsert(setProjects, rowToProject))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"projects"}, mergeProjectUpsert)
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"projects"}, mergeProjectUpsert)
       .on("postgres_changes", {event:"DELETE", schema:"public", table:"projects"}, mergeDelete(setProjects))
       .on("postgres_changes", {event:"INSERT", schema:"public", table:"team_members"}, mergeUpsert(setTeamRoster, rowToTeamMember))
       .on("postgres_changes", {event:"UPDATE", schema:"public", table:"team_members"}, mergeUpsert(setTeamRoster, rowToTeamMember))
