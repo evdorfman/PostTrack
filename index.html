@@ -22074,9 +22074,14 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     }, []);
     const productionsWriteRef = (0, import_react.useRef)(/* @__PURE__ */ new Map());
     const updateProject = (0, import_react.useCallback)((projectId, field, value) => {
-      const prevProj = projectsRef.current.find((p) => p.id === projectId);
+      const prevProj = projectsRef.current.find((p) => p.id === projectId) || archivedProjectViewRef.current;
       setProjects((prev) => {
-        if (!prev.some((p) => p.id === projectId)) return prev;
+        if (!prev.some((p) => p.id === projectId)) {
+          if (field === "closedAt" && !value && archivedProjectViewRef.current?.id === projectId) {
+            return [...prev, { ...archivedProjectViewRef.current, [field]: value }];
+          }
+          return prev;
+        }
         return prev.map((p) => p.id !== projectId ? p : { ...p, [field]: value });
       });
       if (SEED_PROJECTS.some((p) => p.id === projectId)) {
@@ -22449,6 +22454,10 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, deliverables, productions }));
     }, []);
     const [archivedProjectView, setArchivedProjectView] = (0, import_react.useState)(null);
+    const archivedProjectViewRef = (0, import_react.useRef)(null);
+    (0, import_react.useEffect)(() => {
+      archivedProjectViewRef.current = archivedProjectView;
+    }, [archivedProjectView]);
     const openArchivedProject = (0, import_react.useCallback)(async (projectId, { push = true } = {}) => {
       if (!sb) return false;
       const { data: projRow, error } = await sb.from("projects").select("*").eq("id", projectId).single();

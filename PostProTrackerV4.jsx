@@ -31273,10 +31273,26 @@ function App() {
   const productionsWriteRef = useRef(new Map());
 
   const updateProject=useCallback((projectId,field,value)=>{
-    const prevProj = projectsRef.current.find(p=>p.id===projectId);
+    const prevProj = projectsRef.current.find(p=>p.id===projectId) || archivedProjectViewRef.current;
     // Try real projects first
     setProjects(prev=>{
-      if(!prev.some(p=>p.id===projectId)) return prev;
+      if(!prev.some(p=>p.id===projectId)){
+        // Not in the active set — the only way that happens is a closed
+        // project currently open via the Projects Archive (see
+        // archivedProjectView's own comment). Reviving it (closedAt being
+        // cleared from the Close Out panel) needs to actually ADD it to
+        // the active set, not no-op — otherwise this never reaches the
+        // projects-autosave effect that writes it to Supabase either,
+        // since that effect only fires on an actual `projects` state
+        // change. Any other field edit on an archived project (there
+        // isn't a UI path to make one today, since it's shown read-only
+        // apart from Close Out) still correctly no-ops rather than
+        // reviving a project just because something else touched it.
+        if(field==="closedAt" && !value && archivedProjectViewRef.current?.id===projectId){
+          return [...prev, {...archivedProjectViewRef.current, [field]:value}];
+        }
+        return prev;
+      }
       return prev.map(p=>p.id!==projectId?p:{...p,[field]:value});
     });
     // If it's a seed project, store the override in-memory
@@ -31694,6 +31710,11 @@ function App() {
   // allProjects expecting only active projects). liveSelected below falls
   // back to this when `selected` isn't found in allProjects at all.
   const [archivedProjectView, setArchivedProjectView] = useState(null);
+  // Lets updateProject (declared earlier, as a stable [] callback — see
+  // its own comment on the revive case) read the current archived project
+  // being viewed without a stale closure, same pattern as projectsRef.
+  const archivedProjectViewRef = useRef(null);
+  useEffect(()=>{ archivedProjectViewRef.current = archivedProjectView; },[archivedProjectView]);
   // Returns whether the project was actually found, so callers that need
   // to know (the deep-link resolution effect, deciding whether to fall
   // back to clearing a stale link) don't have to inspect state separately.
