@@ -11,11 +11,14 @@
 // into a query string and redirects to the site's actual index.html,
 // which restores it via history.replaceState before the app mounts — see
 // the matching script in index.html's head.
+//
+// Base path is pinned, not inferred from the 404'd URL itself — matches
+// ROUTE_BASE_PATH in PostProTrackerV4.jsx (see its comment for why: an
+// inferred base can self-corrupt from a single bad URL and keep
+// perpetuating it). Update both if the repo is ever renamed/moved again.
 (function(){
   var l = window.location;
-  var segs = l.pathname.split('/').filter(Boolean);
-  var base = segs.length ? '/' + segs[0] + '/' : '/';
-  l.replace(base + '?spa-redirect=' + encodeURIComponent(l.pathname + l.search + l.hash));
+  l.replace('/PostTrack/?spa-redirect=' + encodeURIComponent(l.pathname + l.search + l.hash));
 })();
 </script>
 </head>

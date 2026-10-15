@@ -729,15 +729,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   var _uid = 400;
   var uid = () => ++_uid;
   var ROUTE_VIEWS = ["projects", "studio", "calendar", "deliverables", "animations", "ingest", "resources", "myview", "admin", "pipeline", "intake", "workreview", "kanban"];
-  var ROUTE_BASE_PATH = (() => {
-    try {
-      const segs = window.location.pathname.split("/").filter(Boolean);
-      if (segs.length && ROUTE_VIEWS.includes(segs[segs.length - 1])) segs.pop();
-      return segs.length ? "/" + segs.join("/") : "";
-    } catch (e) {
-      return "";
-    }
-  })();
+  var ROUTE_BASE_PATH = "/PostTrack";
   function parseRoute() {
     try {
       let path = window.location.pathname;
@@ -20219,19 +20211,32 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     }, [view]);
     const [popstateGen, setPopstateGen] = (0, import_react.useState)(0);
     const updateRoute = (0, import_react.useCallback)((overrides, { push = false } = {}) => {
-      const current = parseRoute();
-      const next = {
-        view: overrides.view !== void 0 ? overrides.view : current.view || viewRef.current || "projects",
-        projectId: overrides.projectId !== void 0 ? overrides.projectId : current.projectId,
-        ptab: overrides.ptab !== void 0 ? overrides.ptab : current.ptab,
-        pitem: overrides.pitem !== void 0 ? overrides.pitem : current.pitem,
-        atab: overrides.atab !== void 0 ? overrides.atab : current.atab,
-        agear: overrides.agear !== void 0 ? overrides.agear : current.agear
-      };
-      const url = buildRouteUrl(next);
-      if (url === window.location.pathname + window.location.search) return;
-      if (push) window.history.pushState({}, "", url);
-      else window.history.replaceState({}, "", url);
+      try {
+        const current = parseRoute();
+        const next = {
+          view: overrides.view !== void 0 ? overrides.view : current.view || viewRef.current || "projects",
+          projectId: overrides.projectId !== void 0 ? overrides.projectId : current.projectId,
+          ptab: overrides.ptab !== void 0 ? overrides.ptab : current.ptab,
+          pitem: overrides.pitem !== void 0 ? overrides.pitem : current.pitem,
+          atab: overrides.atab !== void 0 ? overrides.atab : current.atab,
+          agear: overrides.agear !== void 0 ? overrides.agear : current.agear
+        };
+        const url = buildRouteUrl(next);
+        if (url === window.location.pathname + window.location.search) return;
+        if (push) window.history.pushState({}, "", url);
+        else window.history.replaceState({}, "", url);
+      } catch (e) {
+        console.warn("[routing] updateRoute failed:", e);
+      }
+    }, []);
+    (0, import_react.useEffect)(() => {
+      try {
+        if (!window.location.pathname.startsWith(ROUTE_BASE_PATH)) {
+          window.history.replaceState({}, "", buildRouteUrl(parseRoute()));
+        }
+      } catch (e) {
+        console.warn("[routing] self-heal failed:", e);
+      }
     }, []);
     (0, import_react.useEffect)(() => {
       const onPopState = () => {
