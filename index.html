@@ -711,6 +711,35 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   };
   var _uid = 400;
   var uid = () => ++_uid;
+  var ROUTE_VIEWS = ["projects", "studio", "calendar", "deliverables", "animations", "ingest", "resources", "myview", "admin", "pipeline", "intake", "workreview", "kanban"];
+  function parseRoute() {
+    try {
+      const path = window.location.pathname.replace(/^\/+|\/+$/g, "");
+      const q = new URLSearchParams(window.location.search);
+      const pitem = q.get("pitem");
+      return {
+        view: ROUTE_VIEWS.includes(path) ? path : null,
+        projectId: q.get("project") ? +q.get("project") : null,
+        ptab: q.get("ptab") || null,
+        pitem: pitem ? Number.isNaN(+pitem) ? pitem : +pitem : null,
+        atab: q.get("atab") || null,
+        agear: q.get("agear") || null
+      };
+    } catch (e) {
+      return { view: null, projectId: null, ptab: null, pitem: null, atab: null, agear: null };
+    }
+  }
+  function buildRouteUrl({ view, projectId, ptab, pitem, atab, agear }) {
+    const path = "/" + (view || "projects");
+    const q = new URLSearchParams();
+    if (projectId != null) q.set("project", projectId);
+    if (ptab) q.set("ptab", ptab);
+    if (pitem != null) q.set("pitem", pitem);
+    if (atab) q.set("atab", atab);
+    if (agear) q.set("agear", agear);
+    const qs = q.toString();
+    return path + (qs ? `?${qs}` : "");
+  }
   var TEAM = [
     // ── Producers ──
     { id: 1, name: "Team Member 01", roles: ["Executive Producer", "Producer", "Reviewer"], employeeType: "Internal", available: true, email: "", phone: "", department: "Production", rate: { type: "salary", amount: null }, skills: ["Production Management", "Client Relations", "Live Events"] },
@@ -4721,7 +4750,7 @@ Brief content: ${content}`;
       return this.props.children;
     }
   };
-  var ProjectOverview = ({ project, team, allProjects, onClose, onUpdateDel, onAddDel, onDeleteDel, onUpdateProject, initialDelId, initialTab, initialShootId, initialItemId, studioBookings = [], mediaCards = [], setupTypes = [], onAddSetupType, talentRoster = [], onUpdateTalentRoster, nudges = [], onAddNudge, furnitureList = [], propsList = [], screenContentOptions = {}, gearList = [], customTasks = [], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, appPresets = [], onSaveAppPresets, vendorCompanies = [], addVendorCompany, intakes = [], becRequests = [], canAccessBudget = true, reviewerNames = [], addReviewerName, workReviewSessions = [], addWorkReviewSession, updateWorkReviewSession, lists = {} }) => {
+  var ProjectOverview = ({ project, team, allProjects, onClose, onUpdateDel, onAddDel, onDeleteDel, onUpdateProject, initialDelId, initialTab, initialShootId, initialItemId, studioBookings = [], mediaCards = [], setupTypes = [], onAddSetupType, talentRoster = [], onUpdateTalentRoster, nudges = [], onAddNudge, furnitureList = [], propsList = [], screenContentOptions = {}, gearList = [], customTasks = [], onAddCustomTask, onUpdateCustomTask, onDeleteCustomTask, appPresets = [], onSaveAppPresets, vendorCompanies = [], addVendorCompany, intakes = [], becRequests = [], canAccessBudget = true, reviewerNames = [], addReviewerName, workReviewSessions = [], addWorkReviewSession, updateWorkReviewSession, lists = {}, onTabChange }) => {
     const [activeDelModal, setActiveDelModal] = (0, import_react.useState)(initialDelId || (initialTab === "deliverables" || initialTab === "ingest" ? initialItemId : null) || null);
     const [handoffDelId, setHandoffDelId] = (0, import_react.useState)(null);
     const editors = team.filter((m) => m.roles?.some((r) => ["Editor", "Animator", "Designer"].includes(r)));
@@ -4738,6 +4767,9 @@ Brief content: ${content}`;
     (0, import_react.useEffect)(() => {
       if (activeTab === "budget" && !canAccessBudget) setActiveTab("overview");
     }, [activeTab, canAccessBudget]);
+    (0, import_react.useEffect)(() => {
+      onTabChange?.(activeTab, activeDelModal);
+    }, [activeTab, activeDelModal]);
     const [expandedShoot, setExpandedShoot] = (0, import_react.useState)(initialShootId || null);
     const [validationErrors, setValidationErrors] = (0, import_react.useState)(null);
     const [checklistOpen, setChecklistOpenRaw] = (0, import_react.useState)(false);
@@ -19389,9 +19421,12 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       return /* @__PURE__ */ React.createElement("div", { key: p.id, style: { background: "#0d1117", border: "1px solid #1f2937", borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: "#f1f5f9", marginBottom: 4 } }, p.name), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, chips.map((c) => /* @__PURE__ */ React.createElement("span", { key: c, style: { fontSize: 12, color: "#9ca3af", background: "#1f2937", borderRadius: 4, padding: "2px 7px" } }, c))), p.notes && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#4b5563", marginTop: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.notes)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => openEdit(p), style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 6, color: "#9ca3af", padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "Edit"), /* @__PURE__ */ React.createElement("button", { onClick: () => del(p.id), style: { background: "#ef444415", border: "1px solid #ef444440", borderRadius: 6, color: "#ef4444", padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "Delete")));
     })));
   };
-  var AdminView = ({ team, onUpdateTeam, projects = [], nudges = [], onOpenProject, gear, onUpdateGear, mediaCards = [], onUpdateMediaCards, furniture = [], onUpdateFurniture, props_ = [], onUpdateProps, screenContent = {}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes = [], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations = [], onUpdateWorkstations, talentRoster = [], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists = {}, onUpdateLists, presets = [], onUpdatePresets, tabLocks = {}, onUpdateTabLocks }) => {
-    const [gearSubTab, setGearSubTab] = (0, import_react.useState)("equipment");
-    const [tab, setTab] = (0, import_react.useState)("team");
+  var AdminView = ({ team, onUpdateTeam, projects = [], nudges = [], onOpenProject, gear, onUpdateGear, mediaCards = [], onUpdateMediaCards, furniture = [], onUpdateFurniture, props_ = [], onUpdateProps, screenContent = {}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes = [], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations = [], onUpdateWorkstations, talentRoster = [], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists = {}, onUpdateLists, presets = [], onUpdatePresets, tabLocks = {}, onUpdateTabLocks, initialTab, initialGearSubTab, onTabChange }) => {
+    const [gearSubTab, setGearSubTab] = (0, import_react.useState)(initialGearSubTab || "equipment");
+    const [tab, setTab] = (0, import_react.useState)(initialTab || "team");
+    (0, import_react.useEffect)(() => {
+      onTabChange?.(tab, gearSubTab);
+    }, [tab, gearSubTab]);
     const tabs = [{ id: "team", l: "\u{1F465} Team" }, { id: "gear", l: "\u{1F392} Gear" }, { id: "props", l: "\u{1FA91} Props & Furniture" }, { id: "screen", l: "\u{1F4FA} Screen Content" }, { id: "spaces", l: "\u{1F4CD} Spaces" }, { id: "setups", l: "\u{1F3AC} Setups" }, { id: "workstations", l: "\u{1F4BB} Workstations" }, { id: "talent", l: "\u{1F3A4} Talent" }, { id: "resources", l: "\u{1F4CA} Resources" }, { id: "lists", l: "\u{1F5C2} Metadata" }, { id: "crewRoles", l: "\u{1F3A5} Crew Roles" }, { id: "presets", l: "\u2B50 Production Presets" }, { id: "access", l: "\u{1F512} Access" }];
     return /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 26, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Admin"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: "#8e97a6" } }, "Manage your team roster, equipment inventory, and studio spaces.")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 8, marginBottom: 20 } }, tabs.map((t) => /* @__PURE__ */ React.createElement(
       "button",
@@ -20135,7 +20170,9 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         return list;
       });
     }, []);
+    const [initialRoute] = (0, import_react.useState)(() => parseRoute());
     const [view, setView] = (0, import_react.useState)(() => {
+      if (initialRoute.view) return initialRoute.view;
       try {
         return localStorage.getItem("posttrack-last-view") || "projects";
       } catch (e) {
@@ -20147,6 +20184,54 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         localStorage.setItem("posttrack-last-view", view);
       } catch (e) {
       }
+    }, [view]);
+    const viewRef = (0, import_react.useRef)(view);
+    (0, import_react.useEffect)(() => {
+      viewRef.current = view;
+    }, [view]);
+    const [popstateGen, setPopstateGen] = (0, import_react.useState)(0);
+    const updateRoute = (0, import_react.useCallback)((overrides, { push = false } = {}) => {
+      const current = parseRoute();
+      const next = {
+        view: overrides.view !== void 0 ? overrides.view : current.view || viewRef.current || "projects",
+        projectId: overrides.projectId !== void 0 ? overrides.projectId : current.projectId,
+        ptab: overrides.ptab !== void 0 ? overrides.ptab : current.ptab,
+        pitem: overrides.pitem !== void 0 ? overrides.pitem : current.pitem,
+        atab: overrides.atab !== void 0 ? overrides.atab : current.atab,
+        agear: overrides.agear !== void 0 ? overrides.agear : current.agear
+      };
+      const url = buildRouteUrl(next);
+      if (url === window.location.pathname + window.location.search) return;
+      if (push) window.history.pushState({}, "", url);
+      else window.history.replaceState({}, "", url);
+    }, []);
+    (0, import_react.useEffect)(() => {
+      const onPopState = () => {
+        const r = parseRoute();
+        setView(r.view || "projects");
+        if (r.projectId != null) {
+          const p = allProjectsRef.current.find((pr) => pr.id === r.projectId);
+          if (p) {
+            setSelected(p);
+            setInitialTab(r.ptab ? { tab: r.ptab, itemId: r.pitem } : null);
+          } else setSelected(null);
+        } else {
+          setSelected(null);
+        }
+        setAdminInitialTab(r.atab || "team");
+        setAdminInitialGearSubTab(r.agear || "equipment");
+        setPopstateGen((g) => g + 1);
+      };
+      window.addEventListener("popstate", onPopState);
+      return () => window.removeEventListener("popstate", onPopState);
+    }, []);
+    const viewNavMountedRef = (0, import_react.useRef)(false);
+    (0, import_react.useEffect)(() => {
+      if (!viewNavMountedRef.current) {
+        viewNavMountedRef.current = true;
+        return;
+      }
+      updateRoute({ view }, { push: true });
     }, [view]);
     const [toast, setToast] = (0, import_react.useState)(null);
     const pushOffset = usePushOffset();
@@ -21417,6 +21502,10 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [seedOverrides, setSeedOverrides] = (0, import_react.useState)({});
     const realProjects = projects.filter((p) => !p._isSeedData);
     const allProjects = showSeedData ? [...realProjects, ...SEED_PROJECTS.map((p) => seedOverrides[p.id] ? { ...p, ...seedOverrides[p.id] } : p)] : realProjects;
+    const allProjectsRef = (0, import_react.useRef)(allProjects);
+    (0, import_react.useEffect)(() => {
+      allProjectsRef.current = allProjects;
+    });
     const allStudioBookings = showSeedData ? [...studioBookings, ...STUDIO_BOOKINGS_SEED] : studioBookings;
     const [showDummyTeam, setShowDummyTeam] = (0, import_react.useState)(() => {
       try {
@@ -21442,6 +21531,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [filterStatus, setFilterStatus] = (0, import_react.useState)("All");
     const [search, setSearch] = (0, import_react.useState)("");
     const [selected, setSelected] = (0, import_react.useState)(null);
+    const [adminInitialTab, setAdminInitialTab] = (0, import_react.useState)(() => initialRoute.view === "admin" ? initialRoute.atab || "team" : "team");
+    const [adminInitialGearSubTab, setAdminInitialGearSubTab] = (0, import_react.useState)(() => initialRoute.view === "admin" ? initialRoute.agear || "equipment" : "equipment");
     const [addingProject, setAddingProject] = (0, import_react.useState)(false);
     const [statsFilter, setStatsFilter] = (0, import_react.useState)(null);
     const [sidebarSlotNode, setSidebarSlotNode] = (0, import_react.useState)(null);
@@ -21904,8 +21995,23 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const openProject = (0, import_react.useCallback)((p, tab, itemId) => {
       setSelected(p);
       setInitialTab(tab ? { tab, itemId } : null);
+      updateRoute({ projectId: p.id, ptab: tab || null, pitem: itemId ?? null }, { push: true });
     }, []);
     const [initialTab, setInitialTab] = (0, import_react.useState)(null);
+    const closeProject = (0, import_react.useCallback)(() => {
+      setSelected(null);
+      updateRoute({ projectId: null, ptab: null, pitem: null }, { push: true });
+    }, []);
+    const deepLinkResolvedRef = (0, import_react.useRef)(false);
+    (0, import_react.useEffect)(() => {
+      if (deepLinkResolvedRef.current || !initialRoute.projectId || !projectsLoaded) return;
+      deepLinkResolvedRef.current = true;
+      const p = allProjects.find((pr) => pr.id === initialRoute.projectId);
+      if (p) {
+        setSelected(p);
+        setInitialTab(initialRoute.ptab ? { tab: initialRoute.ptab, itemId: initialRoute.pitem } : null);
+      } else updateRoute({ projectId: null, ptab: null, pitem: null }, { push: false });
+    }, [projectsLoaded, allProjects]);
     const filtered = (0, import_react.useMemo)(() => projects, [projects]);
     const liveSelected = selected ? allProjects.find((p) => p.id === selected.id) || null : null;
     const VIEWS = [{ id: "projects", l: "Projects" }, { id: "studio", l: "Studio" }, { id: "calendar", l: "Calendar" }, { id: "deliverables", l: "Deliverables" }, { id: "animations", l: "Animation" }, { id: "ingest", l: "Ingest" }, { id: "resources", l: "Resources" }, { id: "myview", l: "My View" }, { id: "admin", l: "\u2699 Admin" }, { id: "pipeline", l: "Pipeline" }, { id: "intake", l: "Intake" }].filter((v) => v.id !== "admin" || isAdmin).filter((v) => v.id !== "resources" || canAccessTab("resourcing"));
@@ -22003,6 +22109,10 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     ), view === "projects" && /* @__PURE__ */ React.createElement(ProjectsView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, statsFilter, onClearStatsFilter: () => setStatsFilter(null), navSidebarWidth, navSidebarHandle, projectsLoaded }), view === "studio" && /* @__PURE__ */ React.createElement(StudioTab, { projects: allProjects, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, team: allTeam, onOpenProject: openProject, talentRoster, onUpdateProject: updateProject, mediaCards, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "kanban" && kanbanMode === "status" && /* @__PURE__ */ React.createElement(KanbanStatus, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "kanban" && kanbanMode === "editor" && /* @__PURE__ */ React.createElement(KanbanEditor, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "calendar" && /* @__PURE__ */ React.createElement(CalendarView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, unavailability, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "deliverables" && /* @__PURE__ */ React.createElement(DeliverablesTab, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "ingest" && /* @__PURE__ */ React.createElement(IngestView, { projects: allProjects, team: allTeam, onUpdateProject: updateProject, onAddDel: addDel, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "resources" && /* @__PURE__ */ React.createElement(ResourceView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, resourceConfig, onUpdateProject: updateProject, unavailability, onUpdateDel: updateDel }), view === "myview" && /* @__PURE__ */ React.createElement(MyView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, showToast, nudges, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, unavailability, onAddUnavailability: addUnavailability, onDeleteUnavailability: deleteUnavailability, currentMember, isAdmin, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "admin" && /* @__PURE__ */ React.createElement(
       AdminView,
       {
+        key: `admin:${popstateGen}`,
+        initialTab: adminInitialTab,
+        initialGearSubTab: adminInitialGearSubTab,
+        onTabChange: (tab, gearSubTab) => updateRoute({ atab: tab, agear: tab === "gear" ? gearSubTab : null }),
         team: teamRoster,
         onUpdateTeam: saveTeam,
         projects: allProjects,
@@ -22039,7 +22149,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         tabLocks,
         onUpdateTabLocks: saveTabLocks
       }
-    )))), liveSelected && /* @__PURE__ */ React.createElement(ProjectOverviewErrorBoundary, { key: liveSelected.id, onClose: () => setSelected(null) }, /* @__PURE__ */ React.createElement(ProjectOverview, { project: liveSelected, team: allTeam, allProjects, onClose: () => setSelected(null), onUpdateDel: updateDel, onAddDel: addDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, initialTab: initialTab?.tab, initialShootId: initialTab?.itemId, initialItemId: initialTab?.itemId, studioBookings: allStudioBookings, mediaCards, setupTypes, onAddSetupType: addSetupType, talentRoster, onUpdateTalentRoster: saveTalentRoster, nudges, onAddNudge: addNudge, furnitureList, propsList, screenContentOptions, gearList, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, appPresets, onSaveAppPresets: saveAppPresets, vendorCompanies, addVendorCompany, intakes, becRequests, canAccessBudget: canAccessTab("budget"), reviewerNames, addReviewerName, workReviewSessions, addWorkReviewSession, updateWorkReviewSession, lists })), addingProject && /* @__PURE__ */ React.createElement(AddProjectModal, { team: allTeam, existingProjects: allProjects, onClose: () => setAddingProject(false), onAdd: addProject }), createFromIntake && /* @__PURE__ */ React.createElement(
+    )))), liveSelected && /* @__PURE__ */ React.createElement(ProjectOverviewErrorBoundary, { key: `${liveSelected.id}:${popstateGen}`, onClose: closeProject }, /* @__PURE__ */ React.createElement(ProjectOverview, { project: liveSelected, team: allTeam, allProjects, onClose: closeProject, onTabChange: (tab, delId) => updateRoute({ ptab: tab, pitem: delId ?? null }), onUpdateDel: updateDel, onAddDel: addDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, initialTab: initialTab?.tab, initialShootId: initialTab?.itemId, initialItemId: initialTab?.itemId, studioBookings: allStudioBookings, mediaCards, setupTypes, onAddSetupType: addSetupType, talentRoster, onUpdateTalentRoster: saveTalentRoster, nudges, onAddNudge: addNudge, furnitureList, propsList, screenContentOptions, gearList, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, appPresets, onSaveAppPresets: saveAppPresets, vendorCompanies, addVendorCompany, intakes, becRequests, canAccessBudget: canAccessTab("budget"), reviewerNames, addReviewerName, workReviewSessions, addWorkReviewSession, updateWorkReviewSession, lists })), addingProject && /* @__PURE__ */ React.createElement(AddProjectModal, { team: allTeam, existingProjects: allProjects, onClose: () => setAddingProject(false), onAdd: addProject }), createFromIntake && /* @__PURE__ */ React.createElement(
       AddProjectModal,
       {
         team: allTeam,

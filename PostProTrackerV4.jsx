@@ -366,6 +366,44 @@ const DEFAULT_SCREEN_CONTENT_OPTIONS = {
 let _uid = 400;
 const uid = () => ++_uid;
 
+// ─── URL routing ────────────────────────────────────────────────────────────
+// No router library — the app has never had one (confirmed: no prior use of
+// window.history/location.hash/URLSearchParams anywhere), so this is plain
+// History API, matching the dependency-free style everywhere else here.
+// Top-level nav (`view`) is a path segment; the project-detail modal and
+// Admin's own sub-tabs are an overlay on top of whatever view is showing, so
+// they're query params rather than nested paths. Two independently-updated
+// param groups, kept separate to avoid collisions since a project can be
+// opened from any view including Admin: "p*" for the project modal
+// (project/ptab/pitem), "a*" for Admin's own tab/gear-sub-tab.
+const ROUTE_VIEWS = ["projects","studio","calendar","deliverables","animations","ingest","resources","myview","admin","pipeline","intake","workreview","kanban"];
+function parseRoute(){
+  try{
+    const path = window.location.pathname.replace(/^\/+|\/+$/g,"");
+    const q = new URLSearchParams(window.location.search);
+    const pitem = q.get("pitem");
+    return {
+      view: ROUTE_VIEWS.includes(path) ? path : null,
+      projectId: q.get("project") ? +q.get("project") : null,
+      ptab: q.get("ptab") || null,
+      pitem: pitem ? (Number.isNaN(+pitem) ? pitem : +pitem) : null,
+      atab: q.get("atab") || null,
+      agear: q.get("agear") || null,
+    };
+  }catch(e){ return {view:null,projectId:null,ptab:null,pitem:null,atab:null,agear:null}; }
+}
+function buildRouteUrl({view, projectId, ptab, pitem, atab, agear}){
+  const path = "/"+(view||"projects");
+  const q = new URLSearchParams();
+  if(projectId!=null) q.set("project", projectId);
+  if(ptab) q.set("ptab", ptab);
+  if(pitem!=null) q.set("pitem", pitem);
+  if(atab) q.set("atab", atab);
+  if(agear) q.set("agear", agear);
+  const qs = q.toString();
+  return path + (qs?`?${qs}`:"");
+}
+
 const TEAM = [
   // ── Producers ──
   {id:1,  name:"Team Member 01",  roles:["Executive Producer","Producer","Reviewer"],          employeeType:"Internal",   available:true,  email:"", phone:"", department:"Production", rate:{type:"salary",amount:null}, skills:["Production Management","Client Relations","Live Events"]},
@@ -6784,7 +6822,7 @@ class ProjectOverviewErrorBoundary extends React.Component {
   }
 }
 
-const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,onDeleteDel,onUpdateProject,initialDelId,initialTab,initialShootId,initialItemId,studioBookings=[],mediaCards=[],setupTypes=[],onAddSetupType,talentRoster=[],onUpdateTalentRoster,nudges=[],onAddNudge,furnitureList=[],propsList=[],screenContentOptions={},gearList=[],customTasks=[],onAddCustomTask,onUpdateCustomTask,onDeleteCustomTask,appPresets=[],onSaveAppPresets,vendorCompanies=[],addVendorCompany,intakes=[],becRequests=[],canAccessBudget=true,reviewerNames=[],addReviewerName,workReviewSessions=[],addWorkReviewSession,updateWorkReviewSession,lists={}}) => {
+const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,onDeleteDel,onUpdateProject,initialDelId,initialTab,initialShootId,initialItemId,studioBookings=[],mediaCards=[],setupTypes=[],onAddSetupType,talentRoster=[],onUpdateTalentRoster,nudges=[],onAddNudge,furnitureList=[],propsList=[],screenContentOptions={},gearList=[],customTasks=[],onAddCustomTask,onUpdateCustomTask,onDeleteCustomTask,appPresets=[],onSaveAppPresets,vendorCompanies=[],addVendorCompany,intakes=[],becRequests=[],canAccessBudget=true,reviewerNames=[],addReviewerName,workReviewSessions=[],addWorkReviewSession,updateWorkReviewSession,lists={},onTabChange}) => {
   const [activeDelModal,setActiveDelModal]=useState(initialDelId||((initialTab==="deliverables"||initialTab==="ingest")?initialItemId:null)||null);
   const [handoffDelId,  setHandoffDelId]  = useState(null); // for editor assignment modal in deliverables tab
   const editors = team.filter(m=>m.roles?.some(r=>["Editor","Animator","Designer"].includes(r)));
@@ -6799,6 +6837,12 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
   const [bulkDelCount, setBulkDelCount] = useState(1);
   const [activeTab,setActiveTab]=useState(initialTab==="budget"&&!canAccessBudget?"overview":(initialTab||"overview"));
   useEffect(()=>{ if(activeTab==="budget" && !canAccessBudget) setActiveTab("overview"); },[activeTab,canAccessBudget]);
+  // Notifies the URL-sync effect in the root component (via onTabChange) so
+  // this modal's active tab and open deliverable are deep-linkable —
+  // activeTab/activeDelModal are otherwise purely local state with nothing
+  // upstream ever learning about an in-modal change after the initial
+  // initialTab/initialDelId/initialItemId seed above.
+  useEffect(()=>{ onTabChange?.(activeTab, activeDelModal); },[activeTab, activeDelModal]);
   const [expandedShoot,setExpandedShoot]=useState(initialShootId||null);
   const [validationErrors,setValidationErrors]=useState(null);
   // Mutually exclusive — only one sidebar slot, so opening one closes the
@@ -27716,9 +27760,13 @@ const ProductionPresetsAdmin = ({presets=[], onUpdatePresets, setupTypes=[], tea
   );
 };
 
-const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, gear, onUpdateGear, mediaCards=[], onUpdateMediaCards, furniture=[], onUpdateFurniture, props_=[], onUpdateProps, screenContent={}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes=[], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations=[], onUpdateWorkstations, talentRoster=[], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists={}, onUpdateLists, presets=[], onUpdatePresets, tabLocks={}, onUpdateTabLocks}) => {
-  const [gearSubTab, setGearSubTab] = useState("equipment"); // "equipment" | "media"
-  const [tab, setTab] = useState("team");
+const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, gear, onUpdateGear, mediaCards=[], onUpdateMediaCards, furniture=[], onUpdateFurniture, props_=[], onUpdateProps, screenContent={}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes=[], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations=[], onUpdateWorkstations, talentRoster=[], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists={}, onUpdateLists, presets=[], onUpdatePresets, tabLocks={}, onUpdateTabLocks, initialTab, initialGearSubTab, onTabChange}) => {
+  const [gearSubTab, setGearSubTab] = useState(initialGearSubTab||"equipment"); // "equipment" | "media"
+  const [tab, setTab] = useState(initialTab||"team");
+  // Notifies the URL-sync effect in the root component (via onTabChange) so
+  // Admin's tab/sub-tab are deep-linkable — see initialTab/initialGearSubTab
+  // above for the reverse (reading a deep link back in on mount).
+  useEffect(()=>{ onTabChange?.(tab, gearSubTab); },[tab, gearSubTab]);
   const tabs = [{id:"team",l:"👥 Team"},{id:"gear",l:"🎒 Gear"},{id:"props",l:"🪑 Props & Furniture"},{id:"screen",l:"📺 Screen Content"},{id:"spaces",l:"📍 Spaces"},{id:"setups",l:"🎬 Setups"},{id:"workstations",l:"💻 Workstations"},{id:"talent",l:"🎤 Talent"},{id:"resources",l:"📊 Resources"},{id:"lists",l:"🗂 Metadata"},{id:"crewRoles",l:"🎥 Crew Roles"},{id:"presets",l:"⭐ Production Presets"},{id:"access",l:"🔒 Access"}];
 
   return (
@@ -29005,10 +29053,82 @@ function App() {
       return list;
     });
   },[]);
+  // Captured once at mount — the URL this page was actually opened/shared
+  // with, if any. Everything below that resolves a deep link (the initial
+  // view, and later the project/admin-tab resolution effects) reads from
+  // this single snapshot rather than re-parsing window.location repeatedly,
+  // so a stale mid-navigation URL can't be read twice with different results.
+  const [initialRoute] = useState(()=>parseRoute());
   const [view,setView]=useState(()=>{
+    if(initialRoute.view) return initialRoute.view;
     try { return localStorage.getItem("posttrack-last-view") || "projects"; } catch(e){ return "projects"; }
   });
   useEffect(()=>{ try{ localStorage.setItem("posttrack-last-view", view); }catch(e){} },[view]);
+  // Mirrors `view` into a ref so updateRoute (below) can read the current
+  // view without depending on it — same stale-closure-avoidance pattern as
+  // projectsRef elsewhere in this component.
+  const viewRef = useRef(view);
+  useEffect(()=>{ viewRef.current = view; },[view]);
+  // Bumped once per actual browser back/forward navigation (see the
+  // popstate effect below) and folded into ProjectOverview's/AdminView's
+  // `key` so only a *real* back/forward reliably remounts them with their
+  // freshly-resolved initial state — normal in-app clicks (switching a
+  // project's tab, an admin sub-tab) must NOT remount them, since that
+  // would blow away unrelated local state (scroll position, open forms)
+  // on every ordinary interaction, not just actual navigation.
+  const [popstateGen, setPopstateGen] = useState(0);
+  // One central place that reads the live URL, applies the given
+  // overrides, and writes the result back — see parseRoute/buildRouteUrl's
+  // comment for the param scheme. Reading the *current* URL fresh each
+  // call (rather than tracking each piece in React state) means whichever
+  // params the caller doesn't mention are simply preserved as-is.
+  const updateRoute = useCallback((overrides, {push=false}={})=>{
+    const current = parseRoute();
+    const next = {
+      view: overrides.view!==undefined ? overrides.view : (current.view || viewRef.current || "projects"),
+      projectId: overrides.projectId!==undefined ? overrides.projectId : current.projectId,
+      ptab: overrides.ptab!==undefined ? overrides.ptab : current.ptab,
+      pitem: overrides.pitem!==undefined ? overrides.pitem : current.pitem,
+      atab: overrides.atab!==undefined ? overrides.atab : current.atab,
+      agear: overrides.agear!==undefined ? overrides.agear : current.agear,
+    };
+    const url = buildRouteUrl(next);
+    if(url === window.location.pathname+window.location.search) return;
+    if(push) window.history.pushState({}, "", url);
+    else window.history.replaceState({}, "", url);
+  },[]);
+  // Pushing a new URL ourselves (open/close a project, switch the top nav)
+  // never fires popstate — only the browser's own back/forward does — so
+  // this effect only has to handle the latter. Re-resolves the whole route
+  // from scratch rather than trying to patch individual pieces of state.
+  useEffect(()=>{
+    const onPopState = () => {
+      const r = parseRoute();
+      setView(r.view || "projects");
+      if(r.projectId!=null){
+        const p = allProjectsRef.current.find(pr=>pr.id===r.projectId);
+        if(p){ setSelected(p); setInitialTab(r.ptab?{tab:r.ptab,itemId:r.pitem}:null); }
+        else setSelected(null);
+      } else {
+        setSelected(null);
+      }
+      setAdminInitialTab(r.atab || "team");
+      setAdminInitialGearSubTab(r.agear || "equipment");
+      setPopstateGen(g=>g+1);
+    };
+    window.addEventListener("popstate", onPopState);
+    return ()=>window.removeEventListener("popstate", onPopState);
+  },[]);
+  // Switching the top-level nav tab pushes a new entry so back/forward
+  // steps through view history, same as any normal page nav would. Skips
+  // the very first run (mount) since the initial URL, if any, already
+  // reflects this same view via initialRoute above — pushing again there
+  // would add a redundant history entry for the page the user just loaded.
+  const viewNavMountedRef = useRef(false);
+  useEffect(()=>{
+    if(!viewNavMountedRef.current){ viewNavMountedRef.current = true; return; }
+    updateRoute({view}, {push:true});
+  },[view]);
   const [toast, setToast] = useState(null);
   // How far the main app content should shift right to make room for whichever
   // side panel (Checklist, sidebars, drawers) is currently open.
@@ -30366,6 +30486,11 @@ function App() {
   const allProjects = showSeedData
     ? [...realProjects, ...SEED_PROJECTS.map(p=>seedOverrides[p.id]?{...p,...seedOverrides[p.id]}:p)]
     : realProjects;
+  // Lets the popstate handler (declared earlier, reused as a closure — see
+  // its comment) look a project up by id without depending on allProjects
+  // directly, same stale-closure-avoidance pattern as projectsRef.
+  const allProjectsRef = useRef(allProjects);
+  useEffect(()=>{ allProjectsRef.current = allProjects; });
   // Seed studio bookings governed by the same toggle as seed projects
   const allStudioBookings = showSeedData ? [...studioBookings, ...STUDIO_BOOKINGS_SEED] : studioBookings;
 
@@ -30393,6 +30518,13 @@ function App() {
   const [filterStatus,setFilterStatus]=useState("All");
   const [search,setSearch]=useState("");
   const [selected,setSelected]=useState(null);
+  // AdminView's own tab/gearSubTab are local state it only reads an
+  // initial value from (see its initialTab/initialGearSubTab props) — these
+  // carry that initial value, seeded from a deep link on first mount and
+  // updated by the popstate handler above before it bumps popstateGen to
+  // force AdminView to remount and pick them up again.
+  const [adminInitialTab, setAdminInitialTab] = useState(()=> initialRoute.view==="admin" ? (initialRoute.atab||"team") : "team");
+  const [adminInitialGearSubTab, setAdminInitialGearSubTab] = useState(()=> initialRoute.view==="admin" ? (initialRoute.agear||"equipment") : "equipment");
   const [addingProject,setAddingProject]=useState(false);
   const [statsFilter,setStatsFilter]=useState(null); // {label, ids:Set<id>} — set by StatsBar tiles
   // Sidebar portal target: a DOM node owned by App, sized here, that regular
@@ -30928,8 +31060,41 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[allProjects,updateProject,addProject,appPresets,showToast,becRequests,saveBecRequests]);
 
-  const openProject=useCallback((p,tab,itemId)=>{setSelected(p);setInitialTab(tab?{tab,itemId}:null);},[]);
+  // Every "open a project" entry point in the app funnels through this one
+  // function (ProjectCard clicks, Studio/Calendar/WorkReview rows, the AI
+  // action dispatcher, …), which makes it the one place that needs to push
+  // a URL for the project to become deep-linkable — none of those many call
+  // sites need to change. Does NOT fire for the deep-link resolution effect
+  // or the popstate handler below, which set selected/initialTab directly
+  // since in both of those cases the URL is already correct (it's the
+  // thing that triggered the navigation, not something to push again).
+  const openProject=useCallback((p,tab,itemId)=>{
+    setSelected(p);
+    setInitialTab(tab?{tab,itemId}:null);
+    updateRoute({projectId:p.id, ptab:tab||null, pitem:itemId??null}, {push:true});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
   const [initialTab,setInitialTab]=useState(null);
+  const closeProject = useCallback(()=>{
+    setSelected(null);
+    updateRoute({projectId:null, ptab:null, pitem:null}, {push:true});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+  // Resolves a `?project=` deep link once the real project data has loaded
+  // (it's fetched async from Supabase, so it may not exist yet at mount —
+  // see projectsLoaded's own comment). Runs at most once: if the id isn't
+  // found once loading finishes (a stale/bad link), it gives up rather than
+  // retrying forever. Sets selected/initialTab directly rather than through
+  // openProject so it doesn't re-push a URL that's already correct.
+  const deepLinkResolvedRef = useRef(false);
+  useEffect(()=>{
+    if(deepLinkResolvedRef.current || !initialRoute.projectId || !projectsLoaded) return;
+    deepLinkResolvedRef.current = true;
+    const p = allProjects.find(pr=>pr.id===initialRoute.projectId);
+    if(p){ setSelected(p); setInitialTab(initialRoute.ptab?{tab:initialRoute.ptab,itemId:initialRoute.pitem}:null); }
+    else updateRoute({projectId:null, ptab:null, pitem:null}, {push:false});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[projectsLoaded, allProjects]);
 
   const filtered=useMemo(()=>projects,[projects]);
 
@@ -31101,6 +31266,9 @@ function App() {
           {view==="resources"&&<ResourceView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
           {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability} currentMember={currentMember} isAdmin={isAdmin} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="admin"&&<AdminView
+            key={`admin:${popstateGen}`}
+            initialTab={adminInitialTab} initialGearSubTab={adminInitialGearSubTab}
+            onTabChange={(tab,gearSubTab)=>updateRoute({atab:tab, agear:tab==="gear"?gearSubTab:null})}
             team={teamRoster} onUpdateTeam={saveTeam}
             projects={allProjects} nudges={nudges} onOpenProject={openProject}
             gear={gearList}   onUpdateGear={saveGear}
@@ -31123,8 +31291,8 @@ function App() {
         </div>
 
         {liveSelected&&(
-          <ProjectOverviewErrorBoundary key={liveSelected.id} onClose={()=>setSelected(null)}>
-            <ProjectOverview project={liveSelected} team={allTeam} allProjects={allProjects} onClose={()=>setSelected(null)} onUpdateDel={updateDel} onAddDel={addDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} initialTab={initialTab?.tab} initialShootId={initialTab?.itemId} initialItemId={initialTab?.itemId} studioBookings={allStudioBookings} mediaCards={mediaCards} setupTypes={setupTypes} onAddSetupType={addSetupType} talentRoster={talentRoster} onUpdateTalentRoster={saveTalentRoster} nudges={nudges} onAddNudge={addNudge} furnitureList={furnitureList} propsList={propsList} screenContentOptions={screenContentOptions} gearList={gearList} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} appPresets={appPresets} onSaveAppPresets={saveAppPresets} vendorCompanies={vendorCompanies} addVendorCompany={addVendorCompany} intakes={intakes} becRequests={becRequests} canAccessBudget={canAccessTab("budget")} reviewerNames={reviewerNames} addReviewerName={addReviewerName} workReviewSessions={workReviewSessions} addWorkReviewSession={addWorkReviewSession} updateWorkReviewSession={updateWorkReviewSession} lists={lists}/>
+          <ProjectOverviewErrorBoundary key={`${liveSelected.id}:${popstateGen}`} onClose={closeProject}>
+            <ProjectOverview project={liveSelected} team={allTeam} allProjects={allProjects} onClose={closeProject} onTabChange={(tab,delId)=>updateRoute({ptab:tab, pitem:delId??null})} onUpdateDel={updateDel} onAddDel={addDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} initialTab={initialTab?.tab} initialShootId={initialTab?.itemId} initialItemId={initialTab?.itemId} studioBookings={allStudioBookings} mediaCards={mediaCards} setupTypes={setupTypes} onAddSetupType={addSetupType} talentRoster={talentRoster} onUpdateTalentRoster={saveTalentRoster} nudges={nudges} onAddNudge={addNudge} furnitureList={furnitureList} propsList={propsList} screenContentOptions={screenContentOptions} gearList={gearList} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} appPresets={appPresets} onSaveAppPresets={saveAppPresets} vendorCompanies={vendorCompanies} addVendorCompany={addVendorCompany} intakes={intakes} becRequests={becRequests} canAccessBudget={canAccessTab("budget")} reviewerNames={reviewerNames} addReviewerName={addReviewerName} workReviewSessions={workReviewSessions} addWorkReviewSession={addWorkReviewSession} updateWorkReviewSession={updateWorkReviewSession} lists={lists}/>
           </ProjectOverviewErrorBoundary>
         )}
         {addingProject&&<AddProjectModal team={allTeam} existingProjects={allProjects} onClose={()=>setAddingProject(false)} onAdd={addProject}/>}
