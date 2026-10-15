@@ -15164,7 +15164,7 @@ const READ_FROM_NORMALIZED_DELIVERABLES_PRODUCTIONS = true;
 // raced against — whenever this is true, so there's exactly one writer for
 // these three pieces of state no matter which order the two effects
 // actually resolve in.
-const READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS = false;
+const READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS = true;
 
 // Phase 3 — the remaining app_kv-backed collections (see production_schema_new_tables.sql's
 // Phase 3 section and the "what else should be its own table" conversation).
