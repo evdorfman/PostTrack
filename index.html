@@ -21263,7 +21263,10 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       if (!projectsLoadedRef.current || !sb) return;
       const real = projects.filter((p) => !p._isSeedData);
       if (!real.length) return;
-      sb.from("projects").upsert(real.map(projectToRow)).then(({ error }) => reportSbError("Project", error));
+      const timer = setTimeout(() => {
+        sb.from("projects").upsert(real.map(projectToRow)).then(({ error }) => reportSbError("Project", error));
+      }, 500);
+      return () => clearTimeout(timer);
     }, [projects]);
     (0, import_react.useEffect)(() => {
       if (!bookingsLoadedRef.current || !sb) return;
@@ -21444,6 +21447,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [sidebarRequestedWidth, setSidebarRequestedWidth] = (0, import_react.useState)(0);
     const [navSidebarWidth, navSidebarHandle] = useResizableWidth("posttrack-nav-sidebar-width", 480, { min: 320, max: 720 });
     const activeSidebarWidth = sidebarRequestedWidth ? navSidebarWidth : 0;
+    const delWriteTimersRef = (0, import_react.useRef)(/* @__PURE__ */ new Map());
+    const DEL_WRITE_DEBOUNCE_MS = 500;
     const updateDel = (0, import_react.useCallback)((projectId, delId, field, value) => {
       const prevProj = projectsRef.current.find((p) => p.id === projectId);
       const prevDel = prevProj?.deliverables.find((d) => d.id === delId);
@@ -21457,11 +21462,20 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         if (field === "rounds") {
           writeRoundDiff(sb, prevDel._rowId, computeRoundDiff(prevDel.rounds || [], value || [])).catch((e) => console.warn("[shadow write] round diff failed:", e));
         } else {
-          const fullRow = deliverableToRow(applyFieldUpdate(prevDel), projectId);
-          const { id: _id, legacy_id: _legacyId, project_id: _projectId, ...patch } = fullRow;
-          updateDeliverableRow(sb, prevDel._rowId, patch).then(({ error }) => {
-            if (error) console.warn("[shadow write] updateDel failed:", error);
-          }).catch((e) => console.warn("[shadow write] updateDel failed:", e));
+          const rowId = prevDel._rowId;
+          const existingTimer = delWriteTimersRef.current.get(rowId);
+          if (existingTimer) clearTimeout(existingTimer);
+          const timer = setTimeout(() => {
+            delWriteTimersRef.current.delete(rowId);
+            const latestDel = projectsRef.current.find((p) => p.id === projectId)?.deliverables.find((d) => d.id === delId);
+            if (!latestDel) return;
+            const fullRow = deliverableToRow(latestDel, projectId);
+            const { id: _id, legacy_id: _legacyId, project_id: _projectId, ...patch } = fullRow;
+            updateDeliverableRow(sb, rowId, patch).then(({ error }) => {
+              if (error) console.warn("[shadow write] updateDel failed:", error);
+            }).catch((e) => console.warn("[shadow write] updateDel failed:", e));
+          }, DEL_WRITE_DEBOUNCE_MS);
+          delWriteTimersRef.current.set(rowId, timer);
         }
       }
       if (SEED_PROJECTS.some((p) => p.id === projectId)) {

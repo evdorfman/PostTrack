@@ -30166,7 +30166,19 @@ function App() {
     // allProjects, so persisting them here would just bloat the table.
     const real = projects.filter(p=>!p._isSeedData);
     if(!real.length) return;
-    sb.from("projects").upsert(real.map(projectToRow)).then(({error})=>reportSbError("Project", error));
+    // Debounced — this effect reruns on every projects-state change, which
+    // includes every keystroke in a free-text field (name, briefNotes,
+    // clientDescription, …). Firing the upsert on each one let the realtime
+    // echo of an early keystroke land after several more had been typed and
+    // clobber the field with that older text (same stutter as updateDel's
+    // write — see its comment — now that REALTIME_PHASE2 broadcasts this
+    // table's UPDATEs back to every tab, including this one). The standard
+    // debounced-effect shape: each change cancels the previous timer via
+    // this cleanup running before the next effect call.
+    const timer = setTimeout(()=>{
+      sb.from("projects").upsert(real.map(projectToRow)).then(({error})=>reportSbError("Project", error));
+    }, 500);
+    return ()=>clearTimeout(timer);
   },[projects]);
 
   // Studio bookings previously had zero persistence of any kind (not even
@@ -30392,6 +30404,17 @@ function App() {
   const [navSidebarWidth, navSidebarHandle] = useResizableWidth("posttrack-nav-sidebar-width", 480, {min:320,max:720});
   const activeSidebarWidth = sidebarRequestedWidth ? navSidebarWidth : 0;
 
+  // Debounces updateDel's per-field shadow write below so rapid typing
+  // (one keystroke = one call) doesn't fire a Supabase UPDATE per
+  // character. Without this, now that REALTIME_PHASE2 is on, the realtime
+  // echo of an early keystroke's write can land after several more
+  // characters have been typed and clobber the field with that older
+  // text — visible as the input stuttering while typing. Keyed by the
+  // deliverable's row id (same useRef-Map pattern as logFieldChangeBatched
+  // above) so edits to different deliverables debounce independently.
+  const delWriteTimersRef = useRef(new Map());
+  const DEL_WRITE_DEBOUNCE_MS = 500;
+
   const updateDel=useCallback((projectId,delId,field,value)=>{
     const prevProj = projectsRef.current.find(p=>p.id===projectId);
     const prevDel = prevProj?.deliverables.find(d=>d.id===delId);
@@ -30413,11 +30436,23 @@ function App() {
         writeRoundDiff(sb, prevDel._rowId, computeRoundDiff(prevDel.rounds||[], value||[]))
           .catch(e=>console.warn("[shadow write] round diff failed:", e));
       } else {
-        const fullRow = deliverableToRow(applyFieldUpdate(prevDel), projectId);
-        const {id:_id, legacy_id:_legacyId, project_id:_projectId, ...patch} = fullRow;
-        updateDeliverableRow(sb, prevDel._rowId, patch)
-          .then(({error})=>{ if(error) console.warn("[shadow write] updateDel failed:", error); })
-          .catch(e=>console.warn("[shadow write] updateDel failed:", e));
+        const rowId = prevDel._rowId;
+        const existingTimer = delWriteTimersRef.current.get(rowId);
+        if(existingTimer) clearTimeout(existingTimer);
+        const timer = setTimeout(()=>{
+          delWriteTimersRef.current.delete(rowId);
+          // Re-read current state rather than closing over prevDel — by the
+          // time this fires, more keystrokes may have landed and this must
+          // send the latest text, not the snapshot from when typing started.
+          const latestDel = projectsRef.current.find(p=>p.id===projectId)?.deliverables.find(d=>d.id===delId);
+          if(!latestDel) return;
+          const fullRow = deliverableToRow(latestDel, projectId);
+          const {id:_id, legacy_id:_legacyId, project_id:_projectId, ...patch} = fullRow;
+          updateDeliverableRow(sb, rowId, patch)
+            .then(({error})=>{ if(error) console.warn("[shadow write] updateDel failed:", error); })
+            .catch(e=>console.warn("[shadow write] updateDel failed:", e));
+        }, DEL_WRITE_DEBOUNCE_MS);
+        delWriteTimersRef.current.set(rowId, timer);
       }
     }
     // Seed project override
