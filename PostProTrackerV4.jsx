@@ -27824,7 +27824,7 @@ const ProductionPresetsAdmin = ({presets=[], onUpdatePresets, setupTypes=[], tea
   );
 };
 
-const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, gear, onUpdateGear, mediaCards=[], onUpdateMediaCards, furniture=[], onUpdateFurniture, props_=[], onUpdateProps, screenContent={}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes=[], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations=[], onUpdateWorkstations, talentRoster=[], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists={}, onUpdateLists, presets=[], onUpdatePresets, tabLocks={}, onUpdateTabLocks, issueReports=[], onResolveIssue, initialTab, initialGearSubTab, onTabChange}) => {
+const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, gear, onUpdateGear, mediaCards=[], onUpdateMediaCards, furniture=[], onUpdateFurniture, props_=[], onUpdateProps, screenContent={}, onUpdateScreenContent, spaces, spaceMeta, onUpdateSpaces, onUpdateSpaceMeta, setupTypes=[], onAddSetupType, onUpdateSetupType, onDeleteSetupType, workstations=[], onUpdateWorkstations, talentRoster=[], onUpdateTalentRoster, resourceConfig, onUpdateResourceConfig, lists={}, onUpdateLists, presets=[], onUpdatePresets, tabLocks={}, onUpdateTabLocks, issueReports=[], onResolveIssue, onSearchResolvedIssues, initialTab, initialGearSubTab, onTabChange}) => {
   const [gearSubTab, setGearSubTab] = useState(initialGearSubTab||"equipment"); // "equipment" | "media"
   const [tab, setTab] = useState(initialTab||"team");
   // Notifies the URL-sync effect in the root component (via onTabChange) so
@@ -27883,55 +27883,136 @@ const AdminView = ({team, onUpdateTeam, projects=[], nudges=[], onOpenProject, g
       {tab==="access"&&<AdminAccessTab tabLocks={tabLocks} onUpdateTabLocks={onUpdateTabLocks}/>}
 
       {/* ── ISSUES TAB ── */}
-      {tab==="issues"&&<AdminIssuesTab issueReports={issueReports} onResolve={onResolveIssue}/>}
+      {tab==="issues"&&<AdminIssuesTab issueReports={issueReports} onResolve={onResolveIssue} onSearchResolved={onSearchResolvedIssues}/>}
     </div>
   );
 };
 
-// ─── Admin → Issues — app errors (auto-logged whenever a Supabase write
-// fails) and user-submitted "Report an Issue" messages in one feed, newest
-// first, since with only one person supporting this app, both need to land
-// somewhere that gets checked rather than a console only the person who hit
-// them happened to have open.
-const AdminIssuesTab = ({issueReports=[], onResolve}) => {
-  const [showResolved, setShowResolved] = useState(false);
-  const visible = showResolved ? issueReports : issueReports.filter(r=>!r.resolved);
+// One shared card so the active list and the archive search results look
+// identical — the only behavioral difference is which action the button
+// performs (Resolve vs. Reopen) and that's driven entirely by the caller.
+const IssueReportCard = ({r, onToggleResolve}) => {
+  const isReport = r.source==="user_report";
   return (
-    <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-        <div style={{fontSize:16,color:"#838ba0"}}>App errors are logged here automatically; "Report an Issue" messages come from anyone in the app's user menu.</div>
-        <button onClick={()=>setShowResolved(v=>!v)}
-          style={{background:showResolved?"#1f2937":"transparent",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"6px 14px",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
-          {showResolved?"Hide resolved":"Show resolved"}
+    <div style={{background:"#111827",border:`1px solid ${r.resolved?"#1f2937":isReport?"#6366f140":"#ef444440"}`,borderRadius:10,padding:14,opacity:r.resolved?0.6:1}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:6}}>
+        <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
+          <Chip label={isReport?"Report":"App Error"} color={isReport?"#6366f1":"#ef4444"} xs/>
+          {r.reporter_name&&<span style={{fontSize:14,fontWeight:700,color:"#e2e8f0"}}>{r.reporter_name}</span>}
+          {r.reporter_email&&<span style={{fontSize:13,color:"#6b7280"}}>{r.reporter_email}</span>}
+        </div>
+        <button onClick={()=>onToggleResolve?.(r.id, !r.resolved)}
+          style={{background:r.resolved?"#1f2937":"#10b98118",border:`1px solid ${r.resolved?"#374151":"#10b98140"}`,borderRadius:6,color:r.resolved?"#9ca3af":"#10b981",padding:"3px 10px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
+          {r.resolved?"Reopen":"✓ Resolve"}
         </button>
       </div>
-      {visible.length===0&&<div style={{textAlign:"center",color:"#838ba0",padding:"32px 0",fontSize:16}}>
-        {showResolved?"Nothing here yet.":"No open issues. 🎉"}
-      </div>}
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {visible.map(r=>{
-          const isReport = r.source==="user_report";
-          return (
-            <div key={r.id} style={{background:"#111827",border:`1px solid ${r.resolved?"#1f2937":isReport?"#6366f140":"#ef444440"}`,borderRadius:10,padding:14,opacity:r.resolved?0.6:1}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:6}}>
-                <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
-                  <Chip label={isReport?"Report":"App Error"} color={isReport?"#6366f1":"#ef4444"} xs/>
-                  {r.reporter_name&&<span style={{fontSize:14,fontWeight:700,color:"#e2e8f0"}}>{r.reporter_name}</span>}
-                  {r.reporter_email&&<span style={{fontSize:13,color:"#6b7280"}}>{r.reporter_email}</span>}
-                </div>
-                <button onClick={()=>onResolve?.(r.id, !r.resolved)}
-                  style={{background:r.resolved?"#1f2937":"#10b98118",border:`1px solid ${r.resolved?"#374151":"#10b98140"}`,borderRadius:6,color:r.resolved?"#9ca3af":"#10b981",padding:"3px 10px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
-                  {r.resolved?"Reopen":"✓ Resolve"}
-                </button>
-              </div>
-              <div style={{fontSize:15,color:"#e2e8f0",marginBottom:6,whiteSpace:"pre-wrap"}}>{r.message}</div>
-              {r.context&&Object.keys(r.context).length>0&&(
-                <div style={{fontSize:12,color:"#4b5563",fontFamily:"monospace"}}>{JSON.stringify(r.context)}</div>
-              )}
-              <div style={{fontSize:12,color:"#4b5563",marginTop:4}}>{fmtDT(r.created_at)}</div>
+      <div style={{fontSize:15,color:"#e2e8f0",marginBottom:6,whiteSpace:"pre-wrap"}}>{r.message}</div>
+      {r.context&&Object.keys(r.context).length>0&&(
+        <div style={{fontSize:12,color:"#4b5563",fontFamily:"monospace"}}>{JSON.stringify(r.context)}</div>
+      )}
+      <div style={{fontSize:12,color:"#4b5563",marginTop:4}}>{fmtDT(r.created_at)}{r.resolved_at?` · resolved ${fmtDT(r.resolved_at)}`:""}</div>
+    </div>
+  );
+};
+
+// Quick quarter/year range buttons for the archive search, matching the
+// "active, then this year by quarter, then previous years" mental model —
+// each just computes an ISO start/end and hands it to the search, no
+// actual grouping/partitioning needed server-side at this app's scale.
+const issueQuarterRanges = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const ranges = [];
+  const qStart = (year,q) => new Date(Date.UTC(year, (q-1)*3, 1)).toISOString();
+  for(let q=4; q>=1; q--){
+    const start = qStart(y,q), end = q===4 ? new Date(Date.UTC(y+1,0,1)).toISOString() : qStart(y,q+1);
+    if(new Date(start) <= now) ranges.push({label:`Q${q} ${y}`, start, end});
+  }
+  ranges.push({label:`${y-1}`, start:new Date(Date.UTC(y-1,0,1)).toISOString(), end:new Date(Date.UTC(y,0,1)).toISOString()});
+  ranges.push({label:`${y-2}`, start:new Date(Date.UTC(y-2,0,1)).toISOString(), end:new Date(Date.UTC(y-1,0,1)).toISOString()});
+  ranges.push({label:"Everything", start:null, end:null});
+  return ranges;
+};
+
+// ─── Admin → Issues — app errors (auto-logged whenever a Supabase write
+// fails) and user-submitted "Report an Issue" messages, newest first,
+// since with only one person supporting this app, both need to land
+// somewhere that gets checked rather than a console only the person who
+// hit them happened to have open.
+//
+// Active (unresolved) issues are realtime-synced local state — see
+// issueReports' own comment — so this list stays small regardless of how
+// many years of resolved issues accumulate. Resolved ones are kept
+// forever but only reachable through the archive search below, which
+// fetches on demand rather than ever being loaded wholesale.
+const AdminIssuesTab = ({issueReports=[], onResolve, onSearchResolved}) => {
+  const [showArchive, setShowArchive] = useState(false);
+  const [query, setQuery] = useState("");
+  const [range, setRange] = useState(issueQuarterRanges()[0]);
+  const [results, setResults] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const PAGE_SIZE = 50;
+
+  const runSearch = async (nextOffset=0) => {
+    setBusy(true);
+    const {data, error} = await onSearchResolved({query, startDate:range.start, endDate:range.end, limit:PAGE_SIZE, offset:nextOffset});
+    setBusy(false);
+    if(error){ console.error("[issue_reports] search failed:", error); return; }
+    setResults(prev => nextOffset===0 ? (data||[]) : [...(prev||[]), ...(data||[])]);
+    setHasMore((data||[]).length===PAGE_SIZE);
+    setOffset(nextOffset);
+  };
+
+  return (
+    <div>
+      <div style={{fontSize:16,color:"#838ba0",marginBottom:14}}>App errors are logged here automatically; "Report an Issue" messages come from anyone in the app's user menu.</div>
+
+      {issueReports.length===0&&<div style={{textAlign:"center",color:"#838ba0",padding:"32px 0",fontSize:16}}>No open issues. 🎉</div>}
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:24}}>
+        {issueReports.map(r=><IssueReportCard key={r.id} r={r} onToggleResolve={onResolve}/>)}
+      </div>
+
+      <div style={{borderTop:"1px solid #1f2937",paddingTop:16}}>
+        <button onClick={()=>{ setShowArchive(v=>!v); if(!showArchive && results===null) runSearch(0); }}
+          style={{background:"transparent",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"7px 16px",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+          {showArchive?"▲ Hide resolved archive":"▼ Search resolved archive"}
+        </button>
+        {showArchive&&(
+          <div style={{marginTop:14}}>
+            <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
+              <input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter") runSearch(0);}}
+                placeholder="Search message, name, or email…"
+                style={{flex:"1 1 220px",background:"#0a0f1a",border:"1px solid #374151",borderRadius:7,color:"#e2e8f0",padding:"7px 11px",fontSize:14,outline:"none"}}/>
+              <select value={range.label} onChange={e=>setRange(issueQuarterRanges().find(r=>r.label===e.target.value))}
+                style={{background:"#0a0f1a",border:"1px solid #374151",borderRadius:7,color:"#e2e8f0",padding:"7px 9px",fontSize:14,outline:"none"}}>
+                {issueQuarterRanges().map(r=><option key={r.label} value={r.label} style={{background:"#0d1117"}}>{r.label}</option>)}
+              </select>
+              <button onClick={()=>runSearch(0)} disabled={busy}
+                style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"7px 16px",fontSize:14,fontWeight:700,cursor:"pointer",opacity:busy?0.6:1}}>
+                {busy?"Searching…":"Search"}
+              </button>
             </div>
-          );
-        })}
+            {results&&results.length===0&&<div style={{textAlign:"center",color:"#4b5563",padding:"20px 0",fontSize:15}}>No resolved issues match.</div>}
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {(results||[]).map(r=><IssueReportCard key={r.id} r={r} onToggleResolve={(id,resolved)=>{
+                onResolve(id,resolved);
+                // Reopening here moves it into the active list above (see
+                // onResolve/resolveIssueReport) — drop it from these
+                // archive results too so it isn't shown resolved in two
+                // places at once.
+                if(!resolved) setResults(prev=>prev?.filter(x=>x.id!==id)||prev);
+              }}/>)}
+            </div>
+            {hasMore&&(
+              <button onClick={()=>runSearch(offset+PAGE_SIZE)} disabled={busy}
+                style={{width:"100%",marginTop:10,background:"#1f2937",border:"none",borderRadius:7,color:"#9ca3af",padding:"8px 0",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                {busy?"Loading…":"Load more"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -30137,6 +30218,22 @@ function App() {
       if(id==null) return;
       setter(prev=>prev.some(x=>x.id===id) ? prev.filter(x=>x.id!==id) : prev);
     };
+    // issue_reports' local state (issueReports) only ever holds unresolved
+    // rows — see its own comment — so a plain mergeUpsert is wrong here:
+    // a row flipping to resolved (by this session or another) needs to
+    // DISAPPEAR from local state, not get upserted into it, and a row
+    // flipping back to unresolved needs to appear even though it was
+    // never here before.
+    const mergeIssueReportUpsert = payload => {
+      const incoming = payload.new;
+      setIssueReports(prev=>{
+        if(incoming.resolved) return prev.some(x=>x.id===incoming.id) ? prev.filter(x=>x.id!==incoming.id) : prev;
+        const idx = prev.findIndex(x=>x.id===incoming.id);
+        if(idx===-1) return [incoming, ...prev];
+        if(JSON.stringify(prev[idx])===JSON.stringify(incoming)) return prev;
+        const next = prev.slice(); next[idx] = incoming; return next;
+      });
+    };
     // projects.deliverables/productions are frozen (writes stopped once the
     // read cutover completed — see projectToRow), so a plain rowToProject()
     // on a realtime payload would read stale/frozen arrays. mergeUpsert's
@@ -30426,12 +30523,10 @@ function App() {
       .on("postgres_changes", {event:"UPDATE", schema:"public", table:"resource_config"}, mergeResourceConfigUpsert)
       .on("postgres_changes", {event:"INSERT", schema:"public", table:"tab_locks"}, mergeTabLocksUpsert)
       .on("postgres_changes", {event:"UPDATE", schema:"public", table:"tab_locks"}, mergeTabLocksUpsert)
-      // issue_reports — plain id-keyed, no legacy_id/_rowId split (brand
-      // new table, no migration involved), so the original mergeUpsert/
-      // mergeDelete (matching by .id, used for projects/team_members/
-      // studio_bookings) apply directly with an identity row-mapper.
-      .on("postgres_changes", {event:"INSERT", schema:"public", table:"issue_reports"}, mergeUpsert(setIssueReports, row=>row))
-      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"issue_reports"}, mergeUpsert(setIssueReports, row=>row))
+      // issue_reports — see mergeIssueReportUpsert's own comment for why
+      // this isn't the generic mergeUpsert.
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"issue_reports"}, mergeIssueReportUpsert)
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"issue_reports"}, mergeIssueReportUpsert)
       .on("postgres_changes", {event:"DELETE", schema:"public", table:"issue_reports"}, mergeDelete(setIssueReports))
       .subscribe((status, err)=>{
         // Surfaced because a bad status here (a table missing from the
@@ -30682,19 +30777,53 @@ function App() {
   // (the "Report an Issue" modal), both in one table — see Admin → Issues.
   // No legacy data/migration involved, so unlike most collections here this
   // is a plain id-keyed array with no _rowId/legacy_id split needed.
+  //
+  // Kept forever (nothing here is ever deleted — see resolveIssueReport),
+  // but only unresolved rows are loaded/realtime-synced into this state,
+  // so the table can grow across years without the app ever having to
+  // hold years of history in memory just to show what's currently open.
+  // Resolved rows are reachable through searchResolvedIssues instead — a
+  // one-shot, on-demand, paginated query, not kept in local state or
+  // realtime sync (see AdminIssuesTab's archive search section).
   const [issueReports, setIssueReports] = useState([]);
   useEffect(()=>{
     if(!authed || !sb) return;
-    sb.from("issue_reports").select("*").order("created_at",{ascending:false}).then(({data,error})=>{
+    sb.from("issue_reports").select("*").eq("resolved", false).order("created_at",{ascending:false}).then(({data,error})=>{
       if(error){ console.error("[issue_reports] load failed:", error); return; }
       setIssueReports(data||[]);
     });
   },[authed]);
   const resolveIssueReport = useCallback((id, resolved)=>{
-    setIssueReports(prev=>prev.map(r=>r.id!==id?r:{...r, resolved, resolved_at: resolved?new Date().toISOString():null}));
+    // The active list is unresolved-only now, so resolving removes it
+    // from local state rather than updating it in place; reopening (only
+    // reachable from the archive search UI, on a row that isn't in this
+    // state at all) adds it back with the server's row rather than
+    // reconstructing one locally, since the archive search result is the
+    // only copy of its full fields this component has.
+    if(resolved){
+      setIssueReports(prev=>prev.filter(r=>r.id!==id));
+    }
     if(sb) sb.from("issue_reports").update({resolved, resolved_at: resolved?new Date().toISOString():null}).eq("id", id)
-      .then(({error})=>{ if(error) reportSbError("Issue update", error); });
+      .select().single().then(({data,error})=>{
+        if(error){ reportSbError("Issue update", error); return; }
+        if(!resolved && data) setIssueReports(prev=>prev.some(r=>r.id===id) ? prev : [data, ...prev]);
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+  // On-demand search over EVERY issue report regardless of resolved state
+  // (not just the active, unresolved ones kept in issueReports above) —
+  // backs the archive search section of Admin → Issues. A one-shot query,
+  // never held in realtime-synced state, so browsing years of history
+  // never costs anything until you actually go looking for it. Text
+  // matches message/reporter name/email; date range is optional (year or
+  // quarter quick-picks in the UI just compute a range and pass it here).
+  const searchResolvedIssues = useCallback(async ({query="", startDate=null, endDate=null, limit=50, offset=0}={}) => {
+    if(!sb) return {data:[], error:{message:"Not connected."}};
+    let q = sb.from("issue_reports").select("*").eq("resolved", true).order("created_at",{ascending:false}).range(offset, offset+limit-1);
+    if(startDate) q = q.gte("created_at", startDate);
+    if(endDate) q = q.lte("created_at", endDate);
+    if(query.trim()) q = q.or(`message.ilike.%${query.trim()}%,reporter_name.ilike.%${query.trim()}%,reporter_email.ilike.%${query.trim()}%`);
+    return q;
   },[]);
   const addWorkReviewSession = useCallback(session=>{
     const withId = {id:uid(), reviewers:[], notes:"", ...session};
@@ -31589,7 +31718,7 @@ function App() {
             lists={lists} onUpdateLists={saveLists}
             presets={appPresets} onUpdatePresets={saveAppPresets}
             tabLocks={tabLocks} onUpdateTabLocks={saveTabLocks}
-            issueReports={issueReports} onResolveIssue={resolveIssueReport}
+            issueReports={issueReports} onResolveIssue={resolveIssueReport} onSearchResolvedIssues={searchResolvedIssues}
           />}
         </div>
         </div>
