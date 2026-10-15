@@ -15158,6 +15158,14 @@ const SHADOW_WRITE_CUSTOM_TASKS = true;
 // rather than risk showing an empty project list.
 const READ_FROM_NORMALIZED_DELIVERABLES_PRODUCTIONS = true;
 
+// Read cutover, step two — setup_types/production_presets/custom_tasks.
+// Same staged approach: off by default, dual-write stays on regardless, and
+// the legacy app_kv-based load (in the mount effect) is skipped — not
+// raced against — whenever this is true, so there's exactly one writer for
+// these three pieces of state no matter which order the two effects
+// actually resolve in.
+const READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS = false;
+
 // Phase 3 — the remaining app_kv-backed collections (see production_schema_new_tables.sql's
 // Phase 3 section and the "what else should be its own table" conversation).
 // Same independent-rollback reasoning as every flag above: each collection
@@ -29354,7 +29362,7 @@ function App() {
       try { if(g?.value) setGearList(JSON.parse(g.value)); }   catch(e){}
       try { if(s?.value) setStudioSpaces(JSON.parse(s.value)); } catch(e){}
       try { if(m?.value) setStudioSpaceMeta(JSON.parse(m.value)); } catch(e){}
-      try { if(st?.value) setSetupTypes(JSON.parse(st.value)); } catch(e){}
+      try { if(st?.value && !READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS) setSetupTypes(JSON.parse(st.value)); } catch(e){}
       try { if(tr?.value) setTalentRoster(JSON.parse(tr.value)); } catch(e){}
       try { if(nd?.value) setNudges(JSON.parse(nd.value)); } catch(e){}
       try { if(rc?.value) setResourceConfig(prev=>({...prev,...JSON.parse(rc.value)})); } catch(e){}
@@ -29362,14 +29370,14 @@ function App() {
       try { if(furn?.value) setFurnitureList(JSON.parse(furn.value)); } catch(e){}
       try { if(prps?.value) setPropsList(JSON.parse(prps.value)); } catch(e){}
       try { if(sc?.value) setScreenContentOptions(JSON.parse(sc.value)); } catch(e){}
-      try { if(ct?.value) setCustomTasks(JSON.parse(ct.value)); } catch(e){}
+      try { if(ct?.value && !READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS) setCustomTasks(JSON.parse(ct.value)); } catch(e){}
       setSetupTypesLoaded(true);
       setCustomTasksLoaded(true);
       setAdminDataLoaded(true);
       // Load unavailability separately (added after the main Promise.all)
       safeGet(UNAVAILABILITY_STORAGE_KEY).then(uv=>{ try{if(uv?.value)setUnavailability(JSON.parse(uv.value));}catch(e){} }).catch(()=>{}).finally(()=>setUnavailabilityLoaded(true));
       // Load production presets
-      safeGet(PRESET_STORAGE_KEY).then(ps=>{ try{if(ps?.value)setAppPresets(JSON.parse(ps.value));}catch(e){} }).catch(()=>{}).finally(()=>setProductionPresetsLoaded(true));
+      safeGet(PRESET_STORAGE_KEY).then(ps=>{ try{if(ps?.value && !READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS)setAppPresets(JSON.parse(ps.value));}catch(e){} }).catch(()=>{}).finally(()=>setProductionPresetsLoaded(true));
       safeGet(VENDOR_STORAGE_KEY).then(vc=>{ try{if(vc?.value){ const list=JSON.parse(vc.value); if(Array.isArray(list)&&list.length>0) setVendorCompanies(list); }}catch(e){} }).catch(()=>{}).finally(()=>setVendorCompaniesLoaded(true));
       safeGet(REVIEWER_NAMES_STORAGE_KEY).then(rn=>{ try{if(rn?.value){ const list=JSON.parse(rn.value); if(Array.isArray(list)) setReviewerNames(list); }}catch(e){} }).catch(()=>{}).finally(()=>setReviewerNamesLoaded(true));
       safeGet(WORK_REVIEW_SESSIONS_STORAGE_KEY).then(wr=>{ try{if(wr?.value){ const list=JSON.parse(wr.value); if(Array.isArray(list)) setWorkReviewSessions(list); }}catch(e){} }).catch(()=>{});
@@ -29424,6 +29432,25 @@ function App() {
       if(!error && data) setStudioBookings(data.map(rowToBooking));
       bookingsLoadedRef.current = true;
     });
+    // Read cutover, step two — see READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS's
+    // comment. On any fetch error this just leaves whatever the mount
+    // effect's legacy app_kv load already set (which, with the flag on,
+    // means the initial useState default until a retry/reload) rather than
+    // actively overwriting good data with nothing.
+    if(READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS){
+      sb.from("setup_types").select("*").then(({data,error})=>{
+        if(error){ console.warn("[read cutover] failed to load setup_types:", error); return; }
+        if(data) setSetupTypes(data.map(rowToSetupType));
+      });
+      sb.from("custom_tasks").select("*").then(({data,error})=>{
+        if(error){ console.warn("[read cutover] failed to load custom_tasks:", error); return; }
+        if(data) setCustomTasks(data.map(rowToCustomTask));
+      });
+      sb.from("production_presets").select("*").then(({data,error})=>{
+        if(error){ console.warn("[read cutover] failed to load production_presets:", error); return; }
+        if(data) setAppPresets(data.map(rowToProductionPreset));
+      });
+    }
   },[authed]);
 
   // Shadow-write id-mapping bootstrap — NOT a read cutover (see

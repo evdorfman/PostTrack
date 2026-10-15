@@ -9972,6 +9972,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
   var SHADOW_WRITE_PRODUCTION_PRESETS = true;
   var SHADOW_WRITE_CUSTOM_TASKS = true;
   var READ_FROM_NORMALIZED_DELIVERABLES_PRODUCTIONS = true;
+  var READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS = false;
   var SHADOW_WRITE_GEAR = true;
   var SHADOW_WRITE_FURNITURE = true;
   var SHADOW_WRITE_PROPS = true;
@@ -10285,6 +10286,23 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     ingest: p.ingest || {}
   });
   var parseLegacyId = (v) => v != null && /^-?\d+$/.test(v) ? Number(v) : v;
+  var rowToSetupType = (row) => ({
+    id: parseLegacyId(row.legacy_id) ?? row.id,
+    _rowId: row.id,
+    name: row.name,
+    description: row.description || "",
+    floorplanPhotoKey: row.floorplan_photo_key || null,
+    refPhotoKeys: row.ref_photo_keys || [],
+    equipmentIds: row.equipment_ids || [],
+    externalGear: row.external_gear || [],
+    mediaCardIds: row.media_card_ids || [],
+    furnitureIds: row.furniture_ids || [],
+    propIds: row.prop_ids || [],
+    recordingSpecs: row.recording_specs || {},
+    screenContent: row.screen_content || {},
+    notes: row.notes || "",
+    roles: row.roles || []
+  });
   var setupTypeToRow = (t) => ({
     ...t._rowId ? { id: t._rowId } : {},
     legacy_id: t.id != null ? String(t.id) : null,
@@ -10302,12 +10320,31 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     notes: t.notes || null,
     roles: t.roles || []
   });
+  var rowToProductionPreset = (row) => ({
+    id: parseLegacyId(row.legacy_id) ?? row.id,
+    _rowId: row.id,
+    name: row.name,
+    type: row.type,
+    createdAt: row.created_at,
+    sections: row.sections || {}
+  });
   var productionPresetToRow = (p) => ({
     ...p._rowId ? { id: p._rowId } : {},
     legacy_id: p.id != null ? String(p.id) : null,
     name: p.name || null,
     type: p.type || null,
     sections: p.sections || {}
+  });
+  var rowToCustomTask = (row) => ({
+    id: row.legacy_id != null ? String(row.legacy_id) : row.id,
+    _rowId: row.id,
+    projectId: row.project_id,
+    title: row.title,
+    dueDate: row.due_date,
+    reminders: row.reminders || [],
+    notes: row.notes || "",
+    done: row.done || false,
+    createdAt: row.created_at
   });
   var customTaskToRow = (t) => ({
     ...t._rowId ? { id: t._rowId } : {},
@@ -20399,7 +20436,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         } catch (e) {
         }
         try {
-          if (st?.value) setSetupTypes(JSON.parse(st.value));
+          if (st?.value && !READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS) setSetupTypes(JSON.parse(st.value));
         } catch (e) {
         }
         try {
@@ -20431,7 +20468,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         } catch (e) {
         }
         try {
-          if (ct?.value) setCustomTasks(JSON.parse(ct.value));
+          if (ct?.value && !READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS) setCustomTasks(JSON.parse(ct.value));
         } catch (e) {
         }
         setSetupTypesLoaded(true);
@@ -20446,7 +20483,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         }).finally(() => setUnavailabilityLoaded(true));
         safeGet(PRESET_STORAGE_KEY).then((ps) => {
           try {
-            if (ps?.value) setAppPresets(JSON.parse(ps.value));
+            if (ps?.value && !READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS) setAppPresets(JSON.parse(ps.value));
           } catch (e) {
           }
         }).catch(() => {
@@ -20565,6 +20602,29 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         if (!error && data) setStudioBookings(data.map(rowToBooking));
         bookingsLoadedRef.current = true;
       });
+      if (READ_FROM_NORMALIZED_SETUP_PRESETS_TASKS) {
+        sb.from("setup_types").select("*").then(({ data, error }) => {
+          if (error) {
+            console.warn("[read cutover] failed to load setup_types:", error);
+            return;
+          }
+          if (data) setSetupTypes(data.map(rowToSetupType));
+        });
+        sb.from("custom_tasks").select("*").then(({ data, error }) => {
+          if (error) {
+            console.warn("[read cutover] failed to load custom_tasks:", error);
+            return;
+          }
+          if (data) setCustomTasks(data.map(rowToCustomTask));
+        });
+        sb.from("production_presets").select("*").then(({ data, error }) => {
+          if (error) {
+            console.warn("[read cutover] failed to load production_presets:", error);
+            return;
+          }
+          if (data) setAppPresets(data.map(rowToProductionPreset));
+        });
+      }
     }, [authed]);
     (0, import_react.useEffect)(() => {
       if (!authed || !sb || !SHADOW_WRITE_DELIVERABLES || !projectsLoaded) return;
