@@ -15149,23 +15149,23 @@ const SHADOW_WRITE_CUSTOM_TASKS = true;
 // Same independent-rollback reasoning as every flag above: each collection
 // gets its own flag so a bug in one doesn't force rolling back the rest.
 // All ship off until schema + backfill have actually been run for real.
-const SHADOW_WRITE_GEAR = false;
-const SHADOW_WRITE_FURNITURE = false;
-const SHADOW_WRITE_PROPS = false;
-const SHADOW_WRITE_SCREEN_CONTENT = false;
-const SHADOW_WRITE_UNAVAILABILITY = false;
-const SHADOW_WRITE_TALENT_ROSTER = false;
-const SHADOW_WRITE_NUDGES = false;
-const SHADOW_WRITE_INTAKES = false;
-const SHADOW_WRITE_BEC_REQUESTS = false;
-const SHADOW_WRITE_MEDIA_CARDS = false;
-const SHADOW_WRITE_WORKSTATIONS = false;
-const SHADOW_WRITE_VENDOR_COMPANIES = false;
-const SHADOW_WRITE_REVIEWER_NAMES = false;
-const SHADOW_WRITE_STUDIO_SPACES = false;  // covers both studio_spaces and studio_space_meta together
-const SHADOW_WRITE_APP_LISTS = false;
-const SHADOW_WRITE_RESOURCE_CONFIG = false;
-const SHADOW_WRITE_TAB_LOCKS = false;
+const SHADOW_WRITE_GEAR = true;
+const SHADOW_WRITE_FURNITURE = true;
+const SHADOW_WRITE_PROPS = true;
+const SHADOW_WRITE_SCREEN_CONTENT = true;
+const SHADOW_WRITE_UNAVAILABILITY = true;
+const SHADOW_WRITE_TALENT_ROSTER = true;
+const SHADOW_WRITE_NUDGES = true;
+const SHADOW_WRITE_INTAKES = true;
+const SHADOW_WRITE_BEC_REQUESTS = true;
+const SHADOW_WRITE_MEDIA_CARDS = true;
+const SHADOW_WRITE_WORKSTATIONS = true;
+const SHADOW_WRITE_VENDOR_COMPANIES = true;
+const SHADOW_WRITE_REVIEWER_NAMES = true;
+const SHADOW_WRITE_STUDIO_SPACES = true;  // covers both studio_spaces and studio_space_meta together
+const SHADOW_WRITE_APP_LISTS = true;
+const SHADOW_WRITE_RESOURCE_CONFIG = true;
+const SHADOW_WRITE_TAB_LOCKS = true;
 
 const rowToTeamMember = row => ({
   id: row.id, name: row.name, roles: row.roles||[], employeeType: row.employee_type,
