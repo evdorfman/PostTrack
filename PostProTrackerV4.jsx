@@ -15144,6 +15144,20 @@ const SHADOW_WRITE_SETUP_TYPES = true;
 const SHADOW_WRITE_PRODUCTION_PRESETS = true;
 const SHADOW_WRITE_CUSTOM_TASKS = true;
 
+// Read cutover, step one — the first of several, one per collection group,
+// same staged approach as every SHADOW_WRITE_* flag above. OFF by default.
+// When true, the initial projects load builds each project's deliverables/
+// productions from the real deliverables/review_rounds/productions tables
+// (via assembleNormalizedProjectData) instead of the project row's own
+// nested JSON columns. Writes are UNCHANGED either way — the projects
+// auto-save effect still upserts projectToRow(p) on every change, which
+// still writes deliverables/productions back into the legacy JSON columns
+// regardless of where they were originally read from, so the two stay in
+// sync and this can be flipped back off instantly with zero data loss if
+// anything looks wrong. Falls back to the legacy JSON on any fetch error
+// rather than risk showing an empty project list.
+const READ_FROM_NORMALIZED_DELIVERABLES_PRODUCTIONS = false;
+
 // Phase 3 — the remaining app_kv-backed collections (see production_schema_new_tables.sql's
 // Phase 3 section and the "what else should be its own table" conversation).
 // Same independent-rollback reasoning as every flag above: each collection
@@ -29379,9 +29393,32 @@ function App() {
       setTeamRosterLoaded(true);
     });
     sb.from("projects").select("*").then(({data,error})=>{
-      if(!error && data) setProjects(data.map(rowToProject));
-      projectsLoadedRef.current = true;
-      setProjectsLoaded(true);
+      if(error || !data){ projectsLoadedRef.current = true; setProjectsLoaded(true); return; }
+      const finish = projectsArr => { setProjects(projectsArr); projectsLoadedRef.current = true; setProjectsLoaded(true); };
+      if(!READ_FROM_NORMALIZED_DELIVERABLES_PRODUCTIONS){ finish(data.map(rowToProject)); return; }
+      // Read cutover: deliverables/review_rounds/productions come from
+      // their own tables, reassembled into the exact nested shape every
+      // component already expects — see assembleNormalizedProjectData's
+      // own doc comment for why that shape has to match exactly.
+      Promise.all([
+        sb.from("deliverables").select("*"),
+        sb.from("review_rounds").select("*"),
+        sb.from("productions").select("*"),
+      ]).then(([delRes, roundRes, prodRes])=>{
+        if(delRes.error || roundRes.error || prodRes.error){
+          console.warn("[read cutover] failed to load normalized deliverables/productions, falling back to legacy JSON:", delRes.error||roundRes.error||prodRes.error);
+          finish(data.map(rowToProject));
+          return;
+        }
+        const {deliverablesByProject, productionsByProject} = assembleNormalizedProjectData(delRes.data||[], roundRes.data||[], prodRes.data||[]);
+        finish(data.map(row=>{
+          const p = rowToProject(row);
+          return {...p, deliverables: deliverablesByProject[row.id]||[], productions: productionsByProject[row.id]||[]};
+        }));
+      }).catch(e=>{
+        console.warn("[read cutover] failed to load normalized deliverables/productions, falling back to legacy JSON:", e);
+        finish(data.map(rowToProject));
+      });
     });
     sb.from("studio_bookings").select("*").then(({data,error})=>{
       if(!error && data) setStudioBookings(data.map(rowToBooking));
