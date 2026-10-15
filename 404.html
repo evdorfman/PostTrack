@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PostTrack</title>
+<script>
+// GitHub Pages serves this for any path with no matching file — which is
+// every URL this app pushes via history.pushState once the browser
+// actually asks the server for it directly (hard refresh, pasted/
+// bookmarked link, some back/forward navigations). Encodes the real path
+// into a query string and redirects to the site's actual index.html,
+// which restores it via history.replaceState before the app mounts — see
+// the matching script in index.html's head.
+(function(){
+  var l = window.location;
+  var segs = l.pathname.split('/').filter(Boolean);
+  var base = segs.length ? '/' + segs[0] + '/' : '/';
+  l.replace(base + '?spa-redirect=' + encodeURIComponent(l.pathname + l.search + l.hash));
+})();
+</script>
+</head>
+<body></body>
+</html>

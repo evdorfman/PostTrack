@@ -377,9 +377,27 @@ const uid = () => ++_uid;
 // opened from any view including Admin: "p*" for the project modal
 // (project/ptab/pitem), "a*" for Admin's own tab/gear-sub-tab.
 const ROUTE_VIEWS = ["projects","studio","calendar","deliverables","animations","ingest","resources","myview","admin","pipeline","intake","workreview","kanban"];
+// GitHub Pages project sites are served from a subpath (e.g. /PostTrack/),
+// not the domain root — a pushed/replaced URL missing that prefix 404s the
+// moment anything actually reaches the server for it (a hard refresh, a
+// pasted link, or a back/forward navigation the browser can't satisfy from
+// its own history alone). Computed once from wherever this page actually
+// loaded from rather than hardcoded, so a repo rename doesn't silently
+// break this again. Strips a trailing view-name segment, if present, so it
+// resolves to the same base whether the browser is currently sitting on
+// the bare root or on e.g. /PostTrack/studio.
+const ROUTE_BASE_PATH = (()=>{
+  try{
+    const segs = window.location.pathname.split("/").filter(Boolean);
+    if(segs.length && ROUTE_VIEWS.includes(segs[segs.length-1])) segs.pop();
+    return segs.length ? "/"+segs.join("/") : "";
+  }catch(e){ return ""; }
+})();
 function parseRoute(){
   try{
-    const path = window.location.pathname.replace(/^\/+|\/+$/g,"");
+    let path = window.location.pathname;
+    if(ROUTE_BASE_PATH && path.startsWith(ROUTE_BASE_PATH)) path = path.slice(ROUTE_BASE_PATH.length);
+    path = path.replace(/^\/+|\/+$/g,"");
     const q = new URLSearchParams(window.location.search);
     const pitem = q.get("pitem");
     return {
@@ -393,7 +411,7 @@ function parseRoute(){
   }catch(e){ return {view:null,projectId:null,ptab:null,pitem:null,atab:null,agear:null}; }
 }
 function buildRouteUrl({view, projectId, ptab, pitem, atab, agear}){
-  const path = "/"+(view||"projects");
+  const path = ROUTE_BASE_PATH+"/"+(view||"projects");
   const q = new URLSearchParams();
   if(projectId!=null) q.set("project", projectId);
   if(ptab) q.set("ptab", ptab);
