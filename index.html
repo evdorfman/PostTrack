@@ -4934,7 +4934,7 @@ Brief content: ${content}`;
         /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 3, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("input", { value: d.title || "", onChange: (e) => {
           e.stopPropagation();
           onUpdateDel(project.id, d.id, "title", e.target.value);
-        }, onClick: (e) => e.stopPropagation(), onFocus: (e) => e.stopPropagation(), placeholder: "Deliverable title\u2026", style: { fontWeight: 700, fontSize: 20, color: "#f1f5f9", background: "transparent", border: "none", outline: "none", padding: 0, cursor: "text", fontFamily: "'DM Sans',sans-serif", flex: "0 1 auto", minWidth: 60 } }), /* @__PURE__ */ React.createElement(
+        }, onClick: (e) => e.stopPropagation(), onFocus: (e) => e.stopPropagation(), placeholder: "Deliverable title\u2026", size: Math.max(16, (d.title || "").length + 2), style: { fontWeight: 700, fontSize: 20, color: "#f1f5f9", background: "transparent", border: "none", outline: "none", padding: 0, cursor: "text", fontFamily: "'DM Sans',sans-serif", flex: "0 1 auto", minWidth: 60 } }), /* @__PURE__ */ React.createElement(
           "select",
           {
             value: d.status,
@@ -7969,7 +7969,7 @@ Brief content: ${content}`;
       /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 1, flexWrap: "wrap" } }, editable ? /* @__PURE__ */ React.createElement("input", { value: d.title || "", onChange: (e) => {
         e.stopPropagation();
         onUpdateDel(projectId, d.id, "title", e.target.value);
-      }, onClick: (e) => e.stopPropagation(), onFocus: (e) => e.stopPropagation(), placeholder: "Deliverable title\u2026", style: { fontWeight: 700, fontSize: 16, color: "#f1f5f9", background: "transparent", border: "none", outline: "none", padding: 0, cursor: "text", fontFamily: "'DM Sans',sans-serif", flex: "0 1 auto", minWidth: 60 } }) : /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, fontSize: 16, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, d.title || "Untitled"), readOnly ? /* @__PURE__ */ React.createElement(Chip, { label: d.status, color: DCOLOR[d.status], xs: true }) : /* @__PURE__ */ React.createElement(DelStatusSel, { status: d.status, onChange: (v) => onUpdateDel(projectId, d.id, "status", v), xs: true }), !readOnly && editorEditable && /* @__PURE__ */ React.createElement(DelEditorSel, { editorId: d.editorId, editors: editors || [], onChange: (v) => onUpdateDel(projectId, d.id, "editorId", v), xs: true }), d._fromPreset && /* @__PURE__ */ React.createElement(Chip, { label: "Internal Planning", color: "#8b5cf6", xs: true }), d.aspectRatio && /* @__PURE__ */ React.createElement(Chip, { label: d.aspectRatio, color: "#374151", xs: true }), d.srtNeeded && /* @__PURE__ */ React.createElement(Chip, { label: "SRT", color: "#06b6d4", xs: true }), d.captionsNeeded && /* @__PURE__ */ React.createElement(Chip, { label: "Captions", color: "#a855f7", xs: true }), allAppr && /* @__PURE__ */ React.createElement(Chip, { label: "\u2713 Approved", color: "#10b981", xs: true }), changes && /* @__PURE__ */ React.createElement(Chip, { label: "\u21A9 Changes", color: "#ef4444", xs: true })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", fontSize: 13, color: "#9ca3af" } }, !editorEditable && ed && /* @__PURE__ */ React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(Av, { name: ed.name, size: 13 }), ed.name), showProject && /* @__PURE__ */ React.createElement("span", { style: { color: "#6366f1" } }, projectName), activeR && activeR.deadline && /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600, color: RCOLOR[activeR.status] } }, activeR.label, " due ", fmtDT(activeR.deadline), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 5 } }, /* @__PURE__ */ React.createElement(Dl, { date: activeR.deadline, inline: true }))), d._segments?.length > 1 && d._segments.map((seg, i) => {
+      }, onClick: (e) => e.stopPropagation(), onFocus: (e) => e.stopPropagation(), placeholder: "Deliverable title\u2026", size: Math.max(16, (d.title || "").length + 2), style: { fontWeight: 700, fontSize: 16, color: "#f1f5f9", background: "transparent", border: "none", outline: "none", padding: 0, cursor: "text", fontFamily: "'DM Sans',sans-serif", flex: "0 1 auto", minWidth: 60 } }) : /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700, fontSize: 16, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, d.title || "Untitled"), readOnly ? /* @__PURE__ */ React.createElement(Chip, { label: d.status, color: DCOLOR[d.status], xs: true }) : /* @__PURE__ */ React.createElement(DelStatusSel, { status: d.status, onChange: (v) => onUpdateDel(projectId, d.id, "status", v), xs: true }), !readOnly && editorEditable && /* @__PURE__ */ React.createElement(DelEditorSel, { editorId: d.editorId, editors: editors || [], onChange: (v) => onUpdateDel(projectId, d.id, "editorId", v), xs: true }), d._fromPreset && /* @__PURE__ */ React.createElement(Chip, { label: "Internal Planning", color: "#8b5cf6", xs: true }), d.aspectRatio && /* @__PURE__ */ React.createElement(Chip, { label: d.aspectRatio, color: "#374151", xs: true }), d.srtNeeded && /* @__PURE__ */ React.createElement(Chip, { label: "SRT", color: "#06b6d4", xs: true }), d.captionsNeeded && /* @__PURE__ */ React.createElement(Chip, { label: "Captions", color: "#a855f7", xs: true }), allAppr && /* @__PURE__ */ React.createElement(Chip, { label: "\u2713 Approved", color: "#10b981", xs: true }), changes && /* @__PURE__ */ React.createElement(Chip, { label: "\u21A9 Changes", color: "#ef4444", xs: true })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", fontSize: 13, color: "#9ca3af" } }, !editorEditable && ed && /* @__PURE__ */ React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement(Av, { name: ed.name, size: 13 }), ed.name), showProject && /* @__PURE__ */ React.createElement("span", { style: { color: "#6366f1" } }, projectName), activeR && activeR.deadline && /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600, color: RCOLOR[activeR.status] } }, activeR.label, " due ", fmtDT(activeR.deadline), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 5 } }, /* @__PURE__ */ React.createElement(Dl, { date: activeR.deadline, inline: true }))), d._segments?.length > 1 && d._segments.map((seg, i) => {
         const segEd = team?.find((m) => m.id === seg.editorId);
         const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
         const isCurrent = (!seg.from || seg.from <= todayStr) && (!seg.to || seg.to >= todayStr);
@@ -9976,6 +9976,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
   var READ_FROM_NORMALIZED_PHASE3 = true;
   var SHADOW_WRITE_WORK_REVIEW_SESSIONS = true;
   var REALTIME_PHASE2 = true;
+  var SAVE_DEBOUNCE_MS = 5e3;
   var SHADOW_WRITE_GEAR = true;
   var SHADOW_WRITE_FURNITURE = true;
   var SHADOW_WRITE_PROPS = true;
@@ -21265,7 +21266,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       if (!real.length) return;
       const timer = setTimeout(() => {
         sb.from("projects").upsert(real.map(projectToRow)).then(({ error }) => reportSbError("Project", error));
-      }, 5e3);
+      }, SAVE_DEBOUNCE_MS);
       return () => clearTimeout(timer);
     }, [projects]);
     (0, import_react.useEffect)(() => {
@@ -21448,7 +21449,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [navSidebarWidth, navSidebarHandle] = useResizableWidth("posttrack-nav-sidebar-width", 480, { min: 320, max: 720 });
     const activeSidebarWidth = sidebarRequestedWidth ? navSidebarWidth : 0;
     const delWriteTimersRef = (0, import_react.useRef)(/* @__PURE__ */ new Map());
-    const DEL_WRITE_DEBOUNCE_MS = 5e3;
+    const DEL_WRITE_DEBOUNCE_MS = SAVE_DEBOUNCE_MS;
     const updateDel = (0, import_react.useCallback)((projectId, delId, field, value) => {
       const prevProj = projectsRef.current.find((p) => p.id === projectId);
       const prevDel = prevProj?.deliverables.find((d) => d.id === delId);
@@ -21558,6 +21559,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       }
       if (del) logActivity({ entityType: "deliverable", entityLabel: del.title || "Deliverable", projectId, action: "deleted" });
     }, []);
+    const productionsWriteRef = (0, import_react.useRef)(/* @__PURE__ */ new Map());
     const updateProject = (0, import_react.useCallback)((projectId, field, value) => {
       const prevProj = projectsRef.current.find((p) => p.id === projectId);
       setProjects((prev) => {
@@ -21633,13 +21635,21 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           }
         });
         if (SHADOW_WRITE_PRODUCTIONS && sb) {
-          writeProductionDiff(sb, projectId, computeProductionDiff(prevProds, newProds)).then((insertedTags) => {
-            if (!insertedTags.length) return;
-            setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, productions: p.productions.map((pr) => {
-              const tag = insertedTags.find((t) => t.legacyId === pr.id);
-              return tag ? { ...pr, _rowId: tag.rowId } : pr;
-            }) }));
-          }).catch((e) => console.warn("[shadow write] production diff failed:", e));
+          const existingWrite = productionsWriteRef.current.get(projectId);
+          if (existingWrite) clearTimeout(existingWrite.timer);
+          const basePods = existingWrite?.basePods || prevProds;
+          const timer = setTimeout(() => {
+            productionsWriteRef.current.delete(projectId);
+            const latestProds = projectsRef.current.find((p) => p.id === projectId)?.productions || [];
+            writeProductionDiff(sb, projectId, computeProductionDiff(basePods, latestProds)).then((insertedTags) => {
+              if (!insertedTags.length) return;
+              setProjects((prev) => prev.map((p) => p.id !== projectId ? p : { ...p, productions: p.productions.map((pr) => {
+                const tag = insertedTags.find((t) => t.legacyId === pr.id);
+                return tag ? { ...pr, _rowId: tag.rowId } : pr;
+              }) }));
+            }).catch((e) => console.warn("[shadow write] production diff failed:", e));
+          }, SAVE_DEBOUNCE_MS);
+          productionsWriteRef.current.set(projectId, { timer, basePods });
         }
       } else if (field === "ingestDates") {
         const prevIngests = prevProj?.ingestDates || [];

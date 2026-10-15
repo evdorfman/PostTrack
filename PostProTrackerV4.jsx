@@ -7209,7 +7209,7 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                         <div style={{width:10,height:10,borderRadius:"50%",background:DCOLOR[d.status],flexShrink:0}}/>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:3,flexWrap:"wrap"}}>
-                            <input value={d.title||""} onChange={e=>{e.stopPropagation();onUpdateDel(project.id,d.id,"title",e.target.value);}} onClick={e=>e.stopPropagation()} onFocus={e=>e.stopPropagation()} placeholder="Deliverable title…" style={{fontWeight:700,fontSize:20,color:"#f1f5f9",background:"transparent",border:"none",outline:"none",padding:0,cursor:"text",fontFamily:"'DM Sans',sans-serif",flex:"0 1 auto",minWidth:60}}/>
+                            <input value={d.title||""} onChange={e=>{e.stopPropagation();onUpdateDel(project.id,d.id,"title",e.target.value);}} onClick={e=>e.stopPropagation()} onFocus={e=>e.stopPropagation()} placeholder="Deliverable title…" size={Math.max(16,(d.title||"").length+2)} style={{fontWeight:700,fontSize:20,color:"#f1f5f9",background:"transparent",border:"none",outline:"none",padding:0,cursor:"text",fontFamily:"'DM Sans',sans-serif",flex:"0 1 auto",minWidth:60}}/>
                             {/* Quick status dropdown — stops card click propagation */}
                           <select value={d.status} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();onUpdateDel(project.id,d.id,"status",e.target.value);}}
                             style={{background:d.status==="Not Started"?"#1f2937":DCOLOR[d.status]+"20",border:`1px solid ${DCOLOR[d.status]}40`,borderRadius:6,color:DCOLOR[d.status],padding:"3px 7px",fontSize:14,fontWeight:700,cursor:"pointer",outline:"none",colorScheme:"dark"}}>
@@ -12055,7 +12055,7 @@ const DeliverableRow = ({
         {/* Row 1: title + status + chips */}
         <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:1,flexWrap:"wrap"}}>
           {editable
-            ? <input value={d.title||""} onChange={e=>{e.stopPropagation();onUpdateDel(projectId,d.id,"title",e.target.value);}} onClick={e=>e.stopPropagation()} onFocus={e=>e.stopPropagation()} placeholder="Deliverable title…" style={{fontWeight:700,fontSize:16,color:"#f1f5f9",background:"transparent",border:"none",outline:"none",padding:0,cursor:"text",fontFamily:"'DM Sans',sans-serif",flex:"0 1 auto",minWidth:60}}/>
+            ? <input value={d.title||""} onChange={e=>{e.stopPropagation();onUpdateDel(projectId,d.id,"title",e.target.value);}} onClick={e=>e.stopPropagation()} onFocus={e=>e.stopPropagation()} placeholder="Deliverable title…" size={Math.max(16,(d.title||"").length+2)} style={{fontWeight:700,fontSize:16,color:"#f1f5f9",background:"transparent",border:"none",outline:"none",padding:0,cursor:"text",fontFamily:"'DM Sans',sans-serif",flex:"0 1 auto",minWidth:60}}/>
             : <span style={{fontWeight:700,fontSize:16,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.title||"Untitled"}</span>}
           {readOnly ? <Chip label={d.status} color={DCOLOR[d.status]} xs/> : <DelStatusSel status={d.status} onChange={v=>onUpdateDel(projectId,d.id,"status",v)} xs/>}
           {!readOnly&&editorEditable&&<DelEditorSel editorId={d.editorId} editors={editors||[]} onChange={v=>onUpdateDel(projectId,d.id,"editorId",v)} xs/>}
@@ -15185,6 +15185,14 @@ const SHADOW_WRITE_WORK_REVIEW_SESSIONS = true;
 // this one got a real regression (see mergeProjectUpsert's comment) from a
 // change nearby, so it's getting the same caution.
 const REALTIME_PHASE2 = true;
+
+// Shared debounce window for autosave writes that fire once per keystroke
+// in a free-text field (deliverable fields, the whole-project autosave
+// effect, production fields). Without a pause before the actual network
+// write, a fast typist's realtime echo of an early keystroke can land
+// after several more have been typed and clobber the field with that
+// older text — visible as the input stuttering. 5s per the user's call.
+const SAVE_DEBOUNCE_MS = 5000;
 
 // Phase 3 — the remaining app_kv-backed collections (see production_schema_new_tables.sql's
 // Phase 3 section and the "what else should be its own table" conversation).
@@ -30177,7 +30185,7 @@ function App() {
     // this cleanup running before the next effect call.
     const timer = setTimeout(()=>{
       sb.from("projects").upsert(real.map(projectToRow)).then(({error})=>reportSbError("Project", error));
-    }, 5000);
+    }, SAVE_DEBOUNCE_MS);
     return ()=>clearTimeout(timer);
   },[projects]);
 
@@ -30413,7 +30421,7 @@ function App() {
   // deliverable's row id (same useRef-Map pattern as logFieldChangeBatched
   // above) so edits to different deliverables debounce independently.
   const delWriteTimersRef = useRef(new Map());
-  const DEL_WRITE_DEBOUNCE_MS = 5000;
+  const DEL_WRITE_DEBOUNCE_MS = SAVE_DEBOUNCE_MS;
 
   const updateDel=useCallback((projectId,delId,field,value)=>{
     const prevProj = projectsRef.current.find(p=>p.id===projectId);
@@ -30544,6 +30552,16 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
+  // Debounces the productions shadow write below — see DEL_WRITE_DEBOUNCE_MS's
+  // comment, same issue (every production field edit, e.g. typing a title,
+  // funnels through onUpdateProject(id,"productions",wholeArray) and used to
+  // write on every keystroke). Keyed by projectId since the diff spans
+  // every production in the project; "basePods" pins the diff's starting
+  // point to the state at the start of the current debounce window so a
+  // burst of edits still diffs correctly against what's actually on the
+  // server, not just the immediately-preceding call.
+  const productionsWriteRef = useRef(new Map());
+
   const updateProject=useCallback((projectId,field,value)=>{
     const prevProj = projectsRef.current.find(p=>p.id===projectId);
     // Try real projects first
@@ -30627,17 +30645,29 @@ function App() {
           logActivity({entityType:"production", entityLabel:pp.title||pp.type||"Production", projectId, action:"deleted"});
         }
       });
-      // Shadow write — see SHADOW_WRITE_PRODUCTIONS's comment. Reuses the
-      // same prevProds/newProds already computed above for activity
-      // logging, rather than diffing twice.
+      // Shadow write — see SHADOW_WRITE_PRODUCTIONS's comment and
+      // productionsWriteRef's comment above. Debounced: the diff's base is
+      // pinned to prevProds from the FIRST call in the current debounce
+      // window (not overwritten by later calls), and the diff's other side
+      // is read fresh from projectsRef at fire time — so a burst of rapid
+      // edits (e.g. typing a title) collapses into one write spanning the
+      // whole burst instead of one write per keystroke.
       if(SHADOW_WRITE_PRODUCTIONS && sb){
-        writeProductionDiff(sb, projectId, computeProductionDiff(prevProds, newProds)).then(insertedTags=>{
-          if(!insertedTags.length) return;
-          setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,productions:p.productions.map(pr=>{
-            const tag = insertedTags.find(t=>t.legacyId===pr.id);
-            return tag ? {...pr, _rowId:tag.rowId} : pr;
-          })}));
-        }).catch(e=>console.warn("[shadow write] production diff failed:", e));
+        const existingWrite = productionsWriteRef.current.get(projectId);
+        if(existingWrite) clearTimeout(existingWrite.timer);
+        const basePods = existingWrite?.basePods || prevProds;
+        const timer = setTimeout(()=>{
+          productionsWriteRef.current.delete(projectId);
+          const latestProds = projectsRef.current.find(p=>p.id===projectId)?.productions || [];
+          writeProductionDiff(sb, projectId, computeProductionDiff(basePods, latestProds)).then(insertedTags=>{
+            if(!insertedTags.length) return;
+            setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,productions:p.productions.map(pr=>{
+              const tag = insertedTags.find(t=>t.legacyId===pr.id);
+              return tag ? {...pr, _rowId:tag.rowId} : pr;
+            })}));
+          }).catch(e=>console.warn("[shadow write] production diff failed:", e));
+        }, SAVE_DEBOUNCE_MS);
+        productionsWriteRef.current.set(projectId, {timer, basePods});
       }
     } else if(field==="ingestDates"){
       const prevIngests = prevProj?.ingestDates || [];
