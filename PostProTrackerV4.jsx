@@ -15179,6 +15179,13 @@ const READ_FROM_NORMALIZED_PHASE3 = true;
 // Off until verified live the same way as everything else.
 const SHADOW_WRITE_WORK_REVIEW_SESSIONS = true;
 
+// Live-sync coverage, phase two — extends the realtime subscription (today
+// only projects/team_members/studio_bookings) to the 25 normalized tables.
+// Off until verified live, same staged approach as every other flag here —
+// this one got a real regression (see mergeProjectUpsert's comment) from a
+// change nearby, so it's getting the same caution.
+const REALTIME_PHASE2 = false;
+
 // Phase 3 — the remaining app_kv-backed collections (see production_schema_new_tables.sql's
 // Phase 3 section and the "what else should be its own table" conversation).
 // Same independent-rollback reasoning as every flag above: each collection
@@ -29756,6 +29763,201 @@ function App() {
         const next = prev.slice(); next[idx] = merged; return next;
       });
     };
+    // Phase 2 — see REALTIME_PHASE2's comment near the other flags. Every
+    // handler below early-returns while the flag is off, so wiring them
+    // into the channel now and flipping the flag later needs no further
+    // code changes to turn on.
+    const mergeUpsertByRowId = (setter, mapRow) => payload => {
+      if(!REALTIME_PHASE2) return;
+      const incoming = mapRow(payload.new);
+      setter(prev=>{
+        const idx = prev.findIndex(x=>x._rowId===incoming._rowId);
+        if(idx===-1) return [...prev, incoming];
+        if(JSON.stringify(prev[idx])===JSON.stringify(incoming)) return prev;
+        const next = prev.slice(); next[idx] = incoming; return next;
+      });
+    };
+    // payload.old only reliably carries the primary key (the uuid _rowId),
+    // not legacy_id, so delete-matching has to be by _rowId.
+    const mergeDeleteByRowId = setter => payload => {
+      if(!REALTIME_PHASE2) return;
+      const rowId = payload.old?.id;
+      if(rowId==null) return;
+      setter(prev=>prev.some(x=>x._rowId===rowId) ? prev.filter(x=>x._rowId!==rowId) : prev);
+    };
+    // Plain string lists (vendor_companies, reviewer_names, studio_spaces)
+    // have no id concept — the string itself is the row, keyed by `name`.
+    const mergeStringUpsert = setter => payload => {
+      if(!REALTIME_PHASE2) return;
+      const name = payload.new?.name;
+      if(name==null) return;
+      setter(prev=>prev.includes(name) ? prev : [...prev, name]);
+    };
+    const mergeStringDelete = setter => payload => {
+      if(!REALTIME_PHASE2) return;
+      const name = payload.old?.name;
+      if(name==null) return;
+      setter(prev=>prev.includes(name) ? prev.filter(n=>n!==name) : prev);
+    };
+    // Deliverables/productions live nested inside each project, not their
+    // own top-level state array — find the right project first.
+    // rowToDeliverable always sets rounds:[] (it's only ever populated by
+    // assembleNormalizedProjectData elsewhere), so an UPDATE here must
+    // preserve the existing local rounds — same clobbering risk
+    // mergeProjectUpsert's comment covers, one level deeper.
+    const mergeDeliverableUpsert = payload => {
+      if(!REALTIME_PHASE2) return;
+      const incoming = rowToDeliverable(payload.new);
+      setProjects(prev=>prev.map(p=>{
+        if(p.id!==incoming.projectId) return p;
+        const idx = (p.deliverables||[]).findIndex(d=>d._rowId===incoming._rowId);
+        if(idx===-1) return {...p, deliverables:[...(p.deliverables||[]), incoming]};
+        const merged = {...incoming, rounds: p.deliverables[idx].rounds||[]};
+        if(JSON.stringify(p.deliverables[idx])===JSON.stringify(merged)) return p;
+        const next = p.deliverables.slice(); next[idx] = merged;
+        return {...p, deliverables: next};
+      }));
+    };
+    const mergeDeliverableDelete = payload => {
+      if(!REALTIME_PHASE2) return;
+      const rowId = payload.old?.id;
+      if(rowId==null) return;
+      setProjects(prev=>prev.map(p=>
+        (p.deliverables||[]).some(d=>d._rowId===rowId)
+          ? {...p, deliverables: p.deliverables.filter(d=>d._rowId!==rowId)}
+          : p
+      ));
+    };
+    const mergeProductionUpsert = payload => {
+      if(!REALTIME_PHASE2) return;
+      const incoming = rowToProduction(payload.new);
+      setProjects(prev=>prev.map(p=>{
+        if(p.id!==incoming.projectId) return p;
+        const idx = (p.productions||[]).findIndex(pr=>pr._rowId===incoming._rowId);
+        if(idx===-1) return {...p, productions:[...(p.productions||[]), incoming]};
+        if(JSON.stringify(p.productions[idx])===JSON.stringify(incoming)) return p;
+        const next = p.productions.slice(); next[idx] = incoming;
+        return {...p, productions: next};
+      }));
+    };
+    const mergeProductionDelete = payload => {
+      if(!REALTIME_PHASE2) return;
+      const rowId = payload.old?.id;
+      if(rowId==null) return;
+      setProjects(prev=>prev.map(p=>
+        (p.productions||[]).some(pr=>pr._rowId===rowId)
+          ? {...p, productions: p.productions.filter(pr=>pr._rowId!==rowId)}
+          : p
+      ));
+    };
+    // review_rounds nest one level deeper still — project → deliverable → rounds.
+    const mergeReviewRoundUpsert = payload => {
+      if(!REALTIME_PHASE2) return;
+      const incoming = rowToReviewRound(payload.new);
+      setProjects(prev=>prev.map(p=>({
+        ...p,
+        deliverables: (p.deliverables||[]).map(d=>{
+          if(d._rowId!==incoming.deliverableRowId) return d;
+          const idx = (d.rounds||[]).findIndex(r=>r.id===incoming.id);
+          if(idx===-1) return {...d, rounds:[...(d.rounds||[]), incoming]};
+          if(JSON.stringify(d.rounds[idx])===JSON.stringify(incoming)) return d;
+          const next = d.rounds.slice(); next[idx] = incoming;
+          return {...d, rounds: next};
+        })
+      })));
+    };
+    const mergeReviewRoundDelete = payload => {
+      if(!REALTIME_PHASE2) return;
+      const roundId = payload.old?.id;
+      if(roundId==null) return;
+      setProjects(prev=>prev.map(p=>({
+        ...p,
+        deliverables: (p.deliverables||[]).map(d=>
+          (d.rounds||[]).some(r=>r.id===roundId)
+            ? {...d, rounds: d.rounds.filter(r=>r.id!==roundId)}
+            : d
+        )
+      })));
+    };
+    // screen_content_options is one flat table split into 3 local sub-arrays by category.
+    const mergeScreenContentUpsert = payload => {
+      if(!REALTIME_PHASE2) return;
+      const row = payload.new;
+      const cat = row.category;
+      if(!cat) return;
+      const incoming = rowToScreenContentOption(row);
+      setScreenContentOptions(prev=>{
+        const arr = prev[cat]||[];
+        const idx = arr.findIndex(x=>x._rowId===incoming._rowId);
+        if(idx===-1) return {...prev, [cat]:[...arr, incoming]};
+        if(JSON.stringify(arr[idx])===JSON.stringify(incoming)) return prev;
+        const next = arr.slice(); next[idx] = incoming;
+        return {...prev, [cat]: next};
+      });
+    };
+    const mergeScreenContentDelete = payload => {
+      if(!REALTIME_PHASE2) return;
+      const rowId = payload.old?.id;
+      if(rowId==null) return;
+      setScreenContentOptions(prev=>{
+        let changed = false;
+        const next = {};
+        ["windowWall","vpWall","frameTv"].forEach(cat=>{
+          const arr = prev[cat]||[];
+          if(arr.some(x=>x._rowId===rowId)){ changed=true; next[cat]=arr.filter(x=>x._rowId!==rowId); }
+          else next[cat]=arr;
+        });
+        return changed ? next : prev;
+      });
+    };
+    // studio_space_meta is keyed by space name, not an array.
+    const mergeSpaceMetaUpsert = payload => {
+      if(!REALTIME_PHASE2) return;
+      const row = payload.new;
+      if(!row?.space_name) return;
+      setStudioSpaceMeta(prev=>({...prev, [row.space_name]: {
+        isHMU: row.is_hmu, isGreenRoom: row.is_green_room, isPCR: row.is_pcr,
+        suggestHMU: row.suggest_hmu, linkedGreenRoom: row.linked_green_room||undefined,
+        crewCallOffsetMs: row.crew_call_offset_ms,
+      }}));
+    };
+    const mergeSpaceMetaDelete = payload => {
+      if(!REALTIME_PHASE2) return;
+      const name = payload.old?.space_name;
+      if(name==null) return;
+      setStudioSpaceMeta(prev=>{ if(!(name in prev)) return prev; const next={...prev}; delete next[name]; return next; });
+    };
+    // Three singleton config rows — always exactly one row (id=1), so an
+    // INSERT or UPDATE both just replace the whole local object.
+    const mergeAppListsUpsert = payload => {
+      if(!REALTIME_PHASE2) return;
+      const row = payload.new;
+      setLists({
+        workstreams: row.workstreams||[], businessUnits: row.business_units||[], productionTypes: row.production_types||[],
+        deliverableStatuses: row.deliverable_statuses||[], animBatchStatuses: row.anim_batch_statuses||[],
+        adminRoles: row.admin_roles||[], designRoles: row.design_roles||[],
+        productionRoles: row.production_roles||[], postProductionRoles: row.post_production_roles||[],
+      });
+    };
+    const mergeResourceConfigUpsert = payload => {
+      if(!REALTIME_PHASE2) return;
+      const row = payload.new;
+      setResourceConfig(prev=>({
+        ...prev,
+        deliverableTypeHours: row.deliverable_type_hours||prev.deliverableTypeHours,
+        statusRemainingPct: row.status_remaining_pct||prev.statusRemainingPct,
+        mediaTaskHours: row.media_task_hours||prev.mediaTaskHours,
+        ingestRemainingPct: row.ingest_remaining_pct||prev.ingestRemainingPct,
+        assignablePercent: row.assignable_percent ?? prev.assignablePercent,
+        defaultHoursPerAnimation: row.default_hours_per_animation ?? prev.defaultHoursPerAnimation,
+        hoursPerShoot: row.hours_per_shoot ?? prev.hoursPerShoot,
+        hoursPerDeliverable: row.hours_per_deliverable ?? prev.hoursPerDeliverable,
+      }));
+    };
+    const mergeTabLocksUpsert = payload => {
+      if(!REALTIME_PHASE2) return;
+      setTabLocks(payload.new?.locks||{});
+    };
     const channel = sb.channel("posttrack-realtime")
       .on("postgres_changes", {event:"INSERT", schema:"public", table:"projects"}, mergeProjectUpsert)
       .on("postgres_changes", {event:"UPDATE", schema:"public", table:"projects"}, mergeProjectUpsert)
@@ -29766,6 +29968,72 @@ function App() {
       .on("postgres_changes", {event:"INSERT", schema:"public", table:"studio_bookings"}, mergeUpsert(setStudioBookings, rowToBooking))
       .on("postgres_changes", {event:"UPDATE", schema:"public", table:"studio_bookings"}, mergeUpsert(setStudioBookings, rowToBooking))
       .on("postgres_changes", {event:"DELETE", schema:"public", table:"studio_bookings"}, mergeDelete(setStudioBookings))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"deliverables"}, mergeDeliverableUpsert)
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"deliverables"}, mergeDeliverableUpsert)
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"deliverables"}, mergeDeliverableDelete)
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"productions"}, mergeProductionUpsert)
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"productions"}, mergeProductionUpsert)
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"productions"}, mergeProductionDelete)
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"review_rounds"}, mergeReviewRoundUpsert)
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"review_rounds"}, mergeReviewRoundUpsert)
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"review_rounds"}, mergeReviewRoundDelete)
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"work_review_sessions"}, mergeUpsertByRowId(setWorkReviewSessions, rowToWorkReviewSession))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"work_review_sessions"}, mergeUpsertByRowId(setWorkReviewSessions, rowToWorkReviewSession))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"work_review_sessions"}, mergeDeleteByRowId(setWorkReviewSessions))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"setup_types"}, mergeUpsertByRowId(setSetupTypes, rowToSetupType))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"setup_types"}, mergeUpsertByRowId(setSetupTypes, rowToSetupType))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"setup_types"}, mergeDeleteByRowId(setSetupTypes))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"production_presets"}, mergeUpsertByRowId(setAppPresets, rowToProductionPreset))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"production_presets"}, mergeUpsertByRowId(setAppPresets, rowToProductionPreset))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"production_presets"}, mergeDeleteByRowId(setAppPresets))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"custom_tasks"}, mergeUpsertByRowId(setCustomTasks, rowToCustomTask))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"custom_tasks"}, mergeUpsertByRowId(setCustomTasks, rowToCustomTask))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"custom_tasks"}, mergeDeleteByRowId(setCustomTasks))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"gear"}, mergeUpsertByRowId(setGearList, rowToGear))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"gear"}, mergeUpsertByRowId(setGearList, rowToGear))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"gear"}, mergeDeleteByRowId(setGearList))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"furniture"}, mergeUpsertByRowId(setFurnitureList, rowToFurniture))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"furniture"}, mergeUpsertByRowId(setFurnitureList, rowToFurniture))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"furniture"}, mergeDeleteByRowId(setFurnitureList))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"props"}, mergeUpsertByRowId(setPropsList, rowToProp))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"props"}, mergeUpsertByRowId(setPropsList, rowToProp))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"props"}, mergeDeleteByRowId(setPropsList))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"screen_content_options"}, mergeScreenContentUpsert)
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"screen_content_options"}, mergeScreenContentUpsert)
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"screen_content_options"}, mergeScreenContentDelete)
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"unavailability"}, mergeUpsertByRowId(setUnavailability, rowToUnavailability))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"unavailability"}, mergeUpsertByRowId(setUnavailability, rowToUnavailability))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"unavailability"}, mergeDeleteByRowId(setUnavailability))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"talent_roster"}, mergeUpsertByRowId(setTalentRoster, rowToTalent))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"talent_roster"}, mergeUpsertByRowId(setTalentRoster, rowToTalent))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"talent_roster"}, mergeDeleteByRowId(setTalentRoster))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"nudges"}, mergeUpsertByRowId(setNudges, rowToNudge))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"nudges"}, mergeDeleteByRowId(setNudges))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"intakes"}, mergeUpsertByRowId(setIntakes, rowToIntake))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"intakes"}, mergeUpsertByRowId(setIntakes, rowToIntake))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"intakes"}, mergeDeleteByRowId(setIntakes))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"bec_requests"}, mergeUpsertByRowId(setBecRequests, rowToBecRequest))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"media_cards"}, mergeUpsertByRowId(setMediaCards, rowToMediaCard))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"media_cards"}, mergeUpsertByRowId(setMediaCards, rowToMediaCard))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"media_cards"}, mergeDeleteByRowId(setMediaCards))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"workstations"}, mergeUpsertByRowId(setWorkstations, rowToWorkstation))
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"workstations"}, mergeUpsertByRowId(setWorkstations, rowToWorkstation))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"workstations"}, mergeDeleteByRowId(setWorkstations))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"vendor_companies"}, mergeStringUpsert(setVendorCompanies))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"vendor_companies"}, mergeStringDelete(setVendorCompanies))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"reviewer_names"}, mergeStringUpsert(setReviewerNames))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"reviewer_names"}, mergeStringDelete(setReviewerNames))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"studio_spaces"}, mergeStringUpsert(setStudioSpaces))
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"studio_spaces"}, mergeStringDelete(setStudioSpaces))
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"studio_space_meta"}, mergeSpaceMetaUpsert)
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"studio_space_meta"}, mergeSpaceMetaUpsert)
+      .on("postgres_changes", {event:"DELETE", schema:"public", table:"studio_space_meta"}, mergeSpaceMetaDelete)
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"app_lists"}, mergeAppListsUpsert)
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"app_lists"}, mergeAppListsUpsert)
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"resource_config"}, mergeResourceConfigUpsert)
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"resource_config"}, mergeResourceConfigUpsert)
+      .on("postgres_changes", {event:"INSERT", schema:"public", table:"tab_locks"}, mergeTabLocksUpsert)
+      .on("postgres_changes", {event:"UPDATE", schema:"public", table:"tab_locks"}, mergeTabLocksUpsert)
       .subscribe();
     return ()=>{ sb.removeChannel(channel); };
   },[authed]);
