@@ -28045,6 +28045,11 @@ const quarterYearRanges = () => {
   const y = now.getFullYear();
   const ranges = [];
   const qStart = (year,q) => new Date(Date.UTC(year, (q-1)*3, 1)).toISOString();
+  // The full current year leads (and is every caller's default — each
+  // archive search seeds its range state from ranges()[0]), rather than
+  // just its most recent quarter, so "everything completed this year"
+  // doesn't need clicking through quarters one at a time to see.
+  ranges.push({label:`${y}`, start:new Date(Date.UTC(y,0,1)).toISOString(), end:new Date(Date.UTC(y+1,0,1)).toISOString()});
   for(let q=4; q>=1; q--){
     const start = qStart(y,q), end = q===4 ? new Date(Date.UTC(y+1,0,1)).toISOString() : qStart(y,q+1);
     if(new Date(start) <= now) ranges.push({label:`Q${q} ${y}`, start, end});
