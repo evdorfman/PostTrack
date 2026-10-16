@@ -15642,6 +15642,20 @@ const rowToProduction = row => ({
   equipmentIds: row.equipment_ids||[], externalGear: row.external_gear||[], mediaCardIds: row.media_card_ids||[],
   scriptFile: row.script_file||null, additionalDetails: row.additional_details||"",
   ingest: row.ingest||{},
+  // These were missing from the original migration — see
+  // production_patch_013_production_missing_fields.sql. Without them,
+  // every realtime echo or reload replaced the local production with a
+  // copy that was missing status/setups/talent/etc, silently reverting
+  // Studio approvals, setup instances, and call sheets to their defaults.
+  status: row.status||"Planning", bookingStatus: row.booking_status||null,
+  studioNote: row.studio_note||null, rejectionNote: row.rejection_note||null,
+  notes: row.notes||"", crewCallTime: row.crew_call_time||"",
+  secondaryLocations: row.secondary_locations||[], confirmations: row.confirmations||[],
+  talent: row.talent||[], setups: row.setups||[], deliverables: row.deliverables||[],
+  playbackAssets: row.playback_assets||[], assetRequests: row.asset_requests||[],
+  callSheet: row.call_sheet||null,
+  feedsIntoId: row.feeds_into_id!=null ? parseLegacyId(row.feeds_into_id) : null,
+  playbackDeliverableId: row.playback_deliverable_id!=null ? parseLegacyId(row.playback_deliverable_id) : null,
 });
 
 const productionToRow = (p, projectId) => ({
@@ -15654,6 +15668,15 @@ const productionToRow = (p, projectId) => ({
   equipment_ids: p.equipmentIds||[], external_gear: p.externalGear||[], media_card_ids: p.mediaCardIds||[],
   script_file: p.scriptFile||null, additional_details: p.additionalDetails||null,
   ingest: p.ingest||{},
+  status: p.status||null, booking_status: p.bookingStatus||null,
+  studio_note: p.studioNote||null, rejection_note: p.rejectionNote||null,
+  notes: p.notes||null, crew_call_time: p.crewCallTime||null,
+  secondary_locations: p.secondaryLocations||[], confirmations: p.confirmations||[],
+  talent: p.talent||[], setups: p.setups||[], deliverables: p.deliverables||[],
+  playback_assets: p.playbackAssets||[], asset_requests: p.assetRequests||[],
+  call_sheet: p.callSheet||null,
+  feeds_into_id: p.feedsIntoId!=null ? String(p.feedsIntoId) : null,
+  playback_deliverable_id: p.playbackDeliverableId!=null ? String(p.playbackDeliverableId) : null,
 });
 
 // setup_types and production_presets ship hardcoded defaults with
@@ -22080,9 +22103,9 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                               onMouseEnter={e=>e.currentTarget.style.background="#1a2035"}
                               onMouseLeave={e=>e.currentTarget.style.background="#111827"}>
                               <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontSize:13,fontWeight:700,color:"#c4c9d4",lineHeight:1.3}}>{project.name}</div>
-                                {dels.length>1&&<div style={{fontSize:13,color:"#8e97a6",marginTop:1}}>{dels.length} deliverables</div>}
-                                {project._segments?.length>1&&<div style={{fontSize:12,color:"#f59e0b",marginTop:1}}>⇄ Project-level handoff active</div>}
+                                <div style={{fontSize:13,fontWeight:700,color:"#c4c9d4",lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={project.name}>{project.name}</div>
+                                {dels.length>1&&<div style={{fontSize:13,color:"#8e97a6",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{dels.length} deliverables</div>}
+                                {project._segments?.length>1&&<div style={{fontSize:12,color:"#f59e0b",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⇄ Project-level handoff active</div>}
                               </div>
                               {/* Project-level assign button — stops chip toggle */}
                               <button onClick={e=>{e.stopPropagation();setHandoffTarget({projectId:project.id,isProjectLevel:true});}}
@@ -22118,7 +22141,7 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                                       <div style={{flex:1,minWidth:0}}>
                                         {/* Deliverable name + handoff badge */}
                                         <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}>
-                                          <div style={{fontSize:13,color:"#9ca3af",lineHeight:1.3,flex:1}} title={del.name}>{del.name}</div>
+                                          <div style={{fontSize:13,color:"#9ca3af",lineHeight:1.3,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={del.name}>{del.name}</div>
                                           {hasHandoffs&&<span style={{fontSize:11,fontWeight:800,color:"#f59e0b",background:"#f59e0b15",border:"1px solid #f59e0b30",borderRadius:3,padding:"1px 4px",flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em",textTransform:"uppercase"}}>⇄ Handoff</span>}
                                         </div>
                                         {/* Inline status select */}

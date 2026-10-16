@@ -10508,7 +10508,28 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     mediaCardIds: row.media_card_ids || [],
     scriptFile: row.script_file || null,
     additionalDetails: row.additional_details || "",
-    ingest: row.ingest || {}
+    ingest: row.ingest || {},
+    // These were missing from the original migration — see
+    // production_patch_013_production_missing_fields.sql. Without them,
+    // every realtime echo or reload replaced the local production with a
+    // copy that was missing status/setups/talent/etc, silently reverting
+    // Studio approvals, setup instances, and call sheets to their defaults.
+    status: row.status || "Planning",
+    bookingStatus: row.booking_status || null,
+    studioNote: row.studio_note || null,
+    rejectionNote: row.rejection_note || null,
+    notes: row.notes || "",
+    crewCallTime: row.crew_call_time || "",
+    secondaryLocations: row.secondary_locations || [],
+    confirmations: row.confirmations || [],
+    talent: row.talent || [],
+    setups: row.setups || [],
+    deliverables: row.deliverables || [],
+    playbackAssets: row.playback_assets || [],
+    assetRequests: row.asset_requests || [],
+    callSheet: row.call_sheet || null,
+    feedsIntoId: row.feeds_into_id != null ? parseLegacyId(row.feeds_into_id) : null,
+    playbackDeliverableId: row.playback_deliverable_id != null ? parseLegacyId(row.playback_deliverable_id) : null
   });
   var productionToRow = (p, projectId) => ({
     ...p._rowId ? { id: p._rowId } : {},
@@ -10529,7 +10550,23 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     media_card_ids: p.mediaCardIds || [],
     script_file: p.scriptFile || null,
     additional_details: p.additionalDetails || null,
-    ingest: p.ingest || {}
+    ingest: p.ingest || {},
+    status: p.status || null,
+    booking_status: p.bookingStatus || null,
+    studio_note: p.studioNote || null,
+    rejection_note: p.rejectionNote || null,
+    notes: p.notes || null,
+    crew_call_time: p.crewCallTime || null,
+    secondary_locations: p.secondaryLocations || [],
+    confirmations: p.confirmations || [],
+    talent: p.talent || [],
+    setups: p.setups || [],
+    deliverables: p.deliverables || [],
+    playback_assets: p.playbackAssets || [],
+    asset_requests: p.assetRequests || [],
+    call_sheet: p.callSheet || null,
+    feeds_into_id: p.feedsIntoId != null ? String(p.feedsIntoId) : null,
+    playback_deliverable_id: p.playbackDeliverableId != null ? String(p.playbackDeliverableId) : null
   });
   var parseLegacyId = (v) => v != null && /^-?\d+$/.test(v) ? Number(v) : v;
   var rowToSetupType = (row) => ({
@@ -15115,7 +15152,7 @@ ${conditions}`;
               onMouseEnter: (e) => e.currentTarget.style.background = "#1a2035",
               onMouseLeave: (e) => e.currentTarget.style.background = "#111827"
             },
-            /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#c4c9d4", lineHeight: 1.3 } }, project.name), dels.length > 1 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 1 } }, dels.length, " deliverables"), project._segments?.length > 1 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#f59e0b", marginTop: 1 } }, "\u21C4 Project-level handoff active")),
+            /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#c4c9d4", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: project.name }, project.name), dels.length > 1 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, dels.length, " deliverables"), project._segments?.length > 1 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#f59e0b", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "\u21C4 Project-level handoff active")),
             /* @__PURE__ */ React.createElement(
               "button",
               {
@@ -15153,7 +15190,7 @@ ${conditions}`;
               if (daysLeft2 === 1) return "Due tomorrow";
               return `Due ${dd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
             })();
-            return /* @__PURE__ */ React.createElement("div", { key: del.id, style: { padding: "7px 8px 7px 11px", borderTop: dli > 0 ? "1px solid #1f2937" : "none", display: "flex", alignItems: "flex-start", gap: 6, borderLeft: `3px solid ${ws.color}` } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 5 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af", lineHeight: 1.3, flex: 1 }, title: del.name }, del.name), hasHandoffs && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 800, color: "#f59e0b", background: "#f59e0b15", border: "1px solid #f59e0b30", borderRadius: 3, padding: "1px 4px", flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", textTransform: "uppercase" } }, "\u21C4 Handoff")), /* @__PURE__ */ React.createElement(
+            return /* @__PURE__ */ React.createElement("div", { key: del.id, style: { padding: "7px 8px 7px 11px", borderTop: dli > 0 ? "1px solid #1f2937" : "none", display: "flex", alignItems: "flex-start", gap: 6, borderLeft: `3px solid ${ws.color}` } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 5 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af", lineHeight: 1.3, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: del.name }, del.name), hasHandoffs && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 800, color: "#f59e0b", background: "#f59e0b15", border: "1px solid #f59e0b30", borderRadius: 3, padding: "1px 4px", flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", textTransform: "uppercase" } }, "\u21C4 Handoff")), /* @__PURE__ */ React.createElement(
               "select",
               {
                 value: del.status || "Not Started",
