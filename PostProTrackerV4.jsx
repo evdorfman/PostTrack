@@ -15490,6 +15490,19 @@ const rowToProject = row => ({
   // like it worked for the rest of that session, then silently reverted
   // on the next reload.
   inPipeline: row.in_pipeline||false,
+  // Same bug again, a third time — found while scoping the metrics
+  // dashboard work. See production_patch_014_projects_missing_fields.sql.
+  // `animation` in particular had ZERO persistence at all before this.
+  animation: row.animation||{}, _segments: row.segments||[],
+  budget: row.budget||[], budgetStatus: row.budget_status||null, costCode: row.cost_code||null,
+  addedToCompletes: row.added_to_completes||false,
+  basedOnExistingMaterial: row.based_on_existing_material||false,
+  isBigEvent: row.is_big_event||false,
+  briefSummary: row.brief_summary||null, clientDescription: row.client_description||null,
+  pipelineNotes: row.pipeline_notes||null,
+  mamProjectLink: row.mam_project_link||null, trintProjectLink: row.trint_project_link||null,
+  projectBrief: row.project_brief||null, intakeIds: row.intake_ids||[],
+  rolesNotNeeded: row.roles_not_needed||[],
 });
 
 // deliverables/productions are deliberately NOT included here — migration
@@ -15507,6 +15520,16 @@ const projectToRow = p => ({
   closed_at: p.closedAt||null,
   bxtv_refs: p.bxtvRefs||[], bxtv_meta: p.bxtvMeta||null,
   in_pipeline: !!p.inPipeline,
+  animation: p.animation||{}, segments: p._segments||[],
+  budget: p.budget||[], budget_status: p.budgetStatus||null, cost_code: p.costCode||null,
+  added_to_completes: !!p.addedToCompletes,
+  based_on_existing_material: !!p.basedOnExistingMaterial,
+  is_big_event: !!p.isBigEvent,
+  brief_summary: p.briefSummary||null, client_description: p.clientDescription||null,
+  pipeline_notes: p.pipelineNotes||null,
+  mam_project_link: p.mamProjectLink||null, trint_project_link: p.trintProjectLink||null,
+  project_brief: p.projectBrief||null, intake_ids: p.intakeIds||[],
+  roles_not_needed: p.rolesNotNeeded||[],
 });
 
 // Explicit fields get their own columns; anything else on a booking object
