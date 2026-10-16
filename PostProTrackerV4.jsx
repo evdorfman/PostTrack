@@ -9316,13 +9316,63 @@ const AnimationGroupSidebar = ({row, onClose}) => {
   );
 };
 
+// Turns a flat list of {workstream, businessUnit, deadline, animation} rows
+// (from fetchAnimationMetrics, scoped to whatever period was selected) into
+// the same byStatus/byWs/byBU/byQ shape the Metrics panel renders.
+const computeAnimMetrics = rows => {
+  const byStatus={}, byWs={}, byBU={}, byQ={};
+  ANIM_ROUND_STATUSES.forEach(s=>{byStatus[s]=0;});
+  let totalGroups=0, totalBatches=0;
+  rows.forEach(row=>{
+    const groups = row.animation?.groups||[];
+    const d=row.deadline; const mo=d?new Date(d).getMonth()+1:0; const yr=d?new Date(d).getFullYear():"—";
+    const q = d?`${yr} Q${Math.ceil(mo/3)}`:"—";
+    groups.forEach(group=>{
+      totalGroups++;
+      (group.batches||[]).forEach(b=>{
+        totalBatches++;
+        byStatus[b.status]=(byStatus[b.status]||0)+1;
+        byWs[row.workstream]=(byWs[row.workstream]||0)+1;
+        byBU[row.businessUnit]=(byBU[row.businessUnit]||0)+1;
+        byQ[q]=(byQ[q]||0)+1;
+      });
+    });
+  });
+  return {byStatus, byWs, byBU, byQ, totalGroups, totalBatches};
+};
+
 // Main AnimationView — structure matches DeliverablesTab
-const AnimationView = ({allProjects, team, sidebarSlotNode, onSidebarWidthChange, initialTab, onTabChange}) => {
+const AnimationView = ({allProjects, team, sidebarSlotNode, onSidebarWidthChange, initialTab, onTabChange, onFetchAnimationMetrics}) => {
   const [subTab, setSubTab] = useState(initialTab||"active");
   useEffect(()=>{ onTabChange?.(subTab); },[subTab]);
   const [groupBy, setGroupBy] = useState("animator");
   const [selected, setSelected] = useState(null);
   const sidebarWidth = selected ? 420 : 0;
+
+  // Metrics period state — independent of the active/completed tabs above,
+  // which intentionally only ever show current in-progress work. Metrics
+  // can look at any past quarter/year, or compare two.
+  const curYear = new Date().getFullYear();
+  const [periodA, setPeriodA] = useState({type:"year", year:curYear});
+  const [periodB, setPeriodB] = useState({type:"year", year:curYear-1});
+  const [compare, setCompare] = useState(false);
+  const [metricsA, setMetricsA] = useState(null);
+  const [metricsB, setMetricsB] = useState(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  useEffect(()=>{
+    if(subTab!=="metrics"||!onFetchAnimationMetrics) return;
+    let cancelled = false;
+    setMetricsLoading(true);
+    const rangeA = periodRange(periodA);
+    const periods = compare ? [rangeA, periodRange(periodB)] : [rangeA];
+    Promise.all(periods.map(r=>onFetchAnimationMetrics({start:r.start, end:r.end}))).then(results=>{
+      if(cancelled) return;
+      setMetricsA(computeAnimMetrics(results[0]?.data||[]));
+      setMetricsB(compare ? computeAnimMetrics(results[1]?.data||[]) : null);
+      setMetricsLoading(false);
+    });
+    return ()=>{ cancelled=true; };
+  },[subTab, periodA, periodB, compare, onFetchAnimationMetrics]);
 
   // Flatten groups with project-level tags
   const allRows = useMemo(()=>{
@@ -9359,18 +9409,11 @@ const AnimationView = ({allProjects, team, sidebarSlotNode, onSidebarWidthChange
     return rows;
   },[allProjects,team]);
 
-  // Tab filtering
+  // Tab filtering — In Progress/Completed intentionally only ever show
+  // currently-active work (allProjects never holds closed/archived
+  // projects); Metrics below is the one place that looks across any period.
   const activeRows    = allRows.filter(r=>!r.isComplete&&!r.isArchived);
   const completedRows = allRows.filter(r=>r.isComplete);
-
-  // Tagged batches for metrics
-  const allTaggedBatches = useMemo(()=>allRows.flatMap(r=>r.batches.map(b=>({...b,workstream:r.workstream,businessUnit:r.businessUnit,quarter:r.quarter}))),[allRows]);
-  const metricsData = useMemo(()=>{
-    const byStatus={},byWs={},byBU={},byQ={};
-    ANIM_ROUND_STATUSES.forEach(s=>{byStatus[s]=0;});
-    allTaggedBatches.forEach(b=>{byStatus[b.status]=(byStatus[b.status]||0)+1;byWs[b.workstream]=(byWs[b.workstream]||0)+1;byBU[b.businessUnit]=(byBU[b.businessUnit]||0)+1;byQ[b.quarter]=(byQ[b.quarter]||0)+1;});
-    return {byStatus,byWs,byBU,byQ};
-  },[allTaggedBatches]);
 
   // Grouping
   const getP = r => groupBy==="animator"?r.animator:groupBy==="designer"?r.designer:r.producer;
@@ -9486,36 +9529,55 @@ const AnimationView = ({allProjects, team, sidebarSlotNode, onSidebarWidthChange
           </div>
         )}
 
-        {/* Metrics */}
+        {/* Metrics — any past quarter/year, or two compared side by side */}
         {subTab==="metrics"&&(
           <div style={{display:"flex",flexDirection:"column",gap:20}}>
-            {/* Status tiles */}
-            <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-              {ANIM_ROUND_STATUSES.map(s=>{const c=ANIM_ROUND_STATUS_COLOR[s];const cnt=metricsData.byStatus[s]||0;return(
-                <div key={s} style={{background:c+"15",border:`1px solid ${c}40`,borderRadius:8,padding:"12px 18px",textAlign:"center",minWidth:90}}>
-                  <div style={{fontSize:34,fontWeight:900,color:c,fontFamily:"'Barlow Condensed',sans-serif"}}>{cnt}</div>
-                  <div style={{fontSize:12,color:c,opacity:0.8,textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em",lineHeight:1.2,marginTop:2}}>{s}</div>
-                </div>
-              );})}
-            </div>
-            {/* Breakdown bars */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,flexWrap:"wrap"}}>
-              {[
-                {title:"By Workstream",data:metricsData.byWs,colorFn:ws=>({CON:"#6366f1","Content Studio":"#6366f1",LVE:"#3b82f6","Broadcast":"#3b82f6",SOC:"#10b981","Social":"#10b981",BXTV:"#f59e0b"})[ws]||"#6366f1"},
-                {title:"By Business Unit",data:metricsData.byBU,colorFn:()=>"#8b5cf6"},
-                {title:"By Quarter",data:metricsData.byQ,colorFn:q=>q.includes("Q1")?"#3b82f6":q.includes("Q2")?"#10b981":q.includes("Q3")?"#f59e0b":"#ef4444"},
-              ].map(({title,data,colorFn})=>{
-                const entries=Object.entries(data).sort((a,b)=>b[1]-a[1]);
-                const max=Math.max(...entries.map(([,v])=>v),1);
-                if(!entries.length) return null;
-                return (
-                  <div key={title} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 18px"}}>
-                    <div style={{fontSize:16,fontWeight:800,color:"#9ca3af",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>{title}</div>
-                    {entries.map(([k,v])=><Bar key={k} label={k} count={v} max={max} color={colorFn(k)}/>)}
+            <MetricsPeriodBar periodA={periodA} setPeriodA={setPeriodA} periodB={periodB} setPeriodB={setPeriodB} compare={compare} setCompare={setCompare}/>
+
+            {metricsLoading&&<div style={{textAlign:"center",padding:"30px 0",color:"#838ba0",fontSize:16}}>Loading…</div>}
+
+            {!metricsLoading&&metricsA&&!compare&&(<>
+              {/* Status tiles */}
+              <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                {ANIM_ROUND_STATUSES.map(s=>{const c=ANIM_ROUND_STATUS_COLOR[s];const cnt=metricsA.byStatus[s]||0;return(
+                  <div key={s} style={{background:c+"15",border:`1px solid ${c}40`,borderRadius:8,padding:"12px 18px",textAlign:"center",minWidth:90}}>
+                    <div style={{fontSize:34,fontWeight:900,color:c,fontFamily:"'Barlow Condensed',sans-serif"}}>{cnt}</div>
+                    <div style={{fontSize:12,color:c,opacity:0.8,textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em",lineHeight:1.2,marginTop:2}}>{s}</div>
                   </div>
-                );
-              })}
-            </div>
+                );})}
+              </div>
+              {/* Breakdown bars */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,flexWrap:"wrap"}}>
+                {[
+                  {title:"By Workstream",data:metricsA.byWs,colorFn:ws=>({CON:"#6366f1","Content Studio":"#6366f1",LVE:"#3b82f6","Broadcast":"#3b82f6",SOC:"#10b981","Social":"#10b981",BXTV:"#f59e0b"})[ws]||"#6366f1"},
+                  {title:"By Business Unit",data:metricsA.byBU,colorFn:()=>"#8b5cf6"},
+                  {title:"By Quarter",data:metricsA.byQ,colorFn:q=>q.includes("Q1")?"#3b82f6":q.includes("Q2")?"#10b981":q.includes("Q3")?"#f59e0b":"#ef4444"},
+                ].map(({title,data,colorFn})=>{
+                  const entries=Object.entries(data).sort((a,b)=>b[1]-a[1]);
+                  const max=Math.max(...entries.map(([,v])=>v),1);
+                  if(!entries.length) return null;
+                  return (
+                    <div key={title} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 18px"}}>
+                      <div style={{fontSize:16,fontWeight:800,color:"#9ca3af",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>{title}</div>
+                      {entries.map(([k,v])=><Bar key={k} label={k} count={v} max={max} color={colorFn(k)}/>)}
+                    </div>
+                  );
+                })}
+              </div>
+            </>)}
+
+            {!metricsLoading&&metricsA&&compare&&metricsB&&(<>
+              <div style={{display:"flex",gap:24,fontSize:15}}>
+                <div><span style={{color:"#818cf8",fontWeight:800}}>{periodRange(periodA).label}</span>: {metricsA.totalBatches} batch{metricsA.totalBatches!==1?"es":""} across {metricsA.totalGroups} group{metricsA.totalGroups!==1?"s":""}</div>
+                <div><span style={{color:"#f59e0b",fontWeight:800}}>{periodRange(periodB).label}</span>: {metricsB.totalBatches} batch{metricsB.totalBatches!==1?"es":""} across {metricsB.totalGroups} group{metricsB.totalGroups!==1?"s":""}</div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+                <MetricsCompareTable title="By Status" dataA={metricsA.byStatus} dataB={metricsB.byStatus} labelA={periodRange(periodA).label} labelB={periodRange(periodB).label}/>
+                <MetricsCompareTable title="By Workstream" dataA={metricsA.byWs} dataB={metricsB.byWs} labelA={periodRange(periodA).label} labelB={periodRange(periodB).label}/>
+                <MetricsCompareTable title="By Business Unit" dataA={metricsA.byBU} dataB={metricsB.byBU} labelA={periodRange(periodA).label} labelB={periodRange(periodB).label}/>
+                <MetricsCompareTable title="By Quarter" dataA={metricsA.byQ} dataB={metricsB.byQ} labelA={periodRange(periodA).label} labelB={periodRange(periodB).label}/>
+              </div>
+            </>)}
           </div>
         )}
       </div>
@@ -27069,190 +27131,204 @@ const gatherIngests = (projects, team) => {
 
 const CHART_COLORS = ["#6366f1","#ec4899","#f59e0b","#22c55e","#06b6d4","#f97316","#8b5cf6","#10b981","#ef4444","#3b82f6"];
 
-const IngestDashboard = ({ingests, projects}) => {
-  const now = new Date();
-  const curYear = now.getFullYear();
-  const thisYear = ingests.filter(r=>(r.ingestDatetime||"").startsWith(String(curYear)));
-  const totalIngests = thisYear.length;
-  const totalGB = thisYear.reduce((s,r)=>s+(parseFloat(r.totalSizeGB)||0),0);
-  const totalTB = (totalGB/1024).toFixed(2);
-
+// Turns a flat list of {ingestDatetime, totalSizeGB, numFiles, location,
+// workstream, businessUnit} rows (from fetchIngestMetrics, scoped to
+// whatever period was selected) into the breakdowns the dashboard renders.
+const computeIngestAggregates = rows => {
+  const totalIngests = rows.length;
+  const totalGB = rows.reduce((s,r)=>s+(parseFloat(r.totalSizeGB)||0),0);
   const byQ = {"Q1":0,"Q2":0,"Q3":0,"Q4":0};
-  thisYear.forEach(r=>{const m=new Date(r.ingestDatetime).getMonth();if(m<3)byQ["Q1"]++;else if(m<6)byQ["Q2"]++;else if(m<9)byQ["Q3"]++;else byQ["Q4"]++;});
-  const qData = Object.entries(byQ).map(([q,v])=>({name:`${String(curYear).slice(2)}${q}`,ingests:v}));
-
+  rows.forEach(r=>{const m=new Date(r.ingestDatetime).getMonth();if(m<3)byQ["Q1"]++;else if(m<6)byQ["Q2"]++;else if(m<9)byQ["Q3"]++;else byQ["Q4"]++;});
   const byMonth={};
-  thisYear.forEach(r=>{const d=new Date(r.ingestDatetime);const key=`${d.toLocaleString("default",{month:"short"})} '${String(d.getFullYear()).slice(2)}`;byMonth[key]=(byMonth[key]||0)+1;});
-  const monthData=Object.entries(byMonth).map(([m,v])=>({month:m,ingests:v}));
-
+  rows.forEach(r=>{const d=new Date(r.ingestDatetime);const key=`${d.toLocaleString("default",{month:"short"})} '${String(d.getFullYear()).slice(2)}`;byMonth[key]=(byMonth[key]||0)+1;});
   const byBU={};
-  thisYear.forEach(r=>{if(r.businessUnit)byBU[r.businessUnit]=(byBU[r.businessUnit]||0)+1;});
-  const buData=Object.entries(byBU).map(([bu,v])=>({bu,ingests:v})).sort((a,b)=>b.ingests-a.ingests);
-
+  rows.forEach(r=>{if(r.businessUnit)byBU[r.businessUnit]=(byBU[r.businessUnit]||0)+1;});
   const byLoc={};
-  thisYear.forEach(r=>{const l=r.location||"Unknown";byLoc[l]=(byLoc[l]||0)+1;});
-  const locData=Object.entries(byLoc).map(([l,v])=>({name:l,value:v}));
-
+  rows.forEach(r=>{const l=r.location||"Unknown";byLoc[l]=(byLoc[l]||0)+1;});
   const byWS={};
-  thisYear.forEach(r=>{if(r.workstream)byWS[r.workstream]=(byWS[r.workstream]||0)+1;});
-  const wsData=Object.entries(byWS).map(([ws,v])=>({ws,ingests:v})).sort((a,b)=>b.ingests-a.ingests);
-
+  rows.forEach(r=>{if(r.workstream)byWS[r.workstream]=(byWS[r.workstream]||0)+1;});
   const storageQ={"Q1":0,"Q2":0,"Q3":0,"Q4":0};
-  thisYear.forEach(r=>{const m=new Date(r.ingestDatetime).getMonth();const gb=parseFloat(r.totalSizeGB)||0;if(m<3)storageQ["Q1"]+=gb;else if(m<6)storageQ["Q2"]+=gb;else if(m<9)storageQ["Q3"]+=gb;else storageQ["Q4"]+=gb;});
-  const storageQData=Object.entries(storageQ).map(([q,v])=>({name:`${String(curYear).slice(2)}${q}`,tb:+(v/1024).toFixed(3)}));
-
+  rows.forEach(r=>{const m=new Date(r.ingestDatetime).getMonth();const gb=parseFloat(r.totalSizeGB)||0;if(m<3)storageQ["Q1"]+=gb;else if(m<6)storageQ["Q2"]+=gb;else if(m<9)storageQ["Q3"]+=gb;else storageQ["Q4"]+=gb;});
   const storageM={};
-  thisYear.forEach(r=>{const d=new Date(r.ingestDatetime);const key=`${d.toLocaleString("default",{month:"short"})} '${String(d.getFullYear()).slice(2)}`;storageM[key]=(storageM[key]||0)+(parseFloat(r.totalSizeGB)||0);});
-  const storageMData=Object.entries(storageM).map(([m,v])=>({month:m,tb:+(v/1024).toFixed(3)}));
-
+  rows.forEach(r=>{const d=new Date(r.ingestDatetime);const key=`${d.toLocaleString("default",{month:"short"})} '${String(d.getFullYear()).slice(2)}`;storageM[key]=(storageM[key]||0)+(parseFloat(r.totalSizeGB)||0);});
   const wsMetrics={};
-  thisYear.forEach(r=>{const ws=r.workstream||"Unknown";if(!wsMetrics[ws])wsMetrics[ws]={files:0,ingests:0,gb:0};wsMetrics[ws].files+=(parseInt(r.numFiles)||0);wsMetrics[ws].ingests++;wsMetrics[ws].gb+=(parseFloat(r.totalSizeGB)||0);});
+  rows.forEach(r=>{const ws=r.workstream||"Unknown";if(!wsMetrics[ws])wsMetrics[ws]={files:0,ingests:0,gb:0};wsMetrics[ws].files+=(parseInt(r.numFiles)||0);wsMetrics[ws].ingests++;wsMetrics[ws].gb+=(parseFloat(r.totalSizeGB)||0);});
+  return {totalIngests, totalGB, byQ, byMonth, byBU, byLoc, byWS, storageQ, storageM, wsMetrics};
+};
 
-  const byProd={};
-  thisYear.forEach(r=>{if(r.producer)byProd[r.producer]=(byProd[r.producer]||0)+1;});
-  const prodData=Object.entries(byProd).map(([p,v])=>({name:p,value:v}));
+const IngestDashboard = ({onFetchIngestMetrics}) => {
+  const curYear = new Date().getFullYear();
+  const [periodA, setPeriodA] = useState({type:"year", year:curYear});
+  const [periodB, setPeriodB] = useState({type:"year", year:curYear-1});
+  const [compare, setCompare] = useState(false);
+  const [aggA, setAggA] = useState(null);
+  const [aggB, setAggB] = useState(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(()=>{
+    if(!onFetchIngestMetrics) return;
+    let cancelled = false;
+    setLoading(true);
+    const rangeA = periodRange(periodA);
+    const periods = compare ? [rangeA, periodRange(periodB)] : [rangeA];
+    Promise.all(periods.map(r=>onFetchIngestMetrics({start:r.start, end:r.end}))).then(results=>{
+      if(cancelled) return;
+      setAggA(computeIngestAggregates(results[0]?.data||[]));
+      setAggB(compare ? computeIngestAggregates(results[1]?.data||[]) : null);
+      setLoading(false);
+    });
+    return ()=>{ cancelled=true; };
+  },[periodA, periodB, compare, onFetchIngestMetrics]);
 
-  const transcriptByProd={};
-  thisYear.filter(r=>r.transcriptNeeded).forEach(r=>{if(r.producer)transcriptByProd[r.producer]=(transcriptByProd[r.producer]||0)+1;});
-  const transcriptProdData=Object.entries(transcriptByProd).map(([p,v])=>({name:p,value:v}));
-
+  const labelA = periodRange(periodA).label;
+  const labelB = periodRange(periodB).label;
   const CHART_COLORS=["#6366f1","#ec4899","#f59e0b","#22c55e","#06b6d4","#f97316","#8b5cf6","#10b981","#ef4444","#3b82f6"];
   const ttS={contentStyle:{background:"#111827",border:"1px solid #374151",borderRadius:8,color:"#e2e8f0"}};
   const Card=({children,title,span=1})=>(<div style={{background:"#0d1117",border:"1px solid #1f2937",borderRadius:12,padding:18,gridColumn:`span ${span}`}}>{title&&<div style={{fontSize:13,fontWeight:800,color: "#8e97a6",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.1em",marginBottom:12}}>{title}</div>}{children}</div>);
 
+  if(loading||!aggA) return (
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <MetricsPeriodBar periodA={periodA} setPeriodA={setPeriodA} periodB={periodB} setPeriodB={setPeriodB} compare={compare} setCompare={setCompare}/>
+      <div style={{textAlign:"center",padding:"30px 0",color:"#838ba0",fontSize:16}}>Loading…</div>
+    </div>
+  );
+
+  if(compare&&aggB){
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <MetricsPeriodBar periodA={periodA} setPeriodA={setPeriodA} periodB={periodB} setPeriodB={setPeriodB} compare={compare} setCompare={setCompare}/>
+        <div style={{display:"flex",gap:24,fontSize:15}}>
+          <div><span style={{color:"#818cf8",fontWeight:800}}>{labelA}</span>: {aggA.totalIngests} ingests · {(aggA.totalGB/1024).toFixed(2)} TB</div>
+          <div><span style={{color:"#f59e0b",fontWeight:800}}>{labelB}</span>: {aggB.totalIngests} ingests · {(aggB.totalGB/1024).toFixed(2)} TB</div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+          <MetricsCompareTable title="By Quarter (ingests)" dataA={aggA.byQ} dataB={aggB.byQ} labelA={labelA} labelB={labelB}/>
+          <MetricsCompareTable title="By Business Unit" dataA={aggA.byBU} dataB={aggB.byBU} labelA={labelA} labelB={labelB}/>
+          <MetricsCompareTable title="By Workstream" dataA={aggA.byWS} dataB={aggB.byWS} labelA={labelA} labelB={labelB}/>
+          <MetricsCompareTable title="By Location" dataA={aggA.byLoc} dataB={aggB.byLoc} labelA={labelA} labelB={labelB}/>
+        </div>
+      </div>
+    );
+  }
+
+  const qData = Object.entries(aggA.byQ).map(([q,v])=>({name:q,ingests:v}));
+  const monthData=Object.entries(aggA.byMonth).map(([m,v])=>({month:m,ingests:v}));
+  const buData=Object.entries(aggA.byBU).map(([bu,v])=>({bu,ingests:v})).sort((a,b)=>b.ingests-a.ingests);
+  const locData=Object.entries(aggA.byLoc).map(([l,v])=>({name:l,value:v}));
+  const wsData=Object.entries(aggA.byWS).map(([ws,v])=>({ws,ingests:v})).sort((a,b)=>b.ingests-a.ingests);
+  const storageQData=Object.entries(aggA.storageQ).map(([q,v])=>({name:q,tb:+(v/1024).toFixed(3)}));
+  const storageMData=Object.entries(aggA.storageM).map(([m,v])=>({month:m,tb:+(v/1024).toFixed(3)}));
+
   return (
-    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14}}>
-      <Card title={`Ingests — ${curYear}`}>
-        <div style={{display:"flex",gap:24}}>
-          <div><div style={{fontSize:13,color: "#8e97a6",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>Total Ingests</div><div style={{fontSize:34,fontWeight:900,color:"#818cf8",fontFamily:"'Barlow Condensed',sans-serif",lineHeight:1}}>{totalIngests}</div></div>
-          <div><div style={{fontSize:13,color: "#8e97a6",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>Total Storage</div><div style={{fontSize:34,fontWeight:900,color:"#60a5fa",fontFamily:"'Barlow Condensed',sans-serif",lineHeight:1}}>{totalTB} TB</div></div>
-        </div>
-      </Card>
-      <Card title="Storage" span={2}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
-          {[["Total Used","— TB"],["Available","— TB"],["Total Files","—"],["Avg File Size","—"]].map(([l,v])=>(
-            <div key={l}><div style={{fontSize:13,color: "#8e97a6",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>{l}</div><div style={{fontSize:26,fontWeight:900,color: "#9ca3af",fontFamily:"'Barlow Condensed',sans-serif"}}>{v}</div><div style={{fontSize:13,color:"#1f2937"}}>Awaiting server</div></div>
-          ))}
-        </div>
-      </Card>
-      <Card title={`Ingests by Quarter — ${curYear}`} span={2}>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={qData} margin={{top:0,right:10,left:0,bottom:0}}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1f2937"/>
-            <XAxis dataKey="name" tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
-            <YAxis tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
-            <Tooltip {...ttS}/>
-            <Bar dataKey="ingests" fill="#6366f1" radius={[4,4,0,0]}/>
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
-      <Card title={`Ingests by Month — ${curYear}`}>
-        <ResponsiveContainer width="100%" height={200}>
-          <LineChart data={monthData} margin={{top:0,right:10,left:0,bottom:0}}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1f2937"/>
-            <XAxis dataKey="month" tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
-            <YAxis tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
-            <Tooltip {...ttS}/>
-            <Line type="monotone" dataKey="ingests" stroke="#818cf8" strokeWidth={2} dot={{fill:"#818cf8",r:3}}/>
-          </LineChart>
-        </ResponsiveContainer>
-      </Card>
-      <Card title={`By Business Unit — ${curYear}`} span={2}>
-        <ResponsiveContainer width="100%" height={Math.max(160,buData.length*40)}>
-          <BarChart data={buData} layout="vertical" margin={{top:0,right:20,left:80,bottom:0}}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" horizontal={false}/>
-            <XAxis type="number" tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
-            <YAxis type="category" dataKey="bu" tick={{fill:"#9ca3af",fontSize:13}} axisLine={false} tickLine={false} width={78}/>
-            <Tooltip {...ttS}/>
-            <Bar dataKey="ingests" radius={[0,4,4,0]}>{buData.map((_,i)=><Cell key={i} fill={CHART_COLORS[i%CHART_COLORS.length]}/>)}</Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
-      <Card title={`By Location — ${curYear}`}>
-        <ResponsiveContainer width="100%" height={200}>
-          <PieChart>
-            <Pie data={locData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} paddingAngle={2} label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
-              {locData.map((_,i)=><Cell key={i} fill={CHART_COLORS[i%CHART_COLORS.length]}/>)}
-            </Pie>
-            <Tooltip {...ttS}/>
-          </PieChart>
-        </ResponsiveContainer>
-      </Card>
-      <Card title={`By Workstream — ${curYear}`} span={2}>
-        <ResponsiveContainer width="100%" height={Math.max(140,wsData.length*40)}>
-          <BarChart data={wsData} layout="vertical" margin={{top:0,right:20,left:80,bottom:0}}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" horizontal={false}/>
-            <XAxis type="number" tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
-            <YAxis type="category" dataKey="ws" tick={{fill:"#9ca3af",fontSize:13}} axisLine={false} tickLine={false} width={78}/>
-            <Tooltip {...ttS}/>
-            <Bar dataKey="ingests" radius={[0,4,4,0]}>{wsData.map((_,i)=><Cell key={i} fill={CHART_COLORS[(i+4)%CHART_COLORS.length]}/>)}</Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
-      <Card title={`Storage by Quarter — ${curYear} (TB)`} span={2}>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={storageQData} margin={{top:0,right:10,left:0,bottom:0}}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1f2937"/>
-            <XAxis dataKey="name" tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
-            <YAxis tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
-            <Tooltip {...ttS} formatter={v=>[`${v} TB`,"Storage"]}/>
-            <Bar dataKey="tb" fill="#06b6d4" radius={[4,4,0,0]}/>
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
-      <Card title={`Storage by Month — ${curYear} (TB)`}>
-        <ResponsiveContainer width="100%" height={200}>
-          <LineChart data={storageMData} margin={{top:0,right:10,left:0,bottom:0}}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1f2937"/>
-            <XAxis dataKey="month" tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
-            <YAxis tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
-            <Tooltip {...ttS} formatter={v=>[`${v} TB`,"Storage"]}/>
-            <Line type="monotone" dataKey="tb" stroke="#06b6d4" strokeWidth={2} dot={{fill:"#06b6d4",r:3}}/>
-          </LineChart>
-        </ResponsiveContainer>
-      </Card>
-      <Card title={`Workstream Metrics — ${curYear}`} span={3}>
-        <table style={{width:"100%",borderCollapse:"collapse"}}>
-          <thead><tr>{["Workstream","Ingests","Total Files","Avg Files/Ingest","Avg GB/Ingest"].map(h=>(<th key={h} style={{textAlign:"left",padding:"4px 10px",fontSize:13,fontWeight:700,color: "#8e97a6",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",borderBottom:"1px solid #1f2937"}}>{h}</th>))}</tr></thead>
-          <tbody>
-            {Object.entries(wsMetrics).map(([ws,m],i)=>(
-              <tr key={ws} style={{background:i%2===0?"#0d1117":"#0a0f1a"}}>
-                <td style={{padding:"6px 10px",fontSize:14,color:"#e2e8f0",fontWeight:600}}>{ws}</td>
-                <td style={{padding:"6px 10px",fontSize:14,color:"#9ca3af"}}>{m.ingests}</td>
-                <td style={{padding:"6px 10px",fontSize:14,color:"#9ca3af"}}>{m.files||"—"}</td>
-                <td style={{padding:"6px 10px",fontSize:14,color:"#9ca3af"}}>{m.ingests?Math.round(m.files/m.ingests)||"—":"—"}</td>
-                <td style={{padding:"6px 10px",fontSize:14,color:"#9ca3af"}}>{m.ingests?(m.gb/m.ingests).toFixed(2):"—"}</td>
-              </tr>
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <MetricsPeriodBar periodA={periodA} setPeriodA={setPeriodA} periodB={periodB} setPeriodB={setPeriodB} compare={compare} setCompare={setCompare}/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14}}>
+        <Card title={`Ingests — ${labelA}`}>
+          <div style={{display:"flex",gap:24}}>
+            <div><div style={{fontSize:13,color: "#8e97a6",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>Total Ingests</div><div style={{fontSize:34,fontWeight:900,color:"#818cf8",fontFamily:"'Barlow Condensed',sans-serif",lineHeight:1}}>{aggA.totalIngests}</div></div>
+            <div><div style={{fontSize:13,color: "#8e97a6",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>Total Storage</div><div style={{fontSize:34,fontWeight:900,color:"#60a5fa",fontFamily:"'Barlow Condensed',sans-serif",lineHeight:1}}>{(aggA.totalGB/1024).toFixed(2)} TB</div></div>
+          </div>
+        </Card>
+        <Card title="Storage" span={2}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+            {[["Total Used","— TB"],["Available","— TB"],["Total Files","—"],["Avg File Size","—"]].map(([l,v])=>(
+              <div key={l}><div style={{fontSize:13,color: "#8e97a6",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>{l}</div><div style={{fontSize:26,fontWeight:900,color: "#9ca3af",fontFamily:"'Barlow Condensed',sans-serif"}}>{v}</div><div style={{fontSize:13,color:"#1f2937"}}>Awaiting server</div></div>
             ))}
-            {Object.keys(wsMetrics).length===0&&<tr><td colSpan={5} style={{padding:"16px 10px",textAlign:"center",color: "#838ba0",fontSize:14}}>No ingest data for {curYear}</td></tr>}
-          </tbody>
-        </table>
-      </Card>
-      <Card title={`Producer Metrics — ${curYear}`} span={3}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-          <div>
-            <div style={{fontSize:13,color: "#8e97a6",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Ingests by Producer</div>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={prodData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} paddingAngle={2}>{prodData.map((_,i)=><Cell key={i} fill={CHART_COLORS[i%CHART_COLORS.length]}/>)}</Pie>
-                <Tooltip {...ttS}/><Legend iconSize={8} wrapperStyle={{fontSize:13,color:"#9ca3af"}}/>
-              </PieChart>
-            </ResponsiveContainer>
           </div>
-          <div>
-            <div style={{fontSize:13,color: "#8e97a6",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Transcripts by Producer</div>
-            {transcriptProdData.length===0
-              ? <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:220,color: "#838ba0",fontSize:14}}>No transcript data</div>
-              : <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie data={transcriptProdData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} paddingAngle={2}>{transcriptProdData.map((_,i)=><Cell key={i} fill={CHART_COLORS[i%CHART_COLORS.length]}/>)}</Pie>
-                    <Tooltip {...ttS}/><Legend iconSize={8} wrapperStyle={{fontSize:13,color:"#9ca3af"}}/>
-                  </PieChart>
-                </ResponsiveContainer>
-            }
-          </div>
-        </div>
-      </Card>
+        </Card>
+        <Card title={`Ingests by Quarter — ${labelA}`} span={2}>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={qData} margin={{top:0,right:10,left:0,bottom:0}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937"/>
+              <XAxis dataKey="name" tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
+              <YAxis tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
+              <Tooltip {...ttS}/>
+              <Bar dataKey="ingests" fill="#6366f1" radius={[4,4,0,0]}/>
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+        <Card title={`Ingests by Month — ${labelA}`}>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={monthData} margin={{top:0,right:10,left:0,bottom:0}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937"/>
+              <XAxis dataKey="month" tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
+              <YAxis tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
+              <Tooltip {...ttS}/>
+              <Line type="monotone" dataKey="ingests" stroke="#818cf8" strokeWidth={2} dot={{fill:"#818cf8",r:3}}/>
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+        <Card title={`By Business Unit — ${labelA}`} span={2}>
+          <ResponsiveContainer width="100%" height={Math.max(160,buData.length*40)}>
+            <BarChart data={buData} layout="vertical" margin={{top:0,right:20,left:80,bottom:0}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" horizontal={false}/>
+              <XAxis type="number" tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
+              <YAxis type="category" dataKey="bu" tick={{fill:"#9ca3af",fontSize:13}} axisLine={false} tickLine={false} width={78}/>
+              <Tooltip {...ttS}/>
+              <Bar dataKey="ingests" radius={[0,4,4,0]}>{buData.map((_,i)=><Cell key={i} fill={CHART_COLORS[i%CHART_COLORS.length]}/>)}</Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+        <Card title={`By Location — ${labelA}`}>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie data={locData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} paddingAngle={2} label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
+                {locData.map((_,i)=><Cell key={i} fill={CHART_COLORS[i%CHART_COLORS.length]}/>)}
+              </Pie>
+              <Tooltip {...ttS}/>
+            </PieChart>
+          </ResponsiveContainer>
+        </Card>
+        <Card title={`By Workstream — ${labelA}`} span={2}>
+          <ResponsiveContainer width="100%" height={Math.max(140,wsData.length*40)}>
+            <BarChart data={wsData} layout="vertical" margin={{top:0,right:20,left:80,bottom:0}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" horizontal={false}/>
+              <XAxis type="number" tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
+              <YAxis type="category" dataKey="ws" tick={{fill:"#9ca3af",fontSize:13}} axisLine={false} tickLine={false} width={78}/>
+              <Tooltip {...ttS}/>
+              <Bar dataKey="ingests" radius={[0,4,4,0]}>{wsData.map((_,i)=><Cell key={i} fill={CHART_COLORS[(i+4)%CHART_COLORS.length]}/>)}</Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+        <Card title={`Storage by Quarter — ${labelA} (TB)`} span={2}>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={storageQData} margin={{top:0,right:10,left:0,bottom:0}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937"/>
+              <XAxis dataKey="name" tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
+              <YAxis tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
+              <Tooltip {...ttS} formatter={v=>[`${v} TB`,"Storage"]}/>
+              <Bar dataKey="tb" fill="#06b6d4" radius={[4,4,0,0]}/>
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+        <Card title={`Storage by Month — ${labelA} (TB)`}>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={storageMData} margin={{top:0,right:10,left:0,bottom:0}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937"/>
+              <XAxis dataKey="month" tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
+              <YAxis tick={{fill:"#6b7280",fontSize:13}} axisLine={false} tickLine={false}/>
+              <Tooltip {...ttS} formatter={v=>[`${v} TB`,"Storage"]}/>
+              <Line type="monotone" dataKey="tb" stroke="#06b6d4" strokeWidth={2} dot={{fill:"#06b6d4",r:3}}/>
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+        <Card title={`Workstream Metrics — ${labelA}`} span={3}>
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr>{["Workstream","Ingests","Total Files","Avg Files/Ingest","Avg GB/Ingest"].map(h=>(<th key={h} style={{textAlign:"left",padding:"4px 10px",fontSize:13,fontWeight:700,color: "#8e97a6",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",borderBottom:"1px solid #1f2937"}}>{h}</th>))}</tr></thead>
+            <tbody>
+              {Object.entries(aggA.wsMetrics).map(([ws,m],i)=>(
+                <tr key={ws} style={{background:i%2===0?"#0d1117":"#0a0f1a"}}>
+                  <td style={{padding:"6px 10px",fontSize:14,color:"#e2e8f0",fontWeight:600}}>{ws}</td>
+                  <td style={{padding:"6px 10px",fontSize:14,color:"#9ca3af"}}>{m.ingests}</td>
+                  <td style={{padding:"6px 10px",fontSize:14,color:"#9ca3af"}}>{m.files||"—"}</td>
+                  <td style={{padding:"6px 10px",fontSize:14,color:"#9ca3af"}}>{m.ingests?Math.round(m.files/m.ingests)||"—":"—"}</td>
+                  <td style={{padding:"6px 10px",fontSize:14,color:"#9ca3af"}}>{m.ingests?(m.gb/m.ingests).toFixed(2):"—"}</td>
+                </tr>
+              ))}
+              {Object.keys(aggA.wsMetrics).length===0&&<tr><td colSpan={5} style={{padding:"16px 10px",textAlign:"center",color: "#838ba0",fontSize:14}}>No ingest data for {labelA}</td></tr>}
+            </tbody>
+          </table>
+        </Card>
+      </div>
     </div>
   );
 };
@@ -27446,7 +27522,7 @@ const IngestTrackingSheet = ({ingests, onUpdateRow, projects=[], team=[], onAddR
   );
 };
 
-const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onDeleteDel, talentRoster=[], sidebarSlotNode, onSidebarWidthChange, initialTab, onTabChange}) => {
+const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onDeleteDel, talentRoster=[], sidebarSlotNode, onSidebarWidthChange, initialTab, onTabChange, onFetchIngestMetrics}) => {
   const [tab, setTab] = useState(initialTab||"sheet");
   useEffect(()=>{ onTabChange?.(tab); },[tab]);
   const ingests = useMemo(()=>gatherIngests(projects,team),[projects,team]);
@@ -27552,7 +27628,7 @@ const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onD
         onAddReviewLink={addReviewLinkToRow} onUpdateDel={onUpdateDel} onDeleteDel={onDeleteDel} onUpdateProject={onUpdateProject}
         onDeleteReviewLink={deleteReviewLinkFromRow} onReassignReviewLink={reassignReviewLinkForRow}
         rowKeyOf={rowKeyOf} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={onSidebarWidthChange}/>}
-      {tab==="dashboard" && <IngestDashboard ingests={ingests} projects={projects}/>}
+      {tab==="dashboard" && <IngestDashboard onFetchIngestMetrics={onFetchIngestMetrics}/>}
     </div>
   );
 };
@@ -28265,6 +28341,88 @@ const quarterYearRanges = () => {
   ranges.push({label:`${y-2}`, start:new Date(Date.UTC(y-2,0,1)).toISOString(), end:new Date(Date.UTC(y-1,0,1)).toISOString()});
   ranges.push({label:"Everything", start:null, end:null});
   return ranges;
+};
+
+// ─── Metrics period picker — shared by any dashboard that needs to look at
+// an arbitrary past quarter/year, or compare two periods side by side
+// (e.g. "this quarter vs the same quarter last year"), rather than always
+// showing "right now". A period is {type, year}: type is "year" (the full
+// calendar year — naturally behaves as YTD for the current year, since
+// there's no future data to include) or "Q1".."Q4".
+const periodRange = ({type, year}) => {
+  if(type==="year") return {start:`${year}-01-01`, end:`${year+1}-01-01`, label:`${year}`};
+  const q = Number(type.slice(1));
+  const startMonth = (q-1)*3;
+  const start = new Date(Date.UTC(year, startMonth, 1)).toISOString().slice(0,10);
+  const end   = new Date(Date.UTC(year, startMonth+3, 1)).toISOString().slice(0,10);
+  return {start, end, label:`${type} ${year}`};
+};
+const METRICS_PERIOD_TYPES = [["year","Full Year"],["Q1","Q1"],["Q2","Q2"],["Q3","Q3"],["Q4","Q4"]];
+const MetricsPeriodSelect = ({value, onChange, minYear, maxYear}) => {
+  const years = []; for(let y=maxYear; y>=minYear; y--) years.push(y);
+  const sel = {background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"6px 10px",fontSize:15,outline:"none",cursor:"pointer"};
+  return (
+    <div style={{display:"flex",gap:6}}>
+      <select value={value.type} onChange={e=>onChange({...value,type:e.target.value})} style={sel}>
+        {METRICS_PERIOD_TYPES.map(([v,l])=><option key={v} value={v}>{l}</option>)}
+      </select>
+      <select value={value.year} onChange={e=>onChange({...value,year:Number(e.target.value)})} style={sel}>
+        {years.map(y=><option key={y} value={y}>{y}</option>)}
+      </select>
+    </div>
+  );
+};
+// `compare`/`setCompare` plus a period A and optional period B — the "+
+// Compare" button seeds period B as the same period one year back (the
+// most common comparison), but either select is free to change to any
+// quarter/year combination after that.
+const MetricsPeriodBar = ({periodA, setPeriodA, periodB, setPeriodB, compare, setCompare, minYear=new Date().getFullYear()-5}) => {
+  const maxYear = new Date().getFullYear();
+  const btn = {background:"transparent",border:"1px dashed #374151",borderRadius:7,color:"#818cf8",padding:"6px 12px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",whiteSpace:"nowrap"};
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+      <MetricsPeriodSelect value={periodA} onChange={setPeriodA} minYear={minYear} maxYear={maxYear}/>
+      {compare ? (
+        <>
+          <span style={{color:"#6b7280",fontSize:14,fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>vs</span>
+          <MetricsPeriodSelect value={periodB} onChange={setPeriodB} minYear={minYear} maxYear={maxYear}/>
+          <button onClick={()=>setCompare(false)} style={{...btn,borderStyle:"solid",color:"#9ca3af"}}>✕ Remove comparison</button>
+        </>
+      ) : (
+        <button onClick={()=>{ setPeriodB({...periodA, year:periodA.year-1}); setCompare(true); }} style={btn}>+ Compare to another period</button>
+      )}
+    </div>
+  );
+};
+
+// Side-by-side breakdown table for comparison mode — a bar chart with two
+// series per category gets cluttered fast, a plain table reads cleanly at
+// any number of categories and makes the delta the point.
+const MetricsCompareTable = ({title, dataA, dataB, labelA, labelB}) => {
+  const keys = [...new Set([...Object.keys(dataA), ...Object.keys(dataB)])].sort((a,b)=>(dataB[b]||0)+(dataA[b]||0)-((dataB[a]||0)+(dataA[a]||0)));
+  if(!keys.length) return null;
+  return (
+    <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 18px"}}>
+      <div style={{fontSize:16,fontWeight:800,color:"#9ca3af",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>{title}</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr auto auto auto",gap:"4px 14px",alignItems:"center"}}>
+        <div style={{fontSize:12,color:"#4b5563",fontWeight:700,textTransform:"uppercase"}}></div>
+        <div style={{fontSize:12,color:"#818cf8",fontWeight:700,textTransform:"uppercase",textAlign:"right"}}>{labelA}</div>
+        <div style={{fontSize:12,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",textAlign:"right"}}>{labelB}</div>
+        <div style={{fontSize:12,color:"#4b5563",fontWeight:700,textTransform:"uppercase",textAlign:"right"}}>Δ</div>
+        {keys.map(k=>{
+          const a=dataA[k]||0, b=dataB[k]||0, delta=a-b;
+          return (
+            <React.Fragment key={k}>
+              <div style={{fontSize:15,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{k}</div>
+              <div style={{fontSize:16,fontWeight:700,color:"#c4c9d4",textAlign:"right"}}>{a}</div>
+              <div style={{fontSize:16,fontWeight:700,color:"#c4c9d4",textAlign:"right"}}>{b}</div>
+              <div style={{fontSize:14,fontWeight:700,textAlign:"right",color:delta>0?"#10b981":delta<0?"#ef4444":"#4b5563"}}>{delta>0?`+${delta}`:delta}</div>
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
 };
 
 // ─── Admin → Issues — app errors (auto-logged whenever a Supabase write
@@ -32061,6 +32219,54 @@ function App() {
       businessUnit: row.projects?.business_unit || "—",
     })), error:null};
   },[]);
+  // Metrics dashboards (Animation, Ingest) need to look back across any
+  // past quarter/year, not just currently-active work — allProjects only
+  // ever holds open projects (see the projects fetch's own comment), so a
+  // period that includes closed/archived work has to be fetched fresh,
+  // scoped by date, rather than read from in-memory state. Selects only
+  // the handful of columns each dashboard actually aggregates, not a full
+  // project, since this can span years of history.
+  const fetchAnimationMetrics = useCallback(async ({start, end}) => {
+    if(!sb) return {data:[], error:{message:"Not connected."}};
+    let q = sb.from("projects").select("workstream, business_unit, deadline, animation").not("deadline","is",null);
+    if(start) q = q.gte("deadline", start);
+    if(end)   q = q.lt("deadline", end);
+    const {data, error} = await q;
+    if(error) return {data:[], error};
+    return {data:(data||[]).map(r=>({workstream:r.workstream||"—", businessUnit:r.business_unit||"—", deadline:r.deadline, animation:r.animation||{}})), error:null};
+  },[]);
+  // ingest_dates/production.ingest are jsonb blobs (not their own queryable
+  // date column), so the date-range filter happens client-side after a
+  // lean fetch rather than in SQL — see the SQL patch notes for why these
+  // were never normalized into their own table. Pulls every project/
+  // production that has ANY ingest data (not date-bounded at the query
+  // level), which stays small even over years since it's just a handful of
+  // columns per row, not a full project/production.
+  const fetchIngestMetrics = useCallback(async ({start, end}) => {
+    if(!sb) return {data:[], error:{message:"Not connected."}};
+    const [projRes, prodRes] = await Promise.all([
+      sb.from("projects").select("id, workstream, business_unit, ingest_dates"),
+      sb.from("productions").select("project_id, location, end_time, ingest").not("end_time","is",null),
+    ]);
+    if(projRes.error) return {data:[], error:projRes.error};
+    if(prodRes.error) return {data:[], error:prodRes.error};
+    const wsByProject = {}, buByProject = {};
+    (projRes.data||[]).forEach(p=>{ wsByProject[p.id]=p.workstream||"—"; buByProject[p.id]=p.business_unit||"—"; });
+    const inRange = dt => { if(!dt) return false; if(start && dt<start) return false; if(end && dt>=end) return false; return true; };
+    const rows = [];
+    (projRes.data||[]).forEach(p=>{
+      (p.ingest_dates||[]).forEach(ig=>{
+        if(!inRange(ig.datetime)) return;
+        rows.push({ingestDatetime:ig.datetime, totalSizeGB:ig.totalSizeGB||0, numFiles:ig.numFiles||0, location:ig.location||"", workstream:p.workstream||"—", businessUnit:p.business_unit||"—"});
+      });
+    });
+    (prodRes.data||[]).forEach(prod=>{
+      const dt = prod.ingest?.datetime || prod.end_time;
+      if(!inRange(dt)) return;
+      rows.push({ingestDatetime:dt, totalSizeGB:prod.ingest?.totalSizeGB||0, numFiles:prod.ingest?.numFiles||0, location:prod.location||"", workstream:wsByProject[prod.project_id]||"—", businessUnit:buByProject[prod.project_id]||"—"});
+    });
+    return {data:rows, error:null};
+  },[]);
   // Resolves a `?project=` deep link once the real project data has loaded
   // (it's fetched async from Supabase, so it may not exist yet at mount —
   // see projectsLoaded's own comment). Runs at most once: if it's not in
@@ -32225,7 +32431,7 @@ function App() {
           <StatsBar projects={allProjects} team={allTeam} setView={v=>{setView(v);if(v!=="projects")setStatsFilter(null);}} onOpenProject={openProject} onSetStatsFilter={setStatsFilter} workReviewSessions={workReviewSessions}/>
           {view==="workReview"&&<WorkReviewView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} workReviewSessions={workReviewSessions} updateWorkReviewSession={updateWorkReviewSession}/>}
           {view==="pipeline"&&<PipelineView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject}/>}
-          {view==="animations"&&<AnimationView key={`animations:${popstateGen}`} initialTab={animationInitialTab} onTabChange={tab=>updateRoute({antab:tab})} allProjects={allProjects} team={allTeam} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
+          {view==="animations"&&<AnimationView key={`animations:${popstateGen}`} initialTab={animationInitialTab} onTabChange={tab=>updateRoute({antab:tab})} allProjects={allProjects} team={allTeam} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth} onFetchAnimationMetrics={fetchAnimationMetrics}/>}
           {view==="intake"&&<IntakeView
             key={`intake:${popstateGen}`}
             initialTab={intakeInitialTab}
@@ -32259,7 +32465,7 @@ function App() {
           {view==="kanban"&&kanbanMode==="editor"&&<KanbanEditor projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="calendar"&&<CalendarView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} unavailability={unavailability} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="deliverables"&&<DeliverablesTab key={`deliverables:${popstateGen}`} initialTab={deliverablesInitialTab} onTabChange={tab=>updateRoute({dtab:tab})} onOpenArchivedDeliverable={openProjectDeliverable} onSearchArchivedDeliverables={searchArchivedDeliverables} projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
-          {view==="ingest"&&<IngestView key={`ingest:${popstateGen}`} initialTab={ingestInitialTab} onTabChange={tab=>updateRoute({itab:tab})} projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
+          {view==="ingest"&&<IngestView key={`ingest:${popstateGen}`} initialTab={ingestInitialTab} onTabChange={tab=>updateRoute({itab:tab})} projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth} onFetchIngestMetrics={fetchIngestMetrics}/>}
           {view==="resources"&&<ResourceView key={`resources:${popstateGen}`} initialTab={resourcesInitialTab} onTabChange={tab=>updateRoute({rtab:tab})} projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
           {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability} currentMember={currentMember} isAdmin={isAdmin} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="admin"&&<AdminView
