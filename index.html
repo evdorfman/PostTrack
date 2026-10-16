@@ -8388,7 +8388,24 @@ Brief content: ${content}`;
       busy ? "Loading\u2026" : "Load more"
     ));
   };
-  var DeliverablesTab = ({ projects, team, onOpenProject, onUpdateDel, onDeleteDel, onUpdateProject, talentRoster = [], sidebarSlotNode, onSidebarWidthChange, initialTab, onTabChange, onOpenArchivedDeliverable, onSearchArchivedDeliverables }) => {
+  var computeDeliverableMetrics = (rows) => {
+    const countBy = (key) => {
+      const m = {};
+      rows.forEach((r) => {
+        const k = r[key] || "Unknown";
+        m[k] = (m[k] || 0) + 1;
+      });
+      return m;
+    };
+    const byQ = { "Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0 };
+    rows.forEach((r) => {
+      const m = r.deliveredAt ? new Date(r.deliveredAt).getMonth() : null;
+      if (m == null) return;
+      byQ[`Q${Math.floor(m / 3) + 1}`]++;
+    });
+    return { byWs: countBy("workstream"), byBU: countBy("businessUnit"), byQ, byStatus: countBy("status"), byAspect: countBy("aspectRatio"), total: rows.length };
+  };
+  var DeliverablesTab = ({ projects, team, onOpenProject, onUpdateDel, onDeleteDel, onUpdateProject, talentRoster = [], sidebarSlotNode, onSidebarWidthChange, initialTab, onTabChange, onOpenArchivedDeliverable, onSearchArchivedDeliverables, onFetchDeliverableMetrics }) => {
     const [subTab, setSubTab] = (0, import_react.useState)(initialTab || "active");
     (0, import_react.useEffect)(() => {
       onTabChange?.(subTab);
@@ -8398,6 +8415,29 @@ Brief content: ${content}`;
     const [sidebarSel, setSidebarSel] = (0, import_react.useState)(null);
     const sidebarWidth = sidebarSel ? 420 : 0;
     const [unlocked, setUnlocked] = (0, import_react.useState)(false);
+    const curYear = (/* @__PURE__ */ new Date()).getFullYear();
+    const [metricsPeriodA, setMetricsPeriodA] = (0, import_react.useState)({ type: "year", year: curYear });
+    const [metricsPeriodB, setMetricsPeriodB] = (0, import_react.useState)({ type: "year", year: curYear - 1 });
+    const [metricsCompare, setMetricsCompare] = (0, import_react.useState)(false);
+    const [metricsA, setMetricsA] = (0, import_react.useState)(null);
+    const [metricsB, setMetricsB] = (0, import_react.useState)(null);
+    const [metricsLoading, setMetricsLoading] = (0, import_react.useState)(false);
+    (0, import_react.useEffect)(() => {
+      if (subTab !== "metrics" || !onFetchDeliverableMetrics) return;
+      let cancelled = false;
+      setMetricsLoading(true);
+      const rangeA = periodRange(metricsPeriodA);
+      const periods = metricsCompare ? [rangeA, periodRange(metricsPeriodB)] : [rangeA];
+      Promise.all(periods.map((r) => onFetchDeliverableMetrics({ start: r.start, end: r.end }))).then((results) => {
+        if (cancelled) return;
+        setMetricsA(computeDeliverableMetrics(results[0]?.data || []));
+        setMetricsB(metricsCompare ? computeDeliverableMetrics(results[1]?.data || []) : null);
+        setMetricsLoading(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [subTab, metricsPeriodA, metricsPeriodB, metricsCompare, onFetchDeliverableMetrics]);
     const getQuarter = (d) => {
       if (!d) return "Unknown";
       const m = new Date(d).getMonth();
@@ -8508,17 +8548,19 @@ Brief content: ${content}`;
       return /* @__PURE__ */ React.createElement("div", { key: pr.id }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 10 } }, /* @__PURE__ */ React.createElement(Av, { name: pr.name, size: 32 }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 20, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif" } }, pr.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af" } }, pr.roles.join(", "), " \xB7 ", prDels.length, " active"))), Object.entries(byProj).map(([proj, dels]) => /* @__PURE__ */ React.createElement("div", { key: proj, style: { marginLeft: 42, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", fontWeight: 800, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 } }, proj), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } }, dels.map((d) => /* @__PURE__ */ React.createElement(DeliverableRow, { key: d.id, d, projectId: d.projectId, projectName: d.projectName, showProject: false, ...delRowProps, onClick: (e) => openDel(d, e), readOnly: !!d._fromProduction }))))));
     }), active.filter((d) => !d.producerId).length > 0 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 19, color: "#f59e0b", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, "No Producer Assigned"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } }, active.filter((d) => !d.producerId).map((d) => /* @__PURE__ */ React.createElement(DeliverableRow, { key: d.id, d, projectId: d.projectId, projectName: d.projectName, showProject: true, ...delRowProps, onClick: (e) => openDel(d, e), readOnly: !!d._fromProduction }))))), active.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#8e97a6", padding: "40px 0", fontSize: 19 } }, "No active deliverables")), subTab === "completed" && /* @__PURE__ */ React.createElement(DeliverablesArchiveSearch, { onOpen: onOpenArchivedDeliverable, onSearch: onSearchArchivedDeliverables }), subTab === "metrics" && (() => {
       const CHART_COLORS = ["#6366f1", "#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#f97316"];
-      const charts = [
-        { title: "By Workstream", data: countBy(allDels, "workstream") },
-        { title: "By Business Unit", data: countBy(allDels, "businessUnit") },
-        { title: "By Quarter", data: countBy(allDels, "quarter") },
-        { title: "By Status", data: countBy(allDels, "status") },
-        { title: "By Aspect Ratio", data: countBy(allDels, "aspectRatio") }
-      ];
-      return /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 } }, charts.map(({ title, data }) => {
-        const max = data[0]?.[1] || 1;
-        return /* @__PURE__ */ React.createElement("div", { key: title, style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 20px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 20, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 14 } }, title, /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontWeight: 400, fontSize: 16, marginLeft: 8 } }, "(", data.reduce((a, b) => a + b[1], 0), " total)")), data.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, color: "#838ba0" } }, "No data yet"), data.map(([k, v], i) => /* @__PURE__ */ React.createElement(Bar2, { key: k, label: k, count: v, max, color: CHART_COLORS[i % CHART_COLORS.length] })));
-      }));
+      const labelA = periodRange(metricsPeriodA).label;
+      const labelB = periodRange(metricsPeriodB).label;
+      return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } }, /* @__PURE__ */ React.createElement(MetricsPeriodBar, { periodA: metricsPeriodA, setPeriodA: setMetricsPeriodA, periodB: metricsPeriodB, setPeriodB: setMetricsPeriodB, compare: metricsCompare, setCompare: setMetricsCompare }), metricsLoading && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: "#838ba0", fontSize: 16 } }, "Loading\u2026"), !metricsLoading && metricsA && !metricsCompare && /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 } }, [
+        { title: "By Workstream", data: metricsA.byWs },
+        { title: "By Business Unit", data: metricsA.byBU },
+        { title: "By Quarter", data: metricsA.byQ },
+        { title: "By Status", data: metricsA.byStatus },
+        { title: "By Aspect Ratio", data: metricsA.byAspect }
+      ].map(({ title, data }) => {
+        const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
+        const max = entries[0]?.[1] || 1;
+        return /* @__PURE__ */ React.createElement("div", { key: title, style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 12, padding: "16px 20px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 20, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 14 } }, title, /* @__PURE__ */ React.createElement("span", { style: { color: "#8e97a6", fontWeight: 400, fontSize: 16, marginLeft: 8 } }, "(", entries.reduce((a, [, v]) => a + v, 0), " total)")), entries.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, color: "#838ba0" } }, "No data for ", labelA), entries.map(([k, v], i) => /* @__PURE__ */ React.createElement(Bar2, { key: k, label: k, count: v, max, color: CHART_COLORS[i % CHART_COLORS.length] })));
+      })), !metricsLoading && metricsA && metricsCompare && metricsB && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 24, fontSize: 15 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#818cf8", fontWeight: 800 } }, labelA), ": ", metricsA.total, " delivered"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { color: "#f59e0b", fontWeight: 800 } }, labelB), ": ", metricsB.total, " delivered")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 } }, /* @__PURE__ */ React.createElement(MetricsCompareTable, { title: "By Workstream", dataA: metricsA.byWs, dataB: metricsB.byWs, labelA, labelB }), /* @__PURE__ */ React.createElement(MetricsCompareTable, { title: "By Business Unit", dataA: metricsA.byBU, dataB: metricsB.byBU, labelA, labelB }), /* @__PURE__ */ React.createElement(MetricsCompareTable, { title: "By Quarter", dataA: metricsA.byQ, dataB: metricsB.byQ, labelA, labelB }), /* @__PURE__ */ React.createElement(MetricsCompareTable, { title: "By Aspect Ratio", dataA: metricsA.byAspect, dataB: metricsB.byAspect, labelA, labelB }))));
     })(), popupDel && /* @__PURE__ */ React.createElement(DelInfoPopup, { del: { ...popupDel, projectName: allDels.find((d) => d.id === popupDel.id)?.projectName || "" }, team, onClose: () => setPopupDel(null) })), /* @__PURE__ */ React.createElement(SidebarPortal, { width: sidebarWidth, slotNode: sidebarSlotNode, onWidthChange: onSidebarWidthChange }, sidebarSel && (() => {
       const proj = projects.find((p) => p.id === sidebarSel.projectId);
       const liveDel = proj?.deliverables.find((d) => d.id === sidebarSel.delId);
@@ -22873,6 +22915,22 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       });
       return { data: rows, error: null };
     }, []);
+    const fetchDeliverableMetrics = (0, import_react.useCallback)(async ({ start, end }) => {
+      if (!sb) return { data: [], error: { message: "Not connected." } };
+      let q = sb.from("deliverables").select("workstream, business_unit, deliverable_type, aspect_ratio, status, delivered_at, projects(workstream, business_unit)").eq("status", "Delivered").not("delivered_at", "is", null);
+      if (start) q = q.gte("delivered_at", start);
+      if (end) q = q.lt("delivered_at", end);
+      const { data, error } = await q;
+      if (error) return { data: [], error };
+      return { data: (data || []).map((r) => ({
+        workstream: r.workstream || r.projects?.workstream || "\u2014",
+        businessUnit: r.business_unit || r.projects?.business_unit || "\u2014",
+        deliverableType: r.deliverable_type || "\u2014",
+        aspectRatio: r.aspect_ratio || "\u2014",
+        status: r.status,
+        deliveredAt: r.delivered_at
+      })), error: null };
+    }, []);
     const deepLinkResolvedRef = (0, import_react.useRef)(false);
     (0, import_react.useEffect)(() => {
       if (deepLinkResolvedRef.current || !initialRoute.projectId || !projectsLoaded) return;
@@ -22983,7 +23041,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           });
         }
       }
-    ), view === "projects" && /* @__PURE__ */ React.createElement(ProjectsView, { key: `projects:${popstateGen}`, initialTab: projectsInitialTab, onTabChange: (tab) => updateRoute({ pjtab: tab }), onOpenArchivedProject: openArchivedProject, onSearchArchivedProjects: searchArchivedProjects, onReviveArchivedProject: reviveArchivedProject, projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, statsFilter, onClearStatsFilter: () => setStatsFilter(null), navSidebarWidth, navSidebarHandle, projectsLoaded }), view === "studio" && /* @__PURE__ */ React.createElement(StudioTab, { projects: allProjects, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, team: allTeam, onOpenProject: openProject, talentRoster, onUpdateProject: updateProject, mediaCards, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "kanban" && kanbanMode === "status" && /* @__PURE__ */ React.createElement(KanbanStatus, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "kanban" && kanbanMode === "editor" && /* @__PURE__ */ React.createElement(KanbanEditor, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "calendar" && /* @__PURE__ */ React.createElement(CalendarView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, unavailability, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "deliverables" && /* @__PURE__ */ React.createElement(DeliverablesTab, { key: `deliverables:${popstateGen}`, initialTab: deliverablesInitialTab, onTabChange: (tab) => updateRoute({ dtab: tab }), onOpenArchivedDeliverable: openProjectDeliverable, onSearchArchivedDeliverables: searchArchivedDeliverables, projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "ingest" && /* @__PURE__ */ React.createElement(IngestView, { key: `ingest:${popstateGen}`, initialTab: ingestInitialTab, onTabChange: (tab) => updateRoute({ itab: tab }), projects: allProjects, team: allTeam, onUpdateProject: updateProject, onAddDel: addDel, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth, onFetchIngestMetrics: fetchIngestMetrics }), view === "resources" && /* @__PURE__ */ React.createElement(ResourceView, { key: `resources:${popstateGen}`, initialTab: resourcesInitialTab, onTabChange: (tab) => updateRoute({ rtab: tab }), projects: allProjects, team: allTeam, studioBookings: allStudioBookings, resourceConfig, onUpdateProject: updateProject, unavailability, onUpdateDel: updateDel }), view === "myview" && /* @__PURE__ */ React.createElement(MyView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, showToast, nudges, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, unavailability, onAddUnavailability: addUnavailability, onDeleteUnavailability: deleteUnavailability, currentMember, isAdmin, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "admin" && /* @__PURE__ */ React.createElement(
+    ), view === "projects" && /* @__PURE__ */ React.createElement(ProjectsView, { key: `projects:${popstateGen}`, initialTab: projectsInitialTab, onTabChange: (tab) => updateRoute({ pjtab: tab }), onOpenArchivedProject: openArchivedProject, onSearchArchivedProjects: searchArchivedProjects, onReviveArchivedProject: reviveArchivedProject, projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, statsFilter, onClearStatsFilter: () => setStatsFilter(null), navSidebarWidth, navSidebarHandle, projectsLoaded }), view === "studio" && /* @__PURE__ */ React.createElement(StudioTab, { projects: allProjects, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, team: allTeam, onOpenProject: openProject, talentRoster, onUpdateProject: updateProject, mediaCards, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "kanban" && kanbanMode === "status" && /* @__PURE__ */ React.createElement(KanbanStatus, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "kanban" && kanbanMode === "editor" && /* @__PURE__ */ React.createElement(KanbanEditor, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "calendar" && /* @__PURE__ */ React.createElement(CalendarView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, unavailability, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "deliverables" && /* @__PURE__ */ React.createElement(DeliverablesTab, { key: `deliverables:${popstateGen}`, initialTab: deliverablesInitialTab, onTabChange: (tab) => updateRoute({ dtab: tab }), onOpenArchivedDeliverable: openProjectDeliverable, onSearchArchivedDeliverables: searchArchivedDeliverables, projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth, onFetchDeliverableMetrics: fetchDeliverableMetrics }), view === "ingest" && /* @__PURE__ */ React.createElement(IngestView, { key: `ingest:${popstateGen}`, initialTab: ingestInitialTab, onTabChange: (tab) => updateRoute({ itab: tab }), projects: allProjects, team: allTeam, onUpdateProject: updateProject, onAddDel: addDel, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth, onFetchIngestMetrics: fetchIngestMetrics }), view === "resources" && /* @__PURE__ */ React.createElement(ResourceView, { key: `resources:${popstateGen}`, initialTab: resourcesInitialTab, onTabChange: (tab) => updateRoute({ rtab: tab }), projects: allProjects, team: allTeam, studioBookings: allStudioBookings, resourceConfig, onUpdateProject: updateProject, unavailability, onUpdateDel: updateDel }), view === "myview" && /* @__PURE__ */ React.createElement(MyView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, showToast, nudges, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, unavailability, onAddUnavailability: addUnavailability, onDeleteUnavailability: deleteUnavailability, currentMember, isAdmin, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "admin" && /* @__PURE__ */ React.createElement(
       AdminView,
       {
         key: `admin:${popstateGen}`,

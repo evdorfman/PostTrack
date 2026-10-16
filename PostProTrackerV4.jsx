@@ -12604,7 +12604,18 @@ const DeliverablesArchiveSearch = ({onOpen, onSearch}) => {
 };
 
 // ─── Deliverables Tab (global) ────────────────────────────────────────────────
-const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDel, onUpdateProject, talentRoster=[], sidebarSlotNode, onSidebarWidthChange, initialTab, onTabChange, onOpenArchivedDeliverable, onSearchArchivedDeliverables}) => {
+// Turns a flat list of {workstream, businessUnit, deliverableType,
+// aspectRatio, status, deliveredAt} rows (from fetchDeliverableMetrics,
+// scoped to whatever period was selected) into the same breakdowns the
+// Metrics panel already rendered from in-memory active projects.
+const computeDeliverableMetrics = rows => {
+  const countBy = key => { const m={}; rows.forEach(r=>{const k=r[key]||"Unknown"; m[k]=(m[k]||0)+1;}); return m; };
+  const byQ = {"Q1":0,"Q2":0,"Q3":0,"Q4":0};
+  rows.forEach(r=>{const m=r.deliveredAt?new Date(r.deliveredAt).getMonth():null; if(m==null) return; byQ[`Q${Math.floor(m/3)+1}`]++;});
+  return {byWs:countBy("workstream"), byBU:countBy("businessUnit"), byQ, byStatus:countBy("status"), byAspect:countBy("aspectRatio"), total:rows.length};
+};
+
+const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDel, onUpdateProject, talentRoster=[], sidebarSlotNode, onSidebarWidthChange, initialTab, onTabChange, onOpenArchivedDeliverable, onSearchArchivedDeliverables, onFetchDeliverableMetrics}) => {
   const [subTab, setSubTab] = useState(initialTab||"active");
   useEffect(()=>{ onTabChange?.(subTab); },[subTab]);
   const [groupBy, setGroupBy] = useState("editor"); // editor | producer
@@ -12612,6 +12623,31 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
   const [sidebarSel, setSidebarSel] = useState(null);    // {delId, projectId} for the editable left sidebar
   const sidebarWidth = sidebarSel ? 420 : 0;
   const [unlocked, setUnlocked] = useState(false);       // archive items start locked; toggled per-session
+
+  // Metrics period state — same comparison idea as Animation/Ingest: any
+  // past quarter/year, or two compared side by side, fetched fresh from
+  // completed deliverables rather than limited to active projects.
+  const curYear = new Date().getFullYear();
+  const [metricsPeriodA, setMetricsPeriodA] = useState({type:"year", year:curYear});
+  const [metricsPeriodB, setMetricsPeriodB] = useState({type:"year", year:curYear-1});
+  const [metricsCompare, setMetricsCompare] = useState(false);
+  const [metricsA, setMetricsA] = useState(null);
+  const [metricsB, setMetricsB] = useState(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  useEffect(()=>{
+    if(subTab!=="metrics"||!onFetchDeliverableMetrics) return;
+    let cancelled = false;
+    setMetricsLoading(true);
+    const rangeA = periodRange(metricsPeriodA);
+    const periods = metricsCompare ? [rangeA, periodRange(metricsPeriodB)] : [rangeA];
+    Promise.all(periods.map(r=>onFetchDeliverableMetrics({start:r.start, end:r.end}))).then(results=>{
+      if(cancelled) return;
+      setMetricsA(computeDeliverableMetrics(results[0]?.data||[]));
+      setMetricsB(metricsCompare ? computeDeliverableMetrics(results[1]?.data||[]) : null);
+      setMetricsLoading(false);
+    });
+    return ()=>{ cancelled=true; };
+  },[subTab, metricsPeriodA, metricsPeriodB, metricsCompare, onFetchDeliverableMetrics]);
 
   const getQuarter = d => { if(!d) return "Unknown"; const m=new Date(d).getMonth(); return `Q${Math.floor(m/3)+1}`; };
 
@@ -12834,31 +12870,54 @@ const DeliverablesTab = ({projects, team, onOpenProject, onUpdateDel, onDeleteDe
         <DeliverablesArchiveSearch onOpen={onOpenArchivedDeliverable} onSearch={onSearchArchivedDeliverables}/>
       )}
 
-      {/* ── Metrics ── */}
+      {/* ── Metrics — completed deliverables, any period or two compared ── */}
       {subTab==="metrics"&&(()=>{
         const CHART_COLORS=["#6366f1","#3b82f6","#8b5cf6","#10b981","#f59e0b","#ef4444","#06b6d4","#f97316"];
-        const charts=[
-          {title:"By Workstream", data:countBy(allDels,"workstream")},
-          {title:"By Business Unit", data:countBy(allDels,"businessUnit")},
-          {title:"By Quarter", data:countBy(allDels,"quarter")},
-          {title:"By Status", data:countBy(allDels,"status")},
-          {title:"By Aspect Ratio", data:countBy(allDels,"aspectRatio")},
-        ];
+        const labelA = periodRange(metricsPeriodA).label;
+        const labelB = periodRange(metricsPeriodB).label;
         return (
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-            {charts.map(({title,data})=>{
-              const max=data[0]?.[1]||1;
-              return (
-                <div key={title} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 20px"}}>
-                  <div style={{fontWeight:800,fontSize:20,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:14}}>
-                    {title}
-                    <span style={{color: "#8e97a6",fontWeight:400,fontSize:16,marginLeft:8}}>({data.reduce((a,b)=>a+b[1],0)} total)</span>
-                  </div>
-                  {data.length===0&&<div style={{fontSize:17,color: "#838ba0"}}>No data yet</div>}
-                  {data.map(([k,v],i)=><Bar key={k} label={k} count={v} max={max} color={CHART_COLORS[i%CHART_COLORS.length]}/>)}
-                </div>
-              );
-            })}
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+            <MetricsPeriodBar periodA={metricsPeriodA} setPeriodA={setMetricsPeriodA} periodB={metricsPeriodB} setPeriodB={setMetricsPeriodB} compare={metricsCompare} setCompare={setMetricsCompare}/>
+
+            {metricsLoading&&<div style={{textAlign:"center",padding:"30px 0",color:"#838ba0",fontSize:16}}>Loading…</div>}
+
+            {!metricsLoading&&metricsA&&!metricsCompare&&(
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+                {[
+                  {title:"By Workstream", data:metricsA.byWs},
+                  {title:"By Business Unit", data:metricsA.byBU},
+                  {title:"By Quarter", data:metricsA.byQ},
+                  {title:"By Status", data:metricsA.byStatus},
+                  {title:"By Aspect Ratio", data:metricsA.byAspect},
+                ].map(({title,data})=>{
+                  const entries=Object.entries(data).sort((a,b)=>b[1]-a[1]);
+                  const max=entries[0]?.[1]||1;
+                  return (
+                    <div key={title} style={{background:"#111827",border:"1px solid #1f2937",borderRadius:12,padding:"16px 20px"}}>
+                      <div style={{fontWeight:800,fontSize:20,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:14}}>
+                        {title}
+                        <span style={{color: "#8e97a6",fontWeight:400,fontSize:16,marginLeft:8}}>({entries.reduce((a,[,v])=>a+v,0)} total)</span>
+                      </div>
+                      {entries.length===0&&<div style={{fontSize:17,color: "#838ba0"}}>No data for {labelA}</div>}
+                      {entries.map(([k,v],i)=><Bar key={k} label={k} count={v} max={max} color={CHART_COLORS[i%CHART_COLORS.length]}/>)}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {!metricsLoading&&metricsA&&metricsCompare&&metricsB&&(<>
+              <div style={{display:"flex",gap:24,fontSize:15}}>
+                <div><span style={{color:"#818cf8",fontWeight:800}}>{labelA}</span>: {metricsA.total} delivered</div>
+                <div><span style={{color:"#f59e0b",fontWeight:800}}>{labelB}</span>: {metricsB.total} delivered</div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+                <MetricsCompareTable title="By Workstream" dataA={metricsA.byWs} dataB={metricsB.byWs} labelA={labelA} labelB={labelB}/>
+                <MetricsCompareTable title="By Business Unit" dataA={metricsA.byBU} dataB={metricsB.byBU} labelA={labelA} labelB={labelB}/>
+                <MetricsCompareTable title="By Quarter" dataA={metricsA.byQ} dataB={metricsB.byQ} labelA={labelA} labelB={labelB}/>
+                <MetricsCompareTable title="By Aspect Ratio" dataA={metricsA.byAspect} dataB={metricsB.byAspect} labelA={labelA} labelB={labelB}/>
+              </div>
+            </>)}
           </div>
         );
       })()}
@@ -32267,6 +32326,26 @@ function App() {
     });
     return {data:rows, error:null};
   },[]);
+  // Completed-deliverables metrics — same comparison idea as the Animation/
+  // Ingest dashboards above, applied to the existing Metrics breakdown in
+  // the Deliverables tab (By Workstream/Business Unit/Quarter/Status/
+  // Aspect Ratio), scoped by delivered_at so a past period is complete
+  // rather than limited to currently-active projects.
+  const fetchDeliverableMetrics = useCallback(async ({start, end}) => {
+    if(!sb) return {data:[], error:{message:"Not connected."}};
+    let q = sb.from("deliverables").select("workstream, business_unit, deliverable_type, aspect_ratio, status, delivered_at, projects(workstream, business_unit)")
+      .eq("status","Delivered").not("delivered_at","is",null);
+    if(start) q = q.gte("delivered_at", start);
+    if(end)   q = q.lt("delivered_at", end);
+    const {data, error} = await q;
+    if(error) return {data:[], error};
+    return {data:(data||[]).map(r=>({
+      workstream: r.workstream||r.projects?.workstream||"—",
+      businessUnit: r.business_unit||r.projects?.business_unit||"—",
+      deliverableType: r.deliverable_type||"—", aspectRatio: r.aspect_ratio||"—",
+      status: r.status, deliveredAt: r.delivered_at,
+    })), error:null};
+  },[]);
   // Resolves a `?project=` deep link once the real project data has loaded
   // (it's fetched async from Supabase, so it may not exist yet at mount —
   // see projectsLoaded's own comment). Runs at most once: if it's not in
@@ -32464,7 +32543,7 @@ function App() {
           {view==="kanban"&&kanbanMode==="status"&&<KanbanStatus projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="kanban"&&kanbanMode==="editor"&&<KanbanEditor projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="calendar"&&<CalendarView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} unavailability={unavailability} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
-          {view==="deliverables"&&<DeliverablesTab key={`deliverables:${popstateGen}`} initialTab={deliverablesInitialTab} onTabChange={tab=>updateRoute({dtab:tab})} onOpenArchivedDeliverable={openProjectDeliverable} onSearchArchivedDeliverables={searchArchivedDeliverables} projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
+          {view==="deliverables"&&<DeliverablesTab key={`deliverables:${popstateGen}`} initialTab={deliverablesInitialTab} onTabChange={tab=>updateRoute({dtab:tab})} onOpenArchivedDeliverable={openProjectDeliverable} onSearchArchivedDeliverables={searchArchivedDeliverables} projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth} onFetchDeliverableMetrics={fetchDeliverableMetrics}/>}
           {view==="ingest"&&<IngestView key={`ingest:${popstateGen}`} initialTab={ingestInitialTab} onTabChange={tab=>updateRoute({itab:tab})} projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth} onFetchIngestMetrics={fetchIngestMetrics}/>}
           {view==="resources"&&<ResourceView key={`resources:${popstateGen}`} initialTab={resourcesInitialTab} onTabChange={tab=>updateRoute({rtab:tab})} projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
           {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability} currentMember={currentMember} isAdmin={isAdmin} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
