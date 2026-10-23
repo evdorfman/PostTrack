@@ -22081,6 +22081,11 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
   const [expandedCells, setExpandedCells] = useState(new Set());
   const [handoffTarget, setHandoffTarget] = useState(null); // {projectId, delId}
   const [toast, setToast_]                = useState(null);
+  // Drag-and-drop reassignment — dragItem is {projectId, delIds, fromDay}
+  // for whatever chip/row is being dragged; dragOverKey is the drop
+  // target currently being hovered, purely for highlight styling.
+  const [dragItem, setDragItem]           = useState(null);
+  const [dragOverKey, setDragOverKey]     = useState(null);
 
   const showToast = msg => { setToast_(msg); setTimeout(()=>setToast_(null),2500); };
 
@@ -22145,6 +22150,33 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
     showToast("Handoffs cleared ✓");
   };
 
+  // Drop handler shared by both drop zones below. `fromDate:null` (dropped
+  // on a person's name) reassigns the deliverable entirely, start to
+  // finish; a real date (dropped on a day cell — always dragItem.fromDay,
+  // the day the chip was picked up from, regardless of which day column
+  // it's released over) keeps the previous owner for everything before
+  // that day and hands off from that day forward, per punchIntoSegments
+  // above. Batches every deliverable in the dragged group into one
+  // onUpdateProject call — looping doHandoff per id would have each call
+  // recompute from the same stale `projects` snapshot and clobber the
+  // previous one's change.
+  const dropHandoff = (toMemberId, fromDate) => {
+    if(!dragItem || dragItem.fromMemberId===toMemberId){ setDragItem(null); setDragOverKey(null); return; }
+    const project = projects.find(p=>p.id===dragItem.projectId);
+    if(!project){ setDragItem(null); setDragOverKey(null); return; }
+    const projEditors = [...(project.assignees?.["Editor"]||[]),...(project.assignees?.["Animator"]||[])];
+    const newDels = (project.deliverables||[]).map(d=>{
+      if(!dragItem.delIds.includes(d.id)) return d;
+      const primId = primaryEditorId(d, projEditors);
+      const existing = d._segments?.length ? d._segments : [{editorId:primId, from:null, to:null}];
+      const segments = punchIntoSegments(existing, {editorId:toMemberId, from:fromDate, to:null});
+      return {...d, _segments:segments, _editorId:undefined};
+    });
+    onUpdateProject(dragItem.projectId,"deliverables",newDels);
+    showToast(fromDate ? "Handed off ✓" : "Reassigned ✓");
+    setDragItem(null); setDragOverKey(null);
+  };
+
   // Week days
   const weekStart = useMemo(()=>addWeeks(getWeekStart(new Date()), weekOffset),[weekOffset]);
   const days      = useMemo(()=>getWeekDays(weekStart),[weekStart]);
@@ -22197,8 +22229,11 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
 
   // ── Render ──────────────────────────────────────────────────────────────────
   const navBtn = {background:"#111827",border:"1px solid #1f2937",borderRadius:8,color:"#9ca3af",padding:"6px 14px",fontSize:19,cursor:"pointer",lineHeight:1};
-  const colW = 220;
-  const nameW = 200;
+  // Day columns are fluid (1fr, not a fixed px width) so all 7 fit the
+  // available width without horizontal scrolling — a fixed colW forced
+  // the week wider than the viewport, hiding the weekend behind a scroll.
+  const nameW = 170;
+  const gridCols = `${nameW}px repeat(7,minmax(0,1fr))`;
 
   return (
     <div style={{position:"relative"}}>
@@ -22246,12 +22281,16 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
         </div>
       </div>
 
+      <div style={{fontSize:13,color:"#6b7280",marginBottom:10}}>
+        Drag a deliverable to another person's <strong style={{color:"#9ca3af"}}>day cell</strong> to hand it off from that day forward, or onto their <strong style={{color:"#9ca3af"}}>name</strong> to reassign it entirely.
+      </div>
+
       {/* Grid */}
-      <div style={{overflowX:"auto",borderRadius:12,border:"1px solid #1f2937"}}>
-        <div style={{minWidth:nameW+colW*7}}>
+      <div style={{borderRadius:12,border:"1px solid #1f2937",overflow:"hidden"}}>
+        <div style={{width:"100%"}}>
 
           {/* Day header */}
-          <div style={{display:"grid",gridTemplateColumns:`${nameW}px repeat(7,${colW}px)`,background:"#0d1117",borderBottom:"1px solid #1f2937"}}>
+          <div style={{display:"grid",gridTemplateColumns:gridCols,background:"#0d1117",borderBottom:"1px solid #1f2937"}}>
             <div style={{padding:"10px 16px",borderRight:"1px solid #1f2937"}}>
               <span style={{fontSize:13,fontWeight:700,color: "#838ba0",textTransform:"uppercase",letterSpacing:"0.08em"}}>Team Member</span>
             </div>
@@ -22277,10 +22316,17 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
             const hasWork = byDay.some(d=>d.length>0);
             const rowBg  = ri%2===0?"#060a12":"#080c15";
             return (
-              <div key={member.id} style={{display:"grid",gridTemplateColumns:`${nameW}px repeat(7,${colW}px)`,borderTop:ri===0?"none":"1px solid #1f2937",background:rowBg}}>
+              <div key={member.id} style={{display:"grid",gridTemplateColumns:gridCols,borderTop:ri===0?"none":"1px solid #1f2937",background:rowBg}}>
 
-                {/* Name cell */}
-                <div style={{padding:"10px 14px",borderRight:"1px solid #1f2937",display:"flex",alignItems:"flex-start",gap:9}}>
+                {/* Name cell — dropping a dragged deliverable here reassigns it
+                    entirely (start to finish), not just from a given day. */}
+                <div
+                  onDragOver={e=>{ if(dragItem&&dragItem.fromMemberId!==member.id){ e.preventDefault(); setDragOverKey(`name:${member.id}`); } }}
+                  onDragLeave={()=>setDragOverKey(k=>k===`name:${member.id}`?null:k)}
+                  onDrop={e=>{ e.preventDefault(); dropHandoff(member.id, null); }}
+                  style={{padding:"10px 14px",borderRight:"1px solid #1f2937",display:"flex",alignItems:"flex-start",gap:9,
+                    background:dragOverKey===`name:${member.id}`?"#6366f122":"transparent",
+                    outline:dragOverKey===`name:${member.id}`?"2px dashed #6366f1":"none",outlineOffset:-2}}>
                   <div style={{width:30,height:30,borderRadius:"50%",background:"#1a2035",border:"1px solid #1f2937",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color: "#9ca3af",flexShrink:0,marginTop:1}}>
                     {member.name.split(" ").map(w=>w[0]).slice(0,2).join("")}
                   </div>
@@ -22288,6 +22334,7 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                     <div style={{fontSize:16,fontWeight:700,color:"#d1d5db",lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{member.name}</div>
                     <div style={{fontSize:13,color: "#838ba0",marginTop:2}}>{(member.roles||[]).filter(r=>/editor|animator/i.test(r)).join(" · ")}</div>
                     {!hasWork&&<div style={{fontSize:13,color: "#838ba0",marginTop:4,fontStyle:"italic"}}>No active work</div>}
+                    {dragOverKey===`name:${member.id}`&&<div style={{fontSize:12,color:"#818cf8",marginTop:2,fontWeight:700}}>Drop to reassign entirely</div>}
                   </div>
                 </div>
 
@@ -22298,8 +22345,19 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                   const isWknd = di>=5;
                   // Check if this member is blocked (unavailability) on this day
                   const isBlocked = (unavailability||[]).some(u=>u.memberId===member.id&&dayStr>=u.startDate&&dayStr<=u.endDate);
+                  const cellDropKey = `day:${member.id}:${di}`;
+                  const isCellDropTarget = dragOverKey===cellDropKey;
                   return (
-                    <div key={di} style={{padding:"5px",borderLeft:"1px solid #1f2937",background:isBlocked?"#1a1005":isWknd?"#0a0c1320":"transparent",display:"flex",flexDirection:"column",gap:3,minHeight:48,position:"relative"}}>
+                    <div key={di}
+                      onDragOver={e=>{ if(dragItem&&dragItem.fromMemberId!==member.id){ e.preventDefault(); setDragOverKey(cellDropKey); } }}
+                      onDragLeave={()=>setDragOverKey(k=>k===cellDropKey?null:k)}
+                      onDrop={e=>{ e.preventDefault(); dropHandoff(member.id, dragItem?.fromDay); }}
+                      style={{padding:"5px",borderLeft:"1px solid #1f2937",background:isCellDropTarget?"#6366f122":isBlocked?"#1a1005":isWknd?"#0a0c1320":"transparent",display:"flex",flexDirection:"column",gap:3,minHeight:48,position:"relative",outline:isCellDropTarget?"2px dashed #6366f1":"none",outlineOffset:-2}}>
+                      {isCellDropTarget&&(
+                        <div style={{position:"absolute",top:2,left:2,right:2,fontSize:10,color:"#818cf8",fontWeight:800,textTransform:"uppercase",textAlign:"center",pointerEvents:"none",zIndex:2}}>
+                          Hand off from {dragItem?.fromDay?new Date(dragItem.fromDay+'T12:00').toLocaleDateString("en-US",{month:"short",day:"numeric"}):""}
+                        </div>
+                      )}
                       {isBlocked&&(
                         <div style={{position:"absolute",inset:0,background:"repeating-linear-gradient(45deg,#f59e0b08,#f59e0b08 4px,transparent 4px,transparent 12px)",pointerEvents:"none",borderRadius:0}}/>
                       )}
@@ -22312,9 +22370,17 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                         const urg     = groupWorkflowState(dels);
                         return (
                           <div key={project.id} style={{borderRadius:5,overflow:"hidden",border:"1px solid #1f293780"}}>
-                            {/* Collapsed chip — neutral card, left-border = urgency */}
+                            {/* Collapsed chip — neutral card, left-border = urgency.
+                                Draggable to another team member's row: drop on a day
+                                cell hands off from this day forward, drop on their
+                                name reassigns the whole thing. Drags every
+                                deliverable in this group — expand first to drag just
+                                one when a project has several assigned here. */}
                             <div onClick={()=>toggleCell(member.id,di,project.id)}
-                              style={{width:"100%",textAlign:"left",background:"#111827",borderLeft:`3px solid ${urg.color}`,padding:"5px 8px",cursor:"pointer",display:"flex",alignItems:"center",gap:5}}
+                              draggable
+                              onDragStart={e=>{ e.stopPropagation(); e.dataTransfer.effectAllowed="move"; setDragItem({projectId:project.id, delIds:dels.map(d=>d.id), fromMemberId:member.id, fromDay:dayStr}); }}
+                              onDragEnd={()=>{ setDragItem(null); setDragOverKey(null); }}
+                              style={{width:"100%",textAlign:"left",background:"#111827",borderLeft:`3px solid ${urg.color}`,padding:"5px 8px",cursor:"grab",display:"flex",alignItems:"center",gap:5,opacity:dragItem&&dragItem.projectId===project.id&&dragItem.fromMemberId===member.id&&dragItem.fromDay===dayStr?0.4:1}}
                               onMouseEnter={e=>e.currentTarget.style.background="#1a2035"}
                               onMouseLeave={e=>e.currentTarget.style.background="#111827"}>
                               <div style={{flex:1,minWidth:0}}>
@@ -22352,7 +22418,11 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                                     return `Due ${dd.toLocaleDateString("en-US",{month:"short",day:"numeric"})}`;
                                   })();
                                   return (
-                                    <div key={del.id} style={{padding:"7px 8px 7px 11px",borderTop:dli>0?"1px solid #1f2937":"none",display:"flex",alignItems:"flex-start",gap:6,borderLeft:`3px solid ${ws.color}`}}>
+                                    <div key={del.id}
+                                      draggable
+                                      onDragStart={e=>{ e.stopPropagation(); e.dataTransfer.effectAllowed="move"; setDragItem({projectId:project.id, delIds:[del.id], fromMemberId:member.id, fromDay:dayStr}); }}
+                                      onDragEnd={()=>{ setDragItem(null); setDragOverKey(null); }}
+                                      style={{padding:"7px 8px 7px 11px",borderTop:dli>0?"1px solid #1f2937":"none",display:"flex",alignItems:"flex-start",gap:6,borderLeft:`3px solid ${ws.color}`,cursor:"grab",opacity:dragItem&&dragItem.delIds?.length===1&&dragItem.delIds[0]===del.id?0.4:1}}>
                                       <div style={{flex:1,minWidth:0}}>
                                         {/* Deliverable name + handoff badge */}
                                         <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}>
