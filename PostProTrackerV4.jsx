@@ -22568,7 +22568,7 @@ const ResourceView = ({projects, team, studioBookings=[], resourceConfig, onUpda
   const navBtnStyle = {background:"#1f2937",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",width:32,height:32,cursor:"pointer",fontSize:17};
 
   return (
-    <div style={{maxWidth:1600,margin:"0 auto",padding:"20px 24px 60px"}}>
+    <div style={{maxWidth:2000,margin:"0 auto",padding:"20px 24px 60px"}}>
       {/* Title row */}
       <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:10}}>
         <div>
