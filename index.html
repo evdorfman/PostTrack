@@ -15197,11 +15197,10 @@ ${conditions}`;
     if (!t) return `${f} \u2192 present`;
     return `${f} \u2013 ${t}`;
   };
-  var EditorCalendarView = ({ projects, team, onUpdateProject, unavailability = [] }) => {
+  var EditorCalendarView = ({ projects, team, onUpdateProject, unavailability = [], onOpenProject }) => {
     const [weekOffset, setWeekOffset] = (0, import_react.useState)(0);
     const [personFilter, setPersonFilter] = (0, import_react.useState)("all");
     const [expandedCells, setExpandedCells] = (0, import_react.useState)(/* @__PURE__ */ new Set());
-    const [handoffTarget, setHandoffTarget] = (0, import_react.useState)(null);
     const [toast, setToast_] = (0, import_react.useState)(null);
     const [dragItem, setDragItem] = (0, import_react.useState)(null);
     const [dragOverKey, setDragOverKey] = (0, import_react.useState)(null);
@@ -15240,32 +15239,6 @@ ${conditions}`;
       if (!project) return;
       const newDels = (project.deliverables || []).map((d) => d.id === delId ? { ...d, [field]: value } : d);
       onUpdateProject(projectId, "deliverables", newDels);
-    };
-    const doHandoff = (projectId, delId, mode, newEditorId, fromDate, toDate) => {
-      const project = projects.find((p) => p.id === projectId);
-      if (!project) return;
-      const projEditors = [...project.assignees?.["Editor"] || [], ...project.assignees?.["Animator"] || []];
-      const del = (project.deliverables || []).find((d) => d.id === delId);
-      if (!del) return;
-      const primId = primaryEditorId(del, projEditors);
-      const existing = del._segments?.length ? del._segments : [{ editorId: primId, from: null, to: null }];
-      const newSeg = { editorId: newEditorId, from: fromDate, to: mode === "temp" ? toDate : null };
-      const segments = punchIntoSegments(existing, newSeg);
-      const newDels = (project.deliverables || []).map((d) => d.id === delId ? { ...d, _segments: segments, _editorId: void 0 } : d);
-      onUpdateProject(projectId, "deliverables", newDels);
-      setHandoffTarget(null);
-      showToast(mode === "temp" ? "Temp cover set \u2713" : "Handed off \u2713");
-    };
-    const clearHandoffs = (projectId, delId) => {
-      const project = projects.find((p) => p.id === projectId);
-      if (!project) return;
-      const projEditors = [...project.assignees?.["Editor"] || [], ...project.assignees?.["Animator"] || []];
-      const del = (project.deliverables || []).find((d) => d.id === delId);
-      const primId = del ? primaryEditorId(del, projEditors) : projEditors[0] ?? null;
-      const newDels = (project.deliverables || []).map((d) => d.id === delId ? { ...d, _segments: void 0, _editorId: primId } : d);
-      onUpdateProject(projectId, "deliverables", newDels);
-      setHandoffTarget(null);
-      showToast("Handoffs cleared \u2713");
     };
     const dropHandoff = (toMemberId, fromDate) => {
       if (!dragItem || dragItem.fromMemberId === toMemberId) {
@@ -15487,55 +15460,34 @@ ${conditions}`;
                   },
                   DELIVERABLE_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, value: s }, s))
                 ), deadlineLabel && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 4 } }, deadlineLabel)),
-                /* @__PURE__ */ React.createElement(
+                onOpenProject && /* @__PURE__ */ React.createElement(
                   "button",
                   {
                     onClick: (e) => {
                       e.stopPropagation();
-                      setHandoffTarget({ projectId: project.id, delId: del.id });
+                      onOpenProject(project, "deliverables", del.id);
                     },
-                    style: { fontSize: 11, fontWeight: 700, color: "#838ba0", background: "none", border: "1px solid #1f2937", cursor: "pointer", padding: "2px 6px", borderRadius: 4, flexShrink: 0, marginTop: 1, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" },
+                    title: "Open project",
+                    style: { fontSize: 13, fontWeight: 700, color: "#838ba0", background: "none", border: "1px solid #1f2937", cursor: "pointer", padding: "2px 7px", borderRadius: 4, flexShrink: 0, marginTop: 1, lineHeight: 1.4 },
                     onMouseEnter: (e) => {
                       e.currentTarget.style.borderColor = "#6366f1";
                       e.currentTarget.style.color = "#818cf8";
                     },
                     onMouseLeave: (e) => {
                       e.currentTarget.style.borderColor = "#1f2937";
-                      e.currentTarget.style.color = "#374151";
+                      e.currentTarget.style.color = "#838ba0";
                     }
                   },
-                  "Move"
+                  "\u2197"
                 )
               );
             })));
           })
         );
       }));
-    }), displayed.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 60, color: "#838ba0" } }, "No editors or animators found."))), handoffTarget && (() => {
-      const proj = projects.find((p) => p.id === handoffTarget.projectId);
-      if (!proj) return null;
-      const del = proj?.deliverables?.find((d) => d.id === handoffTarget.delId);
-      if (!del) return null;
-      return /* @__PURE__ */ React.createElement(
-        HandoffCalendarModal,
-        {
-          del,
-          project: proj,
-          editors,
-          team,
-          onSave: (newSegments) => {
-            const newDels = (proj.deliverables || []).map(
-              (d) => d.id === handoffTarget.delId ? { ...d, _segments: newSegments, _editorId: void 0 } : d
-            );
-            onUpdateProject(handoffTarget.projectId, "deliverables", newDels);
-            setHandoffTarget(null);
-          },
-          onClose: () => setHandoffTarget(null)
-        }
-      );
-    })());
+    }), displayed.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 60, color: "#838ba0" } }, "No editors or animators found."))));
   };
-  var ResourceView = ({ projects, team, studioBookings = [], resourceConfig, onUpdateProject, unavailability = [], onUpdateDel, initialTab, onTabChange }) => {
+  var ResourceView = ({ projects, team, studioBookings = [], resourceConfig, onUpdateProject, unavailability = [], onUpdateDel, initialTab, onTabChange, onOpenProject }) => {
     const [subView, setSubView] = (0, import_react.useState)(initialTab || "utilization");
     (0, import_react.useEffect)(() => {
       onTabChange?.(subView);
@@ -15596,7 +15548,7 @@ ${conditions}`;
       },
       sv.l
     )))), subView === "editorcal" && /* @__PURE__ */ React.createElement(EditorCalendarView, { projects, team, onUpdateProject: onUpdateProject || ((id, f, v) => {
-    }), unavailability }), subView === "kanban" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, background: "#111827", borderRadius: 8, padding: 3 } }, [["status", "By Status"], ["editor", "By Editor"]].map(([id, lbl]) => /* @__PURE__ */ React.createElement(
+    }), unavailability, onOpenProject }), subView === "kanban" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, background: "#111827", borderRadius: 8, padding: 3 } }, [["status", "By Status"], ["editor", "By Editor"]].map(([id, lbl]) => /* @__PURE__ */ React.createElement(
       "button",
       {
         key: id,
@@ -23377,7 +23329,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
           });
         }
       }
-    ), view === "projects" && /* @__PURE__ */ React.createElement(ProjectsView, { key: `projects:${popstateGen}`, initialTab: projectsInitialTab, onTabChange: (tab) => updateRoute({ pjtab: tab }), onOpenArchivedProject: openArchivedProject, onSearchArchivedProjects: searchArchivedProjects, onReviveArchivedProject: reviveArchivedProject, projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, statsFilter, onClearStatsFilter: () => setStatsFilter(null), navSidebarWidth, navSidebarHandle, projectsLoaded }), view === "studio" && /* @__PURE__ */ React.createElement(StudioTab, { projects: allProjects, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, team: allTeam, onOpenProject: openProject, talentRoster, onUpdateProject: updateProject, mediaCards, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "kanban" && kanbanMode === "status" && /* @__PURE__ */ React.createElement(KanbanStatus, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "kanban" && kanbanMode === "editor" && /* @__PURE__ */ React.createElement(KanbanEditor, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "calendar" && /* @__PURE__ */ React.createElement(CalendarView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, unavailability, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "deliverables" && /* @__PURE__ */ React.createElement(DeliverablesTab, { key: `deliverables:${popstateGen}`, initialTab: deliverablesInitialTab, onTabChange: (tab) => updateRoute({ dtab: tab }), onOpenArchivedDeliverable: openProjectDeliverable, onSearchArchivedDeliverables: searchArchivedDeliverables, projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth, onFetchDeliverableMetrics: fetchDeliverableMetrics }), view === "ingest" && /* @__PURE__ */ React.createElement(IngestView, { key: `ingest:${popstateGen}`, initialTab: ingestInitialTab, onTabChange: (tab) => updateRoute({ itab: tab }), projects: allProjects, team: allTeam, onUpdateProject: updateProject, onAddDel: addDel, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth, onFetchIngestMetrics: fetchIngestMetrics, onFetchActiveIngests: fetchActiveIngestsCb, onSearchIngestArchive: fetchIngestArchiveCb, onOpenProject: openProject }), view === "resources" && /* @__PURE__ */ React.createElement(ResourceView, { key: `resources:${popstateGen}`, initialTab: resourcesInitialTab, onTabChange: (tab) => updateRoute({ rtab: tab }), projects: allProjects, team: allTeam, studioBookings: allStudioBookings, resourceConfig, onUpdateProject: updateProject, unavailability, onUpdateDel: updateDel }), view === "myview" && /* @__PURE__ */ React.createElement(MyView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, showToast, nudges, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, unavailability, onAddUnavailability: addUnavailability, onDeleteUnavailability: deleteUnavailability, currentMember, isAdmin, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "admin" && /* @__PURE__ */ React.createElement(
+    ), view === "projects" && /* @__PURE__ */ React.createElement(ProjectsView, { key: `projects:${popstateGen}`, initialTab: projectsInitialTab, onTabChange: (tab) => updateRoute({ pjtab: tab }), onOpenArchivedProject: openArchivedProject, onSearchArchivedProjects: searchArchivedProjects, onReviveArchivedProject: reviveArchivedProject, projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, statsFilter, onClearStatsFilter: () => setStatsFilter(null), navSidebarWidth, navSidebarHandle, projectsLoaded }), view === "studio" && /* @__PURE__ */ React.createElement(StudioTab, { projects: allProjects, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, team: allTeam, onOpenProject: openProject, talentRoster, onUpdateProject: updateProject, mediaCards, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "kanban" && kanbanMode === "status" && /* @__PURE__ */ React.createElement(KanbanStatus, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "kanban" && kanbanMode === "editor" && /* @__PURE__ */ React.createElement(KanbanEditor, { projects: filtered, team: allTeam, onUpdateDel: updateDel }), view === "calendar" && /* @__PURE__ */ React.createElement(CalendarView, { projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateProject: updateProject, unavailability, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "deliverables" && /* @__PURE__ */ React.createElement(DeliverablesTab, { key: `deliverables:${popstateGen}`, initialTab: deliverablesInitialTab, onTabChange: (tab) => updateRoute({ dtab: tab }), onOpenArchivedDeliverable: openProjectDeliverable, onSearchArchivedDeliverables: searchArchivedDeliverables, projects: allProjects, team: allTeam, onOpenProject: openProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, onUpdateProject: updateProject, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth, onFetchDeliverableMetrics: fetchDeliverableMetrics }), view === "ingest" && /* @__PURE__ */ React.createElement(IngestView, { key: `ingest:${popstateGen}`, initialTab: ingestInitialTab, onTabChange: (tab) => updateRoute({ itab: tab }), projects: allProjects, team: allTeam, onUpdateProject: updateProject, onAddDel: addDel, onUpdateDel: updateDel, onDeleteDel: deleteDel, talentRoster, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth, onFetchIngestMetrics: fetchIngestMetrics, onFetchActiveIngests: fetchActiveIngestsCb, onSearchIngestArchive: fetchIngestArchiveCb, onOpenProject: openProject }), view === "resources" && /* @__PURE__ */ React.createElement(ResourceView, { key: `resources:${popstateGen}`, initialTab: resourcesInitialTab, onTabChange: (tab) => updateRoute({ rtab: tab }), projects: allProjects, team: allTeam, studioBookings: allStudioBookings, resourceConfig, onUpdateProject: updateProject, unavailability, onUpdateDel: updateDel, onOpenProject: openProject }), view === "myview" && /* @__PURE__ */ React.createElement(MyView, { projects: allProjects, team: allTeam, studioBookings: allStudioBookings, onUpdateStudioBookings: setStudioBookings, onOpenProject: openProject, onUpdateProject: updateProject, onUpdateDel: updateDel, onDeleteDel: deleteDel, showToast, nudges, customTasks, onAddCustomTask: addCustomTask, onUpdateCustomTask: updateCustomTask, onDeleteCustomTask: deleteCustomTask, unavailability, onAddUnavailability: addUnavailability, onDeleteUnavailability: deleteUnavailability, currentMember, isAdmin, sidebarSlotNode, onSidebarWidthChange: setSidebarRequestedWidth }), view === "admin" && /* @__PURE__ */ React.createElement(
       AdminView,
       {
         key: `admin:${popstateGen}`,
