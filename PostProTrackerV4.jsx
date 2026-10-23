@@ -32810,9 +32810,11 @@ function App() {
             Animator / Designer / Productions / Deliverables / Next Due /
             Brief / Notes) is ~1850px wide at its default column widths — past
             the standard 1600px cap it'd need a horizontal scrollbar just to
-            show the default layout. Give that one view more room; every
-            other view keeps the standard cap. */}
-        <div style={{maxWidth:view==="pipeline"?2000:1600,margin:(activeSidebarWidth||pushOffset)?"0":"0 auto",padding:"20px 24px"}}>
+            show the default layout. Give that one view more room; Resources
+            gets the same room so the Editor Cal grid has space for all 7
+            days without squeezing each column. Every other view keeps the
+            standard cap. */}
+        <div style={{maxWidth:(view==="pipeline"||view==="resources")?2000:1600,margin:(activeSidebarWidth||pushOffset)?"0":"0 auto",padding:"20px 24px"}}>
           <StatsBar projects={allProjects} team={allTeam} setView={v=>{setView(v);if(v!=="projects")setStatsFilter(null);}} onOpenProject={openProject} onSetStatsFilter={setStatsFilter} workReviewSessions={workReviewSessions}/>
           {view==="workReview"&&<WorkReviewView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} workReviewSessions={workReviewSessions} updateWorkReviewSession={updateWorkReviewSession}/>}
           {view==="pipeline"&&<PipelineView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject}/>}
