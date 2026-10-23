@@ -15203,6 +15203,8 @@ ${conditions}`;
     const [expandedCells, setExpandedCells] = (0, import_react.useState)(/* @__PURE__ */ new Set());
     const [handoffTarget, setHandoffTarget] = (0, import_react.useState)(null);
     const [toast, setToast_] = (0, import_react.useState)(null);
+    const [dragItem, setDragItem] = (0, import_react.useState)(null);
+    const [dragOverKey, setDragOverKey] = (0, import_react.useState)(null);
     const showToast = (msg) => {
       setToast_(msg);
       setTimeout(() => setToast_(null), 2500);
@@ -15264,6 +15266,31 @@ ${conditions}`;
       setHandoffTarget(null);
       showToast("Handoffs cleared \u2713");
     };
+    const dropHandoff = (toMemberId, fromDate) => {
+      if (!dragItem || dragItem.fromMemberId === toMemberId) {
+        setDragItem(null);
+        setDragOverKey(null);
+        return;
+      }
+      const project = projects.find((p) => p.id === dragItem.projectId);
+      if (!project) {
+        setDragItem(null);
+        setDragOverKey(null);
+        return;
+      }
+      const projEditors = [...project.assignees?.["Editor"] || [], ...project.assignees?.["Animator"] || []];
+      const newDels = (project.deliverables || []).map((d) => {
+        if (!dragItem.delIds.includes(d.id)) return d;
+        const primId = primaryEditorId(d, projEditors);
+        const existing = d._segments?.length ? d._segments : [{ editorId: primId, from: null, to: null }];
+        const segments = punchIntoSegments(existing, { editorId: toMemberId, from: fromDate, to: null });
+        return { ...d, _segments: segments, _editorId: void 0 };
+      });
+      onUpdateProject(dragItem.projectId, "deliverables", newDels);
+      showToast(fromDate ? "Handed off \u2713" : "Reassigned \u2713");
+      setDragItem(null);
+      setDragOverKey(null);
+    };
     const weekStart = (0, import_react.useMemo)(() => addWeeks(getWeekStart(/* @__PURE__ */ new Date()), weekOffset), [weekOffset]);
     const days = (0, import_react.useMemo)(() => getWeekDays(weekStart), [weekStart]);
     const DAY_LABELS2 = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -15309,8 +15336,8 @@ ${conditions}`;
       });
     };
     const navBtn = { background: "#111827", border: "1px solid #1f2937", borderRadius: 8, color: "#9ca3af", padding: "6px 14px", fontSize: 19, cursor: "pointer", lineHeight: 1 };
-    const colW = 220;
-    const nameW = 200;
+    const nameW = 170;
+    const gridCols = `${nameW}px repeat(7,minmax(0,1fr))`;
     return /* @__PURE__ */ React.createElement("div", { style: { position: "relative" } }, toast && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", bottom: 28, right: 28, zIndex: 4e3, background: "#10b981", color: "#fff", padding: "10px 20px", borderRadius: 10, fontSize: 16, fontWeight: 700, boxShadow: "0 4px 20px #0008" } }, toast), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("button", { style: navBtn, onClick: () => setWeekOffset((o) => o - 1) }, "\u2190"), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", minWidth: 190 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: "#e2e8f0" } }, days[0].toLocaleDateString("en-US", { month: "short", day: "numeric" }), " \u2013 ", days[6].toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })), weekOffset !== 0 && /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOffset(0), style: { fontSize: 13, color: "#818cf8", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 2 } }, "Jump to this week")), /* @__PURE__ */ React.createElement("button", { style: navBtn, onClick: () => setWeekOffset((o) => o + 1) }, "\u2192")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, fontSize: 13, color: "#9ca3af" } }, [{ c: "#10b981", l: "Active" }, { c: "#3b82f6", l: "In Review" }, { c: "#f59e0b", l: "Changes/On Hold" }, { c: "#ef4444", l: "Overdue" }, { c: "#374151", l: "Not Started" }].map(({ c, l }) => /* @__PURE__ */ React.createElement("span", { key: l, style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 10, height: 10, borderRadius: 2, background: c, display: "inline-block", flexShrink: 0 } }), l))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 5, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -15326,7 +15353,7 @@ ${conditions}`;
         style: { background: personFilter === String(m.id) ? "#6366f1" : "#111827", border: `1px solid ${personFilter === String(m.id) ? "#6366f1" : "#1f2937"}`, borderRadius: 99, color: personFilter === String(m.id) ? "#fff" : "#9ca3af", padding: "4px 13px", fontSize: 14, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }
       },
       m.name.split(" ")[0]
-    )))), /* @__PURE__ */ React.createElement("div", { style: { overflowX: "auto", borderRadius: 12, border: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement("div", { style: { minWidth: nameW + colW * 7 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: `${nameW}px repeat(7,${colW}px)`, background: "#0d1117", borderBottom: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 16px", borderRight: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "#838ba0", textTransform: "uppercase", letterSpacing: "0.08em" } }, "Team Member")), days.map((d, di) => {
+    )))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#6b7280", marginBottom: 10 } }, "Drag a deliverable to another person's ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#9ca3af" } }, "day cell"), " to hand it off from that day forward, or onto their ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#9ca3af" } }, "name"), " to reassign it entirely."), /* @__PURE__ */ React.createElement("div", { style: { borderRadius: 12, border: "1px solid #1f2937", overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { width: "100%" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: gridCols, background: "#0d1117", borderBottom: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 16px", borderRight: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "#838ba0", textTransform: "uppercase", letterSpacing: "0.08em" } }, "Team Member")), days.map((d, di) => {
       const isToday = d.toDateString() === (/* @__PURE__ */ new Date()).toDateString();
       const isWknd = di >= 5;
       return /* @__PURE__ */ React.createElement("div", { key: di, style: { padding: "10px 0", textAlign: "center", borderLeft: "1px solid #1f2937", background: isToday ? "#6366f112" : isWknd ? "#0a0d14" : "transparent" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: isToday ? "#818cf8" : isWknd ? "#2d3748" : "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em" } }, ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][di]), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, color: isToday ? "#818cf8" : isWknd ? "#374151" : "#e2e8f0", fontFamily: "'Barlow Condensed',sans-serif", lineHeight: 1.1, marginTop: 1 } }, d.getDate()));
@@ -15334,94 +15361,172 @@ ${conditions}`;
       const byDay = getDeliverablesForMember(member.id);
       const hasWork = byDay.some((d) => d.length > 0);
       const rowBg = ri % 2 === 0 ? "#060a12" : "#080c15";
-      return /* @__PURE__ */ React.createElement("div", { key: member.id, style: { display: "grid", gridTemplateColumns: `${nameW}px repeat(7,${colW}px)`, borderTop: ri === 0 ? "none" : "1px solid #1f2937", background: rowBg } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 14px", borderRight: "1px solid #1f2937", display: "flex", alignItems: "flex-start", gap: 9 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 30, height: 30, borderRadius: "50%", background: "#1a2035", border: "1px solid #1f2937", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: "#9ca3af", flexShrink: 0, marginTop: 1 } }, member.name.split(" ").map((w) => w[0]).slice(0, 2).join("")), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#d1d5db", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, member.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", marginTop: 2 } }, (member.roles || []).filter((r) => /editor|animator/i.test(r)).join(" \xB7 ")), !hasWork && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", marginTop: 4, fontStyle: "italic" } }, "No active work"))), byDay.map((items, di) => {
+      return /* @__PURE__ */ React.createElement("div", { key: member.id, style: { display: "grid", gridTemplateColumns: gridCols, borderTop: ri === 0 ? "none" : "1px solid #1f2937", background: rowBg } }, /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          onDragOver: (e) => {
+            if (dragItem && dragItem.fromMemberId !== member.id) {
+              e.preventDefault();
+              setDragOverKey(`name:${member.id}`);
+            }
+          },
+          onDragLeave: () => setDragOverKey((k) => k === `name:${member.id}` ? null : k),
+          onDrop: (e) => {
+            e.preventDefault();
+            dropHandoff(member.id, null);
+          },
+          style: {
+            padding: "10px 14px",
+            borderRight: "1px solid #1f2937",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 9,
+            background: dragOverKey === `name:${member.id}` ? "#6366f122" : "transparent",
+            outline: dragOverKey === `name:${member.id}` ? "2px dashed #6366f1" : "none",
+            outlineOffset: -2
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: { width: 30, height: 30, borderRadius: "50%", background: "#1a2035", border: "1px solid #1f2937", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: "#9ca3af", flexShrink: 0, marginTop: 1 } }, member.name.split(" ").map((w) => w[0]).slice(0, 2).join("")),
+        /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#d1d5db", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, member.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", marginTop: 2 } }, (member.roles || []).filter((r) => /editor|animator/i.test(r)).join(" \xB7 ")), !hasWork && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", marginTop: 4, fontStyle: "italic" } }, "No active work"), dragOverKey === `name:${member.id}` && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#818cf8", marginTop: 2, fontWeight: 700 } }, "Drop to reassign entirely"))
+      ), byDay.map((items, di) => {
         const dayStr = fmtDay(days[di] || /* @__PURE__ */ new Date());
         const groups = groupByProject(items);
         const isWknd = di >= 5;
         const isBlocked = (unavailability || []).some((u) => u.memberId === member.id && dayStr >= u.startDate && dayStr <= u.endDate);
-        return /* @__PURE__ */ React.createElement("div", { key: di, style: { padding: "5px", borderLeft: "1px solid #1f2937", background: isBlocked ? "#1a1005" : isWknd ? "#0a0c1320" : "transparent", display: "flex", flexDirection: "column", gap: 3, minHeight: 48, position: "relative" } }, isBlocked && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, background: "repeating-linear-gradient(45deg,#f59e0b08,#f59e0b08 4px,transparent 4px,transparent 12px)", pointerEvents: "none", borderRadius: 0 } }), isBlocked && groups.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#f59e0b80", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", textAlign: "center", paddingTop: 6 } }, "Away"), groups.map(({ project, dels }) => {
-          const cellKey = `${member.id}|${di}|${project.id}`;
-          const isOpen = expandedCells.has(cellKey);
-          const urg = groupWorkflowState(dels);
-          return /* @__PURE__ */ React.createElement("div", { key: project.id, style: { borderRadius: 5, overflow: "hidden", border: "1px solid #1f293780" } }, /* @__PURE__ */ React.createElement(
-            "div",
-            {
-              onClick: () => toggleCell(member.id, di, project.id),
-              style: { width: "100%", textAlign: "left", background: "#111827", borderLeft: `3px solid ${urg.color}`, padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5 },
-              onMouseEnter: (e) => e.currentTarget.style.background = "#1a2035",
-              onMouseLeave: (e) => e.currentTarget.style.background = "#111827"
+        const cellDropKey = `day:${member.id}:${di}`;
+        const isCellDropTarget = dragOverKey === cellDropKey;
+        return /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            key: di,
+            onDragOver: (e) => {
+              if (dragItem && dragItem.fromMemberId !== member.id) {
+                e.preventDefault();
+                setDragOverKey(cellDropKey);
+              }
             },
-            /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#c4c9d4", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: project.name }, project.name), dels.length > 1 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, dels.length, " deliverables"), project._segments?.length > 1 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#f59e0b", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "\u21C4 Project-level handoff active")),
-            /* @__PURE__ */ React.createElement(
-              "button",
+            onDragLeave: () => setDragOverKey((k) => k === cellDropKey ? null : k),
+            onDrop: (e) => {
+              e.preventDefault();
+              dropHandoff(member.id, dragItem?.fromDay);
+            },
+            style: { padding: "5px", borderLeft: "1px solid #1f2937", background: isCellDropTarget ? "#6366f122" : isBlocked ? "#1a1005" : isWknd ? "#0a0c1320" : "transparent", display: "flex", flexDirection: "column", gap: 3, minHeight: 48, position: "relative", outline: isCellDropTarget ? "2px dashed #6366f1" : "none", outlineOffset: -2 }
+          },
+          isCellDropTarget && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 2, left: 2, right: 2, fontSize: 10, color: "#818cf8", fontWeight: 800, textTransform: "uppercase", textAlign: "center", pointerEvents: "none", zIndex: 2 } }, "Hand off from ", dragItem?.fromDay ? (/* @__PURE__ */ new Date(dragItem.fromDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""),
+          isBlocked && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, background: "repeating-linear-gradient(45deg,#f59e0b08,#f59e0b08 4px,transparent 4px,transparent 12px)", pointerEvents: "none", borderRadius: 0 } }),
+          isBlocked && groups.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#f59e0b80", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", textAlign: "center", paddingTop: 6 } }, "Away"),
+          groups.map(({ project, dels }) => {
+            const cellKey = `${member.id}|${di}|${project.id}`;
+            const isOpen = expandedCells.has(cellKey);
+            const urg = groupWorkflowState(dels);
+            return /* @__PURE__ */ React.createElement("div", { key: project.id, style: { borderRadius: 5, overflow: "hidden", border: "1px solid #1f293780" } }, /* @__PURE__ */ React.createElement(
+              "div",
               {
-                onClick: (e) => {
+                onClick: () => toggleCell(member.id, di, project.id),
+                draggable: true,
+                onDragStart: (e) => {
                   e.stopPropagation();
-                  setHandoffTarget({ projectId: project.id, isProjectLevel: true });
+                  e.dataTransfer.effectAllowed = "move";
+                  setDragItem({ projectId: project.id, delIds: dels.map((d) => d.id), fromMemberId: member.id, fromDay: dayStr });
                 },
-                style: { fontSize: 11, fontWeight: 700, color: "#818cf8", background: "#6366f115", border: "1px solid #6366f140", cursor: "pointer", padding: "2px 6px", borderRadius: 4, flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" },
-                onMouseEnter: (e) => {
-                  e.currentTarget.style.background = "#6366f125";
-                  e.currentTarget.style.borderColor = "#6366f170";
+                onDragEnd: () => {
+                  setDragItem(null);
+                  setDragOverKey(null);
                 },
-                onMouseLeave: (e) => {
-                  e.currentTarget.style.background = "#6366f115";
-                  e.currentTarget.style.borderColor = "#6366f140";
-                }
+                style: { width: "100%", textAlign: "left", background: "#111827", borderLeft: `3px solid ${urg.color}`, padding: "5px 8px", cursor: "grab", display: "flex", alignItems: "center", gap: 5, opacity: dragItem && dragItem.projectId === project.id && dragItem.fromMemberId === member.id && dragItem.fromDay === dayStr ? 0.4 : 1 },
+                onMouseEnter: (e) => e.currentTarget.style.background = "#1a2035",
+                onMouseLeave: (e) => e.currentTarget.style.background = "#111827"
               },
-              "\u2194 Assign"
-            ),
-            /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#838ba0", flexShrink: 0 } }, isOpen ? "\u25B4" : "\u25BE")
-          ), isOpen && /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", borderTop: "1px solid #1f2937" } }, dels.map((del, dli) => {
-            const ws = getWorkflowState(del);
-            const projEditors = [...project.assignees?.["Editor"] || [], ...project.assignees?.["Animator"] || []];
-            const hasHandoffs = (del._segments?.length || 0) > 1;
-            const currentAssignee = editors.find((e) => e.id === editorForDay(del, fmtDay(days[di] || /* @__PURE__ */ new Date()), projEditors));
-            const deadlineLabel = (() => {
-              if (!del.deadline) return null;
-              const today = /* @__PURE__ */ new Date();
-              today.setHours(0, 0, 0, 0);
-              const dd = new Date(del.deadline);
-              dd.setHours(0, 0, 0, 0);
-              const daysLeft2 = Math.ceil((dd - today) / 864e5);
-              if (daysLeft2 < 0) return null;
-              if (daysLeft2 === 0) return "Due today";
-              if (daysLeft2 === 1) return "Due tomorrow";
-              return `Due ${dd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
-            })();
-            return /* @__PURE__ */ React.createElement("div", { key: del.id, style: { padding: "7px 8px 7px 11px", borderTop: dli > 0 ? "1px solid #1f2937" : "none", display: "flex", alignItems: "flex-start", gap: 6, borderLeft: `3px solid ${ws.color}` } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 5 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af", lineHeight: 1.3, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: del.name }, del.name), hasHandoffs && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 800, color: "#f59e0b", background: "#f59e0b15", border: "1px solid #f59e0b30", borderRadius: 3, padding: "1px 4px", flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", textTransform: "uppercase" } }, "\u21C4 Handoff")), /* @__PURE__ */ React.createElement(
-              "select",
-              {
-                value: del.status || "Not Started",
-                onChange: (e) => {
-                  e.stopPropagation();
-                  updateDeliverable(project.id, del.id, "status", e.target.value);
+              /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#c4c9d4", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: project.name }, project.name), dels.length > 1 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, dels.length, " deliverables"), project._segments?.length > 1 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#f59e0b", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "\u21C4 Project-level handoff active")),
+              /* @__PURE__ */ React.createElement(
+                "button",
+                {
+                  onClick: (e) => {
+                    e.stopPropagation();
+                    setHandoffTarget({ projectId: project.id, isProjectLevel: true });
+                  },
+                  style: { fontSize: 11, fontWeight: 700, color: "#818cf8", background: "#6366f115", border: "1px solid #6366f140", cursor: "pointer", padding: "2px 6px", borderRadius: 4, flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" },
+                  onMouseEnter: (e) => {
+                    e.currentTarget.style.background = "#6366f125";
+                    e.currentTarget.style.borderColor = "#6366f170";
+                  },
+                  onMouseLeave: (e) => {
+                    e.currentTarget.style.background = "#6366f115";
+                    e.currentTarget.style.borderColor = "#6366f140";
+                  }
                 },
-                onClick: (e) => e.stopPropagation(),
-                style: { width: "100%", background: "#111827", border: `1px solid ${ws.color}50`, borderRadius: 4, color: ws.color, padding: "3px 6px", fontSize: 13, fontWeight: 700, cursor: "pointer", outline: "none", fontFamily: "inherit" }
-              },
-              DELIVERABLE_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, value: s }, s))
-            ), deadlineLabel && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 4 } }, deadlineLabel)), /* @__PURE__ */ React.createElement(
-              "button",
-              {
-                onClick: (e) => {
-                  e.stopPropagation();
-                  setHandoffTarget({ projectId: project.id, delId: del.id });
+                "\u2194 Assign"
+              ),
+              /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#838ba0", flexShrink: 0 } }, isOpen ? "\u25B4" : "\u25BE")
+            ), isOpen && /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", borderTop: "1px solid #1f2937" } }, dels.map((del, dli) => {
+              const ws = getWorkflowState(del);
+              const projEditors = [...project.assignees?.["Editor"] || [], ...project.assignees?.["Animator"] || []];
+              const hasHandoffs = (del._segments?.length || 0) > 1;
+              const currentAssignee = editors.find((e) => e.id === editorForDay(del, fmtDay(days[di] || /* @__PURE__ */ new Date()), projEditors));
+              const deadlineLabel = (() => {
+                if (!del.deadline) return null;
+                const today = /* @__PURE__ */ new Date();
+                today.setHours(0, 0, 0, 0);
+                const dd = new Date(del.deadline);
+                dd.setHours(0, 0, 0, 0);
+                const daysLeft2 = Math.ceil((dd - today) / 864e5);
+                if (daysLeft2 < 0) return null;
+                if (daysLeft2 === 0) return "Due today";
+                if (daysLeft2 === 1) return "Due tomorrow";
+                return `Due ${dd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+              })();
+              return /* @__PURE__ */ React.createElement(
+                "div",
+                {
+                  key: del.id,
+                  draggable: true,
+                  onDragStart: (e) => {
+                    e.stopPropagation();
+                    e.dataTransfer.effectAllowed = "move";
+                    setDragItem({ projectId: project.id, delIds: [del.id], fromMemberId: member.id, fromDay: dayStr });
+                  },
+                  onDragEnd: () => {
+                    setDragItem(null);
+                    setDragOverKey(null);
+                  },
+                  style: { padding: "7px 8px 7px 11px", borderTop: dli > 0 ? "1px solid #1f2937" : "none", display: "flex", alignItems: "flex-start", gap: 6, borderLeft: `3px solid ${ws.color}`, cursor: "grab", opacity: dragItem && dragItem.delIds?.length === 1 && dragItem.delIds[0] === del.id ? 0.4 : 1 }
                 },
-                style: { fontSize: 11, fontWeight: 700, color: "#838ba0", background: "none", border: "1px solid #1f2937", cursor: "pointer", padding: "2px 6px", borderRadius: 4, flexShrink: 0, marginTop: 1, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" },
-                onMouseEnter: (e) => {
-                  e.currentTarget.style.borderColor = "#6366f1";
-                  e.currentTarget.style.color = "#818cf8";
-                },
-                onMouseLeave: (e) => {
-                  e.currentTarget.style.borderColor = "#1f2937";
-                  e.currentTarget.style.color = "#374151";
-                }
-              },
-              "Move"
-            ));
-          })));
-        }));
+                /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 5 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af", lineHeight: 1.3, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: del.name }, del.name), hasHandoffs && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 800, color: "#f59e0b", background: "#f59e0b15", border: "1px solid #f59e0b30", borderRadius: 3, padding: "1px 4px", flexShrink: 0, fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.04em", textTransform: "uppercase" } }, "\u21C4 Handoff")), /* @__PURE__ */ React.createElement(
+                  "select",
+                  {
+                    value: del.status || "Not Started",
+                    onChange: (e) => {
+                      e.stopPropagation();
+                      updateDeliverable(project.id, del.id, "status", e.target.value);
+                    },
+                    onClick: (e) => e.stopPropagation(),
+                    style: { width: "100%", background: "#111827", border: `1px solid ${ws.color}50`, borderRadius: 4, color: ws.color, padding: "3px 6px", fontSize: 13, fontWeight: 700, cursor: "pointer", outline: "none", fontFamily: "inherit" }
+                  },
+                  DELIVERABLE_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, value: s }, s))
+                ), deadlineLabel && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 4 } }, deadlineLabel)),
+                /* @__PURE__ */ React.createElement(
+                  "button",
+                  {
+                    onClick: (e) => {
+                      e.stopPropagation();
+                      setHandoffTarget({ projectId: project.id, delId: del.id });
+                    },
+                    style: { fontSize: 11, fontWeight: 700, color: "#838ba0", background: "none", border: "1px solid #1f2937", cursor: "pointer", padding: "2px 6px", borderRadius: 4, flexShrink: 0, marginTop: 1, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em" },
+                    onMouseEnter: (e) => {
+                      e.currentTarget.style.borderColor = "#6366f1";
+                      e.currentTarget.style.color = "#818cf8";
+                    },
+                    onMouseLeave: (e) => {
+                      e.currentTarget.style.borderColor = "#1f2937";
+                      e.currentTarget.style.color = "#374151";
+                    }
+                  },
+                  "Move"
+                )
+              );
+            })));
+          })
+        );
       }));
     }), displayed.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 60, color: "#838ba0" } }, "No editors or animators found."))), handoffTarget && (() => {
       const proj = projects.find((p) => p.id === handoffTarget.projectId);
