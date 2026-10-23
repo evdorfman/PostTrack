@@ -14729,15 +14729,17 @@ ${conditions}`;
   var DAILY_STATUS_LABEL = { available: "Available", healthy: "Healthy", tight: "Tight", overbooked: "Overbooked", none: "No work", off: "Off" };
   var DailyStrip = ({ dailyWorkload }) => /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 3, flexShrink: 0 } }, dailyWorkload.map((day, i) => {
     const color = DAILY_STATUS_COLOR[day.status] || "#374151";
+    const pctLabel = day.assignedHours > 0 ? Math.round(day.assignedHours / Math.max(day.assignableCapacity, 0.1) * 100) + "%" : "\u2013";
+    const pctFontSize = pctLabel.length >= 5 ? 10 : pctLabel.length === 4 ? 11 : 13;
     return /* @__PURE__ */ React.createElement(
       "div",
       {
         key: i,
         title: `${DAY_LABELS[i]}: ${day.isWorkingDay ? `${day.assignedHours}h / ${day.assignableCapacity}h \u2014 ${DAILY_STATUS_LABEL[day.status]}` : "Off"}`,
-        style: { width: 30, textAlign: "center" }
+        style: { width: 36, textAlign: "center", flexShrink: 0 }
       },
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginBottom: 2, fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase" } }, DAY_LABELS[i][0]),
-      /* @__PURE__ */ React.createElement("div", { style: { height: 22, borderRadius: 5, background: day.isWorkingDay ? color + "22" : "#0a0f1a", border: `1px solid ${day.isWorkingDay ? color + "50" : "#1f2937"}`, display: "flex", alignItems: "center", justifyContent: "center" } }, day.isWorkingDay ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 800, color } }, day.assignedHours > 0 ? Math.round(day.assignedHours / Math.max(day.assignableCapacity, 0.1) * 100) + "%" : "\u2013") : /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#838ba0" } }, "off"))
+      /* @__PURE__ */ React.createElement("div", { style: { height: 22, borderRadius: 5, background: day.isWorkingDay ? color + "22" : "#0a0f1a", border: `1px solid ${day.isWorkingDay ? color + "50" : "#1f2937"}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", padding: "0 2px" } }, day.isWorkingDay ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: pctFontSize, fontWeight: 800, color, whiteSpace: "nowrap" } }, pctLabel) : /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#838ba0" } }, "off"))
     );
   }));
   var ResourceMemberRow = ({ w, expanded, onToggle, dailyWorkload, showDailyDetail }) => {

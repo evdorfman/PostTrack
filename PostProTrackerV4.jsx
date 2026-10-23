@@ -21401,13 +21401,18 @@ const DailyStrip = ({dailyWorkload}) => (
   <div style={{display:"flex",gap:3,flexShrink:0}}>
     {dailyWorkload.map((day,i)=>{
       const color = DAILY_STATUS_COLOR[day.status]||"#374151";
+      const pctLabel = day.assignedHours>0?Math.round(day.assignedHours/Math.max(day.assignableCapacity,0.1)*100)+"%":"–";
+      // A wildly overbooked day (e.g. 1500%) needs a smaller font and a
+      // wider cell than a normal 2-digit percentage, or the number spills
+      // out of its pill and overlaps its neighbors.
+      const pctFontSize = pctLabel.length>=5 ? 10 : pctLabel.length===4 ? 11 : 13;
       return (
         <div key={i} title={`${DAY_LABELS[i]}: ${day.isWorkingDay?`${day.assignedHours}h / ${day.assignableCapacity}h — ${DAILY_STATUS_LABEL[day.status]}`:"Off"}`}
-          style={{width:30,textAlign:"center"}}>
+          style={{width:36,textAlign:"center",flexShrink:0}}>
           <div style={{fontSize:13,color: "#8e97a6",marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>{DAY_LABELS[i][0]}</div>
-          <div style={{height:22,borderRadius:5,background:day.isWorkingDay?color+"22":"#0a0f1a",border:`1px solid ${day.isWorkingDay?color+"50":"#1f2937"}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{height:22,borderRadius:5,background:day.isWorkingDay?color+"22":"#0a0f1a",border:`1px solid ${day.isWorkingDay?color+"50":"#1f2937"}`,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",padding:"0 2px"}}>
             {day.isWorkingDay
-              ? <span style={{fontSize:13,fontWeight:800,color}}>{day.assignedHours>0?Math.round(day.assignedHours/Math.max(day.assignableCapacity,0.1)*100)+"%":"–"}</span>
+              ? <span style={{fontSize:pctFontSize,fontWeight:800,color,whiteSpace:"nowrap"}}>{pctLabel}</span>
               : <span style={{fontSize:13,color: "#838ba0"}}>off</span>}
           </div>
         </div>
