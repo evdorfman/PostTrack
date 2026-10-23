@@ -22086,6 +22086,10 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
   // target currently being hovered, purely for highlight styling.
   const [dragItem, setDragItem]           = useState(null);
   const [dragOverKey, setDragOverKey]     = useState(null);
+  // Weekdays-only by default — 5 columns instead of 7 gives each one real
+  // room, so a project code reads on one line without truncating or
+  // wrapping. Toggle reveals Sat/Sun when there's weekend work to check.
+  const [showWeekend, setShowWeekend]     = useState(false);
 
   const showToast = msg => { setToast_(msg); setTimeout(()=>setToast_(null),2500); };
 
@@ -22229,11 +22233,15 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
 
   // ── Render ──────────────────────────────────────────────────────────────────
   const navBtn = {background:"#111827",border:"1px solid #1f2937",borderRadius:8,color:"#9ca3af",padding:"6px 14px",fontSize:19,cursor:"pointer",lineHeight:1};
-  // Day columns are fluid (1fr, not a fixed px width) so all 7 fit the
+  // Day columns are fluid (1fr, not a fixed px width) so they fit the
   // available width without horizontal scrolling — a fixed colW forced
-  // the week wider than the viewport, hiding the weekend behind a scroll.
+  // the week wider than the viewport. Weekdays-only by default gives each
+  // column more room so a deliverable's full name fits on one line
+  // without wrapping; the toggle reveals Sat/Sun when there's weekend
+  // work to check.
   const nameW = 170;
-  const gridCols = `${nameW}px repeat(7,minmax(0,1fr))`;
+  const visibleDayCount = showWeekend ? 7 : 5;
+  const gridCols = `${nameW}px repeat(${visibleDayCount},minmax(0,1fr))`;
 
   return (
     <div style={{position:"relative"}}>
@@ -22266,6 +22274,11 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
           ))}
         </div>
 
+        {/* Weekend toggle */}
+        <button onClick={()=>setShowWeekend(v=>!v)} style={navBtn}>
+          {showWeekend ? "Hide Weekend" : "+ Show Weekend"}
+        </button>
+
         {/* Person filter */}
         <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
           <button onClick={()=>setPersonFilter("all")}
@@ -22294,7 +22307,7 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
             <div style={{padding:"10px 16px",borderRight:"1px solid #1f2937"}}>
               <span style={{fontSize:13,fontWeight:700,color: "#838ba0",textTransform:"uppercase",letterSpacing:"0.08em"}}>Team Member</span>
             </div>
-            {days.map((d,di)=>{
+            {days.slice(0,visibleDayCount).map((d,di)=>{
               const isToday = d.toDateString()===new Date().toDateString();
               const isWknd  = di>=5;
               return (
@@ -22339,7 +22352,7 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                 </div>
 
                 {/* Day cells */}
-                {byDay.map((items,di)=>{
+                {byDay.slice(0,visibleDayCount).map((items,di)=>{
                   const dayStr = fmtDay(days[di]||new Date());
                   const groups = groupByProject(items);
                   const isWknd = di>=5;
@@ -22384,12 +22397,9 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                               onMouseEnter={e=>e.currentTarget.style.background="#1a2035"}
                               onMouseLeave={e=>e.currentTarget.style.background="#111827"}>
                               <div style={{flex:1,minWidth:0}}>
-                                {/* Wraps instead of truncating — the name needs to be
-                                    fully readable at a glance, and wider columns would
-                                    force the full week back into horizontal scroll. */}
-                                <div style={{fontSize:14,fontWeight:700,color:"#c4c9d4",lineHeight:1.35,overflowWrap:"anywhere"}} title={project.name}>{project.name}</div>
-                                {dels.length>1&&<div style={{fontSize:13,color:"#8e97a6",marginTop:2,overflowWrap:"anywhere"}}>{dels.length} deliverables</div>}
-                                {project._segments?.length>1&&<div style={{fontSize:12,color:"#f59e0b",marginTop:2,overflowWrap:"anywhere"}}>⇄ Project-level handoff active</div>}
+                                <div style={{fontSize:14,fontWeight:700,color:"#c4c9d4",lineHeight:1.35,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={project.name}>{project.name}</div>
+                                {dels.length>1&&<div style={{fontSize:13,color:"#8e97a6",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{dels.length} deliverables</div>}
+                                {project._segments?.length>1&&<div style={{fontSize:12,color:"#f59e0b",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⇄ Project-level handoff active</div>}
                               </div>
                               <span style={{fontSize:14,color:"#838ba0",flexShrink:0,alignSelf:"flex-start"}}>{isOpen?"▴":"▾"}</span>
                             </div>
@@ -22422,7 +22432,7 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                                       <div style={{flex:1,minWidth:0}}>
                                         {/* Deliverable name + handoff badge */}
                                         <div style={{display:"flex",alignItems:"flex-start",gap:5,marginBottom:5}}>
-                                          <div style={{fontSize:13,color:"#9ca3af",lineHeight:1.3,flex:1,minWidth:0,overflowWrap:"anywhere"}} title={del.name}>{del.name}</div>
+                                          <div style={{fontSize:13,color:"#9ca3af",lineHeight:1.3,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={del.name}>{del.name}</div>
                                           {hasHandoffs&&<span style={{fontSize:11,fontWeight:800,color:"#f59e0b",background:"#f59e0b15",border:"1px solid #f59e0b30",borderRadius:3,padding:"1px 4px",flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em",textTransform:"uppercase"}}>⇄ Handoff</span>}
                                         </div>
                                         {/* Inline status select */}
