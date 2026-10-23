@@ -22075,11 +22075,10 @@ const HandoffModal = ({del, project, editors, onConfirm, onClose, onClear}) => {
   );
 };
 
-const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}) => {
+const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[], onOpenProject}) => {
   const [weekOffset, setWeekOffset]       = useState(0);
   const [personFilter, setPersonFilter]   = useState("all");
   const [expandedCells, setExpandedCells] = useState(new Set());
-  const [handoffTarget, setHandoffTarget] = useState(null); // {projectId, delId}
   const [toast, setToast_]                = useState(null);
   // Drag-and-drop reassignment — dragItem is {projectId, delIds, fromDay}
   // for whatever chip/row is being dragged; dragOverKey is the drop
@@ -22124,34 +22123,6 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
     const project = projects.find(p=>p.id===projectId); if(!project) return;
     const newDels = (project.deliverables||[]).map(d=>d.id===delId?{...d,[field]:value}:d);
     onUpdateProject(projectId,"deliverables",newDels);
-  };
-
-  const doHandoff = (projectId, delId, mode, newEditorId, fromDate, toDate) => {
-    const project = projects.find(p=>p.id===projectId); if(!project) return;
-    const projEditors = [...(project.assignees?.["Editor"]||[]),...(project.assignees?.["Animator"]||[])];
-    const del = (project.deliverables||[]).find(d=>d.id===delId); if(!del) return;
-    const primId = primaryEditorId(del, projEditors);
-    // Build from existing segments (or create the initial "primary owns everything" segment)
-    const existing = del._segments?.length
-      ? del._segments
-      : [{editorId: primId, from: null, to: null}];
-    const newSeg = {editorId: newEditorId, from: fromDate, to: mode==="temp" ? toDate : null};
-    const segments = punchIntoSegments(existing, newSeg);
-    const newDels = (project.deliverables||[]).map(d=>d.id===delId?{...d,_segments:segments,_editorId:undefined}:d);
-    onUpdateProject(projectId,"deliverables",newDels);
-    setHandoffTarget(null);
-    showToast(mode==="temp"?"Temp cover set ✓":"Handed off ✓");
-  };
-
-  const clearHandoffs = (projectId, delId) => {
-    const project = projects.find(p=>p.id===projectId); if(!project) return;
-    const projEditors = [...(project.assignees?.["Editor"]||[]),...(project.assignees?.["Animator"]||[])];
-    const del = (project.deliverables||[]).find(d=>d.id===delId);
-    const primId = del ? primaryEditorId(del, projEditors) : (projEditors[0]??null);
-    const newDels = (project.deliverables||[]).map(d=>d.id===delId?{...d,_segments:undefined,_editorId:primId}:d);
-    onUpdateProject(projectId,"deliverables",newDels);
-    setHandoffTarget(null);
-    showToast("Handoffs cleared ✓");
   };
 
   // Drop handler shared by both drop zones below. `fromDate:null` (dropped
@@ -22446,13 +22417,17 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                                         {/* Deadline label */}
                                         {deadlineLabel&&<div style={{fontSize:13,color: "#8e97a6",marginTop:4}}>{deadlineLabel}</div>}
                                       </div>
-                                      {/* Move/handoff button */}
-                                      <button onClick={e=>{e.stopPropagation();setHandoffTarget({projectId:project.id,delId:del.id});}}
-                                        style={{fontSize:11,fontWeight:700,color: "#838ba0",background:"none",border:"1px solid #1f2937",cursor:"pointer",padding:"2px 6px",borderRadius:4,flexShrink:0,marginTop:1,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}
-                                        onMouseEnter={e=>{e.currentTarget.style.borderColor="#6366f1";e.currentTarget.style.color="#818cf8";}}
-                                        onMouseLeave={e=>{e.currentTarget.style.borderColor="#1f2937";e.currentTarget.style.color="#374151";}}>
-                                        Move
-                                      </button>
+                                      {/* Open the project, scrolled to this deliverable — drag-and-drop
+                                          covers reassignment now, so this replaces the old "Move" button. */}
+                                      {onOpenProject&&(
+                                        <button onClick={e=>{e.stopPropagation();onOpenProject(project,"deliverables",del.id);}}
+                                          title="Open project"
+                                          style={{fontSize:13,fontWeight:700,color: "#838ba0",background:"none",border:"1px solid #1f2937",cursor:"pointer",padding:"2px 7px",borderRadius:4,flexShrink:0,marginTop:1,lineHeight:1.4}}
+                                          onMouseEnter={e=>{e.currentTarget.style.borderColor="#6366f1";e.currentTarget.style.color="#818cf8";}}
+                                          onMouseLeave={e=>{e.currentTarget.style.borderColor="#1f2937";e.currentTarget.style.color="#838ba0";}}>
+                                          ↗
+                                        </button>
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -22474,35 +22449,11 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
         </div>
       </div>
 
-      {/* Handoff calendar modal — deliverable-level (still available from the
-          expanded row's "Move" button, for a precise mid-range date pick
-          drag-and-drop can't easily express). The project-level variant
-          was dropped along with its only trigger, the chip's "↔ Assign"
-          button — drag-and-drop on the chip covers the same ground. */}
-      {handoffTarget&&(()=>{
-        const proj = projects.find(p=>p.id===handoffTarget.projectId);
-        if(!proj) return null;
-        const del = proj?.deliverables?.find(d=>d.id===handoffTarget.delId);
-        if(!del) return null;
-        return (
-          <HandoffCalendarModal
-            del={del} project={proj} editors={editors} team={team}
-            onSave={newSegments=>{
-              const newDels=(proj.deliverables||[]).map(d=>
-                d.id===handoffTarget.delId?{...d,_segments:newSegments,_editorId:undefined}:d
-              );
-              onUpdateProject(handoffTarget.projectId,"deliverables",newDels);
-              setHandoffTarget(null);
-            }}
-            onClose={()=>setHandoffTarget(null)}
-          />
-        );
-      })()}
     </div>
   );
 };
 
-const ResourceView = ({projects, team, studioBookings=[], resourceConfig, onUpdateProject, unavailability=[], onUpdateDel, initialTab, onTabChange}) => {
+const ResourceView = ({projects, team, studioBookings=[], resourceConfig, onUpdateProject, unavailability=[], onUpdateDel, initialTab, onTabChange, onOpenProject}) => {
   const [subView, setSubView]       = useState(initialTab||"utilization");
   useEffect(()=>{ onTabChange?.(subView); },[subView]);
   const [weekOffset, setWeekOffset] = useState(0);
@@ -22601,7 +22552,7 @@ const ResourceView = ({projects, team, studioBookings=[], resourceConfig, onUpda
       </div>
 
       {subView==="editorcal"&&(
-        <EditorCalendarView projects={projects} team={team} onUpdateProject={onUpdateProject||((id,f,v)=>{})} unavailability={unavailability}/>      )}
+        <EditorCalendarView projects={projects} team={team} onUpdateProject={onUpdateProject||((id,f,v)=>{})} unavailability={unavailability} onOpenProject={onOpenProject}/>      )}
       {subView==="kanban"&&(
         <div>
           <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
@@ -32853,7 +32804,7 @@ function App() {
           {view==="calendar"&&<CalendarView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} unavailability={unavailability} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="deliverables"&&<DeliverablesTab key={`deliverables:${popstateGen}`} initialTab={deliverablesInitialTab} onTabChange={tab=>updateRoute({dtab:tab})} onOpenArchivedDeliverable={openProjectDeliverable} onSearchArchivedDeliverables={searchArchivedDeliverables} projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth} onFetchDeliverableMetrics={fetchDeliverableMetrics}/>}
           {view==="ingest"&&<IngestView key={`ingest:${popstateGen}`} initialTab={ingestInitialTab} onTabChange={tab=>updateRoute({itab:tab})} projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth} onFetchIngestMetrics={fetchIngestMetrics} onFetchActiveIngests={fetchActiveIngestsCb} onSearchIngestArchive={fetchIngestArchiveCb} onOpenProject={openProject}/>}
-          {view==="resources"&&<ResourceView key={`resources:${popstateGen}`} initialTab={resourcesInitialTab} onTabChange={tab=>updateRoute({rtab:tab})} projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
+          {view==="resources"&&<ResourceView key={`resources:${popstateGen}`} initialTab={resourcesInitialTab} onTabChange={tab=>updateRoute({rtab:tab})} projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel} onOpenProject={openProject}/>}
           {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability} currentMember={currentMember} isAdmin={isAdmin} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="admin"&&<AdminView
             key={`admin:${popstateGen}`}
