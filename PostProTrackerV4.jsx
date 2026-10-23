@@ -15475,6 +15475,12 @@ const SHADOW_WRITE_DELIVERABLES = true;
 // were — a real edit, checked directly in the database.
 const SHADOW_WRITE_PRODUCTIONS = true;
 
+// Same idea, for standalone ingests (project.ingestDates) — see
+// production_patch_015_ingests_table.sql. Production-sourced ingests
+// (productions.ingest) are already covered by SHADOW_WRITE_PRODUCTIONS
+// above; this only concerns the ones that live directly on a project.
+const SHADOW_WRITE_INGESTS = true;
+
 // Same idea, for the three app_kv-backed collections that got their own
 // normalized tables + backfill (setup_types, production_presets,
 // custom_tasks — see production_patch_006/007 and the updated backfill
@@ -16291,6 +16297,71 @@ const writeProductionDiff = (sbClient, projectId, diff) => Promise.all([
   ...diff.toDelete.map(p=>deleteProductionRow(sbClient, p._rowId).then(({error})=>({kind:"delete", legacyId:p.id, error}))),
 ]).then(results=>{
   results.forEach(({error})=>{ if(error) reportErrorGlobal("production diff op", error); });
+  return results.filter(r=>r.kind==="insert" && !r.error && r.data).map(r=>({legacyId:r.legacyId, rowId:r.data.id}));
+});
+
+// ingests — standalone (project.ingestDates) entries only; see
+// production_patch_015_ingests_table.sql for why production-sourced
+// ingests (productions.ingest) aren't duplicated in here. `seq` is
+// assigned once, at insert, from the entry's position in the ingestDates
+// array at that moment — see computeIngestDiff — so an ingest's display
+// name never shifts just because it scrolled out of the default
+// not-yet-completed view.
+const rowToIngest = row => ({
+  id: row.legacy_id ?? row.id, _rowId: row.id, projectId: row.project_id, seq: row.seq,
+  datetime: row.datetime, completedAt: row.completed_at, location: row.location||"",
+  numFiles: row.num_files||"", totalSizeGB: row.total_size_gb||"",
+  curatorLink: row.curator_link||"", transcriptNeeded: row.transcript_needed||false,
+  transcriptLink: row.transcript_link||"", trintLinks: row.trint_links||[], mediaRows: row.media_rows||[],
+  reviewLink: row.review_link||"", linkedReviewLinkIds: row.linked_review_link_ids||[],
+  reviewLinkDelIds: row.review_link_del_ids||[], mediaSource: row.media_source||"",
+  notes: row.notes||"", callSheet: row.call_sheet||null, status: row.status||"Not Received",
+});
+const ingestToRow = (ig, projectId) => ({
+  ...(ig._rowId ? {id: ig._rowId} : {}),
+  legacy_id: typeof ig.id==="number" ? ig.id : null,
+  project_id: projectId,
+  ...(ig._seq!=null ? {seq: ig._seq} : {}),
+  datetime: ig.datetime||null, completed_at: ig.completedAt||null, location: ig.location||null,
+  num_files: ig.numFiles||null, total_size_gb: ig.totalSizeGB||null,
+  curator_link: ig.curatorLink||null, transcript_needed: !!ig.transcriptNeeded,
+  transcript_link: ig.transcriptLink||null, trint_links: ig.trintLinks||[], media_rows: ig.mediaRows||[],
+  review_link: ig.reviewLink||null, linked_review_link_ids: ig.linkedReviewLinkIds||[],
+  review_link_del_ids: ig.reviewLinkDelIds||[], media_source: ig.mediaSource||null,
+  notes: ig.notes||null, call_sheet: ig.callSheet||null, status: ig.status||null,
+});
+const addIngestRow    = (sbClient, projectId, ig) => sbClient.from("ingests").insert(ingestToRow(ig, projectId)).select().single();
+const updateIngestRow = (sbClient, rowId, patch)  => sbClient.from("ingests").update(patch).eq("id", rowId);
+const deleteIngestRow = (sbClient, rowId)         => sbClient.from("ingests").delete().eq("id", rowId);
+// Same coarse-write shape as productions — every edit to any ingestDates
+// entry arrives as one onUpdateProject(id,"ingestDates",wholeArray) call.
+const computeIngestDiff = (oldIngests, newIngests) => {
+  const oldById = new Map(oldIngests.map(ig=>[String(ig.id), ig]));
+  const newIds = new Set(newIngests.map(ig=>String(ig.id)));
+  const toDelete = oldIngests.filter(ig=>!newIds.has(String(ig.id)) && ig._rowId);
+  const toInsert = [], toUpdate = [];
+  let seqSoFar = oldIngests.length;
+  newIngests.forEach(ig=>{
+    const existing = oldById.get(String(ig.id));
+    if(!existing){
+      if(!ig._rowId){ seqSoFar++; toInsert.push({...ig, _seq:seqSoFar}); }
+      return;
+    }
+    if(!existing._rowId) return;
+    const patchRow = ingestToRow(ig, null);
+    delete patchRow.id; delete patchRow.legacy_id; delete patchRow.project_id;
+    const beforeRow = ingestToRow(existing, null);
+    delete beforeRow.id; delete beforeRow.legacy_id; delete beforeRow.project_id;
+    if(JSON.stringify(patchRow)!==JSON.stringify(beforeRow)) toUpdate.push({rowId:existing._rowId, patch:patchRow, legacyId:ig.id});
+  });
+  return {toInsert, toUpdate, toDelete};
+};
+const writeIngestDiff = (sbClient, projectId, diff) => Promise.all([
+  ...diff.toInsert.map(ig=>addIngestRow(sbClient, projectId, ig).then(({data,error})=>({kind:"insert", legacyId:ig.id, data, error}))),
+  ...diff.toUpdate.map(({rowId,patch,legacyId})=>updateIngestRow(sbClient, rowId, patch).then(({error})=>({kind:"update", legacyId, error}))),
+  ...diff.toDelete.map(ig=>deleteIngestRow(sbClient, ig._rowId).then(({error})=>({kind:"delete", legacyId:ig.id, error}))),
+]).then(results=>{
+  results.forEach(({error})=>{ if(error) reportErrorGlobal("ingest diff op", error); });
   return results.filter(r=>r.kind==="insert" && !r.error && r.data).map(r=>({legacyId:r.legacyId, rowId:r.data.id}));
 });
 
@@ -27112,78 +27183,121 @@ const downloadCSV = (filename, rows) => {
 };
 
 // ─── Ingest View ──────────────────────────────────────────────────────────────
-// Part 1: Tracking sheet — flat list of all ingests across all projects
-// Part 2: Dashboard — charts and metrics
+// Part 1: Tracking sheet — not-yet-completed ingests across all projects
+// Part 2: Archive — on-demand search over completed ingests, any period
+// Part 3: Dashboard — charts and metrics
+//
+// Ingests come from two sources that both land in the same row shape:
+// standalone (project.ingestDates, normalized into its own `ingests` table —
+// see production_patch_015_ingests_table.sql) and production-sourced
+// (productions.ingest, already covered by the productions table). Neither
+// the Sheet nor the Archive ever load every ingest on every active project
+// into memory the way the old gatherIngests(allProjects) did — that's what
+// let a single long-running project's ingest history grow unbounded.
 
-// Flatten all ingests from all projects into one list
-const gatherIngests = (projects, team) => {
-  const rows = [];
-  projects.forEach(p => {
-    const producer   = (p.assignees?.Producer||[]).map(id=>team.find(m=>m.id===id)?.name||"").filter(Boolean).join(", ");
-    const editor     = (p.assignees?.Editor||[]).map(id=>team.find(m=>m.id===id)?.name||"").filter(Boolean).join(", ");
-    const mediaMgr   = (p.assignees?.["Media Manager"]||[]).map(id=>team.find(m=>m.id===id)?.name||"").filter(Boolean).join(", ");
-    // Numbered in the same stable order (ingestDates, then productions) as
-    // the per-project Media Ingest tab, so both surfaces show the same
-    // ProjectCode_IngestNNN name for a given ingest instance.
-    let ingestNum = 0;
-    const nextIngestName = () => { ingestNum++; return `${p.projectCode||"—"}_Ingest${String(ingestNum).padStart(3,"0")}`; };
-    // Gather from project.ingestDates — not tied to a specific production, so
-    // there's no production status to inherit.
-    (p.ingestDates||[]).forEach(ig => {
-      rows.push({
-        _id: ig.id, _projectId: p.id, _source: "ingestDates",
-        ingestName: nextIngestName(),
-        projectName: p.name, workstream: p.workstream||"", businessUnit: p.businessUnit||"",
-        producer, editor, mediaManager: mediaMgr,
-        ingestDatetime: ig.datetime||"",
-        completedDatetime: ig.completedAt||"",
-        location: ig.location||"",
-        numFiles: ig.numFiles||"", totalSizeGB: ig.totalSizeGB||"",
-        curatorLink: ig.curatorLink||"", transcriptNeeded: ig.transcriptNeeded||false,
-        // trintLinks is the canonical multi-link store; transcriptLink is kept
-        // only as a fallback for legacy rows that predate trintLinks.
-        transcriptLink: ig.trintLinks?.[0]?.url || ig.transcriptLink || "",
-        trintLinks: ig.trintLinks||[], mediaRows: ig.mediaRows||[],
-        reviewLink: ig.reviewLink||"",
-        linkedReviewLinkIds: ig.linkedReviewLinkIds||[], reviewLinkDelIds: ig.reviewLinkDelIds||[],
-        mediaSource: ig.mediaSource||"", notes: ig.notes||"",
-        callSheet: ig.callSheet||null,
-        completed: !!ig.completedAt,
-        ingestStatus: ig.status||"Not Received",
-        status: null,
-      });
-    });
-    // Also gather from productions' ingest objects — falls back to the
-    // production's end time when ingest.datetime hasn't been explicitly set,
-    // and inherits the production's status so the two stay in sync.
-    (p.productions||[]).forEach(prod => {
-      const ig = prod.ingest;
-      const effectiveDatetime = ig?.datetime || prod.endTime || "";
-      if(!effectiveDatetime) return;
-      const location = prod.location || "";
-      rows.push({
-        _id: `prod_${prod.id}`, _projectId: p.id, _source: "production", _productionId: prod.id,
-        ingestName: nextIngestName(),
-        projectName: p.name, workstream: p.workstream||"", businessUnit: p.businessUnit||"",
-        producer, editor, mediaManager: mediaMgr,
-        ingestDatetime: effectiveDatetime,
-        completedDatetime: ig?.completedAt||"",
-        location,
-        numFiles: ig?.numFiles||"", totalSizeGB: ig?.totalSizeGB||"",
-        curatorLink: ig?.curatorLink||"", transcriptNeeded: ig?.transcriptNeeded||false,
-        transcriptLink: ig?.trintLinks?.[0]?.url || ig?.transcriptLink || "",
-        trintLinks: ig?.trintLinks||[], mediaRows: ig?.mediaRows||[],
-        reviewLink: ig?.reviewLink||"",
-        linkedReviewLinkIds: ig?.linkedReviewLinkIds||[], reviewLinkDelIds: ig?.reviewLinkDelIds||[],
-        mediaSource: ig?.mediaSource||"", notes: ig?.notes||"",
-        callSheet: ig?.callSheet||null,
-        completed: !!ig?.completedAt,
-        ingestStatus: ig?.status||"Not Received",
-        status: normalizeStage(prod.status||"Planning"),
-      });
-    });
+const ingestRowFromStandalone = (row, team) => {
+  const ig = rowToIngest(row);
+  const proj = row.projects||{};
+  const nameOf = ids => (ids||[]).map(id=>team.find(m=>m.id===id)?.name||"").filter(Boolean).join(", ");
+  return {
+    _id: ig.id, _projectId: proj.id, _source: "ingestDates",
+    ingestName: `${proj.project_code||"—"}_Ingest${String(ig.seq||1).padStart(3,"0")}`,
+    projectName: proj.name||"—", workstream: proj.workstream||"", businessUnit: proj.business_unit||"",
+    producer: nameOf(proj.assignees?.Producer), editor: nameOf(proj.assignees?.Editor), mediaManager: nameOf(proj.assignees?.["Media Manager"]),
+    ingestDatetime: ig.datetime||"", completedDatetime: ig.completedAt||"", location: ig.location,
+    numFiles: ig.numFiles, totalSizeGB: ig.totalSizeGB, curatorLink: ig.curatorLink, transcriptNeeded: ig.transcriptNeeded,
+    transcriptLink: ig.trintLinks?.[0]?.url || ig.transcriptLink || "", trintLinks: ig.trintLinks, mediaRows: ig.mediaRows,
+    reviewLink: ig.reviewLink, linkedReviewLinkIds: ig.linkedReviewLinkIds, reviewLinkDelIds: ig.reviewLinkDelIds,
+    mediaSource: ig.mediaSource, notes: ig.notes, callSheet: ig.callSheet,
+    completed: !!ig.completedAt, ingestStatus: ig.status, status: null,
+  };
+};
+const ingestRowFromProduction = (prod, team, ingestName) => {
+  const proj = prod.projects||{};
+  const ig = prod.ingest||{};
+  const nameOf = ids => (ids||[]).map(id=>team.find(m=>m.id===id)?.name||"").filter(Boolean).join(", ");
+  return {
+    _id: `prod_${prod.id}`, _projectId: proj.id, _source: "production", _productionId: prod.id,
+    ingestName,
+    projectName: proj.name||"—", workstream: proj.workstream||"", businessUnit: proj.business_unit||"",
+    producer: nameOf(proj.assignees?.Producer), editor: nameOf(proj.assignees?.Editor), mediaManager: nameOf(proj.assignees?.["Media Manager"]),
+    ingestDatetime: ig.datetime || prod.end_time || "", completedDatetime: ig.completedAt||"", location: prod.location||"",
+    numFiles: ig.numFiles||"", totalSizeGB: ig.totalSizeGB||"", curatorLink: ig.curatorLink||"", transcriptNeeded: ig.transcriptNeeded||false,
+    transcriptLink: ig.trintLinks?.[0]?.url || ig.transcriptLink || "", trintLinks: ig.trintLinks||[], mediaRows: ig.mediaRows||[],
+    reviewLink: ig.reviewLink||"", linkedReviewLinkIds: ig.linkedReviewLinkIds||[], reviewLinkDelIds: ig.reviewLinkDelIds||[],
+    mediaSource: ig.mediaSource||"", notes: ig.notes||"", callSheet: ig.callSheet||null,
+    completed: !!ig.completedAt, ingestStatus: ig.status||"Not Received", status: normalizeStage(prod.status||"Planning"),
+  };
+};
+const INGEST_PROJECT_EMBED = "id, name, project_code, workstream, business_unit, assignees";
+
+// Resolves each affected project's stable ingest numbering for a batch of
+// production-sourced rows — standalone count (every ingestDates entry for
+// that project, completed or not) plus this production's position among
+// that project's ingest-having productions — matching the per-project
+// Media Ingest tab's own "ingestDates, then productions, in order"
+// numbering convention, so a name never changes once assigned.
+const resolveProductionIngestNames = async (sbClient, prodRows) => {
+  const projectIds = [...new Set(prodRows.map(p=>p.project_id))];
+  if(!projectIds.length) return {};
+  const [countsRes, posRes] = await Promise.all([
+    sbClient.from("ingests").select("project_id").in("project_id", projectIds),
+    sbClient.from("productions").select("id, project_id, created_at").in("project_id", projectIds).not("ingest->>datetime","is",null).order("created_at",{ascending:true}),
+  ]);
+  const standaloneCounts = {};
+  (countsRes.data||[]).forEach(r=>{ standaloneCounts[r.project_id]=(standaloneCounts[r.project_id]||0)+1; });
+  const seenPerProject = {}, positions = {};
+  (posRes.data||[]).forEach(r=>{
+    seenPerProject[r.project_id] = (seenPerProject[r.project_id]||0)+1;
+    positions[r.id] = seenPerProject[r.project_id];
   });
-  return rows.sort((a,b)=>(b.ingestDatetime||"").localeCompare(a.ingestDatetime||""));
+  const names = {};
+  prodRows.forEach(prod=>{
+    const num = (standaloneCounts[prod.project_id]||0) + (positions[prod.id]||1);
+    names[prod.id] = `${prod.projects?.project_code||"—"}_Ingest${String(num).padStart(3,"0")}`;
+  });
+  return names;
+};
+
+// Bounded default view — everything not yet marked complete. Stays small
+// regardless of how many years a project has been running, since
+// completed ingests age out of both queries.
+const fetchActiveIngests = async (sbClient, team) => {
+  if(!sbClient) return {data:[], error:{message:"Not connected."}};
+  const [standaloneRes, prodRes] = await Promise.all([
+    sbClient.from("ingests").select(`*, projects(${INGEST_PROJECT_EMBED})`).is("completed_at", null).not("datetime","is",null),
+    sbClient.from("productions").select(`id, project_id, location, status, end_time, ingest, projects(${INGEST_PROJECT_EMBED})`)
+      .not("ingest->>datetime","is",null).is("ingest->>completedAt", null),
+  ]);
+  if(standaloneRes.error) return {data:[], error:standaloneRes.error};
+  if(prodRes.error) return {data:[], error:prodRes.error};
+  const names = await resolveProductionIngestNames(sbClient, prodRes.data||[]);
+  const rows = [
+    ...(standaloneRes.data||[]).map(row=>ingestRowFromStandalone(row, team)),
+    ...(prodRes.data||[]).map(prod=>ingestRowFromProduction(prod, team, names[prod.id]||"—")),
+  ];
+  rows.sort((a,b)=>(b.ingestDatetime||"").localeCompare(a.ingestDatetime||""));
+  return {data: rows, error:null};
+};
+
+// On-demand search over completed ingests, scoped to a date range (same
+// quarterYearRanges-driven UI pattern as the other archives in this app).
+const fetchIngestArchive = async (sbClient, team, {startDate, endDate}) => {
+  if(!sbClient) return {data:[], error:{message:"Not connected."}};
+  let standaloneQ = sbClient.from("ingests").select(`*, projects(${INGEST_PROJECT_EMBED})`).not("completed_at","is",null);
+  let prodQ = sbClient.from("productions").select(`id, project_id, location, status, end_time, ingest, projects(${INGEST_PROJECT_EMBED})`).not("ingest->>completedAt","is",null);
+  if(startDate){ standaloneQ = standaloneQ.gte("completed_at", startDate); prodQ = prodQ.gte("ingest->>completedAt", startDate); }
+  if(endDate){ standaloneQ = standaloneQ.lt("completed_at", endDate); prodQ = prodQ.lt("ingest->>completedAt", endDate); }
+  const [standaloneRes, prodRes] = await Promise.all([standaloneQ, prodQ]);
+  if(standaloneRes.error) return {data:[], error:standaloneRes.error};
+  if(prodRes.error) return {data:[], error:prodRes.error};
+  const names = await resolveProductionIngestNames(sbClient, prodRes.data||[]);
+  const rows = [
+    ...(standaloneRes.data||[]).map(row=>ingestRowFromStandalone(row, team)),
+    ...(prodRes.data||[]).map(prod=>ingestRowFromProduction(prod, team, names[prod.id]||"—")),
+  ];
+  rows.sort((a,b)=>(b.completedDatetime||"").localeCompare(a.completedDatetime||""));
+  return {data: rows, error:null};
 };
 
 // ── Charts (using recharts) ──
@@ -27581,12 +27695,95 @@ const IngestTrackingSheet = ({ingests, onUpdateRow, projects=[], team=[], onAddR
   );
 };
 
-const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onDeleteDel, talentRoster=[], sidebarSlotNode, onSidebarWidthChange, initialTab, onTabChange, onFetchIngestMetrics}) => {
+const IngestArchiveSearch = ({onSearch, onOpenRow}) => {
+  const [query, setQuery] = useState("");
+  const [range, setRange] = useState(quarterYearRanges()[0]);
+  const [results, setResults] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(50);
+  const PAGE_SIZE = 50;
+
+  const runSearch = async () => {
+    setBusy(true);
+    const {data, error} = await onSearch({startDate:range.start, endDate:range.end});
+    setBusy(false);
+    if(error){ console.error("[ingest] archive search failed:", error); return; }
+    setResults(data||[]);
+    setVisibleCount(PAGE_SIZE);
+  };
+  useEffect(()=>{ runSearch(); },[range.label]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = (results||[]).filter(r=>!query.trim()||`${r.projectName} ${r.ingestName} ${r.location} ${r.mediaSource}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const visible = filtered.slice(0, visibleCount);
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+        <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search project, ingest name, location…"
+          style={{flex:"1 1 240px",background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"8px 12px",fontSize:16,outline:"none",fontFamily:"'DM Sans',sans-serif"}}/>
+        <select value={range.label} onChange={e=>setRange(quarterYearRanges().find(r=>r.label===e.target.value))}
+          style={{background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"8px 10px",fontSize:16,outline:"none"}}>
+          {quarterYearRanges().map(r=><option key={r.label} value={r.label} style={{background:"#0d1117"}}>{r.label}</option>)}
+        </select>
+      </div>
+      {busy&&<div style={{textAlign:"center",color:"#838ba0",padding:"24px 0",fontSize:16}}>Searching…</div>}
+      {!busy&&filtered.length===0&&<div style={{textAlign:"center",color:"#4b5563",padding:"32px 0",fontSize:16}}>No completed ingests match.</div>}
+      {!busy&&(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {visible.map(r=>(
+            <div key={r._id} onClick={()=>onOpenRow(r)}
+              style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#111827",border:"1px solid #1f2937",borderRadius:9,cursor:"pointer"}}
+              onMouseEnter={e=>e.currentTarget.style.borderColor="#374151"} onMouseLeave={e=>e.currentTarget.style.borderColor="#1f2937"}>
+              <div style={{width:7,height:7,borderRadius:"50%",background:"#10b981",flexShrink:0}}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:16,fontWeight:700,color:"#f1f5f9"}}>{r.ingestName}</div>
+                <div style={{fontSize:13,color:"#9ca3af"}}>{r.projectName} · {r.workstream} · {r.businessUnit}</div>
+              </div>
+              <span style={{fontSize:13,color:"#6b7280",whiteSpace:"nowrap"}}>Completed {fmtDT(r.completedDatetime)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {!busy&&filtered.length>visible.length&&(
+        <button onClick={()=>setVisibleCount(c=>c+PAGE_SIZE)}
+          style={{width:"100%",marginTop:12,background:"#1f2937",border:"none",borderRadius:7,color:"#9ca3af",padding:"9px 0",fontSize:15,fontWeight:700,cursor:"pointer"}}>
+          Show more
+        </button>
+      )}
+    </div>
+  );
+};
+
+const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onDeleteDel, talentRoster=[], sidebarSlotNode, onSidebarWidthChange, initialTab, onTabChange, onFetchIngestMetrics, onFetchActiveIngests, onSearchIngestArchive, onOpenProject}) => {
   const [tab, setTab] = useState(initialTab||"sheet");
   useEffect(()=>{ onTabChange?.(tab); },[tab]);
-  const ingests = useMemo(()=>gatherIngests(projects,team),[projects,team]);
+
+  // Not-yet-completed ingests — fetched (not derived from `projects`) so
+  // this stays small no matter how many years of completed ingests a
+  // project accumulates. Refetched whenever the Sheet becomes visible.
+  const [ingests, setIngests] = useState([]);
+  const [ingestsLoading, setIngestsLoading] = useState(true);
+  const refreshIngests = useCallback(()=>{
+    if(!onFetchActiveIngests) return;
+    setIngestsLoading(true);
+    onFetchActiveIngests().then(({data,error})=>{
+      if(error) console.error("[ingests] active fetch failed:", error);
+      setIngests(data||[]);
+      setIngestsLoading(false);
+    });
+  },[onFetchActiveIngests]);
+  useEffect(()=>{ if(tab==="sheet") refreshIngests(); },[tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rowKeyOf = row => row._source==="production" ? `production:${row._productionId}` : `manual:${row._id}`;
+
+  // Mirrors the just-made edit into local state so the Sheet (no longer
+  // reactively derived from `projects`) reflects it immediately; a row
+  // that just became completed drops out, same as the rest of this app's
+  // active/archive pattern.
+  const patchLocalRow = (id, patch) => setIngests(prev=>{
+    const next = prev.map(r=>r._id===id?{...r,...patch}:r);
+    return patch.completed ? next.filter(r=>r._id!==id) : next;
+  });
 
   const addReviewLinkToRow = row => {
     const project = projects.find(p=>p.id===row._projectId);
@@ -27599,6 +27796,7 @@ const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onD
     } else {
       onUpdateProject(project.id,"ingestDates",(project.ingestDates||[]).map(x=>x.id!==row._id?x:{...x,linkedReviewLinkIds:nextIds}));
     }
+    patchLocalRow(row._id, {linkedReviewLinkIds:nextIds});
   };
 
   // "Delete" removes the deliverable entirely (not just its link to this
@@ -27613,6 +27811,7 @@ const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onD
       onUpdateProject(project.id,"ingestDates",(project.ingestDates||[]).map(x=>x.id!==row._id?x:{...x,...patch}));
     }
     onDeleteDel(project.id, delId);
+    patchLocalRow(row._id, patch);
   };
 
   const reassignReviewLinkForRow = (row, delId, toKey) => {
@@ -27621,6 +27820,7 @@ const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onD
     const patch = buildReviewLinkReassignPatch(project, delId, rowKeyOf(row), toKey);
     if(patch.ingestDates) onUpdateProject(project.id,"ingestDates",patch.ingestDates);
     if(patch.productions) onUpdateProject(project.id,"productions",patch.productions);
+    refreshIngests(); // touches two rows (from/to) — simplest to just resync
   };
 
   const updateRow = updated => {
@@ -27665,6 +27865,12 @@ const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onD
         }};
       }));
     }
+    patchLocalRow(updated._id, {...updated, completed: !!updated.completedDatetime});
+  };
+
+  const openArchivedRow = row => {
+    const project = projects.find(p=>p.id===row._projectId);
+    if(project) onOpenProject?.(project, "ingest");
   };
 
   return (
@@ -27672,10 +27878,10 @@ const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onD
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
         <div>
           <div style={{fontSize:26,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>Ingest</div>
-          <div style={{fontSize:16,color: "#8e97a6"}}>{ingests.length} total ingest{ingests.length!==1?"s":""} across all projects</div>
+          <div style={{fontSize:16,color: "#8e97a6"}}>{ingestsLoading?"Loading…":`${ingests.length} not yet completed`}</div>
         </div>
         <div style={{marginLeft:"auto",display:"flex",gap:4,background:"#0d1117",borderRadius:9,padding:4,border:"1px solid #1f2937"}}>
-          {[{id:"sheet",l:"📋 Tracking Sheet"},{id:"dashboard",l:"📊 Dashboard"}].map(t=>(
+          {[{id:"sheet",l:"📋 Tracking Sheet"},{id:"archive",l:"🗄 Completed Archive"},{id:"dashboard",l:"📊 Dashboard"}].map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
               style={{background:tab===t.id?"#1f2937":"transparent",border:"none",borderRadius:7,color:tab===t.id?"#f1f5f9":"#6b7280",padding:"6px 16px",fontSize:14,fontWeight:tab===t.id?800:600,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}>
               {t.l}
@@ -27687,6 +27893,7 @@ const IngestView = ({projects, team, onUpdateProject, onAddDel, onUpdateDel, onD
         onAddReviewLink={addReviewLinkToRow} onUpdateDel={onUpdateDel} onDeleteDel={onDeleteDel} onUpdateProject={onUpdateProject}
         onDeleteReviewLink={deleteReviewLinkFromRow} onReassignReviewLink={reassignReviewLinkForRow}
         rowKeyOf={rowKeyOf} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={onSidebarWidthChange}/>}
+      {tab==="archive"   && <IngestArchiveSearch onSearch={onSearchIngestArchive} onOpenRow={openArchivedRow}/>}
       {tab==="dashboard" && <IngestDashboard onFetchIngestMetrics={onFetchIngestMetrics}/>}
     </div>
   );
@@ -30709,6 +30916,20 @@ function App() {
     });
   },[authed, projectsLoaded]);
 
+  // Same bootstrap, for standalone ingests (project.ingestDates) — see
+  // production_patch_015_ingests_table.sql.
+  useEffect(()=>{
+    if(!authed || !sb || !SHADOW_WRITE_INGESTS || !projectsLoaded) return;
+    sb.from("ingests").select("id, legacy_id").then(({data,error})=>{
+      if(error || !data) return;
+      const rowIdByLegacyId = {};
+      data.forEach(r=>{ if(r.legacy_id!=null) rowIdByLegacyId[r.legacy_id]=r.id; });
+      setProjects(prev=>prev.map(p=>({...p, ingestDates:(p.ingestDates||[]).map(ig=>
+        rowIdByLegacyId[ig.id] && rowIdByLegacyId[ig.id]!==ig._rowId ? {...ig, _rowId:rowIdByLegacyId[ig.id]} : ig
+      )})));
+    });
+  },[authed, projectsLoaded]);
+
   // Same bootstrap, for setup_types — guarded on setupTypesLoaded (not
   // projectsLoaded) since setupTypes comes from window.storage/app_kv on
   // the mount effect above, not the projects fetch.
@@ -31741,6 +31962,8 @@ function App() {
   // burst of edits still diffs correctly against what's actually on the
   // server, not just the immediately-preceding call.
   const productionsWriteRef = useRef(new Map());
+  // Same debounce-and-diff pattern, for standalone ingests (field==="ingestDates").
+  const ingestsWriteRef = useRef(new Map());
 
   const updateProject=useCallback((projectId,field,value)=>{
     const prevProj = projectsRef.current.find(p=>p.id===projectId) || archivedProjectViewRef.current;
@@ -31870,6 +32093,25 @@ function App() {
       (value||[]).filter(ig=>!prevIngests.some(pi=>pi.id===ig.id)).forEach(()=>{
         logActivity({entityType:"ingest", entityLabel:label, projectId, action:"created", detail:`media ingest created ${new Date().toLocaleString()}`});
       });
+      // Shadow write to the normalized ingests table — same debounced
+      // diff-then-write shape as productions above.
+      if(SHADOW_WRITE_INGESTS && sb){
+        const existingWrite = ingestsWriteRef.current.get(projectId);
+        if(existingWrite) clearTimeout(existingWrite.timer);
+        const baseIngests = existingWrite?.baseIngests || prevIngests;
+        const timer = setTimeout(()=>{
+          ingestsWriteRef.current.delete(projectId);
+          const latestIngests = projectsRef.current.find(p=>p.id===projectId)?.ingestDates || [];
+          writeIngestDiff(sb, projectId, computeIngestDiff(baseIngests, latestIngests)).then(insertedTags=>{
+            if(!insertedTags.length) return;
+            setProjects(prev=>prev.map(p=>p.id!==projectId?p:{...p,ingestDates:p.ingestDates.map(ig=>{
+              const tag = insertedTags.find(t=>t.legacyId===ig.id);
+              return tag ? {...ig, _rowId:tag.rowId} : ig;
+            })}));
+          }).catch(e=>reportSbError("ingest diff", e));
+        }, SAVE_DEBOUNCE_MS);
+        ingestsWriteRef.current.set(projectId, {timer, baseIngests});
+      }
     } else if(field==="deliverables"){
       // Every BXTV link/unlink (linkDelToBXTV, unlinkDelFromBXTV, moveBXTVDel)
       // funnels through onUpdateProject(sourceProjectId,"deliverables",...) —
@@ -32346,6 +32588,11 @@ function App() {
       status: r.status, deliveredAt: r.delivered_at,
     })), error:null};
   },[]);
+  // Thin wrappers — the actual queries live as plain functions near
+  // IngestView (fetchActiveIngests/fetchIngestArchive) since they don't
+  // need anything else from this component; these just supply sb/team.
+  const fetchActiveIngestsCb = useCallback(()=>fetchActiveIngests(sb, allTeam),[allTeam]);
+  const fetchIngestArchiveCb = useCallback(({startDate,endDate})=>fetchIngestArchive(sb, allTeam, {startDate,endDate}),[allTeam]);
   // Resolves a `?project=` deep link once the real project data has loaded
   // (it's fetched async from Supabase, so it may not exist yet at mount —
   // see projectsLoaded's own comment). Runs at most once: if it's not in
@@ -32544,7 +32791,7 @@ function App() {
           {view==="kanban"&&kanbanMode==="editor"&&<KanbanEditor projects={filtered} team={allTeam} onUpdateDel={updateDel}/>}
           {view==="calendar"&&<CalendarView projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateProject={updateProject} unavailability={unavailability} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="deliverables"&&<DeliverablesTab key={`deliverables:${popstateGen}`} initialTab={deliverablesInitialTab} onTabChange={tab=>updateRoute({dtab:tab})} onOpenArchivedDeliverable={openProjectDeliverable} onSearchArchivedDeliverables={searchArchivedDeliverables} projects={allProjects} team={allTeam} onOpenProject={openProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} onUpdateProject={updateProject} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth} onFetchDeliverableMetrics={fetchDeliverableMetrics}/>}
-          {view==="ingest"&&<IngestView key={`ingest:${popstateGen}`} initialTab={ingestInitialTab} onTabChange={tab=>updateRoute({itab:tab})} projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth} onFetchIngestMetrics={fetchIngestMetrics}/>}
+          {view==="ingest"&&<IngestView key={`ingest:${popstateGen}`} initialTab={ingestInitialTab} onTabChange={tab=>updateRoute({itab:tab})} projects={allProjects} team={allTeam} onUpdateProject={updateProject} onAddDel={addDel} onUpdateDel={updateDel} onDeleteDel={deleteDel} talentRoster={talentRoster} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth} onFetchIngestMetrics={fetchIngestMetrics} onFetchActiveIngests={fetchActiveIngestsCb} onSearchIngestArchive={fetchIngestArchiveCb} onOpenProject={openProject}/>}
           {view==="resources"&&<ResourceView key={`resources:${popstateGen}`} initialTab={resourcesInitialTab} onTabChange={tab=>updateRoute({rtab:tab})} projects={allProjects} team={allTeam} studioBookings={allStudioBookings} resourceConfig={resourceConfig} onUpdateProject={updateProject} unavailability={unavailability} onUpdateDel={updateDel}/>}
           {view==="myview"&&<MyView projects={allProjects} team={allTeam} studioBookings={allStudioBookings} onUpdateStudioBookings={setStudioBookings} onOpenProject={openProject} onUpdateProject={updateProject} onUpdateDel={updateDel} onDeleteDel={deleteDel} showToast={showToast} nudges={nudges} customTasks={customTasks} onAddCustomTask={addCustomTask} onUpdateCustomTask={updateCustomTask} onDeleteCustomTask={deleteCustomTask} unavailability={unavailability} onAddUnavailability={addUnavailability} onDeleteUnavailability={deleteUnavailability} currentMember={currentMember} isAdmin={isAdmin} sidebarSlotNode={sidebarSlotNode} onSidebarWidthChange={setSidebarRequestedWidth}/>}
           {view==="admin"&&<AdminView
