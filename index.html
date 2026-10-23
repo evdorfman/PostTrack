@@ -19269,14 +19269,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const reassignOptionsForRow = liveRow ? ingests.filter((r) => r._projectId === liveRow._projectId && r._id !== liveRow._id).map((r) => ({ key: rowKeyOf(r), label: r.ingestName })) : [];
     const workstreams = [...new Set(ingests.map((r) => r.workstream).filter(Boolean))];
     const businessUnits = [...new Set(ingests.map((r) => r.businessUnit).filter(Boolean))];
-    const fmtDT2 = (iso) => {
-      if (!iso) return "\u2014";
-      try {
-        return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
-      } catch (e) {
-        return iso.slice(0, 16).replace("T", " ");
-      }
-    };
     const rows = ingests.filter((r) => {
       if (search && !`${r.projectName} ${r.mediaManager} ${r.producer} ${r.location} ${r.mediaSource}`.toLowerCase().includes(search.toLowerCase())) return false;
       if (filter.ws && r.workstream !== filter.ws) return false;
@@ -19292,8 +19284,6 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const closeSidebar = () => setActiveRow(null);
     const f = (k, v) => onUpdateRow({ ...liveRow, [k]: v });
     const selS = { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 6, color: "#9ca3af", padding: "5px 8px", fontSize: 13, outline: "none", cursor: "pointer" };
-    const thS = { padding: "7px 8px", fontSize: 13, fontWeight: 700, color: "#8e97a6", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.07em", borderBottom: "1px solid #374151", whiteSpace: "nowrap", background: "#0a0f1a", cursor: "pointer", userSelect: "none" };
-    const tdS = { padding: "6px 8px", fontSize: 13, color: "#9ca3af", borderBottom: "1px solid #0f172a", verticalAlign: "middle", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
     return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(SidebarPortal, { width: liveRow ? 460 : 0, slotNode: sidebarSlotNode, onWidthChange: onSidebarWidthChange }, liveRow && /* @__PURE__ */ React.createElement("div", { style: { width: "100%", height: "100%", background: "#0d1117", display: "flex", flexDirection: "column", overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "14px 16px", borderBottom: "1px solid #1f2937", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Edit Ingest"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 1 } }, liveRow.projectName)), /* @__PURE__ */ React.createElement("button", { onClick: closeSidebar, style: { background: "none", border: "none", color: "#8e97a6", cursor: "pointer", fontSize: 22, lineHeight: 1 } }, "\xD7")), /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 auto", minHeight: 0, overflowY: "scroll", WebkitOverflowScrolling: "touch", padding: "12px 14px 28px", display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#0a0f1a", borderRadius: 7, padding: "8px 10px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 } }, [["Project", liveRow.projectName], ["Production Stage", liveRow.status], ["Workstream", liveRow.workstream], ["Business Unit", liveRow.businessUnit], ["Producer", liveRow.producer], ["Editor", liveRow.editor], ["Media Manager", liveRow.mediaManager]].map(([l, v]) => /* @__PURE__ */ React.createElement("div", { key: l }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } }, l), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af" } }, v || "\u2014")))), /* @__PURE__ */ React.createElement(LW, { label: "Ingest Date/Time" }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: liveRow.ingestDatetime || "", onChange: (v) => f("ingestDatetime", v), label: "Set ingest time" })), /* @__PURE__ */ React.createElement(
       IngestFullFields,
       {
@@ -19324,37 +19314,60 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         placeholder: "Search ingests\u2026",
         style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "6px 12px", fontSize: 14, outline: "none", flex: 1, minWidth: 160, fontFamily: "'DM Sans',sans-serif" }
       }
-    ), /* @__PURE__ */ React.createElement("select", { value: filter.ws, onChange: (e) => setFilter((p) => ({ ...p, ws: e.target.value })), style: selS }, /* @__PURE__ */ React.createElement("option", { value: "" }, "All Workstreams"), workstreams.map((w) => /* @__PURE__ */ React.createElement("option", { key: w }, w))), /* @__PURE__ */ React.createElement("select", { value: filter.bu, onChange: (e) => setFilter((p) => ({ ...p, bu: e.target.value })), style: selS }, /* @__PURE__ */ React.createElement("option", { value: "" }, "All Business Units"), businessUnits.map((b) => /* @__PURE__ */ React.createElement("option", { key: b }, b))), /* @__PURE__ */ React.createElement("select", { value: filter.complete, onChange: (e) => setFilter((p) => ({ ...p, complete: e.target.value })), style: selS }, /* @__PURE__ */ React.createElement("option", { value: "" }, "All Status"), /* @__PURE__ */ React.createElement("option", { value: "yes" }, "Completed"), /* @__PURE__ */ React.createElement("option", { value: "no" }, "Pending")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", flexShrink: 0 } }, rows.length, " ingest", rows.length !== 1 ? "s" : "")), /* @__PURE__ */ React.createElement("div", { style: { overflowX: "auto", borderRadius: "0 10px 10px 0", border: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", tableLayout: "fixed", minWidth: 800 } }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, [
-      { id: "projectName", label: "Project", w: "14%" },
-      { id: "status", label: "Status", w: "8%" },
-      { id: "ingestDatetime", label: "Ingest", w: "10%" },
-      { id: "completedDatetime", label: "Completed", w: "9%" },
-      { id: "mediaManager", label: "MM", w: "6%" },
-      { id: "producer", label: "Producer", w: "6%" },
-      { id: "workstream", label: "Stream", w: "6%" },
-      { id: "businessUnit", label: "BU", w: "6%" },
-      { id: "location", label: "Location", w: "7%" },
-      { id: "numFiles", label: "Files", w: "4%" },
-      { id: "totalSizeGB", label: "GB", w: "5%" },
-      { id: "mediaSource", label: "Source", w: "6%" },
-      { id: "transcript", label: "Transcript", w: "6%" },
-      { id: "links", label: "Links", w: "5%" }
-    ].map((c) => /* @__PURE__ */ React.createElement("th", { key: c.id, style: { ...thS, width: c.w }, onClick: () => setSort((s) => s.col === c.id ? { ...s, dir: -s.dir } : { col: c.id, dir: -1 }) }, c.label, sort.col === c.id && /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 3 } }, sort.dir > 0 ? "\u2191" : "\u2193"))))), /* @__PURE__ */ React.createElement("tbody", null, rows.length === 0 && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { colSpan: 14, style: { ...tdS, textAlign: "center", padding: 24, color: "#838ba0" } }, "No ingests match your filters.")), rows.map((r, i) => {
-      const isActive = activeRow?._id === r._id;
+    ), /* @__PURE__ */ React.createElement("select", { value: filter.ws, onChange: (e) => setFilter((p) => ({ ...p, ws: e.target.value })), style: selS }, /* @__PURE__ */ React.createElement("option", { value: "" }, "All Workstreams"), workstreams.map((w) => /* @__PURE__ */ React.createElement("option", { key: w }, w))), /* @__PURE__ */ React.createElement("select", { value: filter.bu, onChange: (e) => setFilter((p) => ({ ...p, bu: e.target.value })), style: selS }, /* @__PURE__ */ React.createElement("option", { value: "" }, "All Business Units"), businessUnits.map((b) => /* @__PURE__ */ React.createElement("option", { key: b }, b))), /* @__PURE__ */ React.createElement("select", { value: filter.complete, onChange: (e) => setFilter((p) => ({ ...p, complete: e.target.value })), style: selS }, /* @__PURE__ */ React.createElement("option", { value: "" }, "All Status"), /* @__PURE__ */ React.createElement("option", { value: "yes" }, "Completed"), /* @__PURE__ */ React.createElement("option", { value: "no" }, "Pending")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", flexShrink: 0 } }, rows.length, " ingest", rows.length !== 1 ? "s" : "")), /* @__PURE__ */ React.createElement(
+      IngestRowsTable,
+      {
+        rows,
+        sort,
+        onSort: (col) => setSort((s) => s.col === col ? { ...s, dir: -s.dir } : { col, dir: -1 }),
+        activeRowId: activeRow?._id,
+        onRowClick: (r) => r._id === activeRow?._id ? closeSidebar() : openSidebar(r)
+      }
+    )));
+  };
+  var INGEST_TABLE_COLS = [
+    { id: "projectName", label: "Project", w: "14%" },
+    { id: "status", label: "Status", w: "8%" },
+    { id: "ingestDatetime", label: "Ingest", w: "10%" },
+    { id: "completedDatetime", label: "Completed", w: "9%" },
+    { id: "mediaManager", label: "MM", w: "6%" },
+    { id: "producer", label: "Producer", w: "6%" },
+    { id: "workstream", label: "Stream", w: "6%" },
+    { id: "businessUnit", label: "BU", w: "6%" },
+    { id: "location", label: "Location", w: "7%" },
+    { id: "numFiles", label: "Files", w: "4%" },
+    { id: "totalSizeGB", label: "GB", w: "5%" },
+    { id: "mediaSource", label: "Source", w: "6%" },
+    { id: "transcript", label: "Transcript", w: "6%" },
+    { id: "links", label: "Links", w: "5%" }
+  ];
+  var fmtIngestDT = (iso) => {
+    if (!iso) return "\u2014";
+    try {
+      return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+    } catch (e) {
+      return iso.slice(0, 16).replace("T", " ");
+    }
+  };
+  var IngestRowsTable = ({ rows, sort, onSort, activeRowId, onRowClick, emptyLabel = "No ingests match your filters." }) => {
+    const thS = { padding: "7px 8px", fontSize: 13, fontWeight: 700, color: "#8e97a6", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: "0.07em", borderBottom: "1px solid #374151", whiteSpace: "nowrap", background: "#0a0f1a", cursor: onSort ? "pointer" : "default", userSelect: "none" };
+    const tdS = { padding: "6px 8px", fontSize: 13, color: "#9ca3af", borderBottom: "1px solid #0f172a", verticalAlign: "middle", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+    return /* @__PURE__ */ React.createElement("div", { style: { overflowX: "auto", borderRadius: 10, border: "1px solid #1f2937" } }, /* @__PURE__ */ React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", tableLayout: "fixed", minWidth: 800 } }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, INGEST_TABLE_COLS.map((c) => /* @__PURE__ */ React.createElement("th", { key: c.id, style: { ...thS, width: c.w }, onClick: () => onSort?.(c.id) }, c.label, sort?.col === c.id && /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 3 } }, sort.dir > 0 ? "\u2191" : "\u2193"))))), /* @__PURE__ */ React.createElement("tbody", null, rows.length === 0 && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { colSpan: INGEST_TABLE_COLS.length, style: { ...tdS, textAlign: "center", padding: 24, color: "#838ba0" } }, emptyLabel)), rows.map((r, i) => {
+      const isActive = activeRowId === r._id;
       const stColor = r.status ? PROD_STATUS_COLOR[r.status] || "#6b7280" : null;
       return /* @__PURE__ */ React.createElement(
         "tr",
         {
           key: r._id,
-          onClick: () => isActive ? closeSidebar() : openSidebar(r),
+          onClick: () => onRowClick(r),
           style: { background: isActive ? "#1e1b4b" : i % 2 === 0 ? "#0d1117" : "#0a0f1a", cursor: "pointer", transition: "background 0.1s", borderLeft: isActive ? "3px solid #6366f1" : "3px solid transparent" },
           onMouseEnter: (e) => !isActive && (e.currentTarget.style.background = "#111827"),
           onMouseLeave: (e) => !isActive && (e.currentTarget.style.background = i % 2 === 0 ? "#0d1117" : "#0a0f1a")
         },
         /* @__PURE__ */ React.createElement("td", { style: { ...tdS, color: "#e2e8f0", fontWeight: 600 } }, r.projectName),
         /* @__PURE__ */ React.createElement("td", { style: tdS }, r.status ? /* @__PURE__ */ React.createElement("span", { style: { color: stColor, fontWeight: 700, fontSize: 13, background: stColor + "18", borderRadius: 5, padding: "2px 7px", whiteSpace: "nowrap" } }, r.status) : /* @__PURE__ */ React.createElement("span", { style: { color: "#838ba0" } }, "\u2014")),
-        /* @__PURE__ */ React.createElement("td", { style: tdS }, fmtDT2(r.ingestDatetime)),
-        /* @__PURE__ */ React.createElement("td", { style: tdS }, r.completedDatetime ? /* @__PURE__ */ React.createElement("span", { style: { color: "#22c55e", fontSize: 13 } }, fmtDT2(r.completedDatetime)) : /* @__PURE__ */ React.createElement("span", { style: { color: "#838ba0", fontStyle: "italic", fontSize: 13 } }, "Pending")),
+        /* @__PURE__ */ React.createElement("td", { style: tdS }, fmtIngestDT(r.ingestDatetime)),
+        /* @__PURE__ */ React.createElement("td", { style: tdS }, r.completedDatetime ? /* @__PURE__ */ React.createElement("span", { style: { color: "#22c55e", fontSize: 13 } }, fmtIngestDT(r.completedDatetime)) : /* @__PURE__ */ React.createElement("span", { style: { color: "#838ba0", fontStyle: "italic", fontSize: 13 } }, "Pending")),
         /* @__PURE__ */ React.createElement("td", { style: tdS }, r.mediaManager || "\u2014"),
         /* @__PURE__ */ React.createElement("td", { style: tdS }, r.producer || "\u2014"),
         /* @__PURE__ */ React.createElement("td", { style: tdS }, r.workstream || "\u2014"),
@@ -19366,7 +19379,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         /* @__PURE__ */ React.createElement("td", { style: tdS }, r.transcriptNeeded ? r.transcriptLink ? /* @__PURE__ */ React.createElement("a", { href: r.transcriptLink, target: "_blank", rel: "noreferrer", onClick: (e) => e.stopPropagation(), style: { color: "#22c55e", textDecoration: "none", fontWeight: 700, fontSize: 13 } }, "\u2713 Link") : /* @__PURE__ */ React.createElement("span", { style: { color: "#f59e0b", fontSize: 13 } }, "\u2713 Needed") : /* @__PURE__ */ React.createElement("span", { style: { color: "#838ba0" } }, "\u2014")),
         /* @__PURE__ */ React.createElement("td", { style: { ...tdS } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4 } }, r.curatorLink && /* @__PURE__ */ React.createElement("a", { href: r.curatorLink, target: "_blank", rel: "noreferrer", onClick: (e) => e.stopPropagation(), style: { color: "#6366f1", fontSize: 13, fontWeight: 700, textDecoration: "none", border: "1px solid #6366f140", borderRadius: 3, padding: "1px 4px" } }, "CAM"), r.reviewLink && /* @__PURE__ */ React.createElement("a", { href: r.reviewLink, target: "_blank", rel: "noreferrer", onClick: (e) => e.stopPropagation(), style: { color: "#818cf8", fontSize: 13, fontWeight: 700, textDecoration: "none", border: "1px solid #818cf840", borderRadius: 3, padding: "1px 4px" } }, "REV"), !r.curatorLink && !r.reviewLink && /* @__PURE__ */ React.createElement("span", { style: { color: "#838ba0" } }, "\u2014")))
       );
-    }))))));
+    }))));
   };
   var IngestArchiveSearch = ({ onSearch, onOpenRow }) => {
     const [query, setQuery] = (0, import_react.useState)("");
@@ -19374,6 +19387,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [results, setResults] = (0, import_react.useState)(null);
     const [busy, setBusy] = (0, import_react.useState)(false);
     const [visibleCount, setVisibleCount] = (0, import_react.useState)(50);
+    const [sort, setSort] = (0, import_react.useState)({ col: "completedDatetime", dir: -1 });
     const PAGE_SIZE = 50;
     const runSearch = async () => {
       setBusy(true);
@@ -19389,7 +19403,10 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     (0, import_react.useEffect)(() => {
       runSearch();
     }, [range.label]);
-    const filtered = (results || []).filter((r) => !query.trim() || `${r.projectName} ${r.ingestName} ${r.location} ${r.mediaSource}`.toLowerCase().includes(query.trim().toLowerCase()));
+    const filtered = (results || []).filter((r) => !query.trim() || `${r.projectName} ${r.ingestName} ${r.location} ${r.mediaSource}`.toLowerCase().includes(query.trim().toLowerCase())).sort((a, b) => {
+      const av = a[sort.col] || "", bv = b[sort.col] || "";
+      return av < bv ? -sort.dir : av > bv ? sort.dir : 0;
+    });
     const visible = filtered.slice(0, visibleCount);
     return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement(
       "input",
@@ -19407,19 +19424,17 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         style: { background: "#111827", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "8px 10px", fontSize: 16, outline: "none" }
       },
       quarterYearRanges().map((r) => /* @__PURE__ */ React.createElement("option", { key: r.label, value: r.label, style: { background: "#0d1117" } }, r.label))
-    )), busy && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#838ba0", padding: "24px 0", fontSize: 16 } }, "Searching\u2026"), !busy && filtered.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#4b5563", padding: "32px 0", fontSize: 16 } }, "No completed ingests match."), !busy && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, visible.map((r) => /* @__PURE__ */ React.createElement(
-      "div",
+    ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#838ba0", flexShrink: 0 } }, filtered.length, " ingest", filtered.length !== 1 ? "s" : "")), busy && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#838ba0", padding: "24px 0", fontSize: 16 } }, "Searching\u2026"), !busy && /* @__PURE__ */ React.createElement(
+      IngestRowsTable,
       {
-        key: r._id,
-        onClick: () => onOpenRow(r),
-        style: { display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "#111827", border: "1px solid #1f2937", borderRadius: 9, cursor: "pointer" },
-        onMouseEnter: (e) => e.currentTarget.style.borderColor = "#374151",
-        onMouseLeave: (e) => e.currentTarget.style.borderColor = "#1f2937"
-      },
-      /* @__PURE__ */ React.createElement("div", { style: { width: 7, height: 7, borderRadius: "50%", background: "#10b981", flexShrink: 0 } }),
-      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#f1f5f9" } }, r.ingestName), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af" } }, r.projectName, " \xB7 ", r.workstream, " \xB7 ", r.businessUnit)),
-      /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#6b7280", whiteSpace: "nowrap" } }, "Completed ", fmtDT(r.completedDatetime))
-    ))), !busy && filtered.length > visible.length && /* @__PURE__ */ React.createElement(
+        rows: visible,
+        sort,
+        onSort: (col) => setSort((s) => s.col === col ? { ...s, dir: -s.dir } : { col, dir: -1 }),
+        activeRowId: null,
+        onRowClick: onOpenRow,
+        emptyLabel: "No completed ingests match."
+      }
+    ), !busy && filtered.length > visible.length && /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => setVisibleCount((c) => c + PAGE_SIZE),

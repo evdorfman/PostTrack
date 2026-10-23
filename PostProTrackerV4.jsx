@@ -27525,12 +27525,6 @@ const IngestTrackingSheet = ({ingests, onUpdateRow, projects=[], team=[], onAddR
   const workstreams   = [...new Set(ingests.map(r=>r.workstream).filter(Boolean))];
   const businessUnits = [...new Set(ingests.map(r=>r.businessUnit).filter(Boolean))];
 
-  const fmtDT = iso => {
-    if(!iso) return "—";
-    try { return new Date(iso).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit",hour12:true}); }
-    catch(e){ return iso.slice(0,16).replace("T"," "); }
-  };
-
   const rows = ingests
     .filter(r=>{
       if(search && !`${r.projectName} ${r.mediaManager} ${r.producer} ${r.location} ${r.mediaSource}`.toLowerCase().includes(search.toLowerCase())) return false;
@@ -27550,8 +27544,6 @@ const IngestTrackingSheet = ({ingests, onUpdateRow, projects=[], team=[], onAddR
   const f = (k,v) => onUpdateRow({...liveRow,[k]:v});
 
   const selS = {background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:6,color:"#9ca3af",padding:"5px 8px",fontSize:13,outline:"none",cursor:"pointer"};
-  const thS  = {padding:"7px 8px",fontSize:13,fontWeight:700,color: "#8e97a6",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.07em",borderBottom:"1px solid #374151",whiteSpace:"nowrap",background:"#0a0f1a",cursor:"pointer",userSelect:"none"};
-  const tdS  = {padding:"6px 8px",fontSize:13,color:"#9ca3af",borderBottom:"1px solid #0f172a",verticalAlign:"middle",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"};
 
   return (
     <>
@@ -27611,87 +27603,106 @@ const IngestTrackingSheet = ({ingests, onUpdateRow, projects=[], team=[], onAddR
           <div style={{fontSize:13,color: "#838ba0",flexShrink:0}}>{rows.length} ingest{rows.length!==1?"s":""}</div>
         </div>
 
-        <div style={{overflowX:"auto",borderRadius:"0 10px 10px 0",border:"1px solid #1f2937"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:800}}>
-            <thead>
-              <tr>
-                {[
-                  {id:"projectName",    label:"Project",         w:"14%"},
-                  {id:"status",         label:"Status",          w:"8%"},
-                  {id:"ingestDatetime", label:"Ingest",          w:"10%"},
-                  {id:"completedDatetime",label:"Completed",     w:"9%"},
-                  {id:"mediaManager",   label:"MM",              w:"6%"},
-                  {id:"producer",       label:"Producer",        w:"6%"},
-                  {id:"workstream",     label:"Stream",          w:"6%"},
-                  {id:"businessUnit",   label:"BU",              w:"6%"},
-                  {id:"location",       label:"Location",        w:"7%"},
-                  {id:"numFiles",       label:"Files",           w:"4%"},
-                  {id:"totalSizeGB",    label:"GB",              w:"5%"},
-                  {id:"mediaSource",    label:"Source",          w:"6%"},
-                  {id:"transcript",     label:"Transcript",      w:"6%"},
-                  {id:"links",          label:"Links",           w:"5%"},
-                ].map(c=>(
-                  <th key={c.id} style={{...thS,width:c.w}} onClick={()=>setSort(s=>s.col===c.id?{...s,dir:-s.dir}:{col:c.id,dir:-1})}>
-                    {c.label}{sort.col===c.id&&<span style={{marginLeft:3}}>{sort.dir>0?"↑":"↓"}</span>}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length===0&&(
-                <tr><td colSpan={14} style={{...tdS,textAlign:"center",padding:24,color: "#838ba0"}}>No ingests match your filters.</td></tr>
-              )}
-              {rows.map((r,i)=>{
-                const isActive = activeRow?._id===r._id;
-                const stColor = r.status ? (PROD_STATUS_COLOR[r.status]||"#6b7280") : null;
-                return (
-                  <tr key={r._id}
-                    onClick={()=>isActive?closeSidebar():openSidebar(r)}
-                    style={{background:isActive?"#1e1b4b":i%2===0?"#0d1117":"#0a0f1a",cursor:"pointer",transition:"background 0.1s",borderLeft:isActive?"3px solid #6366f1":"3px solid transparent"}}
-                    onMouseEnter={e=>!isActive&&(e.currentTarget.style.background="#111827")}
-                    onMouseLeave={e=>!isActive&&(e.currentTarget.style.background=i%2===0?"#0d1117":"#0a0f1a")}>
-                    <td style={{...tdS,color:"#e2e8f0",fontWeight:600}}>{r.projectName}</td>
-                    <td style={tdS}>
-                      {r.status
-                        ? <span style={{color:stColor,fontWeight:700,fontSize:13,background:stColor+"18",borderRadius:5,padding:"2px 7px",whiteSpace:"nowrap"}}>{r.status}</span>
-                        : <span style={{color: "#838ba0"}}>—</span>}
-                    </td>
-                    <td style={tdS}>{fmtDT(r.ingestDatetime)}</td>
-                    <td style={tdS}>
-                      {r.completedDatetime
-                        ? <span style={{color:"#22c55e",fontSize:13}}>{fmtDT(r.completedDatetime)}</span>
-                        : <span style={{color: "#838ba0",fontStyle:"italic",fontSize:13}}>Pending</span>}
-                    </td>
-                    <td style={tdS}>{r.mediaManager||"—"}</td>
-                    <td style={tdS}>{r.producer||"—"}</td>
-                    <td style={tdS}>{r.workstream||"—"}</td>
-                    <td style={tdS}>{r.businessUnit||"—"}</td>
-                    <td style={tdS}>{r.location||"—"}</td>
-                    <td style={{...tdS,textAlign:"right"}}>{r.numFiles||"—"}</td>
-                    <td style={{...tdS,textAlign:"right"}}>{r.totalSizeGB?`${r.totalSizeGB}`:""}</td>
-                    <td style={tdS}>{r.mediaSource||"—"}</td>
-                    <td style={tdS}>
-                      {r.transcriptNeeded
-                        ? r.transcriptLink
-                          ? <a href={r.transcriptLink} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{color:"#22c55e",textDecoration:"none",fontWeight:700,fontSize:13}}>✓ Link</a>
-                          : <span style={{color:"#f59e0b",fontSize:13}}>✓ Needed</span>
-                        : <span style={{color: "#838ba0"}}>—</span>}
-                    </td>
-                    <td style={{...tdS}}>
-                      <div style={{display:"flex",gap:4}}>
-                        {r.curatorLink&&<a href={r.curatorLink} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{color:"#6366f1",fontSize:13,fontWeight:700,textDecoration:"none",border:"1px solid #6366f140",borderRadius:3,padding:"1px 4px"}}>CAM</a>}
-                        {r.reviewLink&&<a href={r.reviewLink} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{color:"#818cf8",fontSize:13,fontWeight:700,textDecoration:"none",border:"1px solid #818cf840",borderRadius:3,padding:"1px 4px"}}>REV</a>}
-                        {!r.curatorLink&&!r.reviewLink&&<span style={{color: "#838ba0"}}>—</span>}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <IngestRowsTable rows={rows} sort={sort} onSort={col=>setSort(s=>s.col===col?{...s,dir:-s.dir}:{col,dir:-1})}
+          activeRowId={activeRow?._id} onRowClick={r=>r._id===activeRow?._id?closeSidebar():openSidebar(r)}/>
       </div>
     </>
+  );
+};
+
+// Shared by the Tracking Sheet and the Completed Archive so a row looks
+// identical in both places — the only difference is which rows are passed
+// in and what clicking one does (open the edit sidebar vs. jump to the
+// project's own Ingest tab).
+const INGEST_TABLE_COLS = [
+  {id:"projectName",    label:"Project",         w:"14%"},
+  {id:"status",         label:"Status",          w:"8%"},
+  {id:"ingestDatetime", label:"Ingest",          w:"10%"},
+  {id:"completedDatetime",label:"Completed",     w:"9%"},
+  {id:"mediaManager",   label:"MM",              w:"6%"},
+  {id:"producer",       label:"Producer",        w:"6%"},
+  {id:"workstream",     label:"Stream",          w:"6%"},
+  {id:"businessUnit",   label:"BU",              w:"6%"},
+  {id:"location",       label:"Location",        w:"7%"},
+  {id:"numFiles",       label:"Files",           w:"4%"},
+  {id:"totalSizeGB",    label:"GB",              w:"5%"},
+  {id:"mediaSource",    label:"Source",          w:"6%"},
+  {id:"transcript",     label:"Transcript",      w:"6%"},
+  {id:"links",          label:"Links",           w:"5%"},
+];
+const fmtIngestDT = iso => {
+  if(!iso) return "—";
+  try { return new Date(iso).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit",hour12:true}); }
+  catch(e){ return iso.slice(0,16).replace("T"," "); }
+};
+const IngestRowsTable = ({rows, sort, onSort, activeRowId, onRowClick, emptyLabel="No ingests match your filters."}) => {
+  const thS = {padding:"7px 8px",fontSize:13,fontWeight:700,color: "#8e97a6",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.07em",borderBottom:"1px solid #374151",whiteSpace:"nowrap",background:"#0a0f1a",cursor:onSort?"pointer":"default",userSelect:"none"};
+  const tdS = {padding:"6px 8px",fontSize:13,color:"#9ca3af",borderBottom:"1px solid #0f172a",verticalAlign:"middle",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"};
+  return (
+    <div style={{overflowX:"auto",borderRadius:10,border:"1px solid #1f2937"}}>
+      <table style={{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:800}}>
+        <thead>
+          <tr>
+            {INGEST_TABLE_COLS.map(c=>(
+              <th key={c.id} style={{...thS,width:c.w}} onClick={()=>onSort?.(c.id)}>
+                {c.label}{sort?.col===c.id&&<span style={{marginLeft:3}}>{sort.dir>0?"↑":"↓"}</span>}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length===0&&(
+            <tr><td colSpan={INGEST_TABLE_COLS.length} style={{...tdS,textAlign:"center",padding:24,color: "#838ba0"}}>{emptyLabel}</td></tr>
+          )}
+          {rows.map((r,i)=>{
+            const isActive = activeRowId===r._id;
+            const stColor = r.status ? (PROD_STATUS_COLOR[r.status]||"#6b7280") : null;
+            return (
+              <tr key={r._id}
+                onClick={()=>onRowClick(r)}
+                style={{background:isActive?"#1e1b4b":i%2===0?"#0d1117":"#0a0f1a",cursor:"pointer",transition:"background 0.1s",borderLeft:isActive?"3px solid #6366f1":"3px solid transparent"}}
+                onMouseEnter={e=>!isActive&&(e.currentTarget.style.background="#111827")}
+                onMouseLeave={e=>!isActive&&(e.currentTarget.style.background=i%2===0?"#0d1117":"#0a0f1a")}>
+                <td style={{...tdS,color:"#e2e8f0",fontWeight:600}}>{r.projectName}</td>
+                <td style={tdS}>
+                  {r.status
+                    ? <span style={{color:stColor,fontWeight:700,fontSize:13,background:stColor+"18",borderRadius:5,padding:"2px 7px",whiteSpace:"nowrap"}}>{r.status}</span>
+                    : <span style={{color: "#838ba0"}}>—</span>}
+                </td>
+                <td style={tdS}>{fmtIngestDT(r.ingestDatetime)}</td>
+                <td style={tdS}>
+                  {r.completedDatetime
+                    ? <span style={{color:"#22c55e",fontSize:13}}>{fmtIngestDT(r.completedDatetime)}</span>
+                    : <span style={{color: "#838ba0",fontStyle:"italic",fontSize:13}}>Pending</span>}
+                </td>
+                <td style={tdS}>{r.mediaManager||"—"}</td>
+                <td style={tdS}>{r.producer||"—"}</td>
+                <td style={tdS}>{r.workstream||"—"}</td>
+                <td style={tdS}>{r.businessUnit||"—"}</td>
+                <td style={tdS}>{r.location||"—"}</td>
+                <td style={{...tdS,textAlign:"right"}}>{r.numFiles||"—"}</td>
+                <td style={{...tdS,textAlign:"right"}}>{r.totalSizeGB?`${r.totalSizeGB}`:""}</td>
+                <td style={tdS}>{r.mediaSource||"—"}</td>
+                <td style={tdS}>
+                  {r.transcriptNeeded
+                    ? r.transcriptLink
+                      ? <a href={r.transcriptLink} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{color:"#22c55e",textDecoration:"none",fontWeight:700,fontSize:13}}>✓ Link</a>
+                      : <span style={{color:"#f59e0b",fontSize:13}}>✓ Needed</span>
+                    : <span style={{color: "#838ba0"}}>—</span>}
+                </td>
+                <td style={{...tdS}}>
+                  <div style={{display:"flex",gap:4}}>
+                    {r.curatorLink&&<a href={r.curatorLink} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{color:"#6366f1",fontSize:13,fontWeight:700,textDecoration:"none",border:"1px solid #6366f140",borderRadius:3,padding:"1px 4px"}}>CAM</a>}
+                    {r.reviewLink&&<a href={r.reviewLink} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{color:"#818cf8",fontSize:13,fontWeight:700,textDecoration:"none",border:"1px solid #818cf840",borderRadius:3,padding:"1px 4px"}}>REV</a>}
+                    {!r.curatorLink&&!r.reviewLink&&<span style={{color: "#838ba0"}}>—</span>}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 };
 
@@ -27701,6 +27712,7 @@ const IngestArchiveSearch = ({onSearch, onOpenRow}) => {
   const [results, setResults] = useState(null);
   const [busy, setBusy] = useState(false);
   const [visibleCount, setVisibleCount] = useState(50);
+  const [sort, setSort] = useState({col:"completedDatetime", dir:-1});
   const PAGE_SIZE = 50;
 
   const runSearch = async () => {
@@ -27713,7 +27725,9 @@ const IngestArchiveSearch = ({onSearch, onOpenRow}) => {
   };
   useEffect(()=>{ runSearch(); },[range.label]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filtered = (results||[]).filter(r=>!query.trim()||`${r.projectName} ${r.ingestName} ${r.location} ${r.mediaSource}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const filtered = (results||[])
+    .filter(r=>!query.trim()||`${r.projectName} ${r.ingestName} ${r.location} ${r.mediaSource}`.toLowerCase().includes(query.trim().toLowerCase()))
+    .sort((a,b)=>{ const av=a[sort.col]||"", bv=b[sort.col]||""; return av<bv?-sort.dir:av>bv?sort.dir:0; });
   const visible = filtered.slice(0, visibleCount);
 
   return (
@@ -27725,24 +27739,12 @@ const IngestArchiveSearch = ({onSearch, onOpenRow}) => {
           style={{background:"#111827",border:"1px solid #1f2937",borderRadius:7,color:"#e2e8f0",padding:"8px 10px",fontSize:16,outline:"none"}}>
           {quarterYearRanges().map(r=><option key={r.label} value={r.label} style={{background:"#0d1117"}}>{r.label}</option>)}
         </select>
+        <div style={{fontSize:13,color: "#838ba0",flexShrink:0}}>{filtered.length} ingest{filtered.length!==1?"s":""}</div>
       </div>
       {busy&&<div style={{textAlign:"center",color:"#838ba0",padding:"24px 0",fontSize:16}}>Searching…</div>}
-      {!busy&&filtered.length===0&&<div style={{textAlign:"center",color:"#4b5563",padding:"32px 0",fontSize:16}}>No completed ingests match.</div>}
       {!busy&&(
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {visible.map(r=>(
-            <div key={r._id} onClick={()=>onOpenRow(r)}
-              style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#111827",border:"1px solid #1f2937",borderRadius:9,cursor:"pointer"}}
-              onMouseEnter={e=>e.currentTarget.style.borderColor="#374151"} onMouseLeave={e=>e.currentTarget.style.borderColor="#1f2937"}>
-              <div style={{width:7,height:7,borderRadius:"50%",background:"#10b981",flexShrink:0}}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:16,fontWeight:700,color:"#f1f5f9"}}>{r.ingestName}</div>
-                <div style={{fontSize:13,color:"#9ca3af"}}>{r.projectName} · {r.workstream} · {r.businessUnit}</div>
-              </div>
-              <span style={{fontSize:13,color:"#6b7280",whiteSpace:"nowrap"}}>Completed {fmtDT(r.completedDatetime)}</span>
-            </div>
-          ))}
-        </div>
+        <IngestRowsTable rows={visible} sort={sort} onSort={col=>setSort(s=>s.col===col?{...s,dir:-s.dir}:{col,dir:-1})}
+          activeRowId={null} onRowClick={onOpenRow} emptyLabel="No completed ingests match."/>
       )}
       {!busy&&filtered.length>visible.length&&(
         <button onClick={()=>setVisibleCount(c=>c+PAGE_SIZE)}
