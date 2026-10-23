@@ -22384,11 +22384,14 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                               onMouseEnter={e=>e.currentTarget.style.background="#1a2035"}
                               onMouseLeave={e=>e.currentTarget.style.background="#111827"}>
                               <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontSize:14,fontWeight:700,color:"#c4c9d4",lineHeight:1.35,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={project.name}>{project.name}</div>
-                                {dels.length>1&&<div style={{fontSize:13,color:"#8e97a6",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{dels.length} deliverables</div>}
-                                {project._segments?.length>1&&<div style={{fontSize:12,color:"#f59e0b",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⇄ Project-level handoff active</div>}
+                                {/* Wraps instead of truncating — the name needs to be
+                                    fully readable at a glance, and wider columns would
+                                    force the full week back into horizontal scroll. */}
+                                <div style={{fontSize:14,fontWeight:700,color:"#c4c9d4",lineHeight:1.35,overflowWrap:"anywhere"}} title={project.name}>{project.name}</div>
+                                {dels.length>1&&<div style={{fontSize:13,color:"#8e97a6",marginTop:2,overflowWrap:"anywhere"}}>{dels.length} deliverables</div>}
+                                {project._segments?.length>1&&<div style={{fontSize:12,color:"#f59e0b",marginTop:2,overflowWrap:"anywhere"}}>⇄ Project-level handoff active</div>}
                               </div>
-                              <span style={{fontSize:14,color:"#838ba0",flexShrink:0}}>{isOpen?"▴":"▾"}</span>
+                              <span style={{fontSize:14,color:"#838ba0",flexShrink:0,alignSelf:"flex-start"}}>{isOpen?"▴":"▾"}</span>
                             </div>
 
                             {/* Expanded list */}
@@ -22418,8 +22421,8 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                                       style={{padding:"7px 8px 7px 11px",borderTop:dli>0?"1px solid #1f2937":"none",display:"flex",alignItems:"flex-start",gap:6,borderLeft:`3px solid ${ws.color}`,cursor:"grab",opacity:dragItem&&dragItem.delIds?.length===1&&dragItem.delIds[0]===del.id?0.4:1}}>
                                       <div style={{flex:1,minWidth:0}}>
                                         {/* Deliverable name + handoff badge */}
-                                        <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}>
-                                          <div style={{fontSize:13,color:"#9ca3af",lineHeight:1.3,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={del.name}>{del.name}</div>
+                                        <div style={{display:"flex",alignItems:"flex-start",gap:5,marginBottom:5}}>
+                                          <div style={{fontSize:13,color:"#9ca3af",lineHeight:1.3,flex:1,minWidth:0,overflowWrap:"anywhere"}} title={del.name}>{del.name}</div>
                                           {hasHandoffs&&<span style={{fontSize:11,fontWeight:800,color:"#f59e0b",background:"#f59e0b15",border:"1px solid #f59e0b30",borderRadius:3,padding:"1px 4px",flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em",textTransform:"uppercase"}}>⇄ Handoff</span>}
                                         </div>
                                         {/* Inline status select */}
