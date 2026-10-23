@@ -9890,7 +9890,6 @@ const PipelineView = ({projects, team, onOpenProject, onUpdateProject}) => {
                     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
                       <span style={{color:"#374151",fontSize:13,fontWeight:700}}>{i+1}</span>
                       <button onClick={()=>onUpdateProject(p.id,"inPipeline",false)}
-                        title="Remove from Pipeline"
                         style={{background:"#ef444415",border:"1px solid #ef444440",borderRadius:6,color:"#ef4444",padding:"4px 10px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",whiteSpace:"nowrap"}}
                         onMouseEnter={e=>{e.currentTarget.style.background="#ef444425";}}
                         onMouseLeave={e=>{e.currentTarget.style.background="#ef444415";}}>
@@ -22217,7 +22216,9 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
   return (
     <div style={{position:"relative"}}>
       {toast&&(
-        <div style={{position:"fixed",bottom:28,right:28,zIndex:4000,background:"#10b981",color:"#fff",padding:"10px 20px",borderRadius:10,fontSize:16,fontWeight:700,boxShadow:"0 4px 20px #0008"}}>
+        // Bottom-center (not bottom-right) so it never sits on top of the
+        // floating AI chat button, which lives at bottom:28,right:28.
+        <div style={{position:"fixed",bottom:28,left:"50%",transform:"translateX(-50%)",zIndex:4000,background:"#10b981",color:"#fff",padding:"10px 20px",borderRadius:10,fontSize:16,fontWeight:700,boxShadow:"0 4px 20px #0008",pointerEvents:"none"}}>
           {toast}
         </div>
       )}
