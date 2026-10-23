@@ -22383,16 +22383,19 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
                                   const projEditors = [...(project.assignees?.["Editor"]||[]),...(project.assignees?.["Animator"]||[])];
                                   const hasHandoffs = (del._segments?.length||0)>1;
                                   const currentAssignee = editors.find(e=>e.id===editorForDay(del, fmtDay(days[di]||new Date()), projEditors));
-                                  // Deadline label (separate from workflow state)
-                                  const deadlineLabel = (() => {
+                                  // Deadline label — always shows the actual date (not just a
+                                  // relative "Due today"/"Overdue" state color) since during the
+                                  // status-check meeting people need the real date at a glance.
+                                  const deadlineInfo = (() => {
                                     if(!del.deadline) return null;
                                     const today = new Date(); today.setHours(0,0,0,0);
                                     const dd = new Date(del.deadline); dd.setHours(0,0,0,0);
                                     const daysLeft = Math.ceil((dd-today)/86400000);
-                                    if(daysLeft<0)  return null; // already shown via "Overdue" state
-                                    if(daysLeft===0) return "Due today";
-                                    if(daysLeft===1) return "Due tomorrow";
-                                    return `Due ${dd.toLocaleDateString("en-US",{month:"short",day:"numeric"})}`;
+                                    const dateStr = dd.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+                                    if(daysLeft<0)    return {text:`${dateStr} · ${Math.abs(daysLeft)}d overdue`, color:"#ef4444"};
+                                    if(daysLeft===0)  return {text:`${dateStr} · Due today`, color:"#8e97a6"};
+                                    if(daysLeft===1)  return {text:`${dateStr} · Due tomorrow`, color:"#8e97a6"};
+                                    return {text:`Due ${dateStr}`, color:"#8e97a6"};
                                   })();
                                   return (
                                     <div key={del.id}
@@ -22415,7 +22418,16 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
                                           {DELIVERABLE_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
                                         </select>
                                         {/* Deadline label */}
-                                        {deadlineLabel&&<div style={{fontSize:13,color: "#8e97a6",marginTop:4}}>{deadlineLabel}</div>}
+                                        {deadlineInfo&&<div style={{fontSize:13,color:deadlineInfo.color,fontWeight:deadlineInfo.color==="#ef4444"?700:400,marginTop:4}}>{deadlineInfo.text}</div>}
+                                        {/* Frame.io review link + password — for pulling up the latest
+                                            cut right in this meeting without opening the project.
+                                            Omitted (not shown as "(No Frame link)") when there isn't
+                                            one yet, so early-stage rows without a cut don't add noise. */}
+                                        {del.frameLink&&(
+                                          <div style={{marginTop:4}} onClick={e=>e.stopPropagation()}>
+                                            <DelFrameInfo frameLink={del.frameLink} framePW={del.framePW} small/>
+                                          </div>
+                                        )}
                                       </div>
                                       {/* Open the project, scrolled to this deliverable — drag-and-drop
                                           covers reassignment now, so this replaces the old "Move" button. */}
