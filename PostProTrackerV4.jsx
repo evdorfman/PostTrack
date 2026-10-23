@@ -22352,7 +22352,7 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                       onDragOver={e=>{ if(dragItem&&dragItem.fromMemberId!==member.id){ e.preventDefault(); setDragOverKey(cellDropKey); } }}
                       onDragLeave={()=>setDragOverKey(k=>k===cellDropKey?null:k)}
                       onDrop={e=>{ e.preventDefault(); dropHandoff(member.id, dragItem?.fromDay); }}
-                      style={{padding:"5px",borderLeft:"1px solid #1f2937",background:isCellDropTarget?"#6366f122":isBlocked?"#1a1005":isWknd?"#0a0c1320":"transparent",display:"flex",flexDirection:"column",gap:3,minHeight:48,position:"relative",outline:isCellDropTarget?"2px dashed #6366f1":"none",outlineOffset:-2}}>
+                      style={{padding:"7px",borderLeft:"1px solid #1f2937",background:isCellDropTarget?"#6366f122":isBlocked?"#1a1005":isWknd?"#0a0c1320":"transparent",display:"flex",flexDirection:"column",gap:5,minHeight:64,position:"relative",outline:isCellDropTarget?"2px dashed #6366f1":"none",outlineOffset:-2}}>
                       {isCellDropTarget&&(
                         <div style={{position:"absolute",top:2,left:2,right:2,fontSize:10,color:"#818cf8",fontWeight:800,textTransform:"uppercase",textAlign:"center",pointerEvents:"none",zIndex:2}}>
                           Hand off from {dragItem?.fromDay?new Date(dragItem.fromDay+'T12:00').toLocaleDateString("en-US",{month:"short",day:"numeric"}):""}
@@ -22380,22 +22380,15 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
                               draggable
                               onDragStart={e=>{ e.stopPropagation(); e.dataTransfer.effectAllowed="move"; setDragItem({projectId:project.id, delIds:dels.map(d=>d.id), fromMemberId:member.id, fromDay:dayStr}); }}
                               onDragEnd={()=>{ setDragItem(null); setDragOverKey(null); }}
-                              style={{width:"100%",textAlign:"left",background:"#111827",borderLeft:`3px solid ${urg.color}`,padding:"5px 8px",cursor:"grab",display:"flex",alignItems:"center",gap:5,opacity:dragItem&&dragItem.projectId===project.id&&dragItem.fromMemberId===member.id&&dragItem.fromDay===dayStr?0.4:1}}
+                              style={{width:"100%",textAlign:"left",background:"#111827",borderLeft:`3px solid ${urg.color}`,padding:"8px 10px",cursor:"grab",display:"flex",alignItems:"center",gap:6,opacity:dragItem&&dragItem.projectId===project.id&&dragItem.fromMemberId===member.id&&dragItem.fromDay===dayStr?0.4:1}}
                               onMouseEnter={e=>e.currentTarget.style.background="#1a2035"}
                               onMouseLeave={e=>e.currentTarget.style.background="#111827"}>
                               <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontSize:13,fontWeight:700,color:"#c4c9d4",lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={project.name}>{project.name}</div>
-                                {dels.length>1&&<div style={{fontSize:13,color:"#8e97a6",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{dels.length} deliverables</div>}
-                                {project._segments?.length>1&&<div style={{fontSize:12,color:"#f59e0b",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⇄ Project-level handoff active</div>}
+                                <div style={{fontSize:14,fontWeight:700,color:"#c4c9d4",lineHeight:1.35,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={project.name}>{project.name}</div>
+                                {dels.length>1&&<div style={{fontSize:13,color:"#8e97a6",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{dels.length} deliverables</div>}
+                                {project._segments?.length>1&&<div style={{fontSize:12,color:"#f59e0b",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⇄ Project-level handoff active</div>}
                               </div>
-                              {/* Project-level assign button — stops chip toggle */}
-                              <button onClick={e=>{e.stopPropagation();setHandoffTarget({projectId:project.id,isProjectLevel:true});}}
-                                style={{fontSize:11,fontWeight:700,color:"#818cf8",background:"#6366f115",border:"1px solid #6366f140",cursor:"pointer",padding:"2px 6px",borderRadius:4,flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em"}}
-                                onMouseEnter={e=>{e.currentTarget.style.background="#6366f125";e.currentTarget.style.borderColor="#6366f170";}}
-                                onMouseLeave={e=>{e.currentTarget.style.background="#6366f115";e.currentTarget.style.borderColor="#6366f140";}}>
-                                ↔ Assign
-                              </button>
-                              <span style={{fontSize:13,color:"#838ba0",flexShrink:0}}>{isOpen?"▴":"▾"}</span>
+                              <span style={{fontSize:14,color:"#838ba0",flexShrink:0}}>{isOpen?"▴":"▾"}</span>
                             </div>
 
                             {/* Expanded list */}
@@ -22468,33 +22461,14 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[]}
         </div>
       </div>
 
-      {/* Handoff calendar modal — deliverable-level OR project-level */}
+      {/* Handoff calendar modal — deliverable-level (still available from the
+          expanded row's "Move" button, for a precise mid-range date pick
+          drag-and-drop can't easily express). The project-level variant
+          was dropped along with its only trigger, the chip's "↔ Assign"
+          button — drag-and-drop on the chip covers the same ground. */}
       {handoffTarget&&(()=>{
         const proj = projects.find(p=>p.id===handoffTarget.projectId);
         if(!proj) return null;
-
-        // ── Project-level: assigns segments to project._segments ──────────────
-        if(handoffTarget.isProjectLevel) {
-          return (
-            <HandoffCalendarModal
-              del={{
-                id:`project-${proj.id}`,
-                title:`${proj.name} — All Deliverables`,
-                name:proj.name,
-                deadline:proj.deadline,
-                _segments:proj._segments||[],
-              }}
-              project={proj} editors={editors} team={team}
-              onSave={newSegments=>{
-                onUpdateProject(handoffTarget.projectId,"_segments",newSegments);
-                setHandoffTarget(null);
-              }}
-              onClose={()=>setHandoffTarget(null)}
-            />
-          );
-        }
-
-        // ── Deliverable-level ─────────────────────────────────────────────────
         const del = proj?.deliverables?.find(d=>d.id===handoffTarget.delId);
         if(!del) return null;
         return (
