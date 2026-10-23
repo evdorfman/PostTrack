@@ -15961,7 +15961,7 @@ ${conditions}`;
     const now2 = /* @__PURE__ */ new Date();
     const pendingRequests = (0, import_react.useMemo)(
       () => allBookings.filter(
-        (b) => b._source === "project" && !b.parentBookingId && b.startTime && b.location && (b.bookingStatus === "Tentative" || b.status === "Tentative")
+        (b) => b._source === "project" && !b.parentBookingId && b.startTime && b.location && b.status === "Tentative"
       ),
       [allBookings]
     );

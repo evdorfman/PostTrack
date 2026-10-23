@@ -23113,14 +23113,24 @@ const StudioBookingsList = ({allBookings, projects, team, studioBookings, onUpda
   const [denyOpen,setDenyOpen]=useState(null);
   const now=new Date();
 
-  // Productions pending studio approval — Tentative status with a location set
+  // Productions pending studio approval — gated on the production's own
+  // `status` field alone, which is the actual approval-pending signal
+  // (set by onSendForApproval, cleared by approveRequest/denyRequest/
+  // onUnapprove below). `bookingStatus` is a separate, display-only field
+  // (drives calendar/badge colors) that PROD_TO_BOOKING_STATUS above
+  // synthesizes as "Tentative" for ANY Planning-stage production — so a
+  // denied request (status → "Planning") kept matching this filter via
+  // that `bookingStatus==="Tentative"` OR-clause forever, even though it
+  // was no longer actually pending approval. That's what made a denied/
+  // revised request look like it "wasn't saving" — status really was
+  // changing and persisting correctly the whole time.
   const pendingRequests = useMemo(()=>
     allBookings.filter(b=>
       b._source==="project" &&
       !b.parentBookingId &&
       b.startTime &&
       b.location &&
-      (b.bookingStatus==="Tentative" || b.status==="Tentative")
+      b.status==="Tentative"
     )
   ,[allBookings]);
 
