@@ -15419,17 +15419,18 @@ ${conditions}`;
               const projEditors = [...project.assignees?.["Editor"] || [], ...project.assignees?.["Animator"] || []];
               const hasHandoffs = (del._segments?.length || 0) > 1;
               const currentAssignee = editors.find((e) => e.id === editorForDay(del, fmtDay(days[di] || /* @__PURE__ */ new Date()), projEditors));
-              const deadlineLabel = (() => {
+              const deadlineInfo = (() => {
                 if (!del.deadline) return null;
                 const today = /* @__PURE__ */ new Date();
                 today.setHours(0, 0, 0, 0);
                 const dd = new Date(del.deadline);
                 dd.setHours(0, 0, 0, 0);
                 const daysLeft2 = Math.ceil((dd - today) / 864e5);
-                if (daysLeft2 < 0) return null;
-                if (daysLeft2 === 0) return "Due today";
-                if (daysLeft2 === 1) return "Due tomorrow";
-                return `Due ${dd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+                const dateStr = dd.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                if (daysLeft2 < 0) return { text: `${dateStr} \xB7 ${Math.abs(daysLeft2)}d overdue`, color: "#ef4444" };
+                if (daysLeft2 === 0) return { text: `${dateStr} \xB7 Due today`, color: "#8e97a6" };
+                if (daysLeft2 === 1) return { text: `${dateStr} \xB7 Due tomorrow`, color: "#8e97a6" };
+                return { text: `Due ${dateStr}`, color: "#8e97a6" };
               })();
               return /* @__PURE__ */ React.createElement(
                 "div",
@@ -15459,7 +15460,7 @@ ${conditions}`;
                     style: { width: "100%", background: "#111827", border: `1px solid ${ws.color}50`, borderRadius: 4, color: ws.color, padding: "3px 6px", fontSize: 13, fontWeight: 700, cursor: "pointer", outline: "none", fontFamily: "inherit" }
                   },
                   DELIVERABLE_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, value: s }, s))
-                ), deadlineLabel && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 4 } }, deadlineLabel)),
+                ), deadlineInfo && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: deadlineInfo.color, fontWeight: deadlineInfo.color === "#ef4444" ? 700 : 400, marginTop: 4 } }, deadlineInfo.text), del.frameLink && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 4 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement(DelFrameInfo, { frameLink: del.frameLink, framePW: del.framePW, small: true }))),
                 onOpenProject && /* @__PURE__ */ React.createElement(
                   "button",
                   {
