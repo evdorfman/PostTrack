@@ -15718,6 +15718,11 @@ const rowToDeliverable = row => ({
   containsAI: row.contains_ai||false, aiTools: row.ai_tools||[], greenscreen: row.greenscreen||false,
   captionsNeeded: row.captions_needed||false, srtDelivered: row.srt_delivered||false, srtFrameUrl: row.srt_frame_url,
   watermark: row.watermark||false, bxtvLink: row.bxtv_link||null,
+  // Found in the same audit pass as review_rounds' isWorkReview/
+  // reviewRoundId gap above — see
+  // production_patch_016_rounds_deliverables_missing_fields.sql.
+  srtNeeded: row.srt_needed||false, qualitiesConfirmed: row.qualities_confirmed||false,
+  _reassignmentRequested: row.reassignment_requested||null,
   rounds: [], // populated by assembleNormalizedProjectData, never by this mapper alone
 });
 
@@ -15737,6 +15742,8 @@ const deliverableToRow = (d, projectId) => ({
   contains_ai: !!d.containsAI, ai_tools: d.aiTools||[], greenscreen: !!d.greenscreen,
   captions_needed: !!d.captionsNeeded, srt_delivered: !!d.srtDelivered, srt_frame_url: d.srtFrameUrl||null,
   watermark: !!d.watermark, bxtv_link: d.bxtvLink||null,
+  srt_needed: !!d.srtNeeded, qualities_confirmed: !!d.qualitiesConfirmed,
+  reassignment_requested: d._reassignmentRequested||null,
 });
 
 const isUuid = v => typeof v === "string" && v.includes("-");
@@ -15760,12 +15767,23 @@ const rowToReviewRound = row => ({
   deliverableRowId: row.deliverable_id,
   label: row.label, deadline: row.deadline, reviewers: row.reviewers||[], status: row.status, notes: row.notes||"",
   workReviewSessionId: row.work_review_session_id,
+  // isWorkReview/reviewRoundId are how a batch of rounds added together
+  // (AddReviewRoundModal, or linking into a work-review session) stays
+  // grouped as one Calendar event and gets bulk deadline updates — see
+  // production_patch_016_rounds_deliverables_missing_fields.sql.
+  isWorkReview: row.is_work_review||false,
+  reviewRoundId: row.review_round_id!=null ? parseLegacyId(row.review_round_id) : null,
 });
 
 const reviewRoundToRow = (r, deliverableRowId) => ({
   ...(isUuid(r.id) ? {id: r.id} : {}),
   deliverable_id: deliverableRowId,
   label: r.label||null, deadline: r.deadline||null, reviewers: r.reviewers||[], status: r.status||null, notes: r.notes||null,
+  is_work_review: !!r.isWorkReview,
+  // Plain local-counter id (uid()), same shape as legacy_id elsewhere in
+  // this schema — never a uuid, so no "omit until resolved" dance needed
+  // the way work_review_session_id has below.
+  review_round_id: r.reviewRoundId!=null ? String(r.reviewRoundId) : null,
   // work_review_session_id is omitted entirely (not set to null) when the
   // local round's workReviewSessionId isn't a real uuid yet — an UPDATE
   // only touches fields present in the request body, so omitting it leaves
@@ -15893,8 +15911,9 @@ const customTaskToRow = t => ({
 // ═══════════════════════════════════════════════════════════════════════════
 // Phase 3 data layer — the 18 remaining app_kv-backed collections (see
 // production_schema_new_tables.sql's Phase 3 section for the id-type
-// reasoning behind each legacy_id column). Same NOT-YET-WIRED-IN status as
-// everything above until each collection's own SHADOW_WRITE_* flag flips on.
+// reasoning behind each legacy_id column). Every one of these collections'
+// own SHADOW_WRITE_* flag is on, so — same as the normalized-schema
+// section above — this is live, not dead code.
 
 const rowToGear = row => ({
   id: row.legacy_id ?? row.id, _rowId: row.id,
