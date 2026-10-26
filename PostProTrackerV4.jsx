@@ -15563,7 +15563,7 @@ const SHADOW_WRITE_APP_LISTS = true;
 const SHADOW_WRITE_RESOURCE_CONFIG = true;
 const SHADOW_WRITE_TAB_LOCKS = true;
 
-const rowToTeamMember = row => ({
+export const rowToTeamMember = row => ({
   id: row.id, name: row.name, roles: row.roles||[], employeeType: row.employee_type,
   // `available` is a scheduling/capacity concept (do they currently have
   // bandwidth) — unrelated to `active`, which is "do they still work here
@@ -15576,7 +15576,7 @@ const rowToTeamMember = row => ({
   assignablePercent: row.assignable_percent, authUserId: row.auth_user_id||null,
   isAdmin: row.is_admin||false, color: row.color||null,
 });
-const teamMemberToRow = m => ({
+export const teamMemberToRow = m => ({
   id: m.id, name: m.name, roles: m.roles||[], employee_type: m.employeeType,
   available: m.available, active: m.active!==false, email: m.email||null, phone: m.phone||null, department: m.department,
   rate: m.rate||{}, skills: m.skills||[], work_hours: m.workHours||{}, assignable_percent: m.assignablePercent ?? null,
@@ -15596,7 +15596,7 @@ const ColorSwatchPicker = ({value, onChange}) => (
   </div>
 );
 
-const rowToProject = row => ({
+export const rowToProject = row => ({
   id: row.id, projectCode: row.project_code, name: row.name, requester: row.requester,
   year: row.year, status: row.status, workstream: row.workstream, businessUnit: row.business_unit,
   deadline: row.deadline, briefNotes: row.brief_notes, keywords: row.keywords||[],
@@ -15637,7 +15637,7 @@ const rowToProject = row => ({
 // those two legacy JSON columns on every project save would just be dead
 // weight. Leaving the columns themselves in place (not dropped) in case
 // anything needs to roll back to them.
-const projectToRow = p => ({
+export const projectToRow = p => ({
   id: p.id, project_code: p.projectCode||null, name: p.name, requester: p.requester||null,
   year: p.year||null, status: p.status, workstream: p.workstream||null, business_unit: p.businessUnit||null,
   deadline: p.deadline||null, brief_notes: p.briefNotes||null, keywords: p.keywords||[],
@@ -15662,7 +15662,7 @@ const projectToRow = p => ({
 // (e.g. rejectionNote, set only when a Broadcast Manager denies a booking)
 // round-trips through the `extra` JSONB catch-all instead of being dropped.
 const BOOKING_KNOWN_FIELDS = ["id","title","projectId","parentBookingId","bookingStatus","productionType","location","startTime","endTime","crewCallTime","notes","equipmentIds","confirmations","crewInternal","crewExternal"];
-const rowToBooking = row => ({
+export const rowToBooking = row => ({
   id: row.id, title: row.title, projectId: row.project_id, parentBookingId: row.parent_booking_id,
   bookingStatus: row.booking_status, productionType: row.production_type, location: row.location,
   startTime: row.start_time, endTime: row.end_time, crewCallTime: row.crew_call_time, notes: row.notes||"",
@@ -15670,7 +15670,7 @@ const rowToBooking = row => ({
   crewInternal: row.crew_internal||[], crewExternal: row.crew_external||[],
   ...(row.extra||{}),
 });
-const bookingToRow = b => {
+export const bookingToRow = b => {
   const extra = {};
   Object.keys(b).forEach(k=>{ if(!BOOKING_KNOWN_FIELDS.includes(k)) extra[k]=b[k]; });
   return {
@@ -15702,7 +15702,7 @@ const bookingToRow = b => {
 // `del.id`/`production.id` keeps working unchanged; a deliverable created
 // after cutover has no legacy id, so `id` falls back to the row's own uuid.
 
-const rowToDeliverable = row => ({
+export const rowToDeliverable = row => ({
   id: row.legacy_id ?? row.id,
   _rowId: row.id,
   projectId: row.project_id,
@@ -15726,7 +15726,7 @@ const rowToDeliverable = row => ({
   rounds: [], // populated by assembleNormalizedProjectData, never by this mapper alone
 });
 
-const deliverableToRow = (d, projectId) => ({
+export const deliverableToRow = (d, projectId) => ({
   ...(d._rowId ? {id: d._rowId} : {}),
   legacy_id: typeof d.id === "number" ? d.id : null,
   project_id: projectId,
@@ -15746,14 +15746,14 @@ const deliverableToRow = (d, projectId) => ({
   reassignment_requested: d._reassignmentRequested||null,
 });
 
-const isUuid = v => typeof v === "string" && v.includes("-");
+export const isUuid = v => typeof v === "string" && v.includes("-");
 
-const rowToWorkReviewSession = row => ({
+export const rowToWorkReviewSession = row => ({
   id: row.legacy_id ?? row.id, _rowId: row.id,
   datetime: row.datetime, location: row.location, zoomLink: row.zoom_link,
   reviewers: row.reviewers||[], notes: row.notes||"",
 });
-const workReviewSessionToRow = s => ({
+export const workReviewSessionToRow = s => ({
   ...(s._rowId ? {id: s._rowId} : {}),
   legacy_id: typeof s.id==="number" ? s.id : null,
   datetime: s.datetime||null, location: s.location||null, zoom_link: s.zoomLink||null,
@@ -15762,7 +15762,7 @@ const workReviewSessionToRow = s => ({
 const addWorkReviewSessionRow    = (sbClient, session)     => sbClient.from("work_review_sessions").insert(workReviewSessionToRow(session)).select().single();
 const updateWorkReviewSessionRow = (sbClient, rowId, patch) => sbClient.from("work_review_sessions").update(patch).eq("id", rowId);
 
-const rowToReviewRound = row => ({
+export const rowToReviewRound = row => ({
   id: row.id,
   deliverableRowId: row.deliverable_id,
   label: row.label, deadline: row.deadline, reviewers: row.reviewers||[], status: row.status, notes: row.notes||"",
@@ -15775,7 +15775,7 @@ const rowToReviewRound = row => ({
   reviewRoundId: row.review_round_id!=null ? parseLegacyId(row.review_round_id) : null,
 });
 
-const reviewRoundToRow = (r, deliverableRowId) => ({
+export const reviewRoundToRow = (r, deliverableRowId) => ({
   ...(isUuid(r.id) ? {id: r.id} : {}),
   deliverable_id: deliverableRowId,
   label: r.label||null, deadline: r.deadline||null, reviewers: r.reviewers||[], status: r.status||null, notes: r.notes||null,
@@ -15800,7 +15800,7 @@ const reviewRoundToRow = (r, deliverableRowId) => ({
   ...((!isUuid(r.workReviewSessionId) && r.workReviewSessionId!=null) ? {legacy_work_review_session_id: r.workReviewSessionId} : {}),
 });
 
-const rowToProduction = row => ({
+export const rowToProduction = row => ({
   id: row.legacy_id ?? row.id,
   _rowId: row.id,
   projectId: row.project_id,
@@ -15826,7 +15826,7 @@ const rowToProduction = row => ({
   playbackDeliverableId: row.playback_deliverable_id!=null ? parseLegacyId(row.playback_deliverable_id) : null,
 });
 
-const productionToRow = (p, projectId) => ({
+export const productionToRow = (p, projectId) => ({
   ...(p._rowId ? {id: p._rowId} : {}),
   legacy_id: typeof p.id === "number" ? p.id : null,
   project_id: projectId,
@@ -15855,9 +15855,9 @@ const productionToRow = (p, projectId) => ({
 // back into a real number, matching what a user-created item's plain uid()
 // `id` looks like locally — a string id like "setup-001" passes through
 // unchanged.
-const parseLegacyId = v => v!=null && /^-?\d+$/.test(v) ? Number(v) : v;
+export const parseLegacyId = v => v!=null && /^-?\d+$/.test(v) ? Number(v) : v;
 
-const rowToSetupType = row => ({
+export const rowToSetupType = row => ({
   id: parseLegacyId(row.legacy_id) ?? row.id,
   _rowId: row.id,
   name: row.name, description: row.description||"",
@@ -15867,7 +15867,7 @@ const rowToSetupType = row => ({
   recordingSpecs: row.recording_specs||{}, screenContent: row.screen_content||{}, notes: row.notes||"",
   roles: row.roles||[], active: row.active!==false,
 });
-const setupTypeToRow = t => ({
+export const setupTypeToRow = t => ({
   ...(t._rowId ? {id: t._rowId} : {}),
   legacy_id: t.id!=null ? String(t.id) : null,
   name: t.name||null, description: t.description||null,
@@ -15878,12 +15878,12 @@ const setupTypeToRow = t => ({
   roles: t.roles||[], active: t.active!==false,
 });
 
-const rowToProductionPreset = row => ({
+export const rowToProductionPreset = row => ({
   id: parseLegacyId(row.legacy_id) ?? row.id,
   _rowId: row.id,
   name: row.name, type: row.type, createdAt: row.created_at, sections: row.sections||{}, active: row.active!==false,
 });
-const productionPresetToRow = p => ({
+export const productionPresetToRow = p => ({
   ...(p._rowId ? {id: p._rowId} : {}),
   legacy_id: p.id!=null ? String(p.id) : null,
   name: p.name||null, type: p.type||null, sections: p.sections||{}, active: p.active!==false,
@@ -15893,14 +15893,14 @@ const productionPresetToRow = p => ({
 // locally, always numeric) — unlike the two above, no parseLegacyId needed,
 // just a round-trip back to the string shape the app has always used for a
 // task's id.
-const rowToCustomTask = row => ({
+export const rowToCustomTask = row => ({
   id: row.legacy_id!=null ? String(row.legacy_id) : row.id,
   _rowId: row.id,
   projectId: row.project_id,
   title: row.title, dueDate: row.due_date, reminders: row.reminders||[],
   notes: row.notes||"", done: row.done||false, createdAt: row.created_at,
 });
-const customTaskToRow = t => ({
+export const customTaskToRow = t => ({
   ...(t._rowId ? {id: t._rowId} : {}),
   legacy_id: t.id!=null ? Number(t.id) : null,
   project_id: t.projectId||null,
@@ -15915,25 +15915,36 @@ const customTaskToRow = t => ({
 // own SHADOW_WRITE_* flag is on, so — same as the normalized-schema
 // section above — this is live, not dead code.
 
-const rowToGear = row => ({
+export const rowToGear = row => ({
   id: row.legacy_id ?? row.id, _rowId: row.id,
   name: row.name, category: row.category, quantity: row.quantity||1, notes: row.notes||"", active: row.active!==false,
 });
-const gearToRow = g => ({
+export const gearToRow = g => ({
   ...(g._rowId ? {id: g._rowId} : {}),
   legacy_id: typeof g.id==="number" ? g.id : null,
   name: g.name||null, category: g.category||null, quantity: g.quantity||1, notes: g.notes||null, active: g.active!==false,
 });
 
-const rowToFurniture = row => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category||"Furniture", active: row.active!==false });
-const furnitureToRow = f => ({
+// id round-trips through parseLegacyId the same way rowToSetupType/
+// rowToProductionPreset already do — found while writing round-trip tests
+// for this mapper: furnitureToRow stores legacy_id as a string (`text`
+// column), so without this an item created locally with a numeric uid()
+// id comes back from a reload as that same id but as a STRING, breaking
+// every strict `===`/`.includes()` id comparison downstream (confirmed
+// live at two call sites — the Setup Type furniture-selection checkbox
+// and the inactive-reference warning banner — plus a third call site that
+// had already worked around it locally with String(x.id)===String(id)
+// rather than fixing the type at its source).
+export const rowToFurniture = row => ({ id: parseLegacyId(row.legacy_id) ?? row.id, _rowId: row.id, name: row.name, category: row.category||"Furniture", active: row.active!==false });
+export const furnitureToRow = f => ({
   ...(f._rowId ? {id: f._rowId} : {}),
   legacy_id: f.id!=null ? String(f.id) : null,
   name: f.name||null, category: f.category||"Furniture", active: f.active!==false,
 });
 
-const rowToProp = row => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category||"Prop", active: row.active!==false });
-const propToRow = p => ({
+// Same legacy_id string-vs-number fix as rowToFurniture above.
+export const rowToProp = row => ({ id: parseLegacyId(row.legacy_id) ?? row.id, _rowId: row.id, name: row.name, category: row.category||"Prop", active: row.active!==false });
+export const propToRow = p => ({
   ...(p._rowId ? {id: p._rowId} : {}),
   legacy_id: p.id!=null ? String(p.id) : null,
   name: p.name||null, category: p.category||"Prop", active: p.active!==false,
@@ -15943,20 +15954,22 @@ const propToRow = p => ({
 // item lives in) — screenContentOptionToRow takes it as a second argument
 // from whichever category array is being diffed, same approach
 // assembleNormalizedProjectData's siblings use for their own parent-scoped fields.
-const rowToScreenContentOption = row => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, active: row.active!==false });
-const screenContentOptionToRow = (item, category) => ({
+// Same legacy_id string-vs-number fix as rowToFurniture above.
+export const rowToScreenContentOption = row => ({ id: parseLegacyId(row.legacy_id) ?? row.id, _rowId: row.id, name: row.name, active: row.active!==false });
+export const screenContentOptionToRow = (item, category) => ({
   ...(item._rowId ? {id: item._rowId} : {}),
   legacy_id: item.id!=null ? String(item.id) : null,
   category, name: item.name||null, active: item.active!==false,
 });
 
-const rowToUnavailability = row => ({
-  id: row.legacy_id ?? row.id, _rowId: row.id,
+// Same legacy_id string-vs-number fix as rowToFurniture above.
+export const rowToUnavailability = row => ({
+  id: parseLegacyId(row.legacy_id) ?? row.id, _rowId: row.id,
   memberId: row.member_id, type: row.type, label: row.label,
   startDate: row.start_date, endDate: row.end_date, allDay: row.all_day,
   startTime: row.start_time, endTime: row.end_time, notes: row.notes||"", createdAt: row.created_at,
 });
-const unavailabilityToRow = u => ({
+export const unavailabilityToRow = u => ({
   ...(u._rowId ? {id: u._rowId} : {}),
   legacy_id: u.id!=null ? String(u.id) : null,
   member_id: u.memberId||null, type: u.type||null, label: u.label||null,
@@ -15964,12 +15977,13 @@ const unavailabilityToRow = u => ({
   start_time: u.startTime||null, end_time: u.endTime||null, notes: u.notes||null,
 });
 
-const rowToTalent = row => ({
-  id: row.legacy_id ?? row.id, _rowId: row.id,
+// Same legacy_id string-vs-number fix as rowToFurniture above.
+export const rowToTalent = row => ({
+  id: parseLegacyId(row.legacy_id) ?? row.id, _rowId: row.id,
   name: row.name, category: row.category, bio: row.bio||"", photoKey: row.photo_key, lastBookedAt: row.last_booked_at,
   active: row.active!==false,
 });
-const talentToRow = t => ({
+export const talentToRow = t => ({
   ...(t._rowId ? {id: t._rowId} : {}),
   legacy_id: t.id!=null ? String(t.id) : null,
   name: t.name||null, category: t.category||null, bio: t.bio||null,
@@ -15980,22 +15994,22 @@ const talentToRow = t => ({
 // app today — see the research this landed in), so the write side only
 // needed a row builder for INSERT. The read-cutover side still needs the
 // other direction (rowToX) to reconstruct local objects from the table.
-const nudgeToRow = n => ({
+export const nudgeToRow = n => ({
   legacy_id: typeof n.id==="number" ? n.id : null,
   task_key: n.taskKey||null, project_id: n.projectId||null, task_id: n.taskId||null,
   task_label: n.taskLabel||null, tab: n.tab||null, to_member_id: n.toMemberId||null,
 });
-const rowToNudge = row => ({
+export const rowToNudge = row => ({
   id: row.legacy_id ?? row.id,
   taskKey: row.task_key, projectId: row.project_id, taskId: row.task_id,
   taskLabel: row.task_label, tab: row.tab, toMemberId: row.to_member_id, createdAt: row.created_at,
 });
-const becRequestToRow = b => ({
+export const becRequestToRow = b => ({
   legacy_id: typeof b.id==="number" ? b.id : null,
   reservation_id: b.reservationId||null, project_id: b.projectId||null, action: b.action||null,
   received_at: b.receivedAt||null, parsed: b.parsed||{},
 });
-const rowToBecRequest = row => ({
+export const rowToBecRequest = row => ({
   id: row.legacy_id ?? row.id,
   reservationId: row.reservation_id, projectId: row.project_id, action: row.action,
   receivedAt: row.received_at, parsed: row.parsed||{},
@@ -16005,12 +16019,12 @@ const rowToBecRequest = row => ({
 // as a single blob rather than 48 mapped columns (see the schema's own
 // reasoning) — rowToIntake spreads them back onto the object so nothing
 // downstream needs to know they're stored any differently than the other 4.
-const rowToIntake = row => ({
+export const rowToIntake = row => ({
   id: row.legacy_id ?? row.id, _rowId: row.id,
   dateReceived: row.date_received, status: row.status, assignedProjectId: row.assigned_project_id,
   ...(row.fields||{}),
 });
-const intakeToRow = i => {
+export const intakeToRow = i => {
   const {id, _rowId, dateReceived, status, assignedProjectId, ...fields} = i;
   return {
     ...(i._rowId ? {id: i._rowId} : {}),
@@ -16020,13 +16034,14 @@ const intakeToRow = i => {
   };
 };
 
-const rowToMediaCard = row => ({
-  id: row.legacy_id ?? row.id, _rowId: row.id,
+// Same legacy_id string-vs-number fix as rowToFurniture above.
+export const rowToMediaCard = row => ({
+  id: parseLegacyId(row.legacy_id) ?? row.id, _rowId: row.id,
   label: row.label, category: row.category, type: row.type, format: row.format,
   capacityGB: row.capacity_gb, manufacturer: row.manufacturer, model: row.model, folderName: row.folder_name,
   status: row.status, assignedTo: row.assigned_to, projectRef: row.project_ref, homeLocation: row.home_location, notes: row.notes,
 });
-const mediaCardToRow = m => ({
+export const mediaCardToRow = m => ({
   ...(m._rowId ? {id: m._rowId} : {}),
   legacy_id: m.id!=null ? String(m.id) : null,
   label: m.label||null, category: m.category||null, type: m.type||null, format: m.format||null,
@@ -16034,13 +16049,13 @@ const mediaCardToRow = m => ({
   status: m.status||null, assigned_to: m.assignedTo||null, project_ref: m.projectRef||null, home_location: m.homeLocation||null, notes: m.notes||null,
 });
 
-const rowToWorkstation = row => ({
+export const rowToWorkstation = row => ({
   id: row.legacy_id ?? row.id, _rowId: row.id,
   name: row.name, location: row.location, machineType: row.machine_type,
   serialNumber: row.serial_number, assignedTo: row.assigned_to, available: row.available,
   active: row.active!==false,
 });
-const workstationToRow = w => ({
+export const workstationToRow = w => ({
   ...(w._rowId ? {id: w._rowId} : {}),
   legacy_id: typeof w.id==="number" ? w.id : null,
   name: w.name||null, location: w.location||null, machine_type: w.machineType||null,
@@ -16054,7 +16069,7 @@ const workstationToRow = w => ({
 // the App level a full replacement array (gear, furniture, props,
 // talent_roster, media_cards, workstations, intakes) rather than calling
 // a per-item add/update/delete prop.
-const computeListDiff = (oldList, newList, toRow) => {
+export const computeListDiff = (oldList, newList, toRow) => {
   const oldById = new Map(oldList.map(x=>[String(x.id), x]));
   const newIds = new Set(newList.map(x=>String(x.id)));
   const toDelete = oldList.filter(x=>!newIds.has(String(x.id)) && x._rowId);
@@ -16086,7 +16101,7 @@ const writeListDiff = (sbClient, table, diff, toRow) => Promise.all([
 // _rowId. A rename (studio_spaces) necessarily shows up here as one delete
 // + one insert, matching the same destructive-rename behavior the app
 // already has today (see production_schema_new_tables.sql's note on this).
-const computeStringListDiff = (oldList, newList) => {
+export const computeStringListDiff = (oldList, newList) => {
   const oldSet = new Set(oldList), newSet = new Set(newList);
   return {
     toInsert: newList.filter(s=>!oldSet.has(s)),
@@ -16111,7 +16126,7 @@ const spaceMetaToRow = (spaceName, m) => ({
   linked_green_room: m.linkedGreenRoom||null, crew_call_offset_ms: m.crewCallOffsetMs||0,
   active: m.active!==false,
 });
-const computeSpaceMetaDiff = (oldMeta, newMeta) => {
+export const computeSpaceMetaDiff = (oldMeta, newMeta) => {
   const toUpsert = Object.keys(newMeta).map(k=>spaceMetaToRow(k, newMeta[k]));
   const toDelete = Object.keys(oldMeta).filter(k=>!(k in newMeta));
   return {toUpsert, toDelete};
@@ -16213,7 +16228,7 @@ const deleteProductionRow      = (sbClient, rowId)                  => sbClient.
 // `oldRounds` missing from `newRounds` was removed; everything else that
 // actually changed gets a patch. Kept separate from the sb calls below so
 // the decision logic is testable without a database.
-const computeRoundDiff = (oldRounds, newRounds) => {
+export const computeRoundDiff = (oldRounds, newRounds) => {
   const oldById = new Map(oldRounds.map(r=>[String(r.id), r]));
   const newIds = new Set(newRounds.map(r=>String(r.id)));
   const toDelete = oldRounds.filter(r=>!newIds.has(String(r.id)));
@@ -16268,7 +16283,7 @@ const writeRoundDiff = (sbClient, deliverableRowId, diff) => Promise.all([
 // keyed by _rowId (a production's real uuid row, tagged by the bootstrap
 // effect below) instead of a parent id, since productions aren't nested
 // inside anything else the way rounds are nested inside a deliverable.
-const computeProductionDiff = (oldProds, newProds) => {
+export const computeProductionDiff = (oldProds, newProds) => {
   const oldById = new Map(oldProds.map(p=>[String(p.id), p]));
   const newIds = new Set(newProds.map(p=>String(p.id)));
   const toDelete = oldProds.filter(p=>!newIds.has(String(p.id)) && p._rowId);
@@ -16326,7 +16341,7 @@ const writeProductionDiff = (sbClient, projectId, diff) => Promise.all([
 // array at that moment — see computeIngestDiff — so an ingest's display
 // name never shifts just because it scrolled out of the default
 // not-yet-completed view.
-const rowToIngest = row => ({
+export const rowToIngest = row => ({
   id: row.legacy_id ?? row.id, _rowId: row.id, projectId: row.project_id, seq: row.seq,
   datetime: row.datetime, completedAt: row.completed_at, location: row.location||"",
   numFiles: row.num_files||"", totalSizeGB: row.total_size_gb||"",
@@ -16336,7 +16351,7 @@ const rowToIngest = row => ({
   reviewLinkDelIds: row.review_link_del_ids||[], mediaSource: row.media_source||"",
   notes: row.notes||"", callSheet: row.call_sheet||null, status: row.status||"Not Received",
 });
-const ingestToRow = (ig, projectId) => ({
+export const ingestToRow = (ig, projectId) => ({
   ...(ig._rowId ? {id: ig._rowId} : {}),
   legacy_id: typeof ig.id==="number" ? ig.id : null,
   project_id: projectId,
@@ -16354,7 +16369,7 @@ const updateIngestRow = (sbClient, rowId, patch)  => sbClient.from("ingests").up
 const deleteIngestRow = (sbClient, rowId)         => sbClient.from("ingests").delete().eq("id", rowId);
 // Same coarse-write shape as productions — every edit to any ingestDates
 // entry arrives as one onUpdateProject(id,"ingestDates",wholeArray) call.
-const computeIngestDiff = (oldIngests, newIngests) => {
+export const computeIngestDiff = (oldIngests, newIngests) => {
   const oldById = new Map(oldIngests.map(ig=>[String(ig.id), ig]));
   const newIds = new Set(newIngests.map(ig=>String(ig.id)));
   const toDelete = oldIngests.filter(ig=>!newIds.has(String(ig.id)) && ig._rowId);
@@ -16401,7 +16416,7 @@ const deleteProductionPresetRow = (sbClient, rowId)    => sbClient.from("product
 // per-item add/update/delete call site the way setup types and custom tasks
 // have), so this is the same diff-then-write pattern as
 // computeProductionDiff/writeProductionDiff.
-const computePresetDiff = (oldPresets, newPresets) => {
+export const computePresetDiff = (oldPresets, newPresets) => {
   const oldById = new Map(oldPresets.map(p=>[String(p.id), p]));
   const newIds = new Set(newPresets.map(p=>String(p.id)));
   const toDelete = oldPresets.filter(p=>!newIds.has(String(p.id)) && p._rowId);
@@ -21968,7 +21983,7 @@ const groupWorkflowState = (dels) => {
 
 // Insert newSeg into an existing segment array, trimming/splitting any overlapping
 // segments to make room. Preserves all history outside the new window.
-const punchIntoSegments = (existing, newSeg) => {
+export const punchIntoSegments = (existing, newSeg) => {
   const adj = (d, n) => {
     if(!d) return null;
     const dt = new Date(d+'T12:00'); dt.setDate(dt.getDate()+n);

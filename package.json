@@ -1,0 +1,31 @@
+{
+  "name": "production",
+  "version": "1.0.0",
+  "description": "Post-production pipeline tracker: projects, deliverables, ingest, studio bookings, and resourcing for a production team.",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build:test-module": "esbuild PostProTrackerV4.jsx --bundle --loader:.js=jsx --jsx=transform --format=esm --outfile=test/_built/app.mjs --external:react --external:react-dom --external:recharts --define:process.env.NODE_ENV='\"test\"'",
+    "pretest": "npm run build:test-module",
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/evdorfman/production.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/evdorfman/production/issues"
+  },
+  "homepage": "https://github.com/evdorfman/production#readme",
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "jsdom": "^30.1.3",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "recharts": "^3.10.1",
+    "vitest": "^5.0.5"
+  }
+}
