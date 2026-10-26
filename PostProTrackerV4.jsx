@@ -21040,26 +21040,46 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
   const [locFilter, setLocFilter] = useState("All");
   const [drawerBooking, setDrawerBooking] = useState(null);
   const sidebarWidth = drawerBooking ? 400 : 0;
-  // Persistent approval history — survives the session
+  // Backed by activity_log — see the fetch/write effect and
+  // logBookingApproval below. (Was plain useState([]) despite this same
+  // comment claiming persistence — it reset to empty on every reload.)
   const [approvalHistory, setApprovalHistory] = useState([]);
 
   const openDrawer = b => setDrawerBooking(b);
   const closeDrawer = () => setDrawerBooking(null);
+
+  // Approval history used to be plain useState([]) — looked "persistent"
+  // within a session (the comment literally said so) but reset to empty on
+  // every reload, for everyone. Now backed by activity_log (the same table
+  // Production Status History and every other activity feed in the app
+  // reads from), via a direct insert here and a fetch on mount below.
+  useEffect(()=>{
+    if(!sb || !isApprover) return;
+    sb.from("activity_log").select("*").eq("entity_type","booking").in("action",["approved","denied","unapproved"])
+      .order("created_at",{ascending:false}).limit(200)
+      .then(({data,error})=>{ if(!error&&data) setApprovalHistory(data); });
+  },[isApprover]);
+
+  const logBookingApproval = (booking, action, detail) => {
+    if(!sb) return;
+    sb.from("activity_log").insert({
+      actor_email: member.email||null, actor_name: member.name||"Someone",
+      project_id: booking.projectId||null,
+      entity_type: "booking", entity_label: booking.title||"Booking", action, detail,
+    }).select().single().then(({data,error})=>{
+      if(error){ console.error("[Supabase] Approval history log failed:", error); return; }
+      if(data) setApprovalHistory(h=>[data,...h]);
+    });
+  };
 
   // Approve / Deny a booking — records to history so it's never lost
   const handleApproval = (bookingId, approved, denyReason="") => {
     const booking = (studioBookings||[]).find(b=>b.id===bookingId);
     const newStatus = approved ? "Confirmed" : "Tentative"; // denial returns to Tentative not Cancelled
     onUpdateStudioBookings(prev=>prev.map(b=>b.id!==bookingId?b:{...b,bookingStatus:newStatus,rejectionNote:approved?null:(denyReason||"Denied by Broadcast Manager")}));
-    if(booking) {
-      setApprovalHistory(h=>[{
-        id:uid(), bookingId, title:booking.title,
-        location:booking.location, startTime:booking.startTime,
-        decision:approved?"Approved":"Denied",
-        decidedAt:new Date().toISOString(),
-        decidedBy:member.name,
-        productionType:booking.productionType,
-      },...h]);
+    if(booking){
+      const detail = `📍 ${locStr(booking.location)}${booking.startTime?` · ${fmtDate(booking.startTime)}`:""}`;
+      logBookingApproval(booking, approved?"approved":"denied", detail);
     }
     showToast(approved
       ? {msg:`✓ Booking approved — Studio confirmed.`, color:"#10b981"}
@@ -21072,15 +21092,9 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
   const handleUnapprove = (bookingId) => {
     const booking = (studioBookings||[]).find(b=>b.id===bookingId);
     onUpdateStudioBookings(prev=>prev.map(b=>b.id!==bookingId?b:{...b,bookingStatus:"Tentative"}));
-    if(booking) {
-      setApprovalHistory(h=>[{
-        id:uid(), bookingId, title:booking.title,
-        location:booking.location, startTime:booking.startTime,
-        decision:"Unapproved",
-        decidedAt:new Date().toISOString(),
-        decidedBy:member.name,
-        productionType:booking.productionType,
-      },...h]);
+    if(booking){
+      const detail = `📍 ${locStr(booking.location)}${booking.startTime?` · ${fmtDate(booking.startTime)}`:""}`;
+      logBookingApproval(booking, "unapproved", detail);
     }
     showToast({msg:`↩ Booking returned to Tentative for review.`, color:"#f59e0b"});
     closeDrawer();
@@ -21140,6 +21154,7 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
                       <div style={{fontSize:13,color: "#9ca3af",marginTop:1}}>📍 {locStr(b.location)} · {b.startTime?fmtDT(b.startTime):"TBD"}</div>
                       {linkedProj&&<div style={{fontSize:13,color:"#6366f1",marginTop:1}}>↗ {linkedProj.name}</div>}
                       {b.notes&&<div style={{fontSize:13,color: "#9ca3af",marginTop:2,fontStyle:"italic"}}>{b.notes.slice(0,80)}{b.notes.length>80?"…":""}</div>}
+                      {b.rejectionNote&&<div style={{fontSize:13,color:"#ef4444",marginTop:2}}>↩ Previously denied: {b.rejectionNote}</div>}
                     </div>
                     <div style={{display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end",flexShrink:0}}>
                       <Chip label={b.productionType||"Event"} color={PRODUCTION_COLOR[b.productionType]||"#6b7280"} xs/>
@@ -21165,22 +21180,21 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
       {/* ── Approval History (Torey only) — persists after approval ── */}
       {isApprover&&(
         <RVSec title="Approval History" count={approvalHistory.length} color="#6b7280" defaultOpen={approvalHistory.length>0}>
-          {approvalHistory.length===0&&<div style={{textAlign:"center",padding:"16px 0",color: "#838ba0",fontSize:16}}>No approvals actioned yet this session.</div>}
+          {approvalHistory.length===0&&<div style={{textAlign:"center",padding:"16px 0",color: "#838ba0",fontSize:16}}>No approvals actioned yet.</div>}
           <div style={{display:"flex",flexDirection:"column",gap:5}}>
             {approvalHistory.map(h=>{
-              const isApproved=h.decision==="Approved";
-              const color=isApproved?"#10b981":"#ef4444";
-              const linkedProj=h.projectId?projects.find(p=>p.id===h.projectId):null;
+              const label=h.action==="approved"?"Approved":h.action==="denied"?"Denied":"Unapproved";
+              const color=h.action==="approved"?"#10b981":h.action==="denied"?"#ef4444":"#f59e0b";
               return(
                 <div key={h.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",background:"#111827",border:`1px solid ${color}20`,borderRadius:9}}>
                   <div style={{width:6,height:6,borderRadius:"50%",background:color,flexShrink:0}}/>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:16,fontWeight:700,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.title}</div>
-                    <div style={{fontSize:13,color: "#9ca3af"}}>📍 {locStr(h.location)}{h.startTime?` · ${fmtDate(h.startTime)}`:""} · by {h.decidedBy}</div>
+                    <div style={{fontSize:16,fontWeight:700,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.entity_label}</div>
+                    <div style={{fontSize:13,color: "#9ca3af"}}>{h.detail}{h.actor_name?` · by ${h.actor_name}`:""}</div>
                   </div>
                   <div style={{display:"flex",gap:5,flexShrink:0,alignItems:"center"}}>
-                    <Chip label={h.decision} color={color} xs/>
-                    <span style={{fontSize:13,color: "#8e97a6"}}>{fmtTime(h.decidedAt)}</span>
+                    <Chip label={label} color={color} xs/>
+                    <span style={{fontSize:13,color: "#8e97a6"}}>{fmtTime(h.created_at)}</span>
                   </div>
                 </div>
               );
@@ -21332,6 +21346,18 @@ const BroadcastDashboard = ({member, projects, team, studioBookings, onOpenProje
               </div>
               {/* Drawer body */}
               <div style={{overflowY:"scroll",WebkitOverflowScrolling:"touch",padding:"16px 20px 40px",minHeight:0}}>
+                {/* Denial reason — was being saved all along, just never
+                    shown anywhere; mirrors the same banner for a
+                    project-embedded production's rejectionNote. */}
+                {b.bookingStatus==="Tentative"&&b.rejectionNote&&(
+                  <div style={{background:"#ef444415",border:"1px solid #ef444430",borderRadius:9,padding:"10px 14px",marginBottom:12,display:"flex",gap:8,alignItems:"flex-start"}}>
+                    <span style={{fontSize:16,flexShrink:0}}>↩</span>
+                    <div>
+                      <div style={{fontSize:14,fontWeight:700,color:"#ef4444"}}>Returned — Approval Denied</div>
+                      <div style={{fontSize:13,color:"#9ca3af",marginTop:1}}>{b.rejectionNote}</div>
+                    </div>
+                  </div>
+                )}
                 {/* Approval controls in drawer */}
                 {isApprover&&b.bookingStatus==="Tentative"&&(
                   <div style={{background:"#f59e0b10",border:"1px solid #f59e0b30",borderRadius:9,padding:"10px 14px",marginBottom:16}}>
