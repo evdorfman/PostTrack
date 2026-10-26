@@ -10505,6 +10505,12 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     srtFrameUrl: row.srt_frame_url,
     watermark: row.watermark || false,
     bxtvLink: row.bxtv_link || null,
+    // Found in the same audit pass as review_rounds' isWorkReview/
+    // reviewRoundId gap above — see
+    // production_patch_016_rounds_deliverables_missing_fields.sql.
+    srtNeeded: row.srt_needed || false,
+    qualitiesConfirmed: row.qualities_confirmed || false,
+    _reassignmentRequested: row.reassignment_requested || null,
     rounds: []
     // populated by assembleNormalizedProjectData, never by this mapper alone
   });
@@ -10544,7 +10550,10 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     srt_delivered: !!d.srtDelivered,
     srt_frame_url: d.srtFrameUrl || null,
     watermark: !!d.watermark,
-    bxtv_link: d.bxtvLink || null
+    bxtv_link: d.bxtvLink || null,
+    srt_needed: !!d.srtNeeded,
+    qualities_confirmed: !!d.qualitiesConfirmed,
+    reassignment_requested: d._reassignmentRequested || null
   });
   var isUuid = (v) => typeof v === "string" && v.includes("-");
   var rowToWorkReviewSession = (row) => ({
@@ -10575,7 +10584,13 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     reviewers: row.reviewers || [],
     status: row.status,
     notes: row.notes || "",
-    workReviewSessionId: row.work_review_session_id
+    workReviewSessionId: row.work_review_session_id,
+    // isWorkReview/reviewRoundId are how a batch of rounds added together
+    // (AddReviewRoundModal, or linking into a work-review session) stays
+    // grouped as one Calendar event and gets bulk deadline updates — see
+    // production_patch_016_rounds_deliverables_missing_fields.sql.
+    isWorkReview: row.is_work_review || false,
+    reviewRoundId: row.review_round_id != null ? parseLegacyId(row.review_round_id) : null
   });
   var reviewRoundToRow = (r, deliverableRowId) => ({
     ...isUuid(r.id) ? { id: r.id } : {},
@@ -10585,6 +10600,11 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     reviewers: r.reviewers || [],
     status: r.status || null,
     notes: r.notes || null,
+    is_work_review: !!r.isWorkReview,
+    // Plain local-counter id (uid()), same shape as legacy_id elsewhere in
+    // this schema — never a uuid, so no "omit until resolved" dance needed
+    // the way work_review_session_id has below.
+    review_round_id: r.reviewRoundId != null ? String(r.reviewRoundId) : null,
     // work_review_session_id is omitted entirely (not set to null) when the
     // local round's workReviewSessionId isn't a real uuid yet — an UPDATE
     // only touches fields present in the request body, so omitting it leaves
