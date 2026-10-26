@@ -15684,15 +15684,16 @@ const bookingToRow = b => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Normalized-schema data layer (deliverables/review_rounds/productions as
-// their own Supabase tables — see staging_schema.sql) — NOT YET WIRED IN.
-// Nothing below calls or is called by the live app; projects.deliverables/
-// projects.productions (the nested-JSON columns) stay the only thing any
-// component reads until a deliberate cutover step swaps the data-loading
-// effect and updateDel/addDel/deleteDel/etc. over to these. Until then this
-// is dead code that happens to live in the same file so it ships, builds,
-// and gets code-reviewed alongside everything else — see
-// assembleNormalizedProjectData's doc comment for why the shape it produces
-// has to match today's nested shape exactly.
+// their own Supabase tables — see staging_schema.sql). The cutover is
+// live: READ_FROM_NORMALIZED_DELIVERABLES_PRODUCTIONS and
+// SHADOW_WRITE_PRODUCTIONS/SHADOW_WRITE_DELIVERABLES (see their own flags
+// below) are on, so projects.deliverables/projects.productions (the old
+// nested-JSON columns) are no longer read or written — every component
+// still reads/writes through the same nested `project.deliverables`/
+// `project.productions` shape in memory, but that shape is now assembled
+// from and persisted to these dedicated tables under the hood. See
+// assembleNormalizedProjectData's doc comment for why the in-memory shape
+// has to match the old nested one exactly.
 //
 // `_rowId` on a deliverable/production object is its real Supabase primary
 // key (always a uuid) — the *ToRow functions use it to know whether to
