@@ -10792,7 +10792,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     notes: g.notes || null,
     active: g.active !== false
   });
-  var rowToFurniture = (row) => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category || "Furniture", active: row.active !== false });
+  var rowToFurniture = (row) => ({ id: parseLegacyId(row.legacy_id) ?? row.id, _rowId: row.id, name: row.name, category: row.category || "Furniture", active: row.active !== false });
   var furnitureToRow = (f) => ({
     ...f._rowId ? { id: f._rowId } : {},
     legacy_id: f.id != null ? String(f.id) : null,
@@ -10800,7 +10800,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     category: f.category || "Furniture",
     active: f.active !== false
   });
-  var rowToProp = (row) => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, category: row.category || "Prop", active: row.active !== false });
+  var rowToProp = (row) => ({ id: parseLegacyId(row.legacy_id) ?? row.id, _rowId: row.id, name: row.name, category: row.category || "Prop", active: row.active !== false });
   var propToRow = (p) => ({
     ...p._rowId ? { id: p._rowId } : {},
     legacy_id: p.id != null ? String(p.id) : null,
@@ -10808,7 +10808,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     category: p.category || "Prop",
     active: p.active !== false
   });
-  var rowToScreenContentOption = (row) => ({ id: row.legacy_id ?? row.id, _rowId: row.id, name: row.name, active: row.active !== false });
+  var rowToScreenContentOption = (row) => ({ id: parseLegacyId(row.legacy_id) ?? row.id, _rowId: row.id, name: row.name, active: row.active !== false });
   var screenContentOptionToRow = (item, category) => ({
     ...item._rowId ? { id: item._rowId } : {},
     legacy_id: item.id != null ? String(item.id) : null,
@@ -10817,7 +10817,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     active: item.active !== false
   });
   var rowToUnavailability = (row) => ({
-    id: row.legacy_id ?? row.id,
+    id: parseLegacyId(row.legacy_id) ?? row.id,
     _rowId: row.id,
     memberId: row.member_id,
     type: row.type,
@@ -10844,7 +10844,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     notes: u.notes || null
   });
   var rowToTalent = (row) => ({
-    id: row.legacy_id ?? row.id,
+    id: parseLegacyId(row.legacy_id) ?? row.id,
     _rowId: row.id,
     name: row.name,
     category: row.category,
@@ -10918,7 +10918,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     };
   };
   var rowToMediaCard = (row) => ({
-    id: row.legacy_id ?? row.id,
+    id: parseLegacyId(row.legacy_id) ?? row.id,
     _rowId: row.id,
     label: row.label,
     category: row.category,
