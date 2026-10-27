@@ -15228,8 +15228,10 @@ ${conditions}`;
     const [personFilter, setPersonFilter] = (0, import_react.useState)("all");
     const [expandedCells, setExpandedCells] = (0, import_react.useState)(/* @__PURE__ */ new Set());
     const [toast, setToast_] = (0, import_react.useState)(null);
+    const [shortenDeadlineFor, setShortenDeadlineFor] = (0, import_react.useState)(null);
     const [dragItem, setDragItem] = (0, import_react.useState)(null);
     const [dragOverKey, setDragOverKey] = (0, import_react.useState)(null);
+    const [extendPrompt, setExtendPrompt] = (0, import_react.useState)(null);
     const [showWeekend, setShowWeekend] = (0, import_react.useState)(false);
     const showToast = (msg) => {
       setToast_(msg);
@@ -15290,6 +15292,56 @@ ${conditions}`;
       showToast(fromDate ? "Handed off \u2713" : "Reassigned \u2713");
       setDragItem(null);
       setDragOverKey(null);
+    };
+    const withNewDatePart = (originalStr, newDayStr) => {
+      const m = String(originalStr || "").match(/T.*/);
+      return newDayStr + (m ? m[0] : "");
+    };
+    const trySamePersonDateChange = (memberId, delId, newDayStr) => {
+      const project = projects.find((p) => p.id === dragItem?.projectId);
+      if (!project) return;
+      const del = (project.deliverables || []).find((d) => d.id === delId);
+      if (!del) return;
+      const projEditors = [...project.assignees?.["Editor"] || [], ...project.assignees?.["Animator"] || []];
+      const deadlineDayStr = del.deadline ? fmtDay(parseLocalDT(del.deadline)) : null;
+      const fromDay = dragItem.fromDay;
+      const memberName = editors.find((e) => e.id === memberId)?.name || "";
+      if (deadlineDayStr && newDayStr > deadlineDayStr) {
+        setExtendPrompt({ type: "deadline", projectId: project.id, delId, delName: del.title || del.name || "Deliverable", memberId, memberName, oldDay: deadlineDayStr, newDay: newDayStr });
+        return;
+      }
+      if (newDayStr < fromDay && editorForDay(del, newDayStr, projEditors) !== memberId) {
+        setExtendPrompt({ type: "start", projectId: project.id, delId, delName: del.title || del.name || "Deliverable", memberId, memberName, oldDay: fromDay, newDay: newDayStr });
+      }
+    };
+    const confirmExtendPrompt = () => {
+      if (!extendPrompt) return;
+      const { type, projectId, delId, memberId, newDay, oldDay } = extendPrompt;
+      const project = projects.find((p) => p.id === projectId);
+      if (!project) {
+        setExtendPrompt(null);
+        return;
+      }
+      const del = (project.deliverables || []).find((d) => d.id === delId);
+      if (!del) {
+        setExtendPrompt(null);
+        return;
+      }
+      if (type === "deadline") {
+        const newDels = (project.deliverables || []).map((d) => d.id === delId ? { ...d, deadline: withNewDatePart(d.deadline, newDay) } : d);
+        onUpdateProject(projectId, "deliverables", newDels);
+        showToast("Deadline pushed \u2713");
+      } else {
+        const projEditors = [...project.assignees?.["Editor"] || [], ...project.assignees?.["Animator"] || []];
+        const primId = primaryEditorId(del, projEditors);
+        const existing = del._segments?.length ? del._segments : [{ editorId: primId, from: null, to: null }];
+        const covering = existing.find((s) => (!s.from || oldDay >= s.from) && (!s.to || oldDay <= s.to));
+        const segments = punchIntoSegments(existing, { editorId: memberId, from: newDay, to: covering?.to ?? null });
+        const newDels = (project.deliverables || []).map((d) => d.id === delId ? { ...d, _segments: segments, _editorId: void 0 } : d);
+        onUpdateProject(projectId, "deliverables", newDels);
+        showToast("Start date extended \u2713");
+      }
+      setExtendPrompt(null);
     };
     const weekStart = (0, import_react.useMemo)(() => addWeeks(getWeekStart(/* @__PURE__ */ new Date()), weekOffset), [weekOffset]);
     const days = (0, import_react.useMemo)(() => getWeekDays(weekStart), [weekStart]);
@@ -15403,7 +15455,7 @@ ${conditions}`;
           {
             key: di,
             onDragOver: (e) => {
-              if (dragItem && dragItem.fromMemberId !== member.id) {
+              if (dragItem && (dragItem.fromMemberId !== member.id || dragItem.delIds.length === 1)) {
                 e.preventDefault();
                 setDragOverKey(cellDropKey);
               }
@@ -15411,11 +15463,17 @@ ${conditions}`;
             onDragLeave: () => setDragOverKey((k) => k === cellDropKey ? null : k),
             onDrop: (e) => {
               e.preventDefault();
-              dropHandoff(member.id, dragItem?.fromDay);
+              if (dragItem && dragItem.fromMemberId === member.id) {
+                if (dragItem.delIds.length === 1 && dayStr !== dragItem.fromDay) trySamePersonDateChange(member.id, dragItem.delIds[0], dayStr);
+                setDragItem(null);
+                setDragOverKey(null);
+              } else {
+                dropHandoff(member.id, dragItem?.fromDay);
+              }
             },
             style: { padding: "7px", borderLeft: "1px solid #1f2937", background: isCellDropTarget ? "#6366f122" : isBlocked ? "#1a1005" : isWknd ? "#0a0c1320" : "transparent", display: "flex", flexDirection: "column", gap: 5, minHeight: 64, position: "relative", outline: isCellDropTarget ? "2px dashed #6366f1" : "none", outlineOffset: -2 }
           },
-          isCellDropTarget && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 2, left: 2, right: 2, fontSize: 10, color: "#818cf8", fontWeight: 800, textTransform: "uppercase", textAlign: "center", pointerEvents: "none", zIndex: 2 } }, "Hand off from ", dragItem?.fromDay ? (/* @__PURE__ */ new Date(dragItem.fromDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""),
+          isCellDropTarget && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 2, left: 2, right: 2, fontSize: 10, color: "#818cf8", fontWeight: 800, textTransform: "uppercase", textAlign: "center", pointerEvents: "none", zIndex: 2 } }, dragItem?.fromMemberId === member.id ? "Drop to adjust start/deadline" : `Hand off from ${dragItem?.fromDay ? (/* @__PURE__ */ new Date(dragItem.fromDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}`),
           isBlocked && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, background: "repeating-linear-gradient(45deg,#f59e0b08,#f59e0b08 4px,transparent 4px,transparent 12px)", pointerEvents: "none", borderRadius: 0 } }),
           isBlocked && groups.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#f59e0b80", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", textAlign: "center", paddingTop: 6 } }, "Away"),
           groups.map(({ project, dels }) => {
@@ -15488,7 +15546,41 @@ ${conditions}`;
                     style: { width: "100%", background: "#111827", border: `1px solid ${ws.color}50`, borderRadius: 4, color: ws.color, padding: "3px 6px", fontSize: 13, fontWeight: 700, cursor: "pointer", outline: "none", fontFamily: "inherit" }
                   },
                   DELIVERABLE_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, value: s }, s))
-                ), deadlineInfo && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: deadlineInfo.color, fontWeight: deadlineInfo.color === "#ef4444" ? 700 : 400, marginTop: 4 } }, deadlineInfo.text), del.frameLink && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 4 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement(DelFrameInfo, { frameLink: del.frameLink, framePW: del.framePW, small: true }))),
+                ), deadlineInfo && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: deadlineInfo.color, fontWeight: deadlineInfo.color === "#ef4444" ? 700 : 400 } }, deadlineInfo.text), del.deadline && /* @__PURE__ */ React.createElement(
+                  "button",
+                  {
+                    onClick: (e) => {
+                      e.stopPropagation();
+                      setShortenDeadlineFor((id) => id === del.id ? null : del.id);
+                    },
+                    title: "Move deadline earlier",
+                    style: { background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 12, padding: 0, lineHeight: 1 },
+                    onMouseEnter: (e) => e.currentTarget.style.color = "#818cf8",
+                    onMouseLeave: (e) => e.currentTarget.style.color = "#6b7280"
+                  },
+                  "\u270E"
+                )), shortenDeadlineFor === del.id && /* @__PURE__ */ React.createElement(
+                  "input",
+                  {
+                    type: "date",
+                    autoFocus: true,
+                    defaultValue: fmtDay(parseLocalDT(del.deadline)),
+                    max: fmtDay(parseLocalDT(del.deadline)),
+                    onClick: (e) => e.stopPropagation(),
+                    onChange: (e) => {
+                      e.stopPropagation();
+                      const newDay = e.target.value;
+                      const currentDay = fmtDay(parseLocalDT(del.deadline));
+                      if (newDay && newDay < currentDay) {
+                        updateDeliverable(project.id, del.id, "deadline", withNewDatePart(del.deadline, newDay));
+                        showToast("Deadline moved earlier \u2713");
+                      }
+                      setShortenDeadlineFor(null);
+                    },
+                    onBlur: () => setShortenDeadlineFor(null),
+                    style: { marginTop: 4, background: "#111827", border: "1px solid #374151", borderRadius: 4, color: "#e2e8f0", padding: "3px 6px", fontSize: 13, colorScheme: "dark" }
+                  }
+                )), del.frameLink && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 4 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement(DelFrameInfo, { frameLink: del.frameLink, framePW: del.framePW, small: true }))),
                 onOpenProject && /* @__PURE__ */ React.createElement(
                   "button",
                   {
@@ -15514,7 +15606,14 @@ ${conditions}`;
           })
         );
       }));
-    }), displayed.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 60, color: "#838ba0" } }, "No editors or animators found."))));
+    }), displayed.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 60, color: "#838ba0" } }, "No editors or animators found."))), extendPrompt && /* @__PURE__ */ React.createElement(Modal, { onClose: () => setExtendPrompt(null), maxWidth: 420 }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 20, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, extendPrompt.type === "start" ? "Extend start date?" : "Push deadline?"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#9ca3af", marginBottom: 20, lineHeight: 1.5 } }, extendPrompt.type === "start" ? /* @__PURE__ */ React.createElement(React.Fragment, null, "Make ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, extendPrompt.memberName), "'s assignment on ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, extendPrompt.delName), " start ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, (/* @__PURE__ */ new Date(extendPrompt.newDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" })), " instead of ", (/* @__PURE__ */ new Date(extendPrompt.oldDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }), "?") : /* @__PURE__ */ React.createElement(React.Fragment, null, "Push ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, extendPrompt.delName), "'s deadline to ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, (/* @__PURE__ */ new Date(extendPrompt.newDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" })), "? (currently ", (/* @__PURE__ */ new Date(extendPrompt.oldDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }), ")")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setExtendPrompt(null), style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "8px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer" } }, "Cancel"), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: confirmExtendPrompt,
+        style: { background: "#6366f1", border: "none", borderRadius: 7, color: "#fff", padding: "8px 16px", fontSize: 14, fontWeight: 800, cursor: "pointer" }
+      },
+      extendPrompt.type === "start" ? "Extend Start" : "Push Deadline"
+    ))));
   };
   var ResourceView = ({ projects, team, studioBookings = [], resourceConfig, onUpdateProject, unavailability = [], onUpdateDel, initialTab, onTabChange, onOpenProject }) => {
     const [subView, setSubView] = (0, import_react.useState)(initialTab || "utilization");

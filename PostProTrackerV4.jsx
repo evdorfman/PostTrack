@@ -22145,11 +22145,20 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
   const [personFilter, setPersonFilter]   = useState("all");
   const [expandedCells, setExpandedCells] = useState(new Set());
   const [toast, setToast_]                = useState(null);
+  // Which deliverable (by id) currently has its inline "move deadline
+  // earlier" date picker open — only one at a time.
+  const [shortenDeadlineFor, setShortenDeadlineFor] = useState(null);
   // Drag-and-drop reassignment — dragItem is {projectId, delIds, fromDay}
   // for whatever chip/row is being dragged; dragOverKey is the drop
   // target currently being hovered, purely for highlight styling.
   const [dragItem, setDragItem]           = useState(null);
   const [dragOverKey, setDragOverKey]     = useState(null);
+  // Dropping a single deliverable on its OWN row, on a different day than
+  // it was picked up from, offers to extend its start or deadline instead
+  // of a (meaningless) same-person handoff — see trySamePersonDateChange.
+  // Holds {type:"start"|"deadline", projectId, delId, delName, memberId,
+  // memberName, oldDay, newDay} while awaiting confirmation.
+  const [extendPrompt, setExtendPrompt]   = useState(null);
   // Weekdays-only by default — 5 columns instead of 7 gives each one real
   // room, so a project code reads on one line without truncating or
   // wrapping. Toggle reveals Sat/Sun when there's weekend work to check.
@@ -22215,6 +22224,71 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
     onUpdateProject(dragItem.projectId,"deliverables",newDels);
     showToast(fromDate ? "Handed off ✓" : "Reassigned ✓");
     setDragItem(null); setDragOverKey(null);
+  };
+
+  // Preserves whatever time-of-day a deadline carried (e.g. "...T17:00")
+  // when only its date part changes, instead of silently stripping it.
+  const withNewDatePart = (originalStr, newDayStr) => {
+    const m = String(originalStr||"").match(/T.*/);
+    return newDayStr + (m ? m[0] : "");
+  };
+
+  // Dropping a single deliverable back on its OWN row, on a day other than
+  // the one it was dragged from, doesn't fit the handoff model above (same
+  // person on both ends) — offer the two date-extension moves from the
+  // editor-cal request instead: dropping past the deadline offers to push
+  // it out; dropping earlier than a day this member doesn't already own
+  // (i.e. before wherever their current segment actually starts) offers to
+  // pull their start date back. Dropping somewhere that changes nothing
+  // (same day, or a day already theirs) is just a silent no-op. Only
+  // offered for a single dragged deliverable — a multi-deliverable chip
+  // drag could span different deadlines/owners per item, which doesn't
+  // reduce to one confirmation.
+  const trySamePersonDateChange = (memberId, delId, newDayStr) => {
+    const project = projects.find(p=>p.id===dragItem?.projectId);
+    if(!project) return;
+    const del = (project.deliverables||[]).find(d=>d.id===delId);
+    if(!del) return;
+    const projEditors = [...(project.assignees?.["Editor"]||[]),...(project.assignees?.["Animator"]||[])];
+    const deadlineDayStr = del.deadline ? fmtDay(parseLocalDT(del.deadline)) : null;
+    const fromDay = dragItem.fromDay;
+    const memberName = editors.find(e=>e.id===memberId)?.name||"";
+    if(deadlineDayStr && newDayStr>deadlineDayStr){
+      setExtendPrompt({type:"deadline", projectId:project.id, delId, delName:del.title||del.name||"Deliverable", memberId, memberName, oldDay:deadlineDayStr, newDay:newDayStr});
+      return;
+    }
+    if(newDayStr<fromDay && editorForDay(del, newDayStr, projEditors)!==memberId){
+      setExtendPrompt({type:"start", projectId:project.id, delId, delName:del.title||del.name||"Deliverable", memberId, memberName, oldDay:fromDay, newDay:newDayStr});
+    }
+    // Anything else (dropped on a day they already own, within range) —
+    // nothing meaningful to change, so no prompt.
+  };
+
+  const confirmExtendPrompt = () => {
+    if(!extendPrompt) return;
+    const {type, projectId, delId, memberId, newDay, oldDay} = extendPrompt;
+    const project = projects.find(p=>p.id===projectId);
+    if(!project){ setExtendPrompt(null); return; }
+    const del = (project.deliverables||[]).find(d=>d.id===delId);
+    if(!del){ setExtendPrompt(null); return; }
+    if(type==="deadline"){
+      const newDels = (project.deliverables||[]).map(d=>d.id===delId?{...d,deadline:withNewDatePart(d.deadline,newDay)}:d);
+      onUpdateProject(projectId,"deliverables",newDels);
+      showToast("Deadline pushed ✓");
+    } else {
+      const projEditors = [...(project.assignees?.["Editor"]||[]),...(project.assignees?.["Animator"]||[])];
+      const primId = primaryEditorId(del, projEditors);
+      const existing = del._segments?.length ? del._segments : [{editorId:primId, from:null, to:null}];
+      // Only the start moves — reuse whatever end boundary this member's
+      // current segment already had, so a later handoff further down the
+      // week (if any) is left exactly where it was.
+      const covering = existing.find(s=>(!s.from||oldDay>=s.from)&&(!s.to||oldDay<=s.to));
+      const segments = punchIntoSegments(existing, {editorId:memberId, from:newDay, to:covering?.to??null});
+      const newDels = (project.deliverables||[]).map(d=>d.id===delId?{...d,_segments:segments,_editorId:undefined}:d);
+      onUpdateProject(projectId,"deliverables",newDels);
+      showToast("Start date extended ✓");
+    }
+    setExtendPrompt(null);
   };
 
   // Week days
@@ -22400,13 +22474,23 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
                   const isCellDropTarget = dragOverKey===cellDropKey;
                   return (
                     <div key={di}
-                      onDragOver={e=>{ if(dragItem&&dragItem.fromMemberId!==member.id){ e.preventDefault(); setDragOverKey(cellDropKey); } }}
+                      onDragOver={e=>{ if(dragItem && (dragItem.fromMemberId!==member.id || dragItem.delIds.length===1)){ e.preventDefault(); setDragOverKey(cellDropKey); } }}
                       onDragLeave={()=>setDragOverKey(k=>k===cellDropKey?null:k)}
-                      onDrop={e=>{ e.preventDefault(); dropHandoff(member.id, dragItem?.fromDay); }}
+                      onDrop={e=>{
+                        e.preventDefault();
+                        if(dragItem && dragItem.fromMemberId===member.id){
+                          if(dragItem.delIds.length===1 && dayStr!==dragItem.fromDay) trySamePersonDateChange(member.id, dragItem.delIds[0], dayStr);
+                          setDragItem(null); setDragOverKey(null);
+                        } else {
+                          dropHandoff(member.id, dragItem?.fromDay);
+                        }
+                      }}
                       style={{padding:"7px",borderLeft:"1px solid #1f2937",background:isCellDropTarget?"#6366f122":isBlocked?"#1a1005":isWknd?"#0a0c1320":"transparent",display:"flex",flexDirection:"column",gap:5,minHeight:64,position:"relative",outline:isCellDropTarget?"2px dashed #6366f1":"none",outlineOffset:-2}}>
                       {isCellDropTarget&&(
                         <div style={{position:"absolute",top:2,left:2,right:2,fontSize:10,color:"#818cf8",fontWeight:800,textTransform:"uppercase",textAlign:"center",pointerEvents:"none",zIndex:2}}>
-                          Hand off from {dragItem?.fromDay?new Date(dragItem.fromDay+'T12:00').toLocaleDateString("en-US",{month:"short",day:"numeric"}):""}
+                          {dragItem?.fromMemberId===member.id
+                            ? "Drop to adjust start/deadline"
+                            : `Hand off from ${dragItem?.fromDay?new Date(dragItem.fromDay+'T12:00').toLocaleDateString("en-US",{month:"short",day:"numeric"}):""}`}
                         </div>
                       )}
                       {isBlocked&&(
@@ -22485,7 +22569,43 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
                                           {DELIVERABLE_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
                                         </select>
                                         {/* Deadline label */}
-                                        {deadlineInfo&&<div style={{fontSize:13,color:deadlineInfo.color,fontWeight:deadlineInfo.color==="#ef4444"?700:400,marginTop:4}}>{deadlineInfo.text}</div>}
+                                        {deadlineInfo&&(
+                                          <div style={{marginTop:4}}>
+                                            <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                              <div style={{fontSize:13,color:deadlineInfo.color,fontWeight:deadlineInfo.color==="#ef4444"?700:400}}>{deadlineInfo.text}</div>
+                                              {del.deadline&&(
+                                                <button onClick={e=>{e.stopPropagation();setShortenDeadlineFor(id=>id===del.id?null:del.id);}}
+                                                  title="Move deadline earlier"
+                                                  style={{background:"none",border:"none",color:"#6b7280",cursor:"pointer",fontSize:12,padding:0,lineHeight:1}}
+                                                  onMouseEnter={e=>e.currentTarget.style.color="#818cf8"}
+                                                  onMouseLeave={e=>e.currentTarget.style.color="#6b7280"}>
+                                                  ✎
+                                                </button>
+                                              )}
+                                            </div>
+                                            {/* Click-based, deliberately earlier-only (max = current deadline) —
+                                                pushing a deadline LATER is the drag-to-extend gesture above,
+                                                a distinct deliberate action; this is for trimming it in. */}
+                                            {shortenDeadlineFor===del.id&&(
+                                              <input type="date" autoFocus
+                                                defaultValue={fmtDay(parseLocalDT(del.deadline))}
+                                                max={fmtDay(parseLocalDT(del.deadline))}
+                                                onClick={e=>e.stopPropagation()}
+                                                onChange={e=>{
+                                                  e.stopPropagation();
+                                                  const newDay = e.target.value;
+                                                  const currentDay = fmtDay(parseLocalDT(del.deadline));
+                                                  if(newDay && newDay<currentDay){
+                                                    updateDeliverable(project.id, del.id, "deadline", withNewDatePart(del.deadline, newDay));
+                                                    showToast("Deadline moved earlier ✓");
+                                                  }
+                                                  setShortenDeadlineFor(null);
+                                                }}
+                                                onBlur={()=>setShortenDeadlineFor(null)}
+                                                style={{marginTop:4,background:"#111827",border:"1px solid #374151",borderRadius:4,color:"#e2e8f0",padding:"3px 6px",fontSize:13,colorScheme:"dark"}}/>
+                                            )}
+                                          </div>
+                                        )}
                                         {/* Frame.io review link + password — for pulling up the latest
                                             cut right in this meeting without opening the project.
                                             Omitted (not shown as "(No Frame link)") when there isn't
@@ -22528,6 +22648,25 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
         </div>
       </div>
 
+      {extendPrompt&&(
+        <Modal onClose={()=>setExtendPrompt(null)} maxWidth={420}>
+          <div style={{fontSize:20,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:10}}>
+            {extendPrompt.type==="start" ? "Extend start date?" : "Push deadline?"}
+          </div>
+          <div style={{fontSize:15,color:"#9ca3af",marginBottom:20,lineHeight:1.5}}>
+            {extendPrompt.type==="start"
+              ? <>Make <strong style={{color:"#e2e8f0"}}>{extendPrompt.memberName}</strong>'s assignment on <strong style={{color:"#e2e8f0"}}>{extendPrompt.delName}</strong> start <strong style={{color:"#e2e8f0"}}>{new Date(extendPrompt.newDay+'T12:00').toLocaleDateString("en-US",{month:"short",day:"numeric"})}</strong> instead of {new Date(extendPrompt.oldDay+'T12:00').toLocaleDateString("en-US",{month:"short",day:"numeric"})}?</>
+              : <>Push <strong style={{color:"#e2e8f0"}}>{extendPrompt.delName}</strong>'s deadline to <strong style={{color:"#e2e8f0"}}>{new Date(extendPrompt.newDay+'T12:00').toLocaleDateString("en-US",{month:"short",day:"numeric"})}</strong>? (currently {new Date(extendPrompt.oldDay+'T12:00').toLocaleDateString("en-US",{month:"short",day:"numeric"})})</>}
+          </div>
+          <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+            <button onClick={()=>setExtendPrompt(null)} style={{background:"#1f2937",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"8px 16px",fontSize:14,fontWeight:700,cursor:"pointer"}}>Cancel</button>
+            <button onClick={confirmExtendPrompt}
+              style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"8px 16px",fontSize:14,fontWeight:800,cursor:"pointer"}}>
+              {extendPrompt.type==="start" ? "Extend Start" : "Push Deadline"}
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
