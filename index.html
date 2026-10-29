@@ -15297,50 +15297,39 @@ ${conditions}`;
       const m = String(originalStr || "").match(/T.*/);
       return newDayStr + (m ? m[0] : "");
     };
-    const trySamePersonDateChange = (memberId, delId, newDayStr) => {
+    const computeDateChangeForDel = (del, newDayStr) => {
+      if (!del.deadline) return null;
+      const deadlineDayStr = fmtDay(parseLocalDT(del.deadline));
+      if (newDayStr === deadlineDayStr) return null;
+      return newDayStr > deadlineDayStr ? { type: "push", oldDay: deadlineDayStr } : { type: "shorten", oldDay: deadlineDayStr };
+    };
+    const trySamePersonDateChange = (memberId, delIds, newDayStr) => {
       const project = projects.find((p) => p.id === dragItem?.projectId);
       if (!project) return;
-      const del = (project.deliverables || []).find((d) => d.id === delId);
-      if (!del) return;
-      const projEditors = [...project.assignees?.["Editor"] || [], ...project.assignees?.["Animator"] || []];
-      const deadlineDayStr = del.deadline ? fmtDay(parseLocalDT(del.deadline)) : null;
-      const fromDay = dragItem.fromDay;
       const memberName = editors.find((e) => e.id === memberId)?.name || "";
-      if (deadlineDayStr && newDayStr > deadlineDayStr) {
-        setExtendPrompt({ type: "deadline", projectId: project.id, delId, delName: del.title || del.name || "Deliverable", memberId, memberName, oldDay: deadlineDayStr, newDay: newDayStr });
-        return;
-      }
-      if (newDayStr < fromDay && editorForDay(del, newDayStr, projEditors) !== memberId) {
-        setExtendPrompt({ type: "start", projectId: project.id, delId, delName: del.title || del.name || "Deliverable", memberId, memberName, oldDay: fromDay, newDay: newDayStr });
-      }
+      const items = [];
+      delIds.forEach((delId) => {
+        const del = (project.deliverables || []).find((d) => d.id === delId);
+        if (!del) return;
+        const change = computeDateChangeForDel(del, newDayStr);
+        if (change) items.push({ delId, delName: del.title || del.name || "Deliverable", status: del.status || "Not Started", ...change });
+      });
+      if (items.length) setExtendPrompt({ projectId: project.id, memberId, memberName, newDay: newDayStr, items });
     };
     const confirmExtendPrompt = () => {
       if (!extendPrompt) return;
-      const { type, projectId, delId, memberId, newDay, oldDay } = extendPrompt;
+      const { projectId, newDay, items } = extendPrompt;
       const project = projects.find((p) => p.id === projectId);
       if (!project) {
         setExtendPrompt(null);
         return;
       }
-      const del = (project.deliverables || []).find((d) => d.id === delId);
-      if (!del) {
-        setExtendPrompt(null);
-        return;
-      }
-      if (type === "deadline") {
-        const newDels = (project.deliverables || []).map((d) => d.id === delId ? { ...d, deadline: withNewDatePart(d.deadline, newDay) } : d);
-        onUpdateProject(projectId, "deliverables", newDels);
-        showToast("Deadline pushed \u2713");
-      } else {
-        const projEditors = [...project.assignees?.["Editor"] || [], ...project.assignees?.["Animator"] || []];
-        const primId = primaryEditorId(del, projEditors);
-        const existing = del._segments?.length ? del._segments : [{ editorId: primId, from: null, to: null }];
-        const covering = existing.find((s) => (!s.from || oldDay >= s.from) && (!s.to || oldDay <= s.to));
-        const segments = punchIntoSegments(existing, { editorId: memberId, from: newDay, to: covering?.to ?? null });
-        const newDels = (project.deliverables || []).map((d) => d.id === delId ? { ...d, _segments: segments, _editorId: void 0 } : d);
-        onUpdateProject(projectId, "deliverables", newDels);
-        showToast("Start date extended \u2713");
-      }
+      const byId = new Map(items.map((it) => [it.delId, it]));
+      const newDels = (project.deliverables || []).map(
+        (d) => byId.has(d.id) ? { ...d, deadline: withNewDatePart(d.deadline, newDay) } : d
+      );
+      onUpdateProject(projectId, "deliverables", newDels);
+      showToast(items.length > 1 ? `${items.length} deadlines updated \u2713` : items[0].type === "push" ? "Deadline pushed \u2713" : "Deadline moved earlier \u2713");
       setExtendPrompt(null);
     };
     const weekStart = (0, import_react.useMemo)(() => addWeeks(getWeekStart(/* @__PURE__ */ new Date()), weekOffset), [weekOffset]);
@@ -15455,7 +15444,7 @@ ${conditions}`;
           {
             key: di,
             onDragOver: (e) => {
-              if (dragItem && (dragItem.fromMemberId !== member.id || dragItem.delIds.length === 1)) {
+              if (dragItem) {
                 e.preventDefault();
                 setDragOverKey(cellDropKey);
               }
@@ -15464,7 +15453,7 @@ ${conditions}`;
             onDrop: (e) => {
               e.preventDefault();
               if (dragItem && dragItem.fromMemberId === member.id) {
-                if (dragItem.delIds.length === 1 && dayStr !== dragItem.fromDay) trySamePersonDateChange(member.id, dragItem.delIds[0], dayStr);
+                if (dayStr !== dragItem.fromDay) trySamePersonDateChange(member.id, dragItem.delIds, dayStr);
                 setDragItem(null);
                 setDragOverKey(null);
               } else {
@@ -15473,7 +15462,7 @@ ${conditions}`;
             },
             style: { padding: "7px", borderLeft: "1px solid #1f2937", background: isCellDropTarget ? "#6366f122" : isBlocked ? "#1a1005" : isWknd ? "#0a0c1320" : "transparent", display: "flex", flexDirection: "column", gap: 5, minHeight: 64, position: "relative", outline: isCellDropTarget ? "2px dashed #6366f1" : "none", outlineOffset: -2 }
           },
-          isCellDropTarget && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 2, left: 2, right: 2, fontSize: 10, color: "#818cf8", fontWeight: 800, textTransform: "uppercase", textAlign: "center", pointerEvents: "none", zIndex: 2 } }, dragItem?.fromMemberId === member.id ? "Drop to adjust start/deadline" : `Hand off from ${dragItem?.fromDay ? (/* @__PURE__ */ new Date(dragItem.fromDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}`),
+          isCellDropTarget && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 2, left: 2, right: 2, fontSize: 10, color: "#818cf8", fontWeight: 800, textTransform: "uppercase", textAlign: "center", pointerEvents: "none", zIndex: 2 } }, dragItem?.fromMemberId === member.id ? "Drop to adjust deadline" : `Hand off from ${dragItem?.fromDay ? (/* @__PURE__ */ new Date(dragItem.fromDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}`),
           isBlocked && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, background: "repeating-linear-gradient(45deg,#f59e0b08,#f59e0b08 4px,transparent 4px,transparent 12px)", pointerEvents: "none", borderRadius: 0 } }),
           isBlocked && groups.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#f59e0b80", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", textAlign: "center", paddingTop: 6 } }, "Away"),
           groups.map(({ project, dels }) => {
@@ -15606,13 +15595,13 @@ ${conditions}`;
           })
         );
       }));
-    }), displayed.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 60, color: "#838ba0" } }, "No editors or animators found."))), extendPrompt && /* @__PURE__ */ React.createElement(Modal, { onClose: () => setExtendPrompt(null), maxWidth: 420 }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 20, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, extendPrompt.type === "start" ? "Extend start date?" : "Push deadline?"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#9ca3af", marginBottom: 20, lineHeight: 1.5 } }, extendPrompt.type === "start" ? /* @__PURE__ */ React.createElement(React.Fragment, null, "Make ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, extendPrompt.memberName), "'s assignment on ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, extendPrompt.delName), " start ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, (/* @__PURE__ */ new Date(extendPrompt.newDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" })), " instead of ", (/* @__PURE__ */ new Date(extendPrompt.oldDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }), "?") : /* @__PURE__ */ React.createElement(React.Fragment, null, "Push ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, extendPrompt.delName), "'s deadline to ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, (/* @__PURE__ */ new Date(extendPrompt.newDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" })), "? (currently ", (/* @__PURE__ */ new Date(extendPrompt.oldDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }), ")")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setExtendPrompt(null), style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "8px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer" } }, "Cancel"), /* @__PURE__ */ React.createElement(
+    }), displayed.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 60, color: "#838ba0" } }, "No editors or animators found."))), extendPrompt && /* @__PURE__ */ React.createElement(Modal, { onClose: () => setExtendPrompt(null), maxWidth: 460 }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 20, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, extendPrompt.items.length > 1 ? `Update ${extendPrompt.items.length} deadlines?` : extendPrompt.items[0].type === "push" ? "Push deadline?" : "Move deadline earlier?"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#9ca3af", marginBottom: 14, lineHeight: 1.5 } }, "For ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, extendPrompt.memberName), ", on ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, (/* @__PURE__ */ new Date(extendPrompt.newDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" })), ":"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 20, maxHeight: 260, overflowY: "auto" } }, extendPrompt.items.map((it) => /* @__PURE__ */ React.createElement("div", { key: it.delId, style: { display: "flex", alignItems: "center", gap: 10, background: "#111827", border: "1px solid #1f2937", borderRadius: 7, padding: "8px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, it.delName), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#8e97a6", marginTop: 1 } }, it.status)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: it.type === "push" ? "#f59e0b" : "#818cf8", fontWeight: 700, flexShrink: 0, textAlign: "right", whiteSpace: "nowrap" } }, (/* @__PURE__ */ new Date(it.oldDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }), " \u2192 ", (/* @__PURE__ */ new Date(extendPrompt.newDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setExtendPrompt(null), style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "8px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer" } }, "Cancel"), /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: confirmExtendPrompt,
         style: { background: "#6366f1", border: "none", borderRadius: 7, color: "#fff", padding: "8px 16px", fontSize: 14, fontWeight: 800, cursor: "pointer" }
       },
-      extendPrompt.type === "start" ? "Extend Start" : "Push Deadline"
+      extendPrompt.items.length > 1 ? `Update ${extendPrompt.items.length}` : "Confirm"
     ))));
   };
   var ResourceView = ({ projects, team, studioBookings = [], resourceConfig, onUpdateProject, unavailability = [], onUpdateDel, initialTab, onTabChange, onOpenProject }) => {
