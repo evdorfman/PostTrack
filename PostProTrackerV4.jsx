@@ -22063,7 +22063,7 @@ const HandoffModal = ({del, project, editors, onConfirm, onClose, onClear}) => {
     <div style={{position:"fixed",inset:0,zIndex:3000,background:"#000c",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
       <div style={{background:"#111827",border:"1px solid #374151",borderRadius:14,padding:24,width:460,boxShadow:"0 24px 80px #000c",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
         <div style={{fontSize:18,fontWeight:800,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>Assign Deliverable</div>
-        <div style={{fontSize:14,color:"#9ca3af",marginBottom:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={del.name}>{del.name}</div>
+        <div style={{fontSize:14,color:"#9ca3af",marginBottom:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={del.title||del.name}>{del.title||del.name}</div>
 
         {/* Primary owner badge */}
         {primaryEditor&&(
@@ -22549,7 +22549,7 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
                                       <div style={{flex:1,minWidth:0}}>
                                         {/* Deliverable name + handoff badge */}
                                         <div style={{display:"flex",alignItems:"flex-start",gap:5,marginBottom:5}}>
-                                          <div style={{fontSize:13,color:"#9ca3af",lineHeight:1.3,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={del.name}>{del.name}</div>
+                                          <div style={{fontSize:13,color:"#9ca3af",lineHeight:1.3,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={del.title||del.name}>{del.title||del.name}</div>
                                           {hasHandoffs&&<span style={{fontSize:11,fontWeight:800,color:"#f59e0b",background:"#f59e0b15",border:"1px solid #f59e0b30",borderRadius:3,padding:"1px 4px",flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.04em",textTransform:"uppercase"}}>⇄ Handoff</span>}
                                         </div>
                                         {/* Inline status select */}
