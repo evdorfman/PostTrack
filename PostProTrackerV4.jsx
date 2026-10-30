@@ -32887,7 +32887,12 @@ function App() {
       <div style={{minHeight:"100vh",background:"#080c14",fontFamily:"'DM Sans',sans-serif",color:"#e2e8f0",display:"flex",flexDirection:"column"}}>
         <div style={{background:"#0d1117",borderBottom:"1px solid #1f2937",padding:"0 24px",position:"sticky",top:0,zIndex:20}}>
           <div style={{maxWidth:1600,margin:"0 auto",display:"flex",alignItems:"center",gap:14,height:52}}>
-            <button onClick={()=>setView("projects")} style={{fontWeight:900,fontSize:26,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",flexShrink:0,letterSpacing:"-0.01em",background:"none",border:"none",cursor:"pointer",padding:0}}><span style={{color:"#6366f1"}}>POST</span>TRACK</button>
+            {/* Acts as "Home" — unlike the Projects nav tab, this also clears
+                any stats-tile filter (e.g. from clicking "Content Studio
+                productions this week"), so it always lands on the full,
+                unfiltered project list rather than wherever that filter
+                left the view. */}
+            <button onClick={()=>{setView("projects");setStatsFilter(null);}} style={{fontWeight:900,fontSize:26,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",flexShrink:0,letterSpacing:"-0.01em",background:"none",border:"none",cursor:"pointer",padding:0}}><span style={{color:"#6366f1"}}>POST</span>TRACK</button>
             <div style={{height:16,width:1,background:"#1f2937"}}/>
             <div style={{display:"flex",gap:2}}>{VIEWS.map(v=><button key={v.id} style={tabS(view===v.id)} onClick={()=>setView(v.id)}>{v.l}</button>)}</div>
             {view==="kanban"&&(
