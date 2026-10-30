@@ -24617,6 +24617,35 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
   const [showAdd, setShowAdd]   = useState(false);
   const [newMember, setNewMember] = useState({name:"",roles:[],department:"Production",employeeType:"Internal",available:true,email:"",phone:"",skills:[],workHours:{days:[1,2,3,4,5],start:9,end:17,timezone:"EST"},color:null,isAdmin:false});
 
+  // Accounts that signed in but skipped (or never got) the onboarding
+  // modal — authenticated, but no team_members row, so they're invisible
+  // everywhere else in the app. Listing every auth user needs the Admin
+  // API (service-role key), so it goes through the "admin-list-auth-users"
+  // Edge Function rather than a direct client call — same reasoning as
+  // resetMemberMfa below. Fails silently (empty list) if the function
+  // isn't deployed yet or the call errors — this is a nice-to-have
+  // visibility aid, not something that should break the Team tab.
+  const [unlinkedUsers, setUnlinkedUsers] = useState([]);
+  useEffect(()=>{
+    if(!sb) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const {data:{session}} = await sb.auth.getSession();
+        const {data,error} = await sb.functions.invoke("admin-list-auth-users", {
+          headers:{Authorization:`Bearer ${session?.access_token}`},
+        });
+        if(cancelled || error || !data?.users) return;
+        const linkedIds = new Set(team.filter(m=>m.authUserId).map(m=>m.authUserId));
+        setUnlinkedUsers(data.users.filter(u=>!linkedIds.has(u.id)));
+      } catch(e) {
+        console.warn("[admin-list-auth-users] failed:", e);
+      }
+    })();
+    return ()=>{cancelled=true;};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[team]);
+
   // 2FA is mandatory account-wide, so a lost/dead device locks someone out
   // before they can ever reach their own My Profile reset — this is the only
   // way back in for them. Needs the service-role key to clear another
@@ -24678,7 +24707,13 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
   const reactivateM = id => onUpdateTeam(team.map(m=>m.id!==id?m:{...m,active:true}));
   const addMember = () => {
     if(!newMember.name.trim()) return;
-    onUpdateTeam([...team, {...newMember, id:Math.max(...team.map(m=>m.id))+1}]);
+    // _pendingAuthUserId is set when this form was opened via "Complete
+    // Profile" on an unlinked account below — links the new row directly
+    // to that real auth id, rather than leaving it to the email-match
+    // auto-linker (which would also work here since the email already
+    // matches, but doing it directly is immediate and typo-proof).
+    const {_pendingAuthUserId, ...rest} = newMember;
+    onUpdateTeam([...team, {...rest, authUserId:_pendingAuthUserId||null, id:Math.max(...team.map(m=>m.id))+1}]);
     setNewMember({name:"",roles:[],department:"Production",employeeType:"Internal",available:true,email:"",phone:"",skills:[]});
     setShowAdd(false);
   };
@@ -24800,6 +24835,32 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
             style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"7px 18px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",opacity:newMember.name.trim()?1:0.4}}>
             Add Member
           </button>
+        </div>
+      )}
+
+      {/* Signed in, but skipped (or never saw) the onboarding modal — fully
+          authenticated with no team_members row, so they're invisible
+          everywhere else in the app until an admin fills this in for them. */}
+      {unlinkedUsers.length>0&&(
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:14,fontWeight:800,color:"#f59e0b",marginBottom:8,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>
+            ⚠ {unlinkedUsers.length} account{unlinkedUsers.length!==1?"s":""} awaiting profile setup
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {unlinkedUsers.map(u=>(
+              <div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:"#0d1117",border:"1px solid #f59e0b30",borderRadius:10}}>
+                <div style={{width:36,height:36,borderRadius:"50%",background:"#f59e0b15",border:"1px solid #f59e0b40",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,fontWeight:800,color:"#f59e0b",flexShrink:0}}>?</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:16,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email||"(no email on file)"}</div>
+                  <div style={{fontSize:13,color: "#8e97a6"}}>Signed up {u.createdAt?new Date(u.createdAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):"—"} · no profile yet</div>
+                </div>
+                <button onClick={()=>{ setNewMember(p=>({...p, email:u.email||"", _pendingAuthUserId:u.id})); setShowAdd(true); }}
+                  style={{background:"#f59e0b15",border:"1px solid #f59e0b40",borderRadius:7,color:"#f59e0b",padding:"6px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",flexShrink:0}}>
+                  Complete Profile
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
