@@ -24616,6 +24616,19 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
   const [draft, setDraft]       = useState(null);
   const [showAdd, setShowAdd]   = useState(false);
   const [newMember, setNewMember] = useState({name:"",roles:[],department:"Production",employeeType:"Internal",available:true,email:"",phone:"",skills:[],workHours:{days:[1,2,3,4,5],start:9,end:17,timezone:"EST"},color:null,isAdmin:false});
+  // Which unlinked auth account (by its real auth id) is currently showing
+  // the "Link to Existing" picker, and which placeholder member is
+  // selected in it — lets a placeholder created for testing (name only, no
+  // email) get connected to someone's real account once they sign up,
+  // keeping their existing assignment history instead of starting a
+  // duplicate row via "Complete Profile".
+  const [linkPickerFor, setLinkPickerFor] = useState(null);
+  const [linkPickerMemberId, setLinkPickerMemberId] = useState("");
+  const linkToExisting = (authUserId, authEmail) => {
+    if(!linkPickerMemberId) return;
+    onUpdateTeam(team.map(m=>m.id===Number(linkPickerMemberId)?{...m, authUserId, email:m.email||authEmail||""}:m));
+    setLinkPickerFor(null); setLinkPickerMemberId("");
+  };
 
   // Accounts that signed in but skipped (or never got) the onboarding
   // modal — authenticated, but no team_members row, so they're invisible
@@ -24847,19 +24860,50 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
             ⚠ {unlinkedUsers.length} account{unlinkedUsers.length!==1?"s":""} awaiting profile setup
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:4}}>
-            {unlinkedUsers.map(u=>(
-              <div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:"#0d1117",border:"1px solid #f59e0b30",borderRadius:10}}>
-                <div style={{width:36,height:36,borderRadius:"50%",background:"#f59e0b15",border:"1px solid #f59e0b40",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,fontWeight:800,color:"#f59e0b",flexShrink:0}}>?</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:700,fontSize:16,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email||"(no email on file)"}</div>
-                  <div style={{fontSize:13,color: "#8e97a6"}}>Signed up {u.createdAt?new Date(u.createdAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):"—"} · no profile yet</div>
+            {unlinkedUsers.map(u=>{
+              const linkCandidates = team.filter(m=>!m.authUserId);
+              const showingPicker = linkPickerFor===u.id;
+              return (
+                <div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:"#0d1117",border:"1px solid #f59e0b30",borderRadius:10,flexWrap:"wrap"}}>
+                  <div style={{width:36,height:36,borderRadius:"50%",background:"#f59e0b15",border:"1px solid #f59e0b40",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,fontWeight:800,color:"#f59e0b",flexShrink:0}}>?</div>
+                  <div style={{flex:1,minWidth:150}}>
+                    <div style={{fontWeight:700,fontSize:16,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email||"(no email on file)"}</div>
+                    <div style={{fontSize:13,color: "#8e97a6"}}>Signed up {u.createdAt?new Date(u.createdAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):"—"} · no profile yet</div>
+                  </div>
+                  {showingPicker ? (
+                    <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                      <select value={linkPickerMemberId} onChange={e=>setLinkPickerMemberId(e.target.value)}
+                        style={{background:"#0a0f1a",border:"1px solid #374151",borderRadius:6,color:"#e2e8f0",padding:"6px 8px",fontSize:13,outline:"none"}}>
+                        <option value="">Select person…</option>
+                        {linkCandidates.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                      <button onClick={()=>linkToExisting(u.id,u.email)} disabled={!linkPickerMemberId}
+                        style={{background:"#6366f1",border:"none",borderRadius:7,color:"#fff",padding:"6px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",opacity:linkPickerMemberId?1:0.4}}>
+                        Link
+                      </button>
+                      <button onClick={()=>{setLinkPickerFor(null);setLinkPickerMemberId("");}}
+                        style={{background:"#1f2937",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"6px 10px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      {linkCandidates.length>0&&(
+                        <button onClick={()=>{setLinkPickerFor(u.id);setLinkPickerMemberId("");}}
+                          title="Connect this account to a placeholder you already created"
+                          style={{background:"#1f2937",border:"1px solid #374151",borderRadius:7,color:"#9ca3af",padding:"6px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
+                          Link to Existing
+                        </button>
+                      )}
+                      <button onClick={()=>{ setNewMember(p=>({...p, email:u.email||"", _pendingAuthUserId:u.id})); setShowAdd(true); }}
+                        style={{background:"#f59e0b15",border:"1px solid #f59e0b40",borderRadius:7,color:"#f59e0b",padding:"6px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase"}}>
+                        Complete Profile
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <button onClick={()=>{ setNewMember(p=>({...p, email:u.email||"", _pendingAuthUserId:u.id})); setShowAdd(true); }}
-                  style={{background:"#f59e0b15",border:"1px solid #f59e0b40",borderRadius:7,color:"#f59e0b",padding:"6px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",flexShrink:0}}>
-                  Complete Profile
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
