@@ -1424,15 +1424,15 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   };
   var getProjectPostStartDate = (project) => {
     if (project.postStartDate) {
-      const d = new Date(project.postStartDate);
-      if (!isNaN(d.getTime())) return d;
+      const d = parseLocalDT(project.postStartDate);
+      if (d && !isNaN(d.getTime())) return d;
     }
     return getEarliestProjectIngestReadyDate(project);
   };
   var getDeliverableStartDate = (del, project) => {
     if (del.startDate) {
-      const d = new Date(del.startDate);
-      if (!isNaN(d.getTime())) return d;
+      const d = parseLocalDT(del.startDate);
+      if (d && !isNaN(d.getTime())) return d;
     }
     return getProjectPostStartDate(project);
   };

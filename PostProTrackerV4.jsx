@@ -1200,8 +1200,11 @@ const getEarliestProjectIngestReadyDate = (project) => {
 // auto-suggested earliest-ingest date, otherwise null (no constraint).
 const getProjectPostStartDate = (project) => {
   if(project.postStartDate){
-    const d = new Date(project.postStartDate);
-    if(!isNaN(d.getTime())) return d;
+    // parseLocalDT, not new Date() directly — a plain "YYYY-MM-DD" (no
+    // time part) is parsed as UTC midnight by the Date constructor, which
+    // silently shifts a day earlier in any timezone behind UTC.
+    const d = parseLocalDT(project.postStartDate);
+    if(d&&!isNaN(d.getTime())) return d;
   }
   return getEarliestProjectIngestReadyDate(project);
 };
@@ -1213,8 +1216,8 @@ const getProjectPostStartDate = (project) => {
 // work by start date goes through this so the two compose consistently.
 const getDeliverableStartDate = (del, project) => {
   if(del.startDate){
-    const d = new Date(del.startDate);
-    if(!isNaN(d.getTime())) return d;
+    const d = parseLocalDT(del.startDate);
+    if(d&&!isNaN(d.getTime())) return d;
   }
   return getProjectPostStartDate(project);
 };
