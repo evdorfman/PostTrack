@@ -21492,8 +21492,11 @@ const ResourceMemberRow = ({w, expanded, onToggle, dailyWorkload, showDailyDetai
     if(!wh) return "Not set";
     const days = wh.days||[1,2,3,4,5];
     const dayStr = (days.length===5 && [1,2,3,4,5].every(d=>days.includes(d))) ? "Mon–Fri" : days.map(d=>DAYS_SHORT[d]).join(", ");
-    const hr = h=>{const ap=h>=12?"pm":"am";const h12=h%12===0?12:h%12;return `${h12}${ap}`;};
-    return `${dayStr} ${hr(wh.start)}–${hr(wh.end)}`;
+    // Same guard as AdminTeamTab's workHoursLabel — a team_members row
+    // saved with a partial work_hours object (missing start/end) would
+    // otherwise render as literal "NaNam–NaNam".
+    const hr = h=>{ if(h==null||isNaN(h)) return "?"; const ap=h>=12?"pm":"am"; const h12=h%12===0?12:h%12; return `${h12}${ap}`; };
+    return `${dayStr} ${hr(wh.start??9)}–${hr(wh.end??17)}`;
   })();
 
   // Daily-level warnings (conflicts, off-day work, outside hours, overbooked
@@ -24615,7 +24618,15 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
   const [search, setSearch]     = useState("");
   const [draft, setDraft]       = useState(null);
   const [showAdd, setShowAdd]   = useState(false);
-  const [newMember, setNewMember] = useState({name:"",roles:[],department:"Production",employeeType:"Internal",available:true,email:"",phone:"",skills:[],workHours:{days:[1,2,3,4,5],start:9,end:17,timezone:"EST"},color:null,isAdmin:false});
+  // Defined once and reused for both the initial state and the post-add
+  // reset below — they'd previously drifted apart (the reset was missing
+  // workHours/color/isAdmin), so every member added after the first one in
+  // the same sitting started from workHours:undefined. Left untouched by
+  // the WorkHoursPicker (not everyone remembers to set it for a quick
+  // placeholder), that becomes work_hours:{} in the DB — rendering as
+  // "NaNam–NaNam undefined" everywhere the hours label is shown.
+  const EMPTY_NEW_MEMBER = {name:"",roles:[],department:"Production",employeeType:"Internal",available:true,email:"",phone:"",skills:[],workHours:{days:[1,2,3,4,5],start:9,end:17,timezone:"EST"},color:null,isAdmin:false};
+  const [newMember, setNewMember] = useState(EMPTY_NEW_MEMBER);
   // Which unlinked auth account (by its real auth id) is currently showing
   // the "Link to Existing" picker, and which placeholder member is
   // selected in it — lets a placeholder created for testing (name only, no
@@ -24727,7 +24738,7 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
     // matches, but doing it directly is immediate and typo-proof).
     const {_pendingAuthUserId, ...rest} = newMember;
     onUpdateTeam([...team, {...rest, authUserId:_pendingAuthUserId||null, id:Math.max(...team.map(m=>m.id))+1}]);
-    setNewMember({name:"",roles:[],department:"Production",employeeType:"Internal",available:true,email:"",phone:"",skills:[]});
+    setNewMember(EMPTY_NEW_MEMBER);
     setShowAdd(false);
   };
 
@@ -24917,9 +24928,14 @@ const AdminTeamTab = ({team, onUpdateTeam, projects=[]}) => {
             if(!m.workHours) return "—";
             const DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
             const days=m.workHours.days||[];
-            const dayLabel = days.length===5&&[1,2,3,4,5].every(d=>days.includes(d)) ? "Mon–Fri" : days.map(d=>DOW[d]).join(",");
-            const hr=h=>{const ap=h>=12?"pm":"am";const h12=h%12===0?12:h%12;return `${h12}${ap}`;};
-            return `${dayLabel} ${hr(m.workHours.start)}–${hr(m.workHours.end)} ${m.workHours.timezone}`;
+            const dayLabel = days.length===5&&[1,2,3,4,5].every(d=>days.includes(d)) ? "Mon–Fri" : (days.length?days.map(d=>DOW[d]).join(","):"No days set");
+            // ?? rather than ||, same fallback shape WorkHoursPicker itself
+            // uses — a team_members row saved before every field was
+            // filled in (a placeholder added without touching Work Hours,
+            // see EMPTY_NEW_MEMBER's comment) shouldn't render as literal
+            // "NaNam–NaNam undefined".
+            const hr=h=>{ if(h==null||isNaN(h)) return "?"; const ap=h>=12?"pm":"am"; const h12=h%12===0?12:h%12; return `${h12}${ap}`; };
+            return `${dayLabel} ${hr(m.workHours.start??9)}–${hr(m.workHours.end??17)} ${m.workHours.timezone||"EST"}`;
           })();
           return (
             <div key={m.id} style={{background:"#0d1117",border:`1px solid ${isExpanded?"#6366f140":"#1f2937"}`,borderRadius:10,overflow:"hidden"}}>

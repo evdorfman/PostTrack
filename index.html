@@ -14778,11 +14778,12 @@ ${conditions}`;
       const days = wh.days || [1, 2, 3, 4, 5];
       const dayStr = days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d)) ? "Mon\u2013Fri" : days.map((d) => DAYS_SHORT[d]).join(", ");
       const hr = (h) => {
+        if (h == null || isNaN(h)) return "?";
         const ap = h >= 12 ? "pm" : "am";
         const h12 = h % 12 === 0 ? 12 : h % 12;
         return `${h12}${ap}`;
       };
-      return `${dayStr} ${hr(wh.start)}\u2013${hr(wh.end)}`;
+      return `${dayStr} ${hr(wh.start ?? 9)}\u2013${hr(wh.end ?? 17)}`;
     })();
     const dailyWarnings = (0, import_react.useMemo)(() => {
       if (!dailyWorkload) return [];
@@ -16921,7 +16922,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [search, setSearch] = (0, import_react.useState)("");
     const [draft, setDraft] = (0, import_react.useState)(null);
     const [showAdd, setShowAdd] = (0, import_react.useState)(false);
-    const [newMember, setNewMember] = (0, import_react.useState)({ name: "", roles: [], department: "Production", employeeType: "Internal", available: true, email: "", phone: "", skills: [], workHours: { days: [1, 2, 3, 4, 5], start: 9, end: 17, timezone: "EST" }, color: null, isAdmin: false });
+    const EMPTY_NEW_MEMBER = { name: "", roles: [], department: "Production", employeeType: "Internal", available: true, email: "", phone: "", skills: [], workHours: { days: [1, 2, 3, 4, 5], start: 9, end: 17, timezone: "EST" }, color: null, isAdmin: false };
+    const [newMember, setNewMember] = (0, import_react.useState)(EMPTY_NEW_MEMBER);
     const [linkPickerFor, setLinkPickerFor] = (0, import_react.useState)(null);
     const [linkPickerMemberId, setLinkPickerMemberId] = (0, import_react.useState)("");
     const linkToExisting = (authUserId, authEmail) => {
@@ -17010,7 +17012,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       if (!newMember.name.trim()) return;
       const { _pendingAuthUserId, ...rest } = newMember;
       onUpdateTeam([...team, { ...rest, authUserId: _pendingAuthUserId || null, id: Math.max(...team.map((m) => m.id)) + 1 }]);
-      setNewMember({ name: "", roles: [], department: "Production", employeeType: "Internal", available: true, email: "", phone: "", skills: [] });
+      setNewMember(EMPTY_NEW_MEMBER);
       setShowAdd(false);
     };
     const RoleToggle = ({ roles, onChange }) => /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 } }, ROLE_OPTIONS.map((r) => /* @__PURE__ */ React.createElement(
@@ -17177,13 +17179,14 @@ Never delete without explicit confirmation. Be conversational and use studio ter
         if (!m.workHours) return "\u2014";
         const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         const days = m.workHours.days || [];
-        const dayLabel = days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d)) ? "Mon\u2013Fri" : days.map((d) => DOW[d]).join(",");
+        const dayLabel = days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d)) ? "Mon\u2013Fri" : days.length ? days.map((d) => DOW[d]).join(",") : "No days set";
         const hr = (h) => {
+          if (h == null || isNaN(h)) return "?";
           const ap = h >= 12 ? "pm" : "am";
           const h12 = h % 12 === 0 ? 12 : h % 12;
           return `${h12}${ap}`;
         };
-        return `${dayLabel} ${hr(m.workHours.start)}\u2013${hr(m.workHours.end)} ${m.workHours.timezone}`;
+        return `${dayLabel} ${hr(m.workHours.start ?? 9)}\u2013${hr(m.workHours.end ?? 17)} ${m.workHours.timezone || "EST"}`;
       })();
       return /* @__PURE__ */ React.createElement("div", { key: m.id, style: { background: "#0d1117", border: `1px solid ${isExpanded ? "#6366f140" : "#1f2937"}`, borderRadius: 10, overflow: "hidden" } }, /* @__PURE__ */ React.createElement(
         "div",
