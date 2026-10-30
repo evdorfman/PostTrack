@@ -95,7 +95,7 @@ describe("rowToDeliverable / deliverableToRow", () => {
   it("round-trips every field deliverableToRow persists", () => {
     const d = {
       _rowId:"uuid-d1", id:42, projectId:5,
-      title:"Episode 5 Cut", status:"In Review", deadline:"2026-11-10", deliveredAt:null,
+      title:"Episode 5 Cut", status:"In Review", deadline:"2026-11-10", startDate:"2026-11-03", deliveredAt:null,
       editorId:1, animatorId:null, producerId:2,
       deliverableType:"Episode", aspectRatio:"16:9", quality:"4K",
       workstream:"BXTV", businessUnit:"MKT",

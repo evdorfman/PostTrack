@@ -960,6 +960,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     deadline,
     status,
     rounds,
+    startDate: opts.startDate || null,
     aspectRatio: opts.aspectRatio || "16:9",
     notes: opts.notes || "",
     srtNeeded: opts.srtNeeded || false,
@@ -1428,6 +1429,13 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     }
     return getEarliestProjectIngestReadyDate(project);
   };
+  var getDeliverableStartDate = (del, project) => {
+    if (del.startDate) {
+      const d = new Date(del.startDate);
+      if (!isNaN(d.getTime())) return d;
+    }
+    return getProjectPostStartDate(project);
+  };
   var getMemberProductionHoursInWeek = (production, memberId, weekStart, weekEnd) => {
     if (!production.startTime) return 0;
     const onCrew = (production.crewInternal || []).some((c) => c.memberId === memberId) || (production.setups || []).some((s) => (s.crewInternal || []).some((c) => c.memberId === memberId));
@@ -1455,14 +1463,14 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     if (loadsFromDeliverables) {
       projects.forEach((p) => {
         if (p.closedAt) return;
-        const postStart = getProjectPostStartDate(p);
         (p.deliverables || []).forEach((d) => {
           if (d.editorId !== member.id && d.animatorId !== member.id) return;
           if (d.status === "Delivered" || d.status === "On Hold") return;
+          const delStart = getDeliverableStartDate(d, p);
           const { hours: total, isOverridden } = getDeliverableEstimatedHours(d, config);
-          const hours = spreadHoursIntoWeek(d.deadline, total, weekStart, weekEnd, /* @__PURE__ */ new Date(), postStart);
-          const isBlocked = postStart && postStart > /* @__PURE__ */ new Date();
-          if (hours > 0.05) breakdown.push({ source: "deliverable", label: d.title || "Untitled deliverable", projectName: p.name, hours, isOverridden, status: d.status, deadline: d.deadline, totalHours: total, blockedUntil: isBlocked ? postStart : null });
+          const hours = spreadHoursIntoWeek(d.deadline, total, weekStart, weekEnd, /* @__PURE__ */ new Date(), delStart);
+          const isBlocked = delStart && delStart > /* @__PURE__ */ new Date();
+          if (hours > 0.05) breakdown.push({ source: "deliverable", label: d.title || "Untitled deliverable", projectName: p.name, hours, isOverridden, status: d.status, deadline: d.deadline, totalHours: total, blockedUntil: isBlocked ? delStart : null });
         });
       });
     }
@@ -1610,16 +1618,16 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       if (loadsFromDeliverables) {
         projects.forEach((p) => {
           if (p.closedAt) return;
-          const postStart = getProjectPostStartDate(p);
           (p.deliverables || []).forEach((d) => {
             if (d.editorId !== member.id && d.animatorId !== member.id) return;
             if (d.status === "Delivered" || d.status === "On Hold" || !d.deadline) return;
+            const delStart = getDeliverableStartDate(d, p);
             const { hours: total, isOverridden } = getDeliverableEstimatedHours(d, config);
-            const weekHours = spreadHoursIntoWeek(d.deadline, total, weekStart, weekEnd, /* @__PURE__ */ new Date(), postStart);
+            const weekHours = spreadHoursIntoWeek(d.deadline, total, weekStart, weekEnd, /* @__PURE__ */ new Date(), delStart);
             if (weekHours <= 0.05) return;
             const now2 = /* @__PURE__ */ new Date();
             let startPoint = now2;
-            if (postStart && postStart > startPoint) startPoint = postStart;
+            if (delStart && delStart > startPoint) startPoint = delStart;
             const deadline = new Date(d.deadline);
             const validDays = weekDays.filter((day) => {
               const dayEnd = new Date(day);
@@ -3439,7 +3447,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         placeholder: "Deliverable title\u2026",
         style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 7, color: "#e2e8f0", padding: "7px 10px", fontSize: 17, fontWeight: 700, outline: "none", fontFamily: "'DM Sans',sans-serif", width: "100%", boxSizing: "border-box" }
       }
-    )), /* @__PURE__ */ React.createElement(F, { label: "Editor" }, /* @__PURE__ */ React.createElement(EditorPicker, { value: del.editorId, onChange: (v) => upd("editorId", v), deadline: del.deadline, allProjects, excludeDelId: del.id, team: editors }))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement(F, { label: "Status" }, /* @__PURE__ */ React.createElement(Sel, { value: del.status || "", onChange: (e) => upd("status", e.target.value), disabled: locked, style: { background: DCOLOR[del.status] + "18", color: DCOLOR[del.status], border: `1px solid ${DCOLOR[del.status]}40` } }, DELIVERABLE_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, style: { background: "#0d1117", color: "#e2e8f0" } }, s)))), /* @__PURE__ */ React.createElement(F, { label: "Final Deadline" }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: del.deadline || "", onChange: (v) => upd("deadline", v) }))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr auto", gap: 8, background: "#0f172a", borderRadius: 8, padding: "10px 12px", border: "1px solid #6366f120" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 5 } }, "Frame.io Link"), /* @__PURE__ */ React.createElement(StableInp, { value: del.frameLink || "", onChange: (e) => upd("frameLink", e.target.value), placeholder: "https://frame.io/\u2026", disabled: locked })), /* @__PURE__ */ React.createElement("div", { style: { flex: "0 0 160px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 5 } }, "Password"), /* @__PURE__ */ React.createElement(StableInp, { value: del.framePW || "", onChange: (e) => upd("framePW", e.target.value), placeholder: "PW\u2026", disabled: locked }))), project?.mamProjectLink && /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", borderRadius: 8, padding: "9px 12px", border: "1px solid #6366f120", display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 2 } }, "MAM Project Link ", /* @__PURE__ */ React.createElement("span", { style: { color: "#22c55e", fontSize: 13, fontWeight: 700, marginLeft: 4 } }, "AUTO")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 320 } }, project.mamProjectLink)), /* @__PURE__ */ React.createElement(
+    )), /* @__PURE__ */ React.createElement(F, { label: "Editor" }, /* @__PURE__ */ React.createElement(EditorPicker, { value: del.editorId, onChange: (v) => upd("editorId", v), deadline: del.deadline, allProjects, excludeDelId: del.id, team: editors }))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement(F, { label: "Status" }, /* @__PURE__ */ React.createElement(Sel, { value: del.status || "", onChange: (e) => upd("status", e.target.value), disabled: locked, style: { background: DCOLOR[del.status] + "18", color: DCOLOR[del.status], border: `1px solid ${DCOLOR[del.status]}40` } }, DELIVERABLE_STATUSES.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, style: { background: "#0d1117", color: "#e2e8f0" } }, s)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif" } }, "Start Date"), del.startDate && /* @__PURE__ */ React.createElement("button", { onClick: () => upd("startDate", null), style: { background: "none", border: "none", color: "#818cf8", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 } }, "Use project default")), /* @__PURE__ */ React.createElement(DateTimePicker, { value: del.startDate || "", onChange: (v) => upd("startDate", v || null) }), !del.startDate && (() => {
+      const inherited = getProjectPostStartDate(project);
+      return inherited ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#8e97a6", marginTop: 4 } }, "Inherits project default: ", fmtDate(inherited.toISOString())) : null;
+    })()), /* @__PURE__ */ React.createElement(F, { label: "Final Deadline" }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: del.deadline || "", onChange: (v) => upd("deadline", v) }))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr auto", gap: 8, background: "#0f172a", borderRadius: 8, padding: "10px 12px", border: "1px solid #6366f120" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 5 } }, "Frame.io Link"), /* @__PURE__ */ React.createElement(StableInp, { value: del.frameLink || "", onChange: (e) => upd("frameLink", e.target.value), placeholder: "https://frame.io/\u2026", disabled: locked })), /* @__PURE__ */ React.createElement("div", { style: { flex: "0 0 160px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 5 } }, "Password"), /* @__PURE__ */ React.createElement(StableInp, { value: del.framePW || "", onChange: (e) => upd("framePW", e.target.value), placeholder: "PW\u2026", disabled: locked }))), project?.mamProjectLink && /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", borderRadius: 8, padding: "9px 12px", border: "1px solid #6366f120", display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 2 } }, "MAM Project Link ", /* @__PURE__ */ React.createElement("span", { style: { color: "#22c55e", fontSize: 13, fontWeight: 700, marginLeft: 4 } }, "AUTO")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 320 } }, project.mamProjectLink)), /* @__PURE__ */ React.createElement(
       "a",
       {
         href: project.mamProjectLink,
@@ -4807,6 +4818,7 @@ Brief content: ${content}`;
     const [showAddWorkReview, setShowAddWorkReview] = (0, import_react.useState)(false);
     const [newDelTitle, setNewDelTitle] = (0, import_react.useState)("");
     const [newDelDeadline, setNewDelDeadline] = (0, import_react.useState)("");
+    const [newDelStartDate, setNewDelStartDate] = (0, import_react.useState)("");
     const [newDelEditor, setNewDelEditor] = (0, import_react.useState)(null);
     const [newDelAR, setNewDelAR] = (0, import_react.useState)("16:9");
     const [delSort, setDelSort] = (0, import_react.useState)("default");
@@ -4850,7 +4862,7 @@ Brief content: ${content}`;
     const deliverablesPct = pct;
     const addDel = () => {
       if (!newDelTitle.trim()) return;
-      const nd = mkDel(newDelTitle.trim(), newDelEditor, newDelDeadline || null, "Not Started", [], { aspectRatio: newDelAR });
+      const nd = mkDel(newDelTitle.trim(), newDelEditor, newDelDeadline || null, "Not Started", [], { aspectRatio: newDelAR, startDate: newDelStartDate || null });
       onAddDel(project.id, nd);
       setNewDelTitle("");
       setNewDelDeadline("");
@@ -5173,7 +5185,7 @@ Brief content: ${content}`;
           onClose: () => setHandoffDelId(null)
         }
       );
-    })(), /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 12, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement(SH, { label: "Deliverables", desc: "Every deliverable in this project \u2014 add new ones, sort, and track status and rounds from here." }), showAddDel && /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #374151", borderRadius: 12, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, "New Deliverable"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-end" } }, /* @__PURE__ */ React.createElement(LW, { label: "Title", style: { flex: 1 } }, /* @__PURE__ */ React.createElement(Inp, { value: newDelTitle, onChange: (e) => setNewDelTitle(e.target.value), placeholder: "Deliverable title\u2026", onKeyDown: (e) => e.key === "Enter" && newDelTitle.trim() && addDel() })), /* @__PURE__ */ React.createElement(Btn, { onClick: addDel, disabled: !newDelTitle.trim(), style: { flexShrink: 0, marginBottom: 1 } }, "+ Add")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement(LW, { label: "Aspect Ratio" }, /* @__PURE__ */ React.createElement(Sel, { value: newDelAR, onChange: (e) => setNewDelAR(e.target.value) }, ASPECT_RATIOS.map((r) => /* @__PURE__ */ React.createElement("option", { key: r }, r)))), /* @__PURE__ */ React.createElement(LW, { label: "Final Deadline", style: { gridColumn: "2/4" } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: newDelDeadline, onChange: (v) => setNewDelDeadline(v), label: "Set deadline" })), /* @__PURE__ */ React.createElement(LW, { label: "Editor / Animator", style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement(EditorPicker, { value: newDelEditor, onChange: (v) => setNewDelEditor(v), deadline: newDelDeadline, allProjects, team })))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 0, background: "#111827", border: "1px solid #1f2937", borderRadius: 8, overflow: "hidden", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(
+    })(), /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #1f2937", borderRadius: 12, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement(SH, { label: "Deliverables", desc: "Every deliverable in this project \u2014 add new ones, sort, and track status and rounds from here." }), showAddDel && /* @__PURE__ */ React.createElement("div", { style: { background: "#0f172a", border: "1px solid #374151", borderRadius: 12, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: "#8e97a6", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, "New Deliverable"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-end" } }, /* @__PURE__ */ React.createElement(LW, { label: "Title", style: { flex: 1 } }, /* @__PURE__ */ React.createElement(Inp, { value: newDelTitle, onChange: (e) => setNewDelTitle(e.target.value), placeholder: "Deliverable title\u2026", onKeyDown: (e) => e.key === "Enter" && newDelTitle.trim() && addDel() })), /* @__PURE__ */ React.createElement(Btn, { onClick: addDel, disabled: !newDelTitle.trim(), style: { flexShrink: 0, marginBottom: 1 } }, "+ Add")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement(LW, { label: "Aspect Ratio" }, /* @__PURE__ */ React.createElement(Sel, { value: newDelAR, onChange: (e) => setNewDelAR(e.target.value) }, ASPECT_RATIOS.map((r) => /* @__PURE__ */ React.createElement("option", { key: r }, r)))), /* @__PURE__ */ React.createElement(LW, { label: "Final Deadline", style: { gridColumn: "2/4" } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: newDelDeadline, onChange: (v) => setNewDelDeadline(v), label: "Set deadline" })), /* @__PURE__ */ React.createElement(LW, { label: "Start Date (optional)", style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement(DateTimePicker, { value: newDelStartDate, onChange: (v) => setNewDelStartDate(v), label: "When can work begin?" })), /* @__PURE__ */ React.createElement(LW, { label: "Editor / Animator", style: { gridColumn: "1/-1" } }, /* @__PURE__ */ React.createElement(EditorPicker, { value: newDelEditor, onChange: (v) => setNewDelEditor(v), deadline: newDelDeadline, allProjects, team })))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 0, background: "#111827", border: "1px solid #1f2937", borderRadius: 8, overflow: "hidden", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => {
@@ -5200,7 +5212,7 @@ Brief content: ${content}`;
     )), /* @__PURE__ */ React.createElement("button", { onClick: () => {
       const defaultEditor = lp.assignees?.["Editor"]?.[0] || null;
       for (let i = 0; i < bulkDelCount; i++) {
-        onAddDel(project.id, mkDel(`Deliverable ${lp.deliverables.length + i + 1}`, defaultEditor, null, "Not Started", []));
+        onAddDel(project.id, mkDel(`Deliverable ${lp.deliverables.length + i + 1}`, defaultEditor, null, "Not Started", [], { startDate: newDelStartDate || null }));
       }
       setBulkDelCount(1);
     }, style: { background: "#6366f118", border: "none", color: "#818cf8", padding: "7px 14px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap" } }, "Add ", bulkDelCount, " Deliverable", bulkDelCount !== 1 ? "s" : "")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#838ba0" } }, "Sort"), /* @__PURE__ */ React.createElement(
@@ -10475,6 +10487,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     title: row.title,
     status: row.status,
     deadline: row.deadline,
+    startDate: row.start_date,
     deliveredAt: row.delivered_at,
     editorId: row.editor_id,
     animatorId: row.animator_id,
@@ -10521,6 +10534,7 @@ Deliverables: ${(proj.deliverables || []).map((d) => d.title).join(", ") || "Non
     title: d.title || null,
     status: d.status || null,
     deadline: d.deadline || null,
+    start_date: d.startDate || null,
     delivered_at: d.deliveredAt || null,
     editor_id: d.editorId || null,
     animator_id: d.animatorId || null,
@@ -13627,7 +13641,7 @@ ${conditions}`;
     const addDeliverable = () => {
       if (!newDelTitle.trim()) return;
       const parentProject = allProjects.find((p) => p.id === projectId);
-      const nd = mkDel(newDelTitle.trim(), parentProject?.assignees?.["Editor"]?.[0] || null, null, "Not Started", []);
+      const nd = mkDel(newDelTitle.trim(), parentProject?.assignees?.["Editor"]?.[0] || null, null, "Not Started", [], { startDate: production.startTime || null });
       onAddDeliverable(nd);
       setNewDelTitle("");
       setDelOpen(false);
@@ -15352,8 +15366,14 @@ ${conditions}`;
           const deadline = parseLocalDT(del.deadline);
           if (!deadline || isNaN(deadline)) return;
           deadline.setHours(23, 59, 59, 0);
+          const startBound = getDeliverableStartDate(del, p);
           days.forEach((day, di) => {
             if (day > deadline) return;
+            if (startBound) {
+              const sb2 = new Date(startBound);
+              sb2.setHours(0, 0, 0, 0);
+              if (day < sb2) return;
+            }
             const assignedId = editorForDay(del, fmtDay(day), projEditors);
             if (assignedId === memberId) byDay[di].push({ project: p, del });
           });

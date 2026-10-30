@@ -596,6 +596,7 @@ const mkDel = (title, editorId, deadline, status, rounds, opts={}) => ({
   animatorId: opts.animatorId||null,
   producerId: opts.producerId||null,
   deadline, status, rounds,
+  startDate: opts.startDate||null,
   aspectRatio: opts.aspectRatio||"16:9",
   notes: opts.notes||"",
   srtNeeded: opts.srtNeeded||false,
@@ -1204,6 +1205,19 @@ const getProjectPostStartDate = (project) => {
   }
   return getEarliestProjectIngestReadyDate(project);
 };
+// Effective start date for ONE deliverable — its own explicit override
+// (del.startDate) if set, otherwise the project's Post Start Date. Lets
+// a project set one start date for all its deliverables while still
+// allowing an individual deliverable (e.g. one section of a rolling
+// weekly shoot) to override it — every view that schedules or filters
+// work by start date goes through this so the two compose consistently.
+const getDeliverableStartDate = (del, project) => {
+  if(del.startDate){
+    const d = new Date(del.startDate);
+    if(!isNaN(d.getTime())) return d;
+  }
+  return getProjectPostStartDate(project);
+};
 
 // ── Productions/bookings → Producer/crew ──
 // Hours a member is actually booked for on a production this week — checks
@@ -1248,14 +1262,14 @@ const getMemberWeeklyWorkload = (member, weekStart, projects, config={}, studioB
   if(loadsFromDeliverables){
     projects.forEach(p=>{
       if(p.closedAt) return;
-      const postStart = getProjectPostStartDate(p);
       (p.deliverables||[]).forEach(d=>{
         if(d.editorId!==member.id && d.animatorId!==member.id) return;
         if(d.status==="Delivered"||d.status==="On Hold") return;
+        const delStart = getDeliverableStartDate(d, p);
         const {hours:total, isOverridden} = getDeliverableEstimatedHours(d, config);
-        const hours = spreadHoursIntoWeek(d.deadline, total, weekStart, weekEnd, new Date(), postStart);
-        const isBlocked = postStart && postStart>new Date();
-        if(hours>0.05) breakdown.push({source:"deliverable", label:d.title||"Untitled deliverable", projectName:p.name, hours, isOverridden, status:d.status, deadline:d.deadline, totalHours:total, blockedUntil:isBlocked?postStart:null});
+        const hours = spreadHoursIntoWeek(d.deadline, total, weekStart, weekEnd, new Date(), delStart);
+        const isBlocked = delStart && delStart>new Date();
+        if(hours>0.05) breakdown.push({source:"deliverable", label:d.title||"Untitled deliverable", projectName:p.name, hours, isOverridden, status:d.status, deadline:d.deadline, totalHours:total, blockedUntil:isBlocked?delStart:null});
       });
     });
   }
@@ -1412,15 +1426,15 @@ const getResourceBookingsForWeek = (members, projects, weekStart, config={}, stu
     if(loadsFromDeliverables){
       projects.forEach(p=>{
         if(p.closedAt) return;
-        const postStart = getProjectPostStartDate(p);
         (p.deliverables||[]).forEach(d=>{
           if(d.editorId!==member.id && d.animatorId!==member.id) return;
           if(d.status==="Delivered"||d.status==="On Hold"||!d.deadline) return;
+          const delStart = getDeliverableStartDate(d, p);
           const {hours:total, isOverridden} = getDeliverableEstimatedHours(d, config);
-          const weekHours = spreadHoursIntoWeek(d.deadline, total, weekStart, weekEnd, new Date(), postStart);
+          const weekHours = spreadHoursIntoWeek(d.deadline, total, weekStart, weekEnd, new Date(), delStart);
           if(weekHours<=0.05) return;
           const now = new Date();
-          let startPoint = now; if(postStart && postStart>startPoint) startPoint = postStart;
+          let startPoint = now; if(delStart && delStart>startPoint) startPoint = delStart;
           const deadline = new Date(d.deadline);
           // Which days IN THIS WEEK are both (a) within [start,deadline] and
           // (b) one of this person's normal workdays — the deliverable's
@@ -4546,13 +4560,27 @@ const DeliverableDetailModal = React.memo(({del,projectId,team,allProjects,onUpd
                 </div>
                 <F label="Editor"><EditorPicker value={del.editorId} onChange={v=>upd("editorId",v)} deadline={del.deadline} allProjects={allProjects} excludeDelId={del.id} team={editors}/></F>
               </div>
-              {/* Status + Deadline + Frame inline at top */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              {/* Status + Start Date + Deadline + Frame inline at top */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
                 <F label="Status">
                   <Sel value={del.status||""} onChange={e=>upd("status",e.target.value)} disabled={locked} style={{background:DCOLOR[del.status]+"18",color:DCOLOR[del.status],border:`1px solid ${DCOLOR[del.status]}40`}}>
                     {DELIVERABLE_STATUSES.map(s=><option key={s} style={{background:"#0d1117",color:"#e2e8f0"}}>{s}</option>)}
                   </Sel>
                 </F>
+                <div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:5}}>
+                    <div style={{fontSize:13,fontWeight:800,color: "#8e97a6",letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Barlow Condensed',sans-serif"}}>Start Date</div>
+                    {del.startDate&&<button onClick={()=>upd("startDate",null)} style={{background:"none",border:"none",color:"#818cf8",fontSize:11,fontWeight:700,cursor:"pointer",padding:0}}>Use project default</button>}
+                  </div>
+                  <DateTimePicker value={del.startDate||""} onChange={v=>upd("startDate",v||null)}/>
+                  {/* Only shown when NOT overridden — once del.startDate is
+                      set it's self-explanatory, no need to also show what
+                      it would otherwise have inherited. */}
+                  {!del.startDate && (()=>{
+                    const inherited = getProjectPostStartDate(project);
+                    return inherited ? <div style={{fontSize:12,color:"#8e97a6",marginTop:4}}>Inherits project default: {fmtDate(inherited.toISOString())}</div> : null;
+                  })()}
+                </div>
                 <F label="Final Deadline"><DateTimePicker value={del.deadline||""} onChange={v=>upd("deadline",v)}/></F>
               </div>
               {/* Frame link + PW directly under Status/Deadline */}
@@ -6883,6 +6911,7 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
   const [showAddWorkReview,setShowAddWorkReview]=useState(false);
   const [newDelTitle,setNewDelTitle]=useState("");
   const [newDelDeadline,setNewDelDeadline]=useState("");
+  const [newDelStartDate,setNewDelStartDate]=useState("");
   const [newDelEditor,setNewDelEditor]=useState(null);
   const [newDelAR,setNewDelAR]=useState("16:9");
   const [delSort, setDelSort] = useState("default");
@@ -6939,8 +6968,12 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
 
   const addDel=()=>{
     if(!newDelTitle.trim()) return;
-    const nd=mkDel(newDelTitle.trim(),newDelEditor,newDelDeadline||null,"Not Started",[],{aspectRatio:newDelAR});
+    const nd=mkDel(newDelTitle.trim(),newDelEditor,newDelDeadline||null,"Not Started",[],{aspectRatio:newDelAR,startDate:newDelStartDate||null});
     onAddDel(project.id,nd);
+    // newDelStartDate is left as-is (not reset) — it's shared with the bulk
+    // "Add N Deliverable(s)" button so one typed-in start date can stamp a
+    // whole batch added one-at-a-time or all at once, e.g. this week's
+    // episode sections all shot the same day.
     setNewDelTitle("");setNewDelDeadline("");setNewDelEditor(lp.assignees?.["Editor"]?.[0]||null);setNewDelAR("16:9");setShowAddDel(false);
   };
 
@@ -7507,6 +7540,14 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                   <LW label="Final Deadline" style={{gridColumn:"2/4"}}>
                     <DateTimePicker value={newDelDeadline} onChange={v=>setNewDelDeadline(v)} label="Set deadline"/>
                   </LW>
+                  {/* Shared with the bulk "Add N Deliverable(s)" button below —
+                      set once here to stamp a whole batch, e.g. this week's
+                      episode sections that were all shot the same day. Left
+                      blank, each deliverable falls back to the project's own
+                      Post Start Date. */}
+                  <LW label="Start Date (optional)" style={{gridColumn:"1/-1"}}>
+                    <DateTimePicker value={newDelStartDate} onChange={v=>setNewDelStartDate(v)} label="When can work begin?"/>
+                  </LW>
                   <LW label="Editor / Animator" style={{gridColumn:"1/-1"}}>
                     <EditorPicker value={newDelEditor} onChange={v=>setNewDelEditor(v)} deadline={newDelDeadline} allProjects={allProjects} team={team}/>
                   </LW>
@@ -7537,7 +7578,7 @@ const ProjectOverview = ({project,team,allProjects,onClose,onUpdateDel,onAddDel,
                   <button onClick={()=>{
                     const defaultEditor = lp.assignees?.["Editor"]?.[0]||null;
                     for(let i=0;i<bulkDelCount;i++){
-                      onAddDel(project.id, mkDel(`Deliverable ${(lp.deliverables.length+i+1)}`,defaultEditor,null,"Not Started",[]));
+                      onAddDel(project.id, mkDel(`Deliverable ${(lp.deliverables.length+i+1)}`,defaultEditor,null,"Not Started",[],{startDate:newDelStartDate||null}));
                     }
                     setBulkDelCount(1);
                   }} style={{background:"#6366f118",border:"none",color:"#818cf8",padding:"7px 14px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:"0.04em",whiteSpace:"nowrap"}}>
@@ -15706,7 +15747,7 @@ export const rowToDeliverable = row => ({
   id: row.legacy_id ?? row.id,
   _rowId: row.id,
   projectId: row.project_id,
-  title: row.title, status: row.status, deadline: row.deadline, deliveredAt: row.delivered_at,
+  title: row.title, status: row.status, deadline: row.deadline, startDate: row.start_date, deliveredAt: row.delivered_at,
   editorId: row.editor_id, animatorId: row.animator_id, producerId: row.producer_id,
   deliverableType: row.deliverable_type, aspectRatio: row.aspect_ratio, quality: row.quality,
   workstream: row.workstream, businessUnit: row.business_unit,
@@ -15730,7 +15771,7 @@ export const deliverableToRow = (d, projectId) => ({
   ...(d._rowId ? {id: d._rowId} : {}),
   legacy_id: typeof d.id === "number" ? d.id : null,
   project_id: projectId,
-  title: d.title||null, status: d.status||null, deadline: d.deadline||null, delivered_at: d.deliveredAt||null,
+  title: d.title||null, status: d.status||null, deadline: d.deadline||null, start_date: d.startDate||null, delivered_at: d.deliveredAt||null,
   editor_id: d.editorId||null, animator_id: d.animatorId||null, producer_id: d.producerId||null,
   deliverable_type: d.deliverableType||null, aspect_ratio: d.aspectRatio||null, quality: d.quality||null,
   workstream: d.workstream||null, business_unit: d.businessUnit||null,
@@ -19865,7 +19906,11 @@ const ProductionCard = ({production, idx, projectId, allProductions, allProjectD
   const addDeliverable = () => {
     if(!newDelTitle.trim()) return;
     const parentProject = allProjects.find(p=>p.id===projectId);
-    const nd = mkDel(newDelTitle.trim(),parentProject?.assignees?.["Editor"]?.[0]||null,null,"Not Started",[]);
+    // Defaults the deliverable's start date to this production's own shoot
+    // date — a deliverable added from inside a specific shoot/production
+    // naturally can't start before that production happens (e.g. a weekly
+    // show's rolling sections, each starting the day it was actually shot).
+    const nd = mkDel(newDelTitle.trim(),parentProject?.assignees?.["Editor"]?.[0]||null,null,"Not Started",[],{startDate:production.startTime||null});
     onAddDeliverable(nd);
     setNewDelTitle(""); setDelOpen(false);
   };
@@ -22330,8 +22375,15 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
         const deadline = parseLocalDT(del.deadline);
         if(!deadline||isNaN(deadline)) return;
         deadline.setHours(23,59,59,0);
+        // Lower bound — a deliverable's own start date (or, if unset, the
+        // project's Post Start Date) means it has no work to show before
+        // that day. Without this, every deliverable appeared on every day
+        // up through its deadline regardless of when work on it could
+        // actually begin.
+        const startBound = getDeliverableStartDate(del, p);
         days.forEach((day,di)=>{
           if(day>deadline) return;
+          if(startBound){ const sb=new Date(startBound); sb.setHours(0,0,0,0); if(day<sb) return; }
           const assignedId = editorForDay(del, fmtDay(day), projEditors);
           if(assignedId===memberId) byDay[di].push({project:p, del});
         });
