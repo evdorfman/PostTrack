@@ -30107,29 +30107,38 @@ const MfaEnrollScreen = ({onDone}) => {
   const [busy,setBusy] = useState(false);
   const [loading,setLoading] = useState(true);
 
+  const startEnroll = useCallback(async (isCancelled=()=>false) => {
+    setLoading(true); setErr("");
+    // An abandoned prior attempt (closed the tab mid-setup, tried again
+    // another day, etc.) leaves a stale unverified TOTP factor behind,
+    // which collides with a fresh enroll() call here — same friendlyName,
+    // "already exists". Supabase does NOT cap this at one — someone who
+    // abandoned setup more than once can have several, and clearing only
+    // the first (this used to be a .find()) still left the others to
+    // collide, which is exactly what was happening live. Clear all of
+    // them; checkMfaStatus already confirmed there's no *verified* one
+    // before ever routing here, so this can't remove a real device.
+    const {data:existing} = await sb.auth.mfa.listFactors();
+    const stale = (existing?.totp||[]).filter(f=>f.status==="unverified");
+    for(const f of stale) await sb.auth.mfa.unenroll({factorId:f.id});
+    // Without an explicit issuer, the authenticator app falls back to
+    // labeling the entry with whatever host the enroll() call was made
+    // from (e.g. "localhost" in dev, or the deployed origin) instead of
+    // a stable, recognizable name.
+    const {data,error} = await sb.auth.mfa.enroll({factorType:"totp", issuer:"PostTrack", friendlyName:"PostTrack"});
+    if(isCancelled()) return;
+    if(error){ setErr(error.message||"Could not start two-factor setup."); setLoading(false); return; }
+    setFactorId(data.id);
+    setQr(data.totp.qr_code);
+    setSecret(data.totp.secret);
+    setLoading(false);
+  },[]);
+
   useEffect(()=>{
     let cancelled = false;
-    (async () => {
-      // Supabase only allows one unverified TOTP factor per account at a
-      // time — an abandoned prior attempt (closed the tab mid-setup) would
-      // otherwise block a fresh enroll() call here with "factor already
-      // exists", so clear any stale unverified factor first.
-      const {data:existing} = await sb.auth.mfa.listFactors();
-      const stale = (existing?.totp||[]).find(f=>f.status==="unverified");
-      if(stale) await sb.auth.mfa.unenroll({factorId:stale.id});
-      // Without an explicit issuer, the authenticator app falls back to
-      // labeling the entry with whatever host the enroll() call was made
-      // from (e.g. "localhost" in dev, or the deployed origin) instead of
-      // a stable, recognizable name.
-      const {data,error} = await sb.auth.mfa.enroll({factorType:"totp", issuer:"PostTrack", friendlyName:"PostTrack"});
-      if(cancelled) return;
-      if(error){ setErr(error.message||"Could not start two-factor setup."); setLoading(false); return; }
-      setFactorId(data.id);
-      setQr(data.totp.qr_code);
-      setSecret(data.totp.secret);
-      setLoading(false);
-    })();
+    startEnroll(()=>cancelled);
     return ()=>{cancelled=true;};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
   const verify = async () => {
@@ -30151,7 +30160,10 @@ const MfaEnrollScreen = ({onDone}) => {
         {loading ? (
           <div style={{color:"#9ca3af",fontSize:16,padding:"20px 0"}}>Preparing setup…</div>
         ) : !factorId ? (
-          <div style={{color:"#ef4444",fontSize:15,marginBottom:16}}>{err}</div>
+          <>
+            <div style={{color:"#ef4444",fontSize:15,marginBottom:16}}>{err}</div>
+            <button onClick={()=>startEnroll()} style={AUTH_BUTTON(false)}>Try Again</button>
+          </>
         ) : (
           <>
             <div style={{fontSize:15,color:"#e2e8f0",marginBottom:10,lineHeight:1.5}}>
