@@ -15312,9 +15312,12 @@ ${conditions}`;
       const m = String(originalStr || "").match(/T.*/);
       return newDayStr + (m ? m[0] : "");
     };
-    const computeDateChangeForDel = (del, newDayStr) => {
+    const computeDateChangeForDel = (del, newDayStr, project) => {
       if (!del.deadline) return null;
       const deadlineDayStr = fmtDay(parseLocalDT(del.deadline));
+      const startBound = getDeliverableStartDate(del, project);
+      const startDayStr = startBound ? fmtDay(startBound) : null;
+      if (startDayStr && newDayStr < startDayStr) return { type: "start-earlier", oldDay: startDayStr };
       if (newDayStr === deadlineDayStr) return null;
       return newDayStr > deadlineDayStr ? { type: "push", oldDay: deadlineDayStr } : { type: "shorten", oldDay: deadlineDayStr };
     };
@@ -15326,7 +15329,7 @@ ${conditions}`;
       delIds.forEach((delId) => {
         const del = (project.deliverables || []).find((d) => d.id === delId);
         if (!del) return;
-        const change = computeDateChangeForDel(del, newDayStr);
+        const change = computeDateChangeForDel(del, newDayStr, project);
         if (change) items.push({ delId, delName: del.title || del.name || "Deliverable", status: del.status || "Not Started", ...change });
       });
       if (items.length) setExtendPrompt({ projectId: project.id, memberId, memberName, newDay: newDayStr, items });
@@ -15340,11 +15343,14 @@ ${conditions}`;
         return;
       }
       const byId = new Map(items.map((it) => [it.delId, it]));
-      const newDels = (project.deliverables || []).map(
-        (d) => byId.has(d.id) ? { ...d, deadline: withNewDatePart(d.deadline, newDay) } : d
-      );
+      const newDels = (project.deliverables || []).map((d) => {
+        const it = byId.get(d.id);
+        if (!it) return d;
+        return it.type === "start-earlier" ? { ...d, startDate: withNewDatePart(d.startDate || newDay, newDay) } : { ...d, deadline: withNewDatePart(d.deadline, newDay) };
+      });
       onUpdateProject(projectId, "deliverables", newDels);
-      showToast(items.length > 1 ? `${items.length} deadlines updated \u2713` : items[0].type === "push" ? "Deadline pushed \u2713" : "Deadline moved earlier \u2713");
+      const msg = items.length > 1 ? `${items.length} dates updated \u2713` : items[0].type === "push" ? "Deadline pushed \u2713" : items[0].type === "start-earlier" ? "Start date moved earlier \u2713" : "Deadline moved earlier \u2713";
+      showToast(msg);
       setExtendPrompt(null);
     };
     const weekStart = (0, import_react.useMemo)(() => addWeeks(getWeekStart(/* @__PURE__ */ new Date()), weekOffset), [weekOffset]);
@@ -15483,7 +15489,7 @@ ${conditions}`;
             },
             style: { padding: "7px", borderLeft: "1px solid #1f2937", background: isCellDropTarget ? "#6366f122" : isBlocked ? "#1a1005" : isWknd ? "#0a0c1320" : "transparent", display: "flex", flexDirection: "column", gap: 5, minHeight: 64, position: "relative", outline: isCellDropTarget ? "2px dashed #6366f1" : "none", outlineOffset: -2 }
           },
-          isCellDropTarget && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 2, left: 2, right: 2, fontSize: 10, color: "#818cf8", fontWeight: 800, textTransform: "uppercase", textAlign: "center", pointerEvents: "none", zIndex: 2 } }, dragItem?.fromMemberId === member.id ? "Drop to adjust deadline" : `Hand off from ${dragItem?.fromDay ? (/* @__PURE__ */ new Date(dragItem.fromDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}`),
+          isCellDropTarget && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 2, left: 2, right: 2, fontSize: 10, color: "#818cf8", fontWeight: 800, textTransform: "uppercase", textAlign: "center", pointerEvents: "none", zIndex: 2 } }, dragItem?.fromMemberId === member.id ? "Drop to adjust start/deadline" : `Hand off from ${dragItem?.fromDay ? (/* @__PURE__ */ new Date(dragItem.fromDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}`),
           isBlocked && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", inset: 0, background: "repeating-linear-gradient(45deg,#f59e0b08,#f59e0b08 4px,transparent 4px,transparent 12px)", pointerEvents: "none", borderRadius: 0 } }),
           isBlocked && groups.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#f59e0b80", fontFamily: "'Barlow Condensed',sans-serif", textTransform: "uppercase", letterSpacing: "0.04em", textAlign: "center", paddingTop: 6 } }, "Away"),
           groups.map(({ project, dels }) => {
@@ -15508,7 +15514,7 @@ ${conditions}`;
                 onMouseEnter: (e) => e.currentTarget.style.background = "#1a2035",
                 onMouseLeave: (e) => e.currentTarget.style.background = "#111827"
               },
-              /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#c4c9d4", lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: project.name }, project.name), dels.length > 1 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, dels.length, " deliverables"), project._segments?.length > 1 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#f59e0b", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "\u21C4 Project-level handoff active")),
+              /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#c4c9d4", lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: project.name }, project.name), dels.length > 1 ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, dels.length, " deliverables") : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#8e97a6", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: dels[0].title || dels[0].name }, dels[0].title || dels[0].name), project._segments?.length > 1 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#f59e0b", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "\u21C4 Project-level handoff active")),
               /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#838ba0", flexShrink: 0, alignSelf: "flex-start" } }, isOpen ? "\u25B4" : "\u25BE")
             ), isOpen && /* @__PURE__ */ React.createElement("div", { style: { background: "#0d1117", borderTop: "1px solid #1f2937" } }, dels.map((del, dli) => {
               const ws = getWorkflowState(del);
@@ -15616,7 +15622,7 @@ ${conditions}`;
           })
         );
       }));
-    }), displayed.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 60, color: "#838ba0" } }, "No editors or animators found."))), extendPrompt && /* @__PURE__ */ React.createElement(Modal, { onClose: () => setExtendPrompt(null), maxWidth: 460 }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 20, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, extendPrompt.items.length > 1 ? `Update ${extendPrompt.items.length} deadlines?` : extendPrompt.items[0].type === "push" ? "Push deadline?" : "Move deadline earlier?"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#9ca3af", marginBottom: 14, lineHeight: 1.5 } }, "For ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, extendPrompt.memberName), ", on ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, (/* @__PURE__ */ new Date(extendPrompt.newDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" })), ":"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 20, maxHeight: 260, overflowY: "auto" } }, extendPrompt.items.map((it) => /* @__PURE__ */ React.createElement("div", { key: it.delId, style: { display: "flex", alignItems: "center", gap: 10, background: "#111827", border: "1px solid #1f2937", borderRadius: 7, padding: "8px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, it.delName), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#8e97a6", marginTop: 1 } }, it.status)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: it.type === "push" ? "#f59e0b" : "#818cf8", fontWeight: 700, flexShrink: 0, textAlign: "right", whiteSpace: "nowrap" } }, (/* @__PURE__ */ new Date(it.oldDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }), " \u2192 ", (/* @__PURE__ */ new Date(extendPrompt.newDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setExtendPrompt(null), style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "8px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer" } }, "Cancel"), /* @__PURE__ */ React.createElement(
+    }), displayed.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 60, color: "#838ba0" } }, "No editors or animators found."))), extendPrompt && /* @__PURE__ */ React.createElement(Modal, { onClose: () => setExtendPrompt(null), maxWidth: 460 }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 20, fontWeight: 900, color: "#f1f5f9", fontFamily: "'Barlow Condensed',sans-serif", marginBottom: 10 } }, extendPrompt.items.length > 1 ? `Update ${extendPrompt.items.length} dates?` : extendPrompt.items[0].type === "push" ? "Push deadline?" : extendPrompt.items[0].type === "start-earlier" ? "Move start date earlier?" : "Move deadline earlier?"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#9ca3af", marginBottom: 14, lineHeight: 1.5 } }, "For ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, extendPrompt.memberName), ", on ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#e2e8f0" } }, (/* @__PURE__ */ new Date(extendPrompt.newDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" })), ":"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 20, maxHeight: 260, overflowY: "auto" } }, extendPrompt.items.map((it) => /* @__PURE__ */ React.createElement("div", { key: it.delId, style: { display: "flex", alignItems: "center", gap: 10, background: "#111827", border: "1px solid #1f2937", borderRadius: 7, padding: "8px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, it.delName), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#8e97a6", marginTop: 1 } }, it.status)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: it.type === "push" ? "#f59e0b" : it.type === "start-earlier" ? "#34d399" : "#818cf8", fontWeight: 700, flexShrink: 0, textAlign: "right", whiteSpace: "nowrap" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: "0.04em", opacity: 0.8 } }, it.type === "start-earlier" ? "Start" : "Deadline"), (/* @__PURE__ */ new Date(it.oldDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }), " \u2192 ", (/* @__PURE__ */ new Date(extendPrompt.newDay + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" }))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setExtendPrompt(null), style: { background: "#1f2937", border: "1px solid #374151", borderRadius: 7, color: "#9ca3af", padding: "8px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer" } }, "Cancel"), /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: confirmExtendPrompt,

@@ -22214,9 +22214,10 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
   // other than the one they were picked up from, offers to push/shorten
   // their deadline instead of a (meaningless) same-person handoff — see
   // trySamePersonDateChange. Holds {projectId, memberId, memberName,
-  // newDay, items:[{delId, delName, status, type:"push"|"shorten",
-  // oldDay}]} while awaiting confirmation — one combined prompt covers
-  // every dragged deliverable, since a group chip can carry several.
+  // newDay, items:[{delId, delName, status,
+  // type:"push"|"shorten"|"start-earlier", oldDay}]} while awaiting
+  // confirmation — one combined prompt covers every dragged deliverable,
+  // since a group chip can carry several.
   const [extendPrompt, setExtendPrompt]   = useState(null);
   // Weekdays-only by default — 5 columns instead of 7 gives each one real
   // room, so a project code reads on one line without truncating or
@@ -22303,16 +22304,24 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
 
   // Dropping deliverables back on their OWN row (same person), on a day
   // other than the one they were dragged from, doesn't fit the handoff
-  // model above — it's a deadline move instead: dropped past the current
-  // deadline offers to push it out, dropped earlier than the current
-  // deadline offers to pull it in. Dropped right back on the deadline day
-  // itself (or wherever it started from, if that's different) is a silent
-  // no-op. Works for the whole dragged group at once — each deliverable's
-  // own current deadline decides its own push/shorten, and one combined
-  // confirmation covers all of them.
-  const computeDateChangeForDel = (del, newDayStr) => {
+  // model above — it's a date move instead, and which end moves depends on
+  // where the dropped day falls relative to the deliverable's current
+  // window:
+  //  - after the deadline        → push the deadline out
+  //  - before the start boundary → pull the start date earlier (only
+  //    possible when there IS a start boundary — a per-deliverable
+  //    startDate, or inherited from the project's Post Start Date; with
+  //    neither, there's nothing to compare against and this case can't fire)
+  //  - anywhere else (inside the window) → pull the deadline in — this is
+  //    unchanged from the original behavior, kept exactly as the user
+  //    explicitly asked for before start dates existed.
+  // Dropped right back on a boundary day itself is a silent no-op.
+  const computeDateChangeForDel = (del, newDayStr, project) => {
     if(!del.deadline) return null;
     const deadlineDayStr = fmtDay(parseLocalDT(del.deadline));
+    const startBound = getDeliverableStartDate(del, project);
+    const startDayStr = startBound ? fmtDay(startBound) : null;
+    if(startDayStr && newDayStr<startDayStr) return {type:"start-earlier", oldDay:startDayStr};
     if(newDayStr===deadlineDayStr) return null;
     return newDayStr>deadlineDayStr
       ? {type:"push", oldDay:deadlineDayStr}
@@ -22327,7 +22336,7 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
     delIds.forEach(delId=>{
       const del = (project.deliverables||[]).find(d=>d.id===delId);
       if(!del) return;
-      const change = computeDateChangeForDel(del, newDayStr);
+      const change = computeDateChangeForDel(del, newDayStr, project);
       if(change) items.push({delId, delName:del.title||del.name||"Deliverable", status:del.status||"Not Started", ...change});
     });
     if(items.length) setExtendPrompt({projectId:project.id, memberId, memberName, newDay:newDayStr, items});
@@ -22341,11 +22350,24 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
     const project = projects.find(p=>p.id===projectId);
     if(!project){ setExtendPrompt(null); return; }
     const byId = new Map(items.map(it=>[it.delId, it]));
-    const newDels = (project.deliverables||[]).map(d=>
-      byId.has(d.id) ? {...d, deadline:withNewDatePart(d.deadline, newDay)} : d
-    );
+    const newDels = (project.deliverables||[]).map(d=>{
+      const it = byId.get(d.id);
+      if(!it) return d;
+      // start-earlier writes the deliverable's OWN startDate — even when
+      // the current boundary it's being pulled earlier than came from the
+      // project's Post Start Date rather than an existing override — since
+      // that's the field that lets this one deliverable diverge from here on.
+      return it.type==="start-earlier"
+        ? {...d, startDate: withNewDatePart(d.startDate||newDay, newDay)}
+        : {...d, deadline: withNewDatePart(d.deadline, newDay)};
+    });
     onUpdateProject(projectId,"deliverables",newDels);
-    showToast(items.length>1 ? `${items.length} deadlines updated ✓` : (items[0].type==="push"?"Deadline pushed ✓":"Deadline moved earlier ✓"));
+    const msg = items.length>1
+      ? `${items.length} dates updated ✓`
+      : items[0].type==="push" ? "Deadline pushed ✓"
+      : items[0].type==="start-earlier" ? "Start date moved earlier ✓"
+      : "Deadline moved earlier ✓";
+    showToast(msg);
     setExtendPrompt(null);
   };
 
@@ -22554,7 +22576,7 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
                       {isCellDropTarget&&(
                         <div style={{position:"absolute",top:2,left:2,right:2,fontSize:10,color:"#818cf8",fontWeight:800,textTransform:"uppercase",textAlign:"center",pointerEvents:"none",zIndex:2}}>
                           {dragItem?.fromMemberId===member.id
-                            ? "Drop to adjust deadline"
+                            ? "Drop to adjust start/deadline"
                             : `Hand off from ${dragItem?.fromDay?new Date(dragItem.fromDay+'T12:00').toLocaleDateString("en-US",{month:"short",day:"numeric"}):""}`}
                         </div>
                       )}
@@ -22585,7 +22607,12 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
                               onMouseLeave={e=>e.currentTarget.style.background="#111827"}>
                               <div style={{flex:1,minWidth:0}}>
                                 <div style={{fontSize:14,fontWeight:700,color:"#c4c9d4",lineHeight:1.35,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={project.name}>{project.name}</div>
-                                {dels.length>1&&<div style={{fontSize:13,color:"#8e97a6",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{dels.length} deliverables</div>}
+                                {/* A single deliverable is worth naming right on the
+                                    collapsed chip — "3 deliverables" is only useful
+                                    as a count when there's more than one to count. */}
+                                {dels.length>1
+                                  ? <div style={{fontSize:13,color:"#8e97a6",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{dels.length} deliverables</div>
+                                  : <div style={{fontSize:13,color:"#8e97a6",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={dels[0].title||dels[0].name}>{dels[0].title||dels[0].name}</div>}
                                 {project._segments?.length>1&&<div style={{fontSize:12,color:"#f59e0b",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⇄ Project-level handoff active</div>}
                               </div>
                               <span style={{fontSize:14,color:"#838ba0",flexShrink:0,alignSelf:"flex-start"}}>{isOpen?"▴":"▾"}</span>
@@ -22716,7 +22743,7 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
       {extendPrompt&&(
         <Modal onClose={()=>setExtendPrompt(null)} maxWidth={460}>
           <div style={{fontSize:20,fontWeight:900,color:"#f1f5f9",fontFamily:"'Barlow Condensed',sans-serif",marginBottom:10}}>
-            {extendPrompt.items.length>1 ? `Update ${extendPrompt.items.length} deadlines?` : (extendPrompt.items[0].type==="push"?"Push deadline?":"Move deadline earlier?")}
+            {extendPrompt.items.length>1 ? `Update ${extendPrompt.items.length} dates?` : (extendPrompt.items[0].type==="push"?"Push deadline?":extendPrompt.items[0].type==="start-earlier"?"Move start date earlier?":"Move deadline earlier?")}
           </div>
           <div style={{fontSize:15,color:"#9ca3af",marginBottom:14,lineHeight:1.5}}>
             For <strong style={{color:"#e2e8f0"}}>{extendPrompt.memberName}</strong>, on <strong style={{color:"#e2e8f0"}}>{new Date(extendPrompt.newDay+'T12:00').toLocaleDateString("en-US",{month:"short",day:"numeric"})}</strong>:
@@ -22728,7 +22755,8 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
                   <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.delName}</div>
                   <div style={{fontSize:12,color:"#8e97a6",marginTop:1}}>{it.status}</div>
                 </div>
-                <div style={{fontSize:12,color:it.type==="push"?"#f59e0b":"#818cf8",fontWeight:700,flexShrink:0,textAlign:"right",whiteSpace:"nowrap"}}>
+                <div style={{fontSize:12,color:it.type==="push"?"#f59e0b":it.type==="start-earlier"?"#34d399":"#818cf8",fontWeight:700,flexShrink:0,textAlign:"right",whiteSpace:"nowrap"}}>
+                  <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.04em",opacity:0.8}}>{it.type==="start-earlier"?"Start":"Deadline"}</div>
                   {new Date(it.oldDay+'T12:00').toLocaleDateString("en-US",{month:"short",day:"numeric"})} → {new Date(extendPrompt.newDay+'T12:00').toLocaleDateString("en-US",{month:"short",day:"numeric"})}
                 </div>
               </div>
