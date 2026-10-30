@@ -15205,7 +15205,7 @@ ${conditions}`;
       const s = del._segments.find((s2) => !s2.from);
       return s?.editorId ?? del._segments[0]?.editorId ?? projEditors[0] ?? null;
     }
-    return del._editorId ?? (projEditors[0] ?? null);
+    return del._editorId ?? del.editorId ?? del.animatorId ?? (projEditors[0] ?? null);
   };
   var segEditorForDay = (del, dayStr, projEditors) => {
     if (del._segments?.length) {
@@ -15214,7 +15214,7 @@ ${conditions}`;
       }
       return null;
     }
-    return del._editorId ?? (projEditors[0] ?? null);
+    return del._editorId ?? del.editorId ?? del.animatorId ?? (projEditors[0] ?? null);
   };
   var fmtSegRange = (from, to) => {
     const fmt = (d) => !d ? null : (/* @__PURE__ */ new Date(d + "T12:00")).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -15254,14 +15254,14 @@ ${conditions}`;
         }
         return null;
       }
-      return del._editorId ?? (projEditors[0] ?? null);
+      return del._editorId ?? del.editorId ?? del.animatorId ?? (projEditors[0] ?? null);
     };
     const primaryEditorId = (del, projEditors) => {
       if (del._segments?.length) {
         const s = del._segments.find((s2) => !s2.from);
         return s?.editorId ?? del._segments[0]?.editorId ?? projEditors[0] ?? null;
       }
-      return del._editorId ?? (projEditors[0] ?? null);
+      return del._editorId ?? del.editorId ?? del.animatorId ?? (projEditors[0] ?? null);
     };
     const updateDeliverable = (projectId, delId, field, value) => {
       const project = projects.find((p) => p.id === projectId);

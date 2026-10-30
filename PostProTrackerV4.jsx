@@ -22019,7 +22019,15 @@ const segPrimaryId = (del, projEditors) => {
     const s = del._segments.find(s=>!s.from);
     return s?.editorId ?? del._segments[0]?.editorId ?? projEditors[0] ?? null;
   }
-  return del._editorId ?? (projEditors[0] ?? null);
+  // _editorId is this handoff system's own override, set only once a
+  // calendar-level reassignment has actually touched this deliverable —
+  // del.editorId/animatorId (set from the Deliverables tab, the project
+  // sidebar, or at creation) is the REAL assignment and has to come
+  // before the projEditors[0] guess, or every deliverable nobody's ever
+  // dragged on the calendar silently shows under whoever happens to be
+  // first in the project's Editor list instead of who it's actually
+  // assigned to.
+  return del._editorId ?? del.editorId ?? del.animatorId ?? (projEditors[0] ?? null);
 };
 
 // Get the editor assigned on a specific day (segment-aware)
@@ -22030,7 +22038,8 @@ const segEditorForDay = (del, dayStr, projEditors) => {
     }
     return null;
   }
-  return del._editorId ?? (projEditors[0] ?? null);
+  // Same fallback order as segPrimaryId above.
+  return del._editorId ?? del.editorId ?? del.animatorId ?? (projEditors[0] ?? null);
 };
 
 // Format a segment date range for display
@@ -22186,7 +22195,15 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
       }
       return null;
     }
-    return del._editorId ?? (projEditors[0]??null);
+    // _editorId is this handoff system's own override, only set once a
+    // calendar-level reassignment has touched this deliverable —
+    // del.editorId/animatorId (the real assignment, set from the
+    // Deliverables tab, the project sidebar, or at creation) has to come
+    // before the projEditors[0] guess, or every deliverable nobody's ever
+    // dragged on this calendar silently shows under whoever happens to be
+    // first in the project's Editor list instead of who it's actually
+    // assigned to.
+    return del._editorId ?? del.editorId ?? del.animatorId ?? (projEditors[0]??null);
   };
 
   // The original/primary owner of a deliverable (first segment with no from, or fallback)
@@ -22195,7 +22212,8 @@ const EditorCalendarView = ({projects, team, onUpdateProject, unavailability=[],
       const s = del._segments.find(s=>!s.from);
       return s?.editorId ?? del._segments[0]?.editorId ?? projEditors[0] ?? null;
     }
-    return del._editorId ?? (projEditors[0]??null);
+    // Same fallback order as editorForDay above.
+    return del._editorId ?? del.editorId ?? del.animatorId ?? (projEditors[0]??null);
   };
 
   const updateDeliverable = (projectId, delId, field, value) => {
