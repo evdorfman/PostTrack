@@ -8252,7 +8252,15 @@ Brief content: ${content}`;
           t
         );
       }))),
-      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 2 } }, (d.rounds || []).map((r, i) => /* @__PURE__ */ React.createElement("div", { key: i, title: `${r.label}: ${r.status}`, style: { width: 16, height: 16, borderRadius: "50%", background: RCOLOR[r.status] + "30", border: `1.5px solid ${RCOLOR[r.status]}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: RCOLOR[r.status] } }, i + 1))), editable ? /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement(
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 2 } }, (d.rounds || []).map((r, i) => /* @__PURE__ */ React.createElement("div", { key: i, title: `${r.label}: ${r.status}`, style: { width: 16, height: 16, borderRadius: "50%", background: RCOLOR[r.status] + "30", border: `1.5px solid ${RCOLOR[r.status]}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: RCOLOR[r.status] } }, i + 1))), editable ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#6b7280", flexShrink: 0 } }, "Start"), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "date",
+          value: d.startDate ? d.startDate.slice(0, 10) : "",
+          onChange: (e) => onUpdateDel(projectId, d.id, "startDate", e.target.value || null),
+          style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 5, color: d.startDate ? "#e2e8f0" : "#4b5563", padding: "2px 5px", fontSize: 12, outline: "none", cursor: "pointer", colorScheme: "dark", fontFamily: "inherit" }
+        }
+      )), /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#6b7280", flexShrink: 0 } }, "Due"), /* @__PURE__ */ React.createElement(
         "input",
         {
           type: "date",
@@ -8260,7 +8268,7 @@ Brief content: ${content}`;
           onChange: (e) => onUpdateDel(projectId, d.id, "deadline", e.target.value),
           style: { background: "#0a0f1a", border: "1px solid #1f2937", borderRadius: 5, color: d.deadline ? "#e2e8f0" : "#4b5563", padding: "2px 5px", fontSize: 12, outline: "none", cursor: "pointer", colorScheme: "dark", fontFamily: "inherit" }
         }
-      ), d.deadline && /* @__PURE__ */ React.createElement(Dl, { date: d.deadline, deliveredAt: d.deliveredAt })) : /* @__PURE__ */ React.createElement(Dl, { date: d.deadline, deliveredAt: d.deliveredAt }), editable && onDeleteDel && /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation() }, confirmDelete ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#f59e0b", fontWeight: 700 } }, "Delete?"), /* @__PURE__ */ React.createElement(
+      ), d.deadline && /* @__PURE__ */ React.createElement(Dl, { date: d.deadline, deliveredAt: d.deliveredAt }))) : /* @__PURE__ */ React.createElement(React.Fragment, null, d.startDate && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#6b7280" } }, "Starts ", fmtDate(d.startDate)), /* @__PURE__ */ React.createElement(Dl, { date: d.deadline, deliveredAt: d.deliveredAt })), editable && onDeleteDel && /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation() }, confirmDelete ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#f59e0b", fontWeight: 700 } }, "Delete?"), /* @__PURE__ */ React.createElement(
         "button",
         {
           onClick: () => {

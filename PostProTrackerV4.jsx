@@ -12440,12 +12440,25 @@ const DeliverableRow = ({
           ))}
         </div>
         {editable ? (
-          <div onClick={e=>e.stopPropagation()} style={{display:"flex",alignItems:"center",gap:5}}>
-            <input type="date" value={d.deadline||""} onChange={e=>onUpdateDel(projectId,d.id,"deadline",e.target.value)}
-              style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:5,color:d.deadline?"#e2e8f0":"#4b5563",padding:"2px 5px",fontSize:12,outline:"none",cursor:"pointer",colorScheme:"dark",fontFamily:"inherit"}}/>
-            {d.deadline&&<Dl date={d.deadline} deliveredAt={d.deliveredAt}/>}
-          </div>
-        ) : <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>}
+          <>
+            <div onClick={e=>e.stopPropagation()} style={{display:"flex",alignItems:"center",gap:4}}>
+              <span style={{fontSize:11,color:"#6b7280",flexShrink:0}}>Start</span>
+              <input type="date" value={d.startDate ? d.startDate.slice(0,10) : ""} onChange={e=>onUpdateDel(projectId,d.id,"startDate",e.target.value||null)}
+                style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:5,color:d.startDate?"#e2e8f0":"#4b5563",padding:"2px 5px",fontSize:12,outline:"none",cursor:"pointer",colorScheme:"dark",fontFamily:"inherit"}}/>
+            </div>
+            <div onClick={e=>e.stopPropagation()} style={{display:"flex",alignItems:"center",gap:5}}>
+              <span style={{fontSize:11,color:"#6b7280",flexShrink:0}}>Due</span>
+              <input type="date" value={d.deadline||""} onChange={e=>onUpdateDel(projectId,d.id,"deadline",e.target.value)}
+                style={{background:"#0a0f1a",border:"1px solid #1f2937",borderRadius:5,color:d.deadline?"#e2e8f0":"#4b5563",padding:"2px 5px",fontSize:12,outline:"none",cursor:"pointer",colorScheme:"dark",fontFamily:"inherit"}}/>
+              {d.deadline&&<Dl date={d.deadline} deliveredAt={d.deliveredAt}/>}
+            </div>
+          </>
+        ) : (
+          <>
+            {d.startDate&&<span style={{fontSize:12,color:"#6b7280"}}>Starts {fmtDate(d.startDate)}</span>}
+            <Dl date={d.deadline} deliveredAt={d.deliveredAt}/>
+          </>
+        )}
         {editable&&onDeleteDel&&(
           <div onClick={e=>e.stopPropagation()}>
             {confirmDelete
