@@ -22549,8 +22549,8 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       logActivity({ entityType: "team_member", entityLabel: updated.name, action: "updated", detail: "updated their own profile" });
     };
     (0, import_react.useEffect)(() => {
-      if (view === "admin" && !isAdmin) setView("projects");
-    }, [isAdmin, view]);
+      if (view === "admin" && teamRosterLoaded && authUser && !isAdmin) setView("projects");
+    }, [isAdmin, view, teamRosterLoaded, authUser]);
     (0, import_react.useEffect)(() => {
       if (view === "resources" && !canAccessTab("resourcing")) setView("projects");
     }, [view, isAdmin, tabLocks, currentMember]);

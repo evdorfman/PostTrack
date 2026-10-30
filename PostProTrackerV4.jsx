@@ -31851,8 +31851,13 @@ function App() {
   };
   // Admin-only nav tabs disappear entirely for non-admins (see VIEWS below);
   // this catches the case where an admin gets demoted mid-session while
-  // still sitting on that tab.
-  useEffect(()=>{ if(view==="admin" && !isAdmin) setView("projects"); },[isAdmin, view]);
+  // still sitting on that tab. Gated on teamRosterLoaded && authUser, not
+  // just isAdmin — on a fresh load/refresh landing directly on view=admin
+  // (restored from the URL), isAdmin starts out false simply because
+  // teamRoster/authUser haven't resolved yet, not because the person
+  // actually isn't an admin. Without this guard that false negative fired
+  // immediately and bounced every admin back to Projects on every refresh.
+  useEffect(()=>{ if(view==="admin" && teamRosterLoaded && authUser && !isAdmin) setView("projects"); },[isAdmin, view, teamRosterLoaded, authUser]);
   useEffect(()=>{ if(view==="resources" && !canAccessTab("resourcing")) setView("projects"); },[view, isAdmin, tabLocks, currentMember]);
 
   // Projects (the user's actual campaigns/deliverables) are the one collection
