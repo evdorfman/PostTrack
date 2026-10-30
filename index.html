@@ -20986,24 +20986,27 @@ Never delete without explicit confirmation. Be conversational and use studio ter
     const [err, setErr] = (0, import_react.useState)("");
     const [busy, setBusy] = (0, import_react.useState)(false);
     const [loading, setLoading] = (0, import_react.useState)(true);
+    const startEnroll = (0, import_react.useCallback)(async (isCancelled = () => false) => {
+      setLoading(true);
+      setErr("");
+      const { data: existing } = await sb.auth.mfa.listFactors();
+      const stale = (existing?.totp || []).filter((f) => f.status === "unverified");
+      for (const f of stale) await sb.auth.mfa.unenroll({ factorId: f.id });
+      const { data, error } = await sb.auth.mfa.enroll({ factorType: "totp", issuer: "PostTrack", friendlyName: "PostTrack" });
+      if (isCancelled()) return;
+      if (error) {
+        setErr(error.message || "Could not start two-factor setup.");
+        setLoading(false);
+        return;
+      }
+      setFactorId(data.id);
+      setQr(data.totp.qr_code);
+      setSecret(data.totp.secret);
+      setLoading(false);
+    }, []);
     (0, import_react.useEffect)(() => {
       let cancelled = false;
-      (async () => {
-        const { data: existing } = await sb.auth.mfa.listFactors();
-        const stale = (existing?.totp || []).find((f) => f.status === "unverified");
-        if (stale) await sb.auth.mfa.unenroll({ factorId: stale.id });
-        const { data, error } = await sb.auth.mfa.enroll({ factorType: "totp", issuer: "PostTrack", friendlyName: "PostTrack" });
-        if (cancelled) return;
-        if (error) {
-          setErr(error.message || "Could not start two-factor setup.");
-          setLoading(false);
-          return;
-        }
-        setFactorId(data.id);
-        setQr(data.totp.qr_code);
-        setSecret(data.totp.secret);
-        setLoading(false);
-      })();
+      startEnroll(() => cancelled);
       return () => {
         cancelled = true;
       };
@@ -21030,7 +21033,7 @@ Never delete without explicit confirmation. Be conversational and use studio ter
       }
       onDone();
     };
-    return /* @__PURE__ */ React.createElement("div", { style: AUTH_SCREEN_WRAP }, /* @__PURE__ */ React.createElement("div", { style: { ...AUTH_CARD, maxWidth: 420 } }, /* @__PURE__ */ React.createElement("div", { style: AUTH_TITLE }, "PostTrack"), /* @__PURE__ */ React.createElement("div", { style: AUTH_SUB }, "Two-factor authentication is required on every account. Set it up to continue."), loading ? /* @__PURE__ */ React.createElement("div", { style: { color: "#9ca3af", fontSize: 16, padding: "20px 0" } }, "Preparing setup\u2026") : !factorId ? /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 15, marginBottom: 16 } }, err) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#e2e8f0", marginBottom: 10, lineHeight: 1.5 } }, "1. Scan this with an authenticator app (Google Authenticator, Authy, 1Password, etc)."), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 10, padding: 12, marginBottom: 14, display: "flex", justifyContent: "center" } }, /* @__PURE__ */ React.createElement("img", { src: qr, alt: "Scan with your authenticator app", style: { maxWidth: "100%", height: "auto" } })), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af", marginBottom: 16, lineHeight: 1.5 } }, "Can't scan? Enter this code manually: ", /* @__PURE__ */ React.createElement("span", { style: { color: "#818cf8", fontFamily: "monospace", wordBreak: "break-all" } }, secret)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#e2e8f0", marginBottom: 8 } }, "2. Enter the 6-digit code it shows:"), /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { style: AUTH_SCREEN_WRAP }, /* @__PURE__ */ React.createElement("div", { style: { ...AUTH_CARD, maxWidth: 420 } }, /* @__PURE__ */ React.createElement("div", { style: AUTH_TITLE }, "PostTrack"), /* @__PURE__ */ React.createElement("div", { style: AUTH_SUB }, "Two-factor authentication is required on every account. Set it up to continue."), loading ? /* @__PURE__ */ React.createElement("div", { style: { color: "#9ca3af", fontSize: 16, padding: "20px 0" } }, "Preparing setup\u2026") : !factorId ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { color: "#ef4444", fontSize: 15, marginBottom: 16 } }, err), /* @__PURE__ */ React.createElement("button", { onClick: () => startEnroll(), style: AUTH_BUTTON(false) }, "Try Again")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#e2e8f0", marginBottom: 10, lineHeight: 1.5 } }, "1. Scan this with an authenticator app (Google Authenticator, Authy, 1Password, etc)."), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 10, padding: 12, marginBottom: 14, display: "flex", justifyContent: "center" } }, /* @__PURE__ */ React.createElement("img", { src: qr, alt: "Scan with your authenticator app", style: { maxWidth: "100%", height: "auto" } })), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#9ca3af", marginBottom: 16, lineHeight: 1.5 } }, "Can't scan? Enter this code manually: ", /* @__PURE__ */ React.createElement("span", { style: { color: "#818cf8", fontFamily: "monospace", wordBreak: "break-all" } }, secret)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#e2e8f0", marginBottom: 8 } }, "2. Enter the 6-digit code it shows:"), /* @__PURE__ */ React.createElement(
       "input",
       {
         value: code,
